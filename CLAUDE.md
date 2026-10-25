@@ -49,8 +49,9 @@ AI only ever see `NationView` from `fog.ts`. Balance numbers are authored in `pa
 
 ## Shipping contract
 
-Trunk-based: commit and push to `main` when `pnpm check`, the soak and e2e are green. GitHub Pages
-serves `main` root (currently the README, not the game).
+Trunk-based: commit and push to `main` when `pnpm check`, the soak and e2e are green. Every push to
+`main` runs `.github/workflows/pages.yml`: `pnpm check`, build `apps/web`, deploy to
+https://zacker3310.github.io/brink/.
 
 ## Method
 
