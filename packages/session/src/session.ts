@@ -13,29 +13,45 @@ export interface AdvanceResult {
 }
 
 /**
- * One match: the authoritative world, which nation the human plays (null for AI-only), and
- * what each AI remembers. The UI holds a session inside a worker and only ever receives views.
+ * One match: the authoritative world, which nations humans play (the first is the local player;
+ * none for AI-only), and what each AI remembers. The UI holds a session inside a worker and only
+ * ever receives views; in multiplayer the host's worker holds it and sends each seat its own.
  */
 export class GameSession {
   private constructor(
     private world: WorldState,
-    readonly playerNation: NationId | null,
+    readonly humans: readonly NationId[],
     private memory: Record<NationId, AiMemory>,
-    private history: TurnReport[],
+    private histories: Record<NationId, TurnReport[]>,
     private lastReports: Record<NationId, TurnReport>,
   ) {}
 
-  static create(scenarioId: string, seed: number, playerNation: NationId | null): GameSession {
+  /** `playerNation` is the local seat; `others` are further human seats (multiplayer, hotseat). */
+  static create(scenarioId: string, seed: number, playerNation: NationId | null, others: readonly NationId[] = []): GameSession {
     const world = createScenario(scenarioId, seed);
-    if (playerNation !== null && !world.nations[playerNation]) throw new Error(`no such nation: ${playerNation}`);
+    const humans = playerNation === null ? [] : [playerNation, ...others.filter((n) => n !== playerNation)];
+    for (const n of humans) if (!world.nations[n]) throw new Error(`no such nation: ${n}`);
+    if (new Set(humans).size !== humans.length) throw new Error('a nation can only have one human');
     const memory: Record<NationId, AiMemory> = {};
-    for (const n of sortedKeys(world.nations)) if (n !== playerNation) memory[n] = emptyMemory();
-    return new GameSession(world, playerNation, memory, [], {});
+    for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
+    return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});
   }
 
   static fromSave(save: SaveFile): GameSession {
-    const last = save.reports.at(-1);
-    return new GameSession(clone(save.world), save.playerNation, clone(save.aiMemory), clone(save.reports), last ? { [save.playerNation]: last } : {});
+    const humans = save.humans ?? [save.playerNation];
+    const histories: Record<NationId, TurnReport[]> = { ...clone(save.histories ?? {}), [save.playerNation]: clone(save.reports) };
+    const lastReports: Record<NationId, TurnReport> = {};
+    for (const n of humans) {
+      histories[n] ??= [];
+      const last = histories[n]!.at(-1);
+      if (last) lastReports[n] = last;
+    }
+    return new GameSession(clone(save.world), humans, clone(save.aiMemory), histories, lastReports);
+  }
+
+  /** The local seat, or null for an AI-only session. */
+  get playerNation(): NationId | null {
+    return this.humans[0] ?? null;
   }
 
   get turn(): number {
@@ -60,8 +76,8 @@ export class GameSession {
     return buildView(this.world, nation);
   }
 
-  reports(): TurnReport[] {
-    return clone(this.history);
+  reports(nation: NationId | null = this.playerNation): TurnReport[] {
+    return nation ? clone(this.histories[nation] ?? []) : [];
   }
 
   /** Validate without resolving: what the engine would reject in these orders. */
@@ -78,11 +94,15 @@ export class GameSession {
     return out;
   }
 
-  /** Lock the player's orders with every AI's, resolve the turn, and move on. */
-  advance(playerOrders: NationOrders | null = null): AdvanceResult {
+  /**
+   * Lock the humans' orders with every AI's, resolve the turn, and move on. A human seat with no
+   * submission holds. Orders for a nation that is not a human seat are ignored.
+   */
+  advance(humanOrders: NationOrders | readonly NationOrders[] | null = null): AdvanceResult {
     if (this.over) throw new Error('the match is over');
     const submissions = this.aiOrders();
-    if (playerOrders) submissions.push(playerOrders);
+    const given = humanOrders === null ? [] : Array.isArray(humanOrders) ? humanOrders : [humanOrders as NationOrders];
+    for (const o of given) if (this.humans.includes(o.nation)) submissions.push(o);
     const result = resolveTurn(this.world, submissions);
     this.world = result.world;
     for (const n of sortedKeys(this.memory)) {
@@ -90,8 +110,8 @@ export class GameSession {
       this.memory[n] = updateMemory(this.memory[n]!, result.observations[n]!, result.reports[n]!.events);
     }
     this.lastReports = result.reports;
-    if (this.playerNation) this.history.push(result.reports[this.playerNation]!);
-    const reports = this.playerNation ? { [this.playerNation]: result.reports[this.playerNation]! } : result.reports;
+    for (const n of this.humans) this.histories[n]!.push(result.reports[n]!);
+    const reports = this.humans.length ? Object.fromEntries(this.humans.map((n) => [n, result.reports[n]!])) : result.reports;
     return { reports, events: result.events, hash: result.hash };
   }
 
@@ -112,9 +132,12 @@ export class GameSession {
       savedAt,
       label,
       world: clone(this.world),
-      reports: clone(this.history),
+      reports: clone(this.histories[this.playerNation]!),
       aiMemory: clone(this.memory),
       hash: hashState(this.world),
+      ...(this.humans.length > 1
+        ? { humans: [...this.humans], histories: Object.fromEntries(this.humans.slice(1).map((n) => [n, clone(this.histories[n]!)])) }
+        : {}),
     };
   }
 }

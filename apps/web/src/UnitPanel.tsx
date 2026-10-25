@@ -6,7 +6,9 @@ import { engine } from './engine';
 import { UnitGlyph } from './glyphs';
 import { hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
+import { useNet } from './net/room';
 import { describeOrder, type Mode } from './planning';
+import { SeatBoard } from './RoomUi';
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
 
@@ -250,14 +252,18 @@ export function TurnControls() {
   const resolving = useGame((s) => s.resolving);
   const report = useGame((s) => s.report);
   const setShowReport = useGame((s) => s.setShowReport);
+  const playback = useGame((s) => s.playback);
+  const role = useNet((s) => s.role);
   const total = Object.keys(view.formations).length;
   const idle = idleFormations(view, draft.formations).length;
   const over = view.victory !== null;
   const idleCities = Object.values(view.sites).filter(
     (s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id),
   ).length;
+  const waitingOthers = role && role !== 'hotseat' && resolving && !playback;
   return (
     <div className="pointer-events-auto absolute right-3 bottom-3 z-10 flex w-56 flex-col items-stretch gap-1.5">
+      <SeatBoard />
       {report && (
         <button type="button" onClick={() => setShowReport(true)} data-testid="open-report" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
           📜 Turn {report.turn} summary
@@ -285,7 +291,7 @@ export function TurnControls() {
         data-testid="end-turn"
         className="end-turn relative overflow-hidden rounded-sm border-2 border-signal bg-gradient-to-b from-[#f2c06a] to-[#c98a2c] px-4 py-3 text-ink-950 shadow-[0_0_24px_rgba(224,168,74,0.35)] transition-all hover:brightness-110 disabled:opacity-60"
       >
-        <div className="font-display text-lg leading-none font-black tracking-wider uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
+        <div className="font-display text-lg leading-none font-black tracking-wider uppercase">{waitingOthers ? 'Waiting…' : resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
         <div className="font-display mt-1 text-[10px] font-bold tracking-[0.2em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
       </button>
       <Minimap />

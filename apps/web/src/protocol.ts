@@ -4,8 +4,19 @@ import type { AssaultPreview, StrikePreview } from '@brink/simulation';
 // Messages between the UI and the engine worker. The worker holds the authoritative world;
 // nothing that crosses this boundary is ever more than the player's own NationView.
 
+/** One seat's slice of the world: all a player, local or remote, ever receives. */
+export interface SeatState {
+  view: NationView;
+  report: TurnReport | null;
+  history: TurnReport[];
+}
+
 export type Request =
-  | { type: 'new'; seed: number; nation: NationId }
+  /** `others` are further human seats (multiplayer and hotseat); every other nation is AI. */
+  | { type: 'new'; seed: number; nation: NationId; others?: NationId[] }
+  | { type: 'stateFor'; nation: NationId }
+  /** Resolve the turn with every human seat's orders; returns each human seat's new state. */
+  | { type: 'resolve'; orders: NationOrders[] }
   | { type: 'load'; text: string }
   | { type: 'check'; orders: NationOrders }
   | { type: 'previewAssault'; attackers: string[]; target: string }
@@ -14,7 +25,8 @@ export type Request =
   | { type: 'save'; label: string; savedAt: string };
 
 export type Response =
-  | { type: 'state'; view: NationView; report: TurnReport | null; history: TurnReport[] }
+  | ({ type: 'state' } & SeatState)
+  | { type: 'resolved'; states: Record<NationId, SeatState> }
   | { type: 'checked'; rejected: GameEvent[] }
   | { type: 'assault'; preview: AssaultPreview | null }
   | { type: 'strike'; preview: StrikePreview | null }

@@ -3,6 +3,7 @@ import { readSlot } from '../saves';
 import { useGame } from '../store';
 import { Archive } from './Archive';
 import { Manual } from './Manual';
+import { Multiplayer } from './Multiplayer';
 import { Setup } from './Setup';
 import { Title, type MenuScreen } from './Title';
 
@@ -12,7 +13,15 @@ export function Menu() {
   const notify = useGame((s) => s.notify);
   const slots = useGame((s) => s.slots);
   const notices = useGame((s) => s.notices);
-  const [screen, setScreen] = useState<MenuScreen>('title');
+  // An invite link (?join=CODE) opens straight into the join form.
+  const [joinCode] = useState(() => {
+    try {
+      return new URLSearchParams(location.search).get('join')?.toUpperCase().slice(0, 5) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  });
+  const [screen, setScreen] = useState<MenuScreen>(joinCode ? 'multiplayer' : 'title');
   const back = () => setScreen('title');
 
   const load = (text: string) => void loadGame(text);
@@ -33,6 +42,7 @@ export function Menu() {
       {screen === 'setup' && <Setup onBack={back} onBegin={newGame} />}
       {screen === 'archive' && <Archive slots={slots} onBack={back} onLoad={load} onError={(t) => notify(t, 'error')} />}
       {screen === 'manual' && <Manual onBack={back} />}
+      {screen === 'multiplayer' && <Multiplayer onBack={back} initialCode={joinCode} />}
       <ul className="pointer-events-none fixed right-4 bottom-4 z-50 flex flex-col items-end gap-1.5" aria-live="polite">
         {notices.map((n) => (
           <li

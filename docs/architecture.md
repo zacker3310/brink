@@ -75,12 +75,25 @@ the planner reuses the engine's own `enterCost`, `movementAllowance` and `reacha
 map is a plan the validator accepts. Planned orders are amber, submitted orders white, last turn's fighting
 red. Saves are JSON strings in three localStorage slots or a file.
 
-## Multiplayer, later
+## Multiplayer
 
-Nothing here assumes one human. To add it: run `GameSession` behind Fastify, collect `NationOrders` per
-nation until a planning deadline, call `resolveTurn`, push each nation its own `observations[n]` and
-`reports[n]` over a WebSocket. Persist worlds and event logs in PostgreSQL (the world hash per turn makes
-replay verification cheap). Nothing in the engine changes.
+The host's browser is the server. `GameSession` takes several human seats (`create(scenario, seed,
+local, others)`); AIs play the empty ones. `apps/web/src/net/room.ts` runs the room:
+
+- **Online**: WebRTC data channels brokered by PeerJS's public signalling server; a five-letter room
+  code maps to the host's peer id. Guests connect straight to the host (no relay server; strict NATs
+  without TURN can fail to connect).
+- **Local** (`?net=local`): BroadcastChannel between tabs on one machine. Used by the e2e tests.
+- **Hotseat**: the same seats on one device, with an opaque curtain between players and each seat's
+  replay starting from the board that seat planned against.
+
+The host collects every human seat's `NationOrders`, resolves when all connected seats have locked (the
+host can force it; missing seats hold), and sends each guest only its own `SeatState` (view, report,
+history). Guests never hold the world, so they cannot see through fog. A guest that drops can rejoin
+with the same name and gets its seat back. Saves record every human seat (`SaveFile.humans`).
+
+A dedicated server (Fastify plus WebSocket, persistence, planning deadlines) would reuse the same
+`GameSession` and message shapes; nothing in the engine changes.
 
 ## Rejected alternatives
 

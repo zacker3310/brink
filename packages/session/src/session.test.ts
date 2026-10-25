@@ -36,4 +36,42 @@ describe('GameSession', () => {
     expect(() => parseSave(JSON.stringify(tampered))).toThrow(/corrupted/);
     expect(hashState(save.world)).toBe(save.hash);
   });
+
+  it('seats several humans: AIs play only the empty seats, every human gets a report', () => {
+    const s = GameSession.create(MERIDIAN_ID, 7, 'aster', ['korva']);
+    expect(s.humans).toEqual(['aster', 'korva']);
+    expect(s.aiOrders().map((o) => o.nation).sort()).toEqual(['drevan', 'selmar']);
+    const korva = s.view('korva');
+    expect(Object.values(korva.formations).every((f) => f.owner === 'korva')).toBe(true);
+    const fid = Object.keys(korva.formations).sort()[0]!;
+    const r = s.advance([
+      { nation: 'aster', turn: 1, formations: {}, recruit: [], diplomacy: [] },
+      { nation: 'korva', turn: 1, formations: { [fid]: { type: 'defend' } }, recruit: [], diplomacy: [] },
+    ]);
+    expect(Object.keys(r.reports).sort()).toEqual(['aster', 'korva']);
+    expect(s.view('korva').formations[fid]!.lastOrder).toBe('defend');
+    expect(s.reports('korva')).toHaveLength(1);
+    expect(s.reports('aster')).toHaveLength(1);
+  });
+
+  it('treats a human who submitted nothing as holding', () => {
+    const a = GameSession.create(MERIDIAN_ID, 9, 'aster', ['korva']);
+    const b = GameSession.create(MERIDIAN_ID, 9, 'aster', ['korva']);
+    a.advance([{ nation: 'aster', turn: 1, formations: {}, recruit: [], diplomacy: [] }]);
+    b.advance([
+      { nation: 'aster', turn: 1, formations: {}, recruit: [], diplomacy: [] },
+      { nation: 'korva', turn: 1, formations: {}, recruit: [], diplomacy: [] },
+    ]);
+    expect(a.hash).toBe(b.hash);
+  });
+
+  it('round-trips a multi-human save with every seat and its history', () => {
+    const s = GameSession.create(MERIDIAN_ID, 5, 'selmar', ['drevan']);
+    s.advance();
+    s.advance();
+    const loaded = GameSession.fromSave(parseSave(serializeSave(s.toSave('mp', '2026-10-25T12:00:00Z'))));
+    expect(loaded.humans).toEqual(['selmar', 'drevan']);
+    expect(loaded.reports('drevan')).toEqual(s.reports('drevan'));
+    expect(loaded.advance().hash).toBe(s.advance().hash);
+  });
 });

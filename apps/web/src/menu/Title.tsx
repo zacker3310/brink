@@ -5,7 +5,7 @@ import { latestSlot, type SlotInfo } from '../saves';
 import { Kbd, relativeTime, useKeys } from '../chrome';
 import { MapPreview } from './MapPreview';
 
-export type MenuScreen = 'title' | 'setup' | 'archive' | 'manual';
+export type MenuScreen = 'title' | 'setup' | 'archive' | 'manual' | 'multiplayer';
 
 const HEADLINES = [
   'VESSA — Free city council suspends the treaty assembly as columns mass on the basin road',
@@ -44,7 +44,8 @@ export function Title({ slots, go, onContinue }: { slots: SlotInfo[]; go: (s: Me
           },
         ]
       : []),
-    { id: 'new', label: 'New campaign', sub: `${scenario.name} · choose a nation and a seed`, go: () => go('setup') },
+    { id: 'new', label: 'New campaign', sub: `${scenario.name} · you against three AI powers`, go: () => go('setup') },
+    { id: 'multiplayer', label: 'Multiplayer', sub: 'Host friends online, join by code, or hotseat', go: () => go('multiplayer') },
     { id: 'load', label: 'Load campaign', sub: slots.length ? `${slots.length} saved operation${slots.length === 1 ? '' : 's'} on file` : 'Save slots and files', go: () => go('archive') },
     { id: 'manual', label: 'Field manual', sub: 'Turns, victory, units and terrain', go: () => go('manual') },
   ];

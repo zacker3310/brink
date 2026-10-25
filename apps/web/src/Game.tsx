@@ -9,7 +9,9 @@ import { netChange, selfLedger, turnClock } from './insight';
 import { HoverCard, ModeBanner, Toasts, ZoomControls } from './MapOverlays';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
+import { useNet } from './net/room';
 import { Notifications } from './Notifications';
+import { ChatOverlay, Curtain, RoomChip } from './RoomUi';
 import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
 import { useGame, type Tab } from './store';
@@ -23,7 +25,7 @@ const RES: [Resource, string][] = [
   ['food', 'Food'],
 ];
 
-function TopBar() {
+function TopBar({ onChat }: { onChat: () => void }) {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report);
   const toMenu = useGame((s) => s.toMenu);
@@ -32,6 +34,13 @@ function TopBar() {
   const animate = useGame((s) => s.animate);
   const setAnimate = useGame((s) => s.setAnimate);
   const [saving, setSaving] = useState(false);
+  const role = useNet((n) => n.role);
+  const leave = useNet((n) => n.leave);
+  const exit = () => {
+    if (role && role !== 'hotseat' && !window.confirm('Leave the war room? Your friends will see you go offline.')) return;
+    if (role) leave();
+    toMenu();
+  };
   const s = view.self;
   const ledger = selfLedger(view, report);
   const net = ledger ? netChange(ledger) : null;
@@ -44,8 +53,8 @@ function TopBar() {
       </div>
       <div className="flex items-center gap-2.5 border-r border-line px-4" style={{ background: `linear-gradient(90deg, ${s.color}1f, transparent)` }}>
         <Emblem color={s.color} government={s.government} className="h-7 w-7" />
-        <div className="leading-tight">
-          <div className="text-sm font-bold">{s.name}</div>
+        <div className="leading-tight whitespace-nowrap">
+          <div className="font-display text-base font-bold tracking-wide uppercase">{s.name}</div>
           <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: s.color }}>
             {GOVERNMENTS[s.government].name}
           </div>
@@ -101,11 +110,12 @@ function TopBar() {
           aria-pressed={animate}
           data-testid="toggle-replay"
           title="Replay each resolved turn on the map before the report"
-          className={`border px-2 py-1.5 text-[11px] ${animate ? 'border-signal/50 text-signal' : 'border-line text-faint'} hover:border-faint`}
+          className={`border px-2 py-1.5 text-[11px] whitespace-nowrap ${animate ? 'border-signal/50 text-signal' : 'border-line text-faint'} hover:border-faint`}
         >
           Replay {animate ? 'on' : 'off'}
         </button>
-        <div className="relative">
+        <RoomChip onChat={onChat} />
+        <div className={`relative ${role === 'guest' ? 'hidden' : ''}`}>
           <button type="button" onClick={() => setSaving(!saving)} disabled={resolving} data-testid="save-menu" className="border border-line px-2.5 py-1.5 text-xs hover:border-faint disabled:opacity-40">
             Save
           </button>
@@ -129,7 +139,7 @@ function TopBar() {
             </div>
           )}
         </div>
-        <button type="button" onClick={toMenu} className="border border-line px-2.5 py-1.5 text-xs text-muted hover:border-faint hover:text-text">
+        <button type="button" onClick={exit} className="border border-line px-2.5 py-1.5 text-xs text-muted hover:border-faint hover:text-text">
           Menu
         </button>
       </div>
@@ -308,7 +318,7 @@ function VictoryOverlay() {
   );
 }
 
-function useShortcuts(toggleHelp: () => void) {
+function useShortcuts(toggleHelp: () => void, openChat: () => void) {
   const s = useGame;
   useKeys((e) => {
     const g = s.getState();
@@ -334,6 +344,10 @@ function useShortcuts(toggleHelp: () => void) {
     const k = e.key.toLowerCase();
     const tab = Number(e.key);
     if (e.key === '?') toggleHelp();
+    else if (e.key === 't' && useNet.getState().role && useNet.getState().role !== 'hotseat') {
+      e.preventDefault();
+      openChat();
+    }
     else if (tab >= 1 && tab <= TABS.length) g.setTab(TABS[tab - 1]![0]);
     else if (e.key === 'Tab') {
       e.preventDefault();
@@ -362,10 +376,14 @@ function useShortcuts(toggleHelp: () => void) {
 export function Game() {
   const showReport = useGame((s) => s.showReport);
   const [help, setHelp] = useState(false);
-  useShortcuts(() => setHelp((h) => !h));
+  const [chat, setChat] = useState(false);
+  useShortcuts(
+    () => setHelp((h) => !h),
+    () => setChat(true),
+  );
   return (
     <div className="grid h-full grid-rows-[auto_1fr] bg-ink-950">
-      <TopBar />
+      <TopBar onChat={() => setChat(!chat)} />
       <div className="flex min-h-0">
         <LeftRail />
         <div className="map-stage relative min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="map">
@@ -382,10 +400,12 @@ export function Game() {
           <CityPanel />
           <Toasts />
           {help && <KeyHelp onClose={() => setHelp(false)} />}
+          <ChatOverlay open={chat} onClose={() => setChat(false)} />
           <VictoryOverlay />
         </div>
       </div>
       {showReport && <Report />}
+      <Curtain />
     </div>
   );
 }

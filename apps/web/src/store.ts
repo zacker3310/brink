@@ -16,8 +16,9 @@ import type {
 } from '@brink/contracts';
 import { engine } from './engine';
 import { idleFormations } from './insight';
+import { useNet } from './net/room';
 import type { Mode } from './planning';
-import type { Response } from './protocol';
+import type { Response, SeatState } from './protocol';
 import { listSlots, readPrefs, writePrefs, writeSlot, type SlotInfo } from './saves';
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy';
@@ -80,6 +81,10 @@ interface State {
   /** Apply the turn being replayed and open its report. Also used to skip the replay. */
   finishPlayback(): void;
   setAnimate(on: boolean): void;
+  /** Show a seat's state as the start of planning (new game, joined room, hotseat seat). */
+  enterGame(state: SeatState): void;
+  /** A resolved turn arrived for this seat: replay it from `before` (default: the current view). */
+  receiveTurn(state: SeatState, before?: NationView): void;
   /** Give an order from the map or unit panel, then move on to the next unit without orders. */
   issueOrder(id: FormationId, order: FormationOrder): void;
   openCity(id: string | null): void;
@@ -140,7 +145,8 @@ export const useGame = create<State>((set, get) => {
   /** Ask the engine what it would reject in the current draft. */
   const recheck = async () => {
     const d = get().draft;
-    if (!d) return;
+    // A guest has no world to check against; the host validates when the turn resolves.
+    if (!d || useNet.getState().role === 'guest') return;
     const r = await engine.call({ type: 'check', orders: d });
     if (r.type === 'checked') set({ rejected: r.rejected });
   };
@@ -257,6 +263,11 @@ export const useGame = create<State>((set, get) => {
       const { draft, resolving } = get();
       if (!draft || resolving) return;
       set({ submitted: structuredClone(draft), resolving: true });
+      // In a room the turn resolves when every seat is in; the result comes back via receiveTurn.
+      if (useNet.getState().role) {
+        useNet.getState().lockLocal(structuredClone(draft));
+        return;
+      }
       const r = await engine.call({ type: 'submit', orders: draft });
       const before = get().view;
       // Replay the turn on the old board first when there is something to see.
@@ -274,6 +285,22 @@ export const useGame = create<State>((set, get) => {
       set({ playback: null, resolving: false });
       apply(pb.result);
       afterResolve();
+    },
+    enterGame(state) {
+      set({ playback: null, resolving: false, showReport: false, selectedFormation: null, selectedCity: null, dismissed: [], panelOpen: false });
+      apply({ type: 'state', ...state });
+      get().nextIdle();
+    },
+    receiveTurn(state, before) {
+      const from = before ?? get().view;
+      const result = { type: 'state' as const, ...state };
+      if (from && get().animate && state.report && state.report.events.some(isVisual)) {
+        // Show the seat's own pre-turn board (hotseat may be coming from another player's).
+        set({ view: from, draft: freshDraft(from), submitted: null, selectedFormation: null, selectedCity: null, playback: { before: from, events: state.report.events, result, phase: 'movement' }, resolving: true });
+        return;
+      }
+      set({ resolving: false, playback: null });
+      if (apply(result)) afterResolve();
     },
     issueOrder(id, order) {
       get().setOrder(id, order);

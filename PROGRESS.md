@@ -56,6 +56,12 @@ Updated 2026-10-25. Milestone 1 (first playable).
   population, VP and production that open a production picker; turn results as notification icons
   on the right edge, full summary on demand; terrain art (forests, hills, snow-capped mountains,
   towns, connected rivers, coasts) and Civ-thick borders.
+- Design system (`docs/design-system.md`): NATO APP-6 unit symbols via milsymbol, IBM Plex and
+  Barlow Condensed (self-hosted), tokenized palette with APP-6 affiliation colours, grain panels.
+- Multiplayer: host a room (WebRTC via PeerJS, five-letter code, invite links), join, lobby with seats,
+  callsigns and chat, host-authoritative turns where each guest only receives its own view, seat
+  status, force-resolve, rejoin by name; hotseat on one device behind a curtain. Engine: multi-human
+  `GameSession` and saves.
 - Turn replay: before the report, the map replays the resolved turn on the pre-turn board: all
   movement at once, then strike tracers, battle flashes and floating losses, then retreats,
   destroyed formations and site captures. Built only from events the player could see. Skip with
@@ -68,7 +74,8 @@ Updated 2026-10-25. Milestone 1 (first playable).
   defender lethality, victory share.
 - No save-file export button in the UI yet (load from file exists).
 - Report has no per-turn history browser; past reports are kept in the save.
-- Multiplayer: not started (see architecture.md).
+- Multiplayer: no turn timer yet, no TURN relay for strict NATs, a loaded multi-human save resumes
+  single-player (other seats hold), guests cannot save.
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
 ## Blockers
@@ -78,5 +85,5 @@ None.
 ## Next recommended tasks
 
 1. Balance pass driven by the soak's ending distribution.
-3. Export save to file; report history.
-4. Multiplayer seam: Fastify session host with a planning deadline and per-nation WebSocket views.
+2. Export save to file; report history.
+3. Multiplayer: planning timer, hand a dropped seat to the AI, resume a multi-human save as a room.

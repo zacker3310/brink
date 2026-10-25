@@ -30,6 +30,10 @@ export function parseSave(text: string): SaveFile {
   if (!SCENARIOS.some((sc) => sc.id === s.scenarioId)) throw new SaveError(`unknown scenario ${s.scenarioId}`);
   if (!s.world || s.world.rulesetVersion !== RULESET_VERSION || s.world.scenarioId !== s.scenarioId) throw new SaveError('save world does not match its header');
   if (!s.playerNation || !s.world.nations[s.playerNation]) throw new SaveError('save names a player nation that does not exist');
+  if (s.humans !== undefined) {
+    if (!Array.isArray(s.humans) || s.humans[0] !== s.playerNation) throw new SaveError('save lists human seats that do not start with the player');
+    if (new Set(s.humans).size !== s.humans.length || s.humans.some((n) => !s.world!.nations[n])) throw new SaveError('save lists an unknown or repeated human seat');
+  }
   if (hashState(s.world) !== s.hash) throw new SaveError('save is corrupted: world hash does not match');
   return s as SaveFile;
 }

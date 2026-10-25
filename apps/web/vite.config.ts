@@ -7,7 +7,20 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
   worker: { format: 'es' },
-  // PixiJS alone is ~450 kB minified; one chunk is fine for a desktop game.
-  build: { chunkSizeWarningLimit: 900 },
+  build: {
+    chunkSizeWarningLimit: 900,
+    // Vendor code changes rarely: split it out so it caches across deploys and loads in parallel.
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'pixi', test: /node_modules[\\/].*pixi/ },
+            { name: 'milsymbol', test: /node_modules[\\/].*milsymbol/ },
+            { name: 'react', test: /node_modules[\\/].*(react|scheduler|zustand)/ },
+          ],
+        },
+      },
+    },
+  },
   server: { port: 5173 },
 });

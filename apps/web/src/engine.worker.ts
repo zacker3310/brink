@@ -2,19 +2,23 @@
 import { MERIDIAN_ID } from '@brink/scenarios';
 import { GameSession, parseSave, serializeSave } from '@brink/session';
 import { previewAssault, previewStrike } from '@brink/simulation';
-import type { Envelope, Request, Response } from './protocol';
+import type { Envelope, Request, Response, SeatState } from './protocol';
 
 let session: GameSession | null = null;
 
-function state(): Response {
+function seat(nation: string | null = session!.playerNation): SeatState {
   const s = session!;
-  return { type: 'state', view: s.view(), report: s.lastReport(), history: s.reports() };
+  return { view: s.view(nation), report: s.lastReport(nation), history: s.reports(nation) };
+}
+
+function state(nation?: string): Response {
+  return { type: 'state', ...seat(nation) };
 }
 
 function handle(req: Request): Response {
   switch (req.type) {
     case 'new':
-      session = GameSession.create(MERIDIAN_ID, req.seed, req.nation);
+      session = GameSession.create(MERIDIAN_ID, req.seed, req.nation, req.others ?? []);
       return state();
     case 'load':
       session = GameSession.fromSave(parseSave(req.text));
@@ -31,6 +35,13 @@ function handle(req: Request): Response {
     case 'submit':
       session.advance(req.orders);
       return state();
+    case 'stateFor':
+      return state(req.nation);
+    case 'resolve': {
+      session.advance(req.orders);
+      const s = session;
+      return { type: 'resolved', states: Object.fromEntries(s.humans.map((n) => [n, seat(n)])) };
+    }
     case 'save':
       return { type: 'saved', text: serializeSave(session.toSave(req.label, req.savedAt)), turn: session.turn };
   }

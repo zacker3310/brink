@@ -416,6 +416,10 @@ export interface SaveFile {
   reports: TurnReport[];
   aiMemory: Record<NationId, AiMemory>;
   hash: string;
+  /** Every human seat, `playerNation` first. Absent in single-player saves. */
+  humans?: NationId[];
+  /** Report history per human seat beyond `playerNation`. */
+  histories?: Record<NationId, TurnReport[]>;
 }
 
 /** What an AI nation remembers between turns. Built only from its own views and reports. */
