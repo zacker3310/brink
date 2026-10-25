@@ -27,6 +27,9 @@ function TopBar() {
   ];
   return (
     <header className="flex items-center gap-5 border-b border-line bg-ink-900 px-4 py-2" data-testid="top-bar">
+      <div className="border-r border-line pr-4 text-sm font-black tracking-[0.24em] text-signal" aria-label="Brink">
+        BRINK
+      </div>
       <div className="flex items-center gap-2">
         <Swatch color={s.color} />
         <div>

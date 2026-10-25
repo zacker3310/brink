@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Shared instructions for any coding agent working on WORLD WAR (repo `brink`). Design: `docs/architecture.md`.
+Shared instructions for any coding agent working on Brink (repo `brink`). Design: `docs/architecture.md`.
 Status: `PROGRESS.md`.
 
 ## Commands

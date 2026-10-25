@@ -8,7 +8,7 @@
 
 ## What this is
 
-WORLD WAR (repo `brink`): a single-player, simultaneous-turn modern strategy game. One human and three
+Brink (repo `brink`): a single-player, simultaneous-turn modern strategy game. One human and three
 AIs plan in secret; a pure deterministic engine resolves all orders at once. Runs fully in the browser
 (engine in a Web Worker); `apps/api` is optional. Design: `docs/architecture.md`. Shared agent rules:
 `AGENTS.md`. Status: `PROGRESS.md`.

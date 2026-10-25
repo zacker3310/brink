@@ -81,10 +81,8 @@ export function Title({ slots, go, onContinue }: { slots: SlotInfo[]; go: (s: Me
 
         <div className="mt-[8vh] max-w-xl">
           <p className="enter-1 text-[11px] font-semibold tracking-[0.42em] text-signal uppercase">{scenario.name}</p>
-          <h1 className="enter-2 title-wordmark mt-2 text-6xl leading-[0.9] font-black tracking-[-0.03em] sm:text-8xl">
-            WORLD
-            <br />
-            WAR
+          <h1 className="enter-2 title-wordmark mt-2 text-7xl leading-[0.9] font-black tracking-[0.04em] sm:text-9xl" data-testid="wordmark">
+            BRINK
           </h1>
           <p className="enter-3 mt-4 max-w-md text-sm leading-relaxed text-muted">
             Four nations. Every order written in secret. When the clocks strike, the whole world moves at once, and you learn what your

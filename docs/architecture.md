@@ -1,6 +1,6 @@
-# WORLD WAR architecture
+# Brink architecture
 
-Repo name `brink`; game title WORLD WAR. Milestone 1: a single-player, four-nation, simultaneous-turn
+Repo and game title: Brink. Milestone 1: a single-player, four-nation, simultaneous-turn
 strategy game that runs entirely in the browser.
 
 ## Shape

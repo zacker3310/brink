@@ -1,6 +1,6 @@
 # brink
 
-**WORLD WAR**, a modern geopolitical strategy game built on simultaneous turns. Every nation plans in
+**Brink**, a modern geopolitical strategy game built on simultaneous turns. Every nation plans in
 secret; when orders lock, the world moves at once.
 
 ```sh

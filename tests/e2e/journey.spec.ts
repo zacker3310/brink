@@ -10,6 +10,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   });
 
   await page.goto('./');
+  await expect(page).toHaveTitle('Brink');
+  await expect(page.getByTestId('wordmark')).toHaveText('BRINK');
   await expect(page.getByTestId('menu-continue')).toHaveCount(0);
   await page.getByTestId('menu-new').click();
   await page.getByTestId('nation-korva').click();
@@ -17,6 +19,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('seed').fill('1234');
   await page.getByTestId('start-game').click();
 
+  await expect(page.getByTestId('top-bar')).toContainText('BRINK');
   await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
   await expect(page.getByTestId('turn')).toContainText('1 / 30');
   await expect(page.getByTestId('map-canvas')).toBeVisible();
