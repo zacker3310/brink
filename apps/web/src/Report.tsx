@@ -86,6 +86,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
         const lost = e.victims.reduce((a, v) => a + (v.owner === me ? v.strengthLoss : 0), 0) + (e.owner === me ? e.sourceLoss : 0);
         totals.dealt += dealt;
         totals.lost += lost;
+        if (e.owner === me || e.victims.some((v) => v.owner === me)) totals.battles += 1;
         out.Engagements!.push({
           at: e.target,
           tone: e.owner === me ? 'good' : 'bad',

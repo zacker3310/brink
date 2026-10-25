@@ -3,6 +3,8 @@ import { Application, Container, Graphics, Text } from 'pixi.js';
 import type { FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
 import { hexCorners, hexToPixel, keyOf, parseKey, pixelToHex } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
+import { COUNTER_H, COUNTER_W, drawCounter } from './counters';
+import { buildTimeline, playReplay } from './replay';
 import { hostilesAt, orderForClick, reachFor } from './planning';
 import { useGame } from './store';
 
@@ -43,18 +45,6 @@ function drawPath(g: Graphics, from: HexKey, order: FormationOrder, color: numbe
     g.moveTo(last.x, last.y).lineTo(t.x, t.y).stroke({ width: 3, color: 0xd9534f, alpha });
     g.circle(t.x, t.y, SIZE * 0.55).stroke({ width: 3, color: 0xd9534f, alpha });
   }
-}
-
-/** A NATO-style class symbol inside a w x h frame at (x, y). */
-function drawSymbol(g: Graphics, cls: UnitClass, x: number, y: number, w: number, h: number, color: number, alpha: number) {
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const line = { width: 1.4, color, alpha };
-  if (cls === 'infantry' || cls === 'mechanized') g.moveTo(x, y).lineTo(x + w, y + h).moveTo(x + w, y).lineTo(x, y + h).stroke(line);
-  if (cls === 'mechanized' || cls === 'armor') g.ellipse(cx, cy, w * 0.32, h * 0.26).stroke({ ...line, width: cls === 'armor' ? 1.8 : 1.4 });
-  if (cls === 'artillery') g.circle(cx, cy, h * 0.18).fill({ color, alpha });
-  if (cls === 'recon') g.moveTo(x, y + h).lineTo(x + w, y).stroke(line);
-  if (cls === 'air') g.moveTo(x + w * 0.15, cy + 2).quadraticCurveTo(x + w * 0.32, cy - 5, cx, cy + 2).quadraticCurveTo(x + w * 0.68, cy - 5, x + w * 0.85, cy + 2).stroke(line);
 }
 
 declare global {
@@ -100,7 +90,7 @@ export function MapView() {
       const world = new Container();
       app.stage.addChild(world);
       const layers: Record<string, Container> = {};
-      for (const name of ['terrain', 'overlay', 'sites', 'highlight', 'paths', 'units', 'hover']) {
+      for (const name of ['terrain', 'overlay', 'sites', 'highlight', 'paths', 'units', 'anim', 'hover']) {
         layers[name] = new Container();
         world.addChild(layers[name]);
       }
@@ -305,7 +295,9 @@ export function MapView() {
   function redraw() {
     const a = appRef.current;
     const s = useGame.getState();
-    const v = s.view;
+    // While a turn replays, the board shows the world it was planned against.
+    const v = s.playback?.before ?? s.view;
+    const replaying = s.playback !== null;
     if (!a || !v) return;
     for (const name of ['terrain', 'overlay', 'sites', 'highlight', 'paths', 'units']) {
       a.layers[name]!.removeChildren().forEach((c) => c.destroy());
@@ -405,7 +397,7 @@ export function MapView() {
 
     // Selection, reachable hexes and results of the last turn.
     const hl = new Graphics();
-    if (reach && s.selectedFormation) {
+    if (reach && s.selectedFormation && !replaying) {
       for (const k of Object.keys(reach)) {
         if (k !== v.formations[s.selectedFormation]?.key) {
           const tint = s.mode === 'attack' ? 0xd9534f : s.mode === 'withdraw' ? 0x8fb3d9 : 0xf2e6b8;
@@ -413,7 +405,7 @@ export function MapView() {
         }
       }
     }
-    if (s.report && !s.showReport) {
+    if (s.report && !s.showReport && !replaying) {
       for (const e of s.report.events) {
         if (e.kind === 'engagement') {
           const c = center(e.location);
@@ -428,7 +420,7 @@ export function MapView() {
     // Orders: planned (amber), submitted (white).
     const paths = new Graphics();
     const orders = s.submitted ?? s.draft;
-    if (orders) {
+    if (orders && !replaying) {
       for (const id of Object.keys(orders.formations).sort()) {
         const f = v.formations[id];
         if (!f) continue;
@@ -454,28 +446,20 @@ export function MapView() {
       ]);
     }
     const units = new Graphics();
-    const W = 24;
-    const H = 16;
+    if (replaying) byHex.clear();
     for (const [key, list] of byHex) {
       const c = center(key);
       // Selected counter draws last so it sits on top of its stack.
       const order = [...list].sort((m, n) => Number(m.selected) - Number(n.selected));
       order.forEach((m, i) => {
-        const x = c.x - W / 2 - 3 + i * 3.5;
-        const y = c.y - H / 2 - 1 - i * 3.5;
-        const alpha = m.confirmed ? 1 : 0.45;
-        if (m.selected) units.roundRect(x - 3, y - 3, W + 6, H + 9, 3).fill({ color: 0xffffff, alpha: 0.18 });
-        units.rect(x, y, W, H).fill({ color: m.own ? m.color : 0x0d121c, alpha }).stroke({ width: m.selected ? 2 : 1.2, color: m.selected ? 0xffffff : m.own ? 0x070b12 : m.color, alpha });
-        drawSymbol(units, m.cls, x, y, W, H, m.own ? 0x070b12 : m.color, alpha);
-        // Strength strip under the counter.
-        units.rect(x, y + H + 1, W, 2.5).fill({ color: 0x070b12, alpha: 0.8 * alpha });
-        const sw = Math.max(1, Math.round((W * m.strength) / 1000));
-        units.rect(x, y + H + 1, sw, 2.5).fill({ color: m.strength < 400 ? 0xd9534f : m.own ? 0x6fbf8e : m.color, alpha });
-        if (m.own && !m.ordered && !s.submitted) units.circle(x + W, y, 2.6).fill({ color: 0xe0a84a }).stroke({ width: 1, color: 0x070b12 });
+        const x = c.x - COUNTER_W / 2 - 3 + i * 3.5;
+        const y = c.y - COUNTER_H / 2 - 1 - i * 3.5;
+        drawCounter(units, x, y, m);
+        if (m.own && !m.ordered && !s.submitted) units.circle(x + COUNTER_W, y, 2.6).fill({ color: 0xe0a84a }).stroke({ width: 1, color: 0x070b12 });
         if (!m.confirmed && i === order.length - 1) {
           const t = new Text({ text: '?', resolution: 3, style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10, fontWeight: '800', fill: m.color } });
           t.anchor.set(0.5, 0.5);
-          t.position.set(x + W + 5, y + H / 2);
+          t.position.set(x + COUNTER_W + 5, y + COUNTER_H / 2);
           a.layers.units!.addChild(t);
         }
       });
@@ -489,10 +473,32 @@ export function MapView() {
 
   useEffect(() => {
     const unsub = useGame.subscribe((s, prev) => {
-      if (s.showReport !== prev.showReport) redraw();
+      if (s.showReport !== prev.showReport || s.playback !== prev.playback) redraw();
     });
     return unsub;
   }, []);
+
+  // Replay a resolved turn, then hand the result back to the store.
+  const playback = useGame((s) => s.playback);
+  const result = playback?.result;
+  useEffect(() => {
+    const a = appRef.current;
+    const pb = useGame.getState().playback;
+    if (!a || !pb) {
+      if (pb) useGame.getState().finishPlayback();
+      return;
+    }
+    const stop = playReplay(a.app, a.layers.anim!, buildTimeline(pb), {
+      center,
+      size: SIZE,
+      onPhase: (phase) => {
+        const cur = useGame.getState().playback;
+        if (cur && cur.phase !== phase) useGame.setState({ playback: { ...cur, phase } });
+      },
+      onDone: () => useGame.getState().finishPlayback(),
+    });
+    return stop;
+  }, [result]);
 
   useEffect(() => {
     const a = appRef.current;

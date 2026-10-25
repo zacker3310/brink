@@ -51,6 +51,7 @@ const PREFS = 'brink.prefs.v1';
 
 export interface Prefs {
   nation?: string;
+  animate?: boolean;
 }
 
 export function readPrefs(): Prefs {

@@ -27,6 +27,9 @@ function TopBar() {
   const report = useGame((s) => s.report);
   const toMenu = useGame((s) => s.toMenu);
   const save = useGame((s) => s.save);
+  const resolving = useGame((s) => s.resolving);
+  const animate = useGame((s) => s.animate);
+  const setAnimate = useGame((s) => s.setAnimate);
   const [saving, setSaving] = useState(false);
   const s = view.self;
   const ledger = selfLedger(view, report);
@@ -91,8 +94,18 @@ function TopBar() {
             <div className="h-full bg-signal" style={{ width: `${((turn - 1) / view.maxTurns) * 100}%` }} />
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setAnimate(!animate)}
+          aria-pressed={animate}
+          data-testid="toggle-replay"
+          title="Replay each resolved turn on the map before the report"
+          className={`border px-2 py-1.5 text-[11px] ${animate ? 'border-signal/50 text-signal' : 'border-line text-faint'} hover:border-faint`}
+        >
+          Replay {animate ? 'on' : 'off'}
+        </button>
         <div className="relative">
-          <button type="button" onClick={() => setSaving(!saving)} data-testid="save-menu" className="border border-line px-2.5 py-1.5 text-xs hover:border-faint">
+          <button type="button" onClick={() => setSaving(!saving)} disabled={resolving} data-testid="save-menu" className="border border-line px-2.5 py-1.5 text-xs hover:border-faint disabled:opacity-40">
             Save
           </button>
           {saving && (
@@ -442,6 +455,13 @@ function useShortcuts() {
   const s = useGame;
   useKeys((e) => {
     const g = s.getState();
+    if (g.playback) {
+      if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        g.finishPlayback();
+      }
+      return;
+    }
     if (g.showReport) {
       if (e.key === 'Escape' || e.key === 'Enter') g.setShowReport(false);
       return;

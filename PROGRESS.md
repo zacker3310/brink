@@ -47,6 +47,10 @@ Updated 2026-10-25. Milestone 1 (first playable).
   zoom controls and a clickable minimap; command bar with segmented orders, hotkeys, visual combat
   odds and next-idle-unit; compact inspector; situation report with headline KPIs, VP deltas, place
   names instead of coordinates and de-duplicated sightings; victory screen; keyboard map.
+- Turn replay: before the report, the map replays the resolved turn on the pre-turn board: all
+  movement at once, then strike tracers, battle flashes and floating losses, then retreats,
+  destroyed formations and site captures. Built only from events the player could see. Skip with
+  Esc/Space; toggle in the top bar (remembered; off by default under reduced motion).
 
 ## Outstanding
 
@@ -55,7 +59,6 @@ Updated 2026-10-25. Milestone 1 (first playable).
   defender lethality, victory share.
 - No save-file export button in the UI yet (load from file exists).
 - Report has no per-turn history browser; past reports are kept in the save.
-- Map: no animation of resolved movement.
 - Multiplayer: not started (see architecture.md).
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
@@ -66,6 +69,5 @@ None.
 ## Next recommended tasks
 
 1. Balance pass driven by the soak's ending distribution.
-2. Animate resolved movement and engagements before showing the report.
 3. Export save to file; report history.
 4. Multiplayer seam: Fastify session host with a planning deadline and per-nation WebSocket views.

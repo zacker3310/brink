@@ -18,9 +18,18 @@ import { engine } from './engine';
 import { idleFormations } from './insight';
 import type { Mode } from './planning';
 import type { Response } from './protocol';
-import { listSlots, writeSlot, type SlotInfo } from './saves';
+import { listSlots, readPrefs, writePrefs, writeSlot, type SlotInfo } from './saves';
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy';
+
+export interface Playback {
+  /** The view the turn was planned against; the map shows it while the turn replays. */
+  before: NationView;
+  events: GameEvent[];
+  /** The resolved state, applied when the replay ends. */
+  result: Extract<Response, { type: 'state' }>;
+  phase: 'movement' | 'combat' | 'aftermath';
+}
 
 export interface Notice {
   id: number;
@@ -48,6 +57,10 @@ interface State {
   slots: SlotInfo[];
   hoverHex: HexKey | null;
   panelOpen: boolean;
+  /** A resolved turn being replayed on the map before its state is applied. */
+  playback: Playback | null;
+  /** Replay resolved turns on the map. */
+  animate: boolean;
 
   newGame(nation: NationId, seed: number): Promise<void>;
   loadGame(text: string): Promise<void>;
@@ -60,6 +73,9 @@ interface State {
   togglePanel(open?: boolean): void;
   /** Select the next own formation without an order, after the current one. */
   nextIdle(): void;
+  /** Apply the turn being replayed and open its report. Also used to skip the replay. */
+  finishPlayback(): void;
+  setAnimate(on: boolean): void;
   setOrder(id: FormationId, order: FormationOrder | null): void;
   addRecruit(siteId: string, unitClass: UnitClass): void;
   removeRecruit(index: number): void;
@@ -76,6 +92,26 @@ interface State {
 }
 
 let noticeId = 1;
+
+/** Events the map can show. A quiet turn skips the replay. */
+function isVisual(e: GameEvent): boolean {
+  return (
+    (e.kind === 'movement' && e.path.length > 0) ||
+    e.kind === 'engagement' ||
+    e.kind === 'strike' ||
+    e.kind === 'retreat' ||
+    e.kind === 'destroyed' ||
+    e.kind === 'site_captured'
+  );
+}
+
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
 
 function freshDraft(view: NationView): NationOrders {
   return { nation: view.self.id, turn: view.turn, formations: {}, recruit: [], diplomacy: [] };
@@ -99,6 +135,12 @@ export const useGame = create<State>((set, get) => {
     if (!d) return;
     const r = await engine.call({ type: 'check', orders: d });
     if (r.type === 'checked') set({ rejected: r.rejected });
+  };
+
+  const afterResolve = () => {
+    const rejected = get().report?.events.filter((e) => e.kind === 'order_rejected') ?? [];
+    if (rejected.length > 0) get().notify(`${rejected.length} order(s) were rejected: see the report`, 'warn');
+    set({ showReport: true });
   };
 
   const editDraft = (fn: (d: NationOrders) => NationOrders) => {
@@ -127,6 +169,8 @@ export const useGame = create<State>((set, get) => {
     slots: listSlots(),
     hoverHex: null,
     panelOpen: true,
+    playback: null,
+    animate: readPrefs().animate ?? !prefersReducedMotion(),
 
     async newGame(nation, seed) {
       if (apply(await engine.call({ type: 'new', seed, nation }))) {
@@ -141,7 +185,15 @@ export const useGame = create<State>((set, get) => {
         get().notify(`Loaded turn ${get().view!.turn}`);
       }
     },
-    toMenu: () => set({ screen: 'menu', slots: listSlots() }),
+    toMenu: () => {
+      // The engine has already resolved a replaying turn; apply it rather than drop it.
+      const pb = get().playback;
+      if (pb) {
+        set({ playback: null, resolving: false });
+        apply(pb.result);
+      }
+      set({ screen: 'menu', slots: listSlots() });
+    },
     selectHex: (key) => set({ selectedHex: key }),
     selectFormation: (id) => {
       const f = id ? get().view?.formations[id] : null;
@@ -193,15 +245,26 @@ export const useGame = create<State>((set, get) => {
       if (!draft || resolving) return;
       set({ submitted: structuredClone(draft), resolving: true });
       const r = await engine.call({ type: 'submit', orders: draft });
-      set({ resolving: false });
-      if (apply(r)) {
-        const report = get().report;
-        const rejected = report?.events.filter((e) => e.kind === 'order_rejected') ?? [];
-        if (rejected.length > 0) get().notify(`${rejected.length} order(s) were rejected: see the report`, 'warn');
-        set({ showReport: true });
-      } else {
-        set({ submitted: null });
+      const before = get().view;
+      // Replay the turn on the old board first when there is something to see.
+      if (r.type === 'state' && before && get().animate && r.report && r.report.events.some(isVisual)) {
+        set({ playback: { before, events: r.report.events, result: r, phase: 'movement' } });
+        return;
       }
+      set({ resolving: false });
+      if (apply(r)) afterResolve();
+      else set({ submitted: null });
+    },
+    finishPlayback() {
+      const pb = get().playback;
+      if (!pb) return;
+      set({ playback: null, resolving: false });
+      apply(pb.result);
+      afterResolve();
+    },
+    setAnimate(on) {
+      writePrefs({ animate: on });
+      set({ animate: on });
     },
 
     async save(slot) {

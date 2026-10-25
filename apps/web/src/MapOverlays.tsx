@@ -24,7 +24,29 @@ export function ModeBanner() {
   const fid = useGame((s) => s.selectedFormation);
   const mode = useGame((s) => s.mode);
   const resolving = useGame((s) => s.resolving);
+  const playback = useGame((s) => s.playback);
+  const finishPlayback = useGame((s) => s.finishPlayback);
   const f = fid ? view.formations[fid] : undefined;
+  if (playback) {
+    const steps = ['movement', 'combat', 'aftermath'] as const;
+    return (
+      <div className="resolving-banner absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-4 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2" role="status" data-testid="replay">
+        <div>
+          <div className="text-[10px] font-bold tracking-[0.3em] text-signal uppercase">Turn {playback.before.turn} · replay</div>
+          <div className="flex gap-3 text-xs font-semibold">
+            {steps.map((p) => (
+              <span key={p} className={`capitalize transition-colors ${p === playback.phase ? 'text-text' : steps.indexOf(p) < steps.indexOf(playback.phase) ? 'text-faint line-through' : 'text-faint'}`}>
+                {p}
+              </span>
+            ))}
+          </div>
+        </div>
+        <button type="button" onClick={finishPlayback} className="border border-line px-2 py-1 text-[11px] text-muted hover:border-faint hover:text-text" data-testid="skip-replay">
+          Skip <span className="font-mono text-[9px] text-faint">Esc</span>
+        </button>
+      </div>
+    );
+  }
   if (resolving) {
     return (
       <div className="resolving-banner pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2 text-center" role="status">

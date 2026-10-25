@@ -51,6 +51,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
 
   // End the turn and read the after-action report.
   await page.getByTestId('end-turn').click();
+  // The turn replays on the map before the report opens.
+  await expect(page.getByTestId('replay')).toBeVisible();
   const report = page.getByTestId('report');
   await expect(report).toBeVisible();
   await expect(report).toContainText('Turn 1 resolved');
