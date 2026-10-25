@@ -1,47 +1,88 @@
-import type { Graphics } from 'pixi.js';
+import { Sprite, Texture, type Container, type Graphics } from 'pixi.js';
 import type { UnitClass } from '@brink/contracts';
+import { AFFILIATION, healthColor, SURFACE } from './design/tokens';
+import { symbolCanvas, type Affiliation } from './design/symbols';
 
-// Unit counters on the Pixi map, shared by the live map and the turn replay.
+// Unit counters on the Pixi map: an APP-6 symbol sprite plus a health bar and selection ring.
+// Shared by the live map and the turn replay so both draw identical units.
 
-export const COUNTER_W = 30;
-export const COUNTER_H = 20;
-
-/** A NATO-style class symbol inside a w x h frame at (x, y). */
-export function drawSymbol(g: Graphics, cls: UnitClass, x: number, y: number, w: number, h: number, color: number, alpha: number) {
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const line = { width: 1.6, color, alpha };
-  if (cls === 'infantry' || cls === 'mechanized') g.moveTo(x, y).lineTo(x + w, y + h).moveTo(x + w, y).lineTo(x, y + h).stroke(line);
-  if (cls === 'mechanized' || cls === 'armor') g.ellipse(cx, cy, w * 0.32, h * 0.26).stroke({ ...line, width: cls === 'armor' ? 2.2 : 1.6 });
-  if (cls === 'artillery') g.circle(cx, cy, h * 0.2).fill({ color, alpha });
-  if (cls === 'recon') g.moveTo(x, y + h).lineTo(x + w, y).stroke(line);
-  if (cls === 'air') g.moveTo(x + w * 0.15, cy + 2).quadraticCurveTo(x + w * 0.32, cy - 6, cx, cy + 2).quadraticCurveTo(x + w * 0.68, cy - 6, x + w * 0.85, cy + 2).stroke(line);
-}
+/** milsymbol size for map counters; a friend frame comes out about 30 x 20 world px. */
+const SYMBOL_SIZE = 20;
+/** Symbols render at this multiple and are scaled down, so they stay sharp when zoomed in. */
+const RES = 3;
 
 export interface CounterLook {
   cls: UnitClass;
-  color: number;
-  own: boolean;
+  aff: Affiliation;
+  /** Owning nation's colour, as #rrggbb. */
+  fill: string;
+  /** False for a last-known contact: dashed frame, faded. */
   confirmed: boolean;
   /** 0..1000. */
   strength: number;
   selected?: boolean;
+  /** A ghost at a planned destination. */
+  planned?: boolean;
 }
 
-/** One counter with its top-left at (x, y): drop shadow, frame, class symbol and health bar. */
-export function drawCounter(g: Graphics, x: number, y: number, m: CounterLook, fade = 1) {
-  const W = COUNTER_W;
-  const H = COUNTER_H;
+const textures = new Map<string, Texture>();
+
+function texture(m: CounterLook) {
+  const look = { cls: m.cls, aff: m.aff, fill: m.fill, planned: m.planned || !m.confirmed, size: SYMBOL_SIZE };
+  const c = symbolCanvas(look, RES);
+  const key = JSON.stringify(look);
+  let t = textures.get(key);
+  if (!t) {
+    t = Texture.from(c.canvas);
+    textures.set(key, t);
+  }
+  return { t, c };
+}
+
+/** World-space extent of a counter around its centre. */
+export function counterExtent(m: CounterLook): { up: number; down: number; half: number } {
+  const { c } = texture(m);
+  return { up: c.anchor.y / RES, down: (c.height - c.anchor.y) / RES, half: c.width / RES / 2 };
+}
+
+/** A sprite for the counter, centred on (0, 0). Callers position it. */
+export function counterSprite(m: CounterLook): Sprite {
+  const { t, c } = texture(m);
+  const s = new Sprite(t);
+  s.anchor.set(c.anchor.x / c.width, c.anchor.y / c.height);
+  s.scale.set(1 / RES);
+  return s;
+}
+
+/** Selection ring and health bar for a counter centred at (x, y). */
+export function drawCounterChrome(g: Graphics, x: number, y: number, m: CounterLook, fade = 1) {
+  const e = counterExtent(m);
   const alpha = (m.confirmed ? 1 : 0.45) * fade;
-  if (m.selected) g.roundRect(x - 4, y - 4, W + 8, H + 12, 4).fill({ color: 0x7fd3ff, alpha: 0.28 * fade }).stroke({ width: 2, color: 0x7fd3ff, alpha: 0.9 * fade });
-  g.roundRect(x + 1.5, y + 2.5, W, H, 2).fill({ color: 0x000000, alpha: 0.45 * alpha });
-  g.roundRect(x, y, W, H, 2)
-    .fill({ color: m.own ? m.color : 0x10161f, alpha })
-    .stroke({ width: m.selected ? 2 : 1.4, color: m.selected ? 0xffffff : m.own ? 0x070b12 : m.color, alpha });
-  drawSymbol(g, m.cls, x + 2, y + 2, W - 4, H - 4, m.own ? 0x070b12 : m.color, alpha);
-  // Health bar, Civ-style: green to red.
+  const w = Math.max(26, e.half * 2 - 4);
+  if (m.selected) {
+    g.roundRect(x - e.half - 4, y - e.up - 2, e.half * 2 + 8, e.up + e.down + 10, 4)
+      .fill({ color: AFFILIATION.friend, alpha: 0.22 * fade })
+      .stroke({ width: 2, color: AFFILIATION.friend, alpha: 0.95 * fade });
+  }
+  if (m.planned) return;
   const ratio = Math.max(0, Math.min(1, m.strength / 1000));
-  const hp = ratio > 0.6 ? 0x5fd17a : ratio > 0.35 ? 0xe8c547 : 0xe0523e;
-  g.rect(x, y + H + 2, W, 3).fill({ color: 0x070b12, alpha: 0.85 * alpha });
-  g.rect(x + 0.5, y + H + 2.5, Math.max(1, (W - 1) * ratio), 2).fill({ color: hp, alpha });
+  const top = y + e.down - 1;
+  g.rect(x - w / 2, top, w, 3.5).fill({ color: SURFACE.ink950, alpha: 0.9 * alpha });
+  g.rect(x - w / 2 + 0.5, top + 0.5, Math.max(1, (w - 1) * ratio), 2.5).fill({ color: healthColor(ratio), alpha });
+}
+
+/** Add a complete counter (sprite into `layer`, chrome into `g`) centred at (x, y). */
+export function addCounter(layer: Container, g: Graphics, x: number, y: number, m: CounterLook, fade = 1): Sprite {
+  const s = counterSprite(m);
+  s.position.set(x, y);
+  s.alpha = (m.confirmed ? 1 : 0.55) * (m.planned ? 0.55 : 1) * fade;
+  layer.addChild(s);
+  drawCounterChrome(g, x, y, m, fade);
+  return s;
+}
+
+/** Affiliation of a unit as the viewer sees it. */
+export function affiliationOf(own: boolean, relation: string | undefined): Affiliation {
+  if (own || relation === 'alliance') return 'friend';
+  return relation === 'war' ? 'hostile' : 'neutral';
 }

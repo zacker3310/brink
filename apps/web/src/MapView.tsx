@@ -4,7 +4,8 @@ import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass 
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
-import { COUNTER_H, COUNTER_W, drawCounter } from './counters';
+import { addCounter, affiliationOf, counterExtent, type CounterLook } from './counters';
+import { AFFILIATION, FONT_DATA, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useGame } from './store';
@@ -20,8 +21,8 @@ const TERRAIN_COLOR: Record<Terrain, number> = {
   water: 0x1b3a55,
 };
 
-const MOVE = 0x7fd3ff;
-const ATTACK = 0xe0523e;
+const MOVE = AFFILIATION.friend;
+const ATTACK = AFFILIATION.hostile;
 
 const hex = (n: string) => Number.parseInt(n.replace('#', ''), 16);
 
@@ -193,7 +194,7 @@ export function MapView() {
     let destroyed = false;
     let resize: ResizeObserver | null = null;
     const app = new Application();
-    void app.init({ resizeTo: el, background: 0x0a0f18, antialias: true, autoDensity: true, resolution: window.devicePixelRatio || 1 }).then(() => {
+    void app.init({ resizeTo: el, background: SURFACE.ink950, antialias: true, autoDensity: true, resolution: window.devicePixelRatio || 1 }).then(() => {
       if (destroyed) {
         app.destroy(true);
         return;
@@ -526,7 +527,7 @@ export function MapView() {
         const label = new Text({
           text: site.name,
           resolution: 3,
-          style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 8, fill: 0xe6e1d3, fontWeight: '600', stroke: { color: 0x070b12, width: 3, join: 'round' } },
+          style: { fontFamily: FONT_UI, fontSize: 8, fill: TEXT, fontWeight: '600', stroke: { color: 0x070b12, width: 3, join: 'round' } },
         });
         label.anchor.set(0.5, 0);
         label.position.set(c.x, c.y + SIZE * 0.55);
@@ -575,6 +576,7 @@ export function MapView() {
     // Planned orders: path, arrowhead and a ghost of the unit where it will end up.
     const paths = new Graphics();
     const ghosts: { key: HexKey; cls: UnitClass; strength: number }[] = [];
+    const labels: Text[] = [];
     const orders = s.submitted ?? s.draft;
     if (orders && !replaying) {
       for (const id of Object.keys(orders.formations).sort()) {
@@ -592,55 +594,66 @@ export function MapView() {
     }
     a.layers.paths!.addChild(paths);
 
-    // Formations: own counters, then contacts, stacked per hex.
-    type Marker = { cls: UnitClass; color: number; own: boolean; confirmed: boolean; strength: number; selected: boolean; ordered: boolean };
+    // Formations: APP-6 counters, own first then contacts, stacked per hex.
+    type Marker = CounterLook & { ordered: boolean };
     const byHex = new Map<HexKey, Marker[]>();
     const planned = (s.submitted ?? s.draft)?.formations ?? {};
     for (const f of Object.values(v.formations).sort((x, y) => (x.id < y.id ? -1 : 1))) {
       byHex.set(f.key, [
         ...(byHex.get(f.key) ?? []),
-        { cls: f.unitClass, color: hex(v.self.color), own: true, confirmed: true, strength: f.strength, selected: f.id === s.selectedFormation, ordered: !!planned[f.id] },
+        { cls: f.unitClass, aff: 'friend', fill: v.self.color, confirmed: true, strength: f.strength, selected: f.id === s.selectedFormation, ordered: !!planned[f.id] },
       ]);
     }
     for (const c of Object.values(v.contacts).sort((x, y) => (x.formation < y.formation ? -1 : 1))) {
       byHex.set(c.key, [
         ...(byHex.get(c.key) ?? []),
-        { cls: c.unitClass, color: hex(v.nations[c.owner]?.color ?? '#888888'), own: false, confirmed: c.confirmed, strength: c.estimatedStrength, selected: false, ordered: false },
+        {
+          cls: c.unitClass,
+          aff: affiliationOf(false, v.relations[c.owner]),
+          fill: v.nations[c.owner]?.color ?? '#888888',
+          confirmed: c.confirmed,
+          strength: c.estimatedStrength,
+          selected: false,
+          ordered: false,
+        },
       ]);
     }
     const units = new Graphics();
+    const top = new Graphics();
+    const sprites = a.layers.units!;
+    sprites.addChild(units);
     if (!replaying) {
       for (const gh of ghosts) {
         const c = center(gh.key);
-        drawCounter(units, c.x - COUNTER_W / 2, c.y - COUNTER_H / 2 - 2, { cls: gh.cls, color: hex(v.self.color), own: true, confirmed: true, strength: gh.strength }, 0.38);
+        addCounter(sprites, units, c.x, c.y - 2, { cls: gh.cls, aff: 'friend', fill: v.self.color, confirmed: true, strength: gh.strength, planned: true });
       }
     } else byHex.clear();
     for (const [key, list] of byHex) {
       const c = center(key);
       const order = [...list].sort((m, n) => Number(m.selected) - Number(n.selected));
       order.forEach((m, i) => {
-        const x = c.x - COUNTER_W / 2 - 3 + i * 4;
-        const y = c.y - COUNTER_H / 2 - 2 - i * 4;
-        drawCounter(units, x, y, m);
-        if (m.own && !m.ordered && !s.submitted) units.circle(x + COUNTER_W, y, 3.4).fill({ color: 0xe0a84a }).stroke({ width: 1.2, color: 0x070b12 });
-        if (!m.confirmed && i === order.length - 1) {
-          const t = new Text({ text: '?', resolution: 3, style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11, fontWeight: '800', fill: m.color } });
-          t.anchor.set(0.5, 0.5);
-          t.position.set(x + COUNTER_W + 6, y + COUNTER_H / 2);
-          a.layers.units!.addChild(t);
+        const x = c.x - 3 + i * 4;
+        const y = c.y - 2 - i * 4;
+        addCounter(sprites, units, x, y, m);
+        if (m.aff === 'friend' && m.fill === v.self.color && !m.ordered && !s.submitted) {
+          const e = counterExtent(m);
+          top.circle(x + e.half - 2, y - e.up + 6, 3.6).fill({ color: SIGNAL }).stroke({ width: 1.2, color: SURFACE.ink950 });
         }
       });
       if (list.length > 1) {
-        const x = c.x - COUNTER_W / 2 - 6;
-        const y = c.y - COUNTER_H / 2 - 4 - (list.length - 1) * 4;
-        units.circle(x, y, 6).fill({ color: 0x070b12 }).stroke({ width: 1.2, color: 0xe6e1d3 });
-        const t = new Text({ text: String(list.length), resolution: 3, style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 8, fontWeight: '800', fill: 0xe6e1d3 } });
+        const e = counterExtent(order.at(-1)!);
+        const x = c.x - 3 - e.half - 2;
+        const y = c.y - 2 - (list.length - 1) * 4 - e.up + 8;
+        top.circle(x, y, 6.5).fill({ color: SURFACE.ink950 }).stroke({ width: 1.2, color: TEXT });
+        const t = new Text({ text: String(list.length), resolution: 3, style: { fontFamily: FONT_DATA, fontSize: 8.5, fontWeight: '700', fill: TEXT } });
         t.anchor.set(0.5, 0.5);
         t.position.set(x, y);
-        a.layers.units!.addChild(t);
+        labels.push(t);
       }
     }
-    a.layers.units!.addChildAt(units, 0);
+    sprites.addChild(top);
+    for (const t of labels) sprites.addChild(t);
+
   }
 
   useEffect(() => {

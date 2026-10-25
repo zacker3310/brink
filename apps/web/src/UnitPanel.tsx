@@ -7,6 +7,7 @@ import { UnitGlyph } from './glyphs';
 import { hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
 import { describeOrder, type Mode } from './planning';
+import { healthColor } from './design/tokens';
 import { useGame } from './store';
 
 // Civ-style unit panel (bottom-left) and turn controls (bottom-right), floating over the map.
@@ -60,7 +61,7 @@ function Action({
   testId: string;
   danger?: boolean;
 }) {
-  const on = danger ? 'border-hostile bg-hostile/25 text-[#ff8d7d]' : 'border-[#7fd3ff] bg-[#7fd3ff]/20 text-[#bfe9ff]';
+  const on = danger ? 'border-hostile bg-hostile/25 text-hostile' : 'border-friend bg-friend/20 text-friend';
   return (
     <button
       type="button"
@@ -84,7 +85,7 @@ function Action({
 }
 
 const OUTCOME: Record<string, { text: string; tone: string }> = {
-  attacker_victory: { text: 'Breakthrough', tone: 'text-friendly' },
+  attacker_victory: { text: 'Breakthrough', tone: 'text-good' },
   inconclusive: { text: 'Stalemate', tone: 'text-signal' },
   defender_held: { text: 'Repulsed', tone: 'text-hostile' },
 };
@@ -111,7 +112,7 @@ export function UnitPanel() {
   const color = view.self.color;
   const mp = movementAllowance(f);
   const hp = f.strength / 10;
-  const hpColor = hp > 60 ? '#5fd17a' : hp > 35 ? '#e8c547' : '#e0523e';
+  const hpColor = `#${healthColor(hp / 100).toString(16).padStart(6, '0')}`;
   const priority: SupplyPriority = draft.supplyPriority?.[f.id] ?? f.supplyPriority;
   const modes: [Mode, string, string][] = [
     ['move', def.ground ? 'Move' : 'Rebase', 'M'],
@@ -129,7 +130,7 @@ export function UnitPanel() {
           ))}
         </ul>
       )}
-      <div className="border border-line bg-ink-950/92 shadow-2xl backdrop-blur">
+      <div className="ds-panel backdrop-blur">
         <div className="flex items-start gap-3 p-3">
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2" style={{ borderColor: color, background: `radial-gradient(circle at 35% 30%, ${color}55, #0b111b 70%)` }}>
             <UnitGlyph unitClass={f.unitClass} color="#e6e1d3" className="h-6 w-9" />
@@ -139,7 +140,7 @@ export function UnitPanel() {
             </svg>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-base leading-tight font-black">{f.name}</div>
+            <div className="font-display truncate text-base leading-tight font-black">{f.name}</div>
             <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color }}>
               {def.name} · {hexLabel(view, f.key)}
             </div>
@@ -152,7 +153,7 @@ export function UnitPanel() {
               <span title="Defense">⛨ {def.defense}</span>
             </div>
             <div className="mt-1 truncate text-[11px]" data-testid="planned-order">
-              <span className={order ? 'font-semibold text-[#7fd3ff]' : 'text-signal'}>{order ? describeOrder(order, view) : 'Needs orders · Hold (default)'}</span>
+              <span className={order ? 'font-semibold text-friend' : 'text-signal'}>{order ? describeOrder(order, view) : 'Needs orders · Hold (default)'}</span>
             </div>
           </div>
         </div>
@@ -222,7 +223,7 @@ export function UnitPanel() {
                   <span className="font-mono">{n}</span>
                 </div>
                 <div className="h-1 bg-ink-700">
-                  <div className={`h-full ${n < 35 ? 'bg-hostile' : n < 60 ? 'bg-signal' : 'bg-friendly'}`} style={{ width: `${Math.min(100, n)}%` }} />
+                  <div className={`h-full ${n < 35 ? 'bg-hostile' : n < 60 ? 'bg-signal' : 'bg-good'}`} style={{ width: `${Math.min(100, n)}%` }} />
                 </div>
               </div>
             ))}
@@ -272,7 +273,7 @@ export function TurnControls() {
         onClick={nextIdle}
         disabled={idle === 0 || resolving}
         data-testid="next-idle"
-        className={`border px-2.5 py-1.5 text-left text-xs font-semibold disabled:opacity-50 ${idle ? 'border-signal/60 bg-signal/15 text-signal hover:bg-signal/25' : 'border-friendly/40 bg-ink-950/90 text-friendly'}`}
+        className={`border px-2.5 py-1.5 text-left text-xs font-semibold disabled:opacity-50 ${idle ? 'border-signal/60 bg-signal/15 text-signal hover:bg-signal/25' : 'border-good/40 bg-ink-950/90 text-good'}`}
         title="Select the next unit that needs orders (N)"
       >
         {idle ? `▸ ${idle} of ${total} units need orders` : `✓ All ${total} units have orders`}
@@ -284,8 +285,8 @@ export function TurnControls() {
         data-testid="end-turn"
         className="end-turn relative overflow-hidden rounded-sm border-2 border-signal bg-gradient-to-b from-[#f2c06a] to-[#c98a2c] px-4 py-3 text-ink-950 shadow-[0_0_24px_rgba(224,168,74,0.35)] transition-all hover:brightness-110 disabled:opacity-60"
       >
-        <div className="text-lg leading-none font-black tracking-wider uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
-        <div className="mt-1 text-[10px] font-bold tracking-[0.2em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
+        <div className="font-display text-lg leading-none font-black tracking-wider uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
+        <div className="font-display mt-1 text-[10px] font-bold tracking-[0.2em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
       </button>
       <Minimap />
     </div>

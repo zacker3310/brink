@@ -72,7 +72,7 @@ export function CityBanners() {
                 </span>
               )}
               {mine && !building && !pending && (s.kind === 'capital' || s.kind === 'city') && (
-                <span className="flex items-center bg-signal/90 px-1.5 text-[0.85em] font-black text-ink-950" title="Idle: nothing in production">
+                <span className="font-display flex items-center bg-signal/90 px-1.5 text-[0.85em] font-black text-ink-950" title="Idle: nothing in production">
                   ⚒
                 </span>
               )}
@@ -117,14 +117,14 @@ export function CityPanel() {
   };
   const capacity = view.self.industrialCapacity;
   return (
-    <aside className="panel-in absolute top-3 bottom-3 left-3 z-20 flex w-[340px] flex-col border border-line bg-ink-950/95 shadow-2xl backdrop-blur" data-testid="city-panel" aria-label={`${site.name} production`}>
+    <aside className="panel-in absolute top-3 bottom-3 left-3 z-20 flex w-[340px] flex-col ds-panel backdrop-blur" data-testid="city-panel" aria-label={`${site.name} production`}>
       <header className="flex items-center gap-3 border-b border-line px-4 py-3" style={{ background: `linear-gradient(90deg, ${color}33, transparent)` }}>
         <div className="flex h-11 w-11 items-center justify-center font-mono text-lg font-black text-ink-950" style={{ background: color }}>
           {Math.max(1, Math.round(site.population / 300))}
         </div>
         <div className="flex-1 leading-tight">
-          <div className="text-[10px] font-bold tracking-[0.24em] text-muted uppercase">{site.kind}</div>
-          <div className="text-xl font-black tracking-tight">{site.name}</div>
+          <div className="font-display text-[10px] font-bold tracking-[0.24em] text-muted uppercase">{site.kind}</div>
+          <div className="font-display text-xl font-black tracking-tight">{site.name}</div>
           <div className="text-[11px] text-muted">
             {site.population}k people · <span className="text-signal">{site.victoryPoints} VP</span>
           </div>
@@ -146,7 +146,7 @@ export function CityPanel() {
           ] as const
         ).map(([l, n]) => (
           <div key={l} className="border-r border-line/50 py-1.5 last:border-r-0">
-            <div className={n ? 'font-semibold text-friendly' : 'text-faint'}>+{n}</div>
+            <div className={n ? 'font-semibold text-good' : 'text-faint'}>+{n}</div>
             <div className="text-[9px] text-faint uppercase">{l}</div>
           </div>
         ))}
@@ -155,7 +155,7 @@ export function CityPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {here.length > 0 && (
           <section className="mb-3">
-            <h3 className="mb-1.5 text-[10px] font-bold tracking-[0.2em] text-faint uppercase">In production</h3>
+            <h3 className="font-display mb-1.5 text-[10px] font-bold tracking-[0.2em] text-faint uppercase">In production</h3>
             {here.map((q) => (
               <div key={q.id} className="mb-1.5 border border-line bg-ink-900 p-2">
                 <div className="flex items-center gap-2 text-sm font-semibold">
@@ -173,7 +173,7 @@ export function CityPanel() {
 
         {canRecruit ? (
           <section>
-            <h3 className="mb-1.5 flex justify-between text-[10px] font-bold tracking-[0.2em] text-faint uppercase">
+            <h3 className="font-display mb-1.5 flex justify-between text-[10px] font-bold tracking-[0.2em] text-faint uppercase">
               <span>Choose production</span>
               <span className="font-mono tracking-normal">{capacity} ind/turn</span>
             </h3>
@@ -219,7 +219,7 @@ export function CityPanel() {
 
         {garrison.length > 0 && (
           <section className="mt-3">
-            <h3 className="mb-1.5 text-[10px] font-bold tracking-[0.2em] text-faint uppercase">Garrison</h3>
+            <h3 className="font-display mb-1.5 text-[10px] font-bold tracking-[0.2em] text-faint uppercase">Garrison</h3>
             {garrison.map((f) => (
               <button key={f.id} type="button" onClick={() => selectFormation(f.id)} className="flex w-full items-center gap-2 border border-line/60 px-2 py-1.5 text-left text-xs hover:border-faint">
                 <UnitGlyph unitClass={f.unitClass} color={color} />

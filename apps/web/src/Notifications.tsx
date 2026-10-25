@@ -29,9 +29,9 @@ const ICON: Record<string, string> = {
 };
 
 const TONE: Record<Tone, string> = {
-  good: 'border-friendly bg-[#1d3b2a] text-friendly',
-  bad: 'border-hostile bg-[#3b1d1d] text-[#ff8d7d]',
-  info: 'border-[#7fd3ff] bg-[#16303f] text-[#bfe9ff]',
+  good: 'border-good bg-good/15 text-good',
+  bad: 'border-hostile bg-hostile/15 text-hostile',
+  info: 'border-friend bg-friend/15 text-friend',
 };
 
 export function notesFor(view: NationView, report: TurnReport): Note[] {

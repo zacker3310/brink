@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from 'react';
 
 export function Frame({ children, className = '', accent }: { children: ReactNode; className?: string; accent?: string }) {
   return (
-    <div className={`frame relative border border-line/80 bg-ink-900/80 backdrop-blur-sm ${className}`} style={accent ? { ['--accent' as string]: accent } : undefined}>
+    <div className={`frame ds-panel backdrop-blur-sm ${className}`} style={accent ? { ['--accent' as string]: accent } : undefined}>
       <span className="frame-tick tl" aria-hidden />
       <span className="frame-tick tr" aria-hidden />
       <span className="frame-tick bl" aria-hidden />
@@ -15,7 +15,7 @@ export function Frame({ children, className = '', accent }: { children: ReactNod
 }
 
 export function Label({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <h3 className={`text-[10px] font-semibold tracking-[0.24em] text-faint uppercase ${className}`}>{children}</h3>;
+  return <h3 className={`ds-label ${className}`}>{children}</h3>;
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
@@ -33,7 +33,7 @@ export function ScreenHeader({ title, kicker, onBack, right }: { title: string; 
       </button>
       <div className="h-6 w-px bg-line" aria-hidden />
       <div className="leading-tight">
-        <div className="text-[10px] font-semibold tracking-[0.3em] text-signal uppercase">{kicker}</div>
+        <div className="font-display text-[10px] font-semibold tracking-[0.3em] text-signal uppercase">{kicker}</div>
         <h1 className="text-lg font-bold tracking-tight">{title}</h1>
       </div>
       <div className="ml-auto">{right}</div>

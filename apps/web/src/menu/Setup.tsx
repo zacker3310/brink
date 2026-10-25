@@ -62,7 +62,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         onBack={onBack}
         right={
           <div className="text-right leading-tight">
-            <div className="text-[10px] tracking-[0.24em] text-faint uppercase">Operation</div>
+            <div className="font-display text-[10px] tracking-[0.24em] text-faint uppercase">Operation</div>
             <div className="font-mono text-sm font-semibold tracking-wider text-signal uppercase" data-testid="operation">
               {op}
             </div>
@@ -119,7 +119,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         {/* Theatre */}
         <section aria-label="Theatre" className="enter-2 flex min-w-0 flex-col gap-3">
           <Frame className="relative flex-1 overflow-hidden p-2" accent={spec.color}>
-            <div className="pointer-events-none absolute top-3 left-4 z-10 text-[10px] tracking-[0.24em] text-faint uppercase">
+            <div className="font-display pointer-events-none absolute top-3 left-4 z-10 text-[10px] tracking-[0.24em] text-faint uppercase">
               Theatre map · seed <span className="font-mono text-muted">{seed}</span>
             </div>
             <MapPreview world={world} focus={nation} labels forces className="setup-map h-full max-h-[62vh] min-h-[280px] w-full" />
@@ -171,7 +171,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               <span id="dossier">Intelligence dossier</span>
             </Label>
             <div key={nation} className="dossier-swap">
-              <h2 className="mt-2 text-2xl leading-tight font-black tracking-tight" style={{ color: spec.color }} data-testid="dossier-name">
+              <h2 className="font-display mt-2 text-2xl leading-tight font-black tracking-tight" style={{ color: spec.color }} data-testid="dossier-name">
                 {spec.name}
               </h2>
               <p className="text-xs font-semibold tracking-wider text-text/80 uppercase">{gov.name}</p>
@@ -183,7 +183,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                 {traits(gov.modifiers).map((t) => (
                   <span
                     key={t.label}
-                    className={`border px-1.5 py-0.5 font-mono text-[11px] ${t.good ? 'border-friendly/40 bg-friendly/10 text-friendly' : 'border-hostile/40 bg-hostile/10 text-hostile'}`}
+                    className={`border px-1.5 py-0.5 font-mono text-[11px] ${t.good ? 'border-good/40 bg-good/10 text-good' : 'border-hostile/40 bg-hostile/10 text-hostile'}`}
                   >
                     {t.value} <span className="font-sans text-text/70">{t.label}</span>
                   </span>
@@ -245,8 +245,8 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
           >
             <span className="relative z-10 flex items-center justify-between">
               <span>
-                <span className="block text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">{starting ? 'Establishing command link' : `Operation ${op}`}</span>
-                <span className="block text-lg font-black tracking-wide uppercase">{starting ? 'Deploying…' : 'Begin campaign'}</span>
+                <span className="font-display block text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">{starting ? 'Establishing command link' : `Operation ${op}`}</span>
+                <span className="font-display block text-lg font-black tracking-wide uppercase">{starting ? 'Deploying…' : 'Begin campaign'}</span>
               </span>
               <span className="text-2xl transition-transform group-hover:translate-x-1" aria-hidden>
                 ▸
@@ -271,7 +271,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 function Big({ label, value, unit }: { label: string; value: number | string; unit?: string }) {
   return (
     <div className="border border-line/70 bg-ink-850/80 px-2 py-1.5">
-      <div className="text-[9px] tracking-[0.18em] text-faint uppercase">{label}</div>
+      <div className="font-display text-[9px] tracking-[0.18em] text-faint uppercase">{label}</div>
       <div className="font-mono text-lg leading-tight font-semibold tabular-nums">
         {value}
         {unit && <span className="ml-1 text-[10px] font-normal text-muted">{unit}</span>}
@@ -284,7 +284,7 @@ function Res({ label, v }: { label: string; v: number }) {
   return (
     <div className="flex justify-between border-b border-line/40 py-0.5">
       <span className="font-sans text-muted">{label}</span>
-      <span className="text-friendly">+{v}</span>
+      <span className="text-good">+{v}</span>
     </div>
   );
 }

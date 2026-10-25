@@ -5,7 +5,7 @@ export function Panel({ title, children, actions }: { title: string; children: R
   return (
     <section className="border-b border-line px-3 py-3">
       <header className="mb-2 flex items-center justify-between">
-        <h2 className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">{title}</h2>
+        <h2 className="ds-label">{title}</h2>
         {actions}
       </header>
       {children}
@@ -57,7 +57,7 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
 
 export function Meter({ value, max = 100, tone = 'neutral' }: { value: number; max?: number; tone?: 'neutral' | 'good' | 'bad' }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
-  const color = tone === 'good' ? 'bg-friendly' : tone === 'bad' ? 'bg-hostile' : 'bg-signal';
+  const color = tone === 'good' ? 'bg-good' : tone === 'bad' ? 'bg-hostile' : 'bg-signal';
   return (
     <div className="h-1.5 w-full rounded-full bg-ink-700" role="meter" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}>
       <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />

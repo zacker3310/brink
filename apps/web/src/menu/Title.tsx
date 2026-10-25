@@ -73,15 +73,15 @@ export function Title({ slots, go, onContinue }: { slots: SlotInfo[]; go: (s: Me
       </div>
 
       <div className="relative z-10 flex min-h-full flex-col px-4 pt-6 pb-4 sm:px-10 sm:pt-10">
-        <div className="flex items-center gap-3 text-[10px] font-semibold tracking-[0.3em] uppercase">
+        <div className="font-display flex items-center gap-3 text-[10px] font-semibold tracking-[0.3em] uppercase">
           <span className="rounded-[2px] bg-hostile/90 px-1.5 py-0.5 text-ink-950">Top secret</span>
           <span className="text-muted">Strategic command // eyes only</span>
           <Clock />
         </div>
 
         <div className="mt-[8vh] max-w-xl">
-          <p className="enter-1 text-[11px] font-semibold tracking-[0.42em] text-signal uppercase">{scenario.name}</p>
-          <h1 className="enter-2 title-wordmark mt-2 text-7xl leading-[0.9] font-black tracking-[0.04em] sm:text-9xl" data-testid="wordmark">
+          <p className="font-display enter-1 text-[11px] font-semibold tracking-[0.42em] text-signal uppercase">{scenario.name}</p>
+          <h1 className="font-display enter-2 title-wordmark mt-2 text-7xl leading-[0.9] font-black tracking-[0.04em] sm:text-9xl" data-testid="wordmark">
             BRINK
           </h1>
           <p className="enter-3 mt-4 max-w-md text-sm leading-relaxed text-muted">
@@ -161,7 +161,7 @@ function Clock() {
   }, []);
   return (
     <span className="ml-auto font-mono tracking-[0.12em] text-faint tabular-nums">
-      {now.toISOString().slice(11, 19)}Z <span className="text-friendly">● LINK</span>
+      {now.toISOString().slice(11, 19)}Z <span className="text-good">● LINK</span>
     </span>
   );
 }

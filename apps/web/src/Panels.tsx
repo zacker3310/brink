@@ -40,13 +40,13 @@ export function Overview() {
           {(
             [
               ['Formations', Object.keys(view.formations).length, ''],
-              ['Idle', idle, idle ? 'text-signal' : 'text-friendly'],
+              ['Idle', idle, idle ? 'text-signal' : 'text-good'],
               ['At war', atWar, atWar ? 'text-hostile' : ''],
             ] as const
           ).map(([l, v, tone]) => (
             <div key={l} className="border border-line/70 bg-ink-850 py-1.5">
               <div className={`font-mono text-lg leading-tight font-semibold ${tone}`}>{v}</div>
-              <div className="text-[9px] tracking-[0.14em] text-faint uppercase">{l}</div>
+              <div className="font-display text-[9px] tracking-[0.14em] text-faint uppercase">{l}</div>
             </div>
           ))}
         </div>
@@ -66,7 +66,7 @@ export function Overview() {
                 <span className={n.id === view.self.id ? 'font-bold' : ''}>{n.name}</span>
                 {n.eliminated && <span className="text-[10px] text-hostile uppercase">out</span>}
                 {n.id !== view.self.id && !n.eliminated && (
-                  <span className={`text-[9px] uppercase ${view.relations[n.id] === 'war' ? 'text-hostile' : view.relations[n.id] === 'alliance' ? 'text-friendly' : 'text-faint'}`}>{view.relations[n.id]}</span>
+                  <span className={`text-[9px] uppercase ${view.relations[n.id] === 'war' ? 'text-hostile' : view.relations[n.id] === 'alliance' ? 'text-good' : 'text-faint'}`}>{view.relations[n.id]}</span>
                 )}
                 <span className="ml-auto font-mono tabular-nums">{n.victoryPoints}</span>
               </div>
@@ -293,10 +293,10 @@ export function Economy() {
             const short = ledger?.shortages.includes(r);
             return (
               <div key={r} className={`border px-2 py-1.5 ${short ? 'border-hostile/60 bg-hostile/10' : 'border-line/70 bg-ink-850'}`}>
-                <div className="text-[9px] tracking-[0.14em] text-faint uppercase">{r}</div>
+                <div className="font-display text-[9px] tracking-[0.14em] text-faint uppercase">{r}</div>
                 <div className="font-mono text-base leading-tight font-semibold tabular-nums">
                   {view.self.stockpile[r]}
-                  {d !== undefined && <span className={`ml-1 text-[10px] ${d >= 0 ? 'text-friendly' : 'text-hostile'}`}>{d >= 0 ? `+${d}` : d}</span>}
+                  {d !== undefined && <span className={`ml-1 text-[10px] ${d >= 0 ? 'text-good' : 'text-hostile'}`}>{d >= 0 ? `+${d}` : d}</span>}
                 </div>
               </div>
             );
@@ -332,7 +332,7 @@ export function Economy() {
                 <tr key={row} className="border-t border-line/40">
                   <td className="py-0.5 font-sans text-muted">{row}</td>
                   {RESOURCES.map((r) => (
-                    <td key={r} className={`text-right ${row === 'income' ? 'text-friendly' : ledger[row][r] ? '' : 'text-faint'}`}>
+                    <td key={r} className={`text-right ${row === 'income' ? 'text-good' : ledger[row][r] ? '' : 'text-faint'}`}>
                       {ledger[row][r] ? `${row === 'income' ? '+' : '−'}${ledger[row][r]}` : '·'}
                     </td>
                   ))}
@@ -342,7 +342,7 @@ export function Economy() {
                 <tr className="border-t border-line font-semibold">
                   <td className="py-0.5 font-sans">net</td>
                   {RESOURCES.map((r) => (
-                    <td key={r} className={`text-right ${net[r] >= 0 ? 'text-friendly' : 'text-hostile'}`}>
+                    <td key={r} className={`text-right ${net[r] >= 0 ? 'text-good' : 'text-hostile'}`}>
                       {net[r] >= 0 ? `+${net[r]}` : net[r]}
                     </td>
                   ))}
@@ -376,7 +376,7 @@ export function Research() {
           return (
             <li
               key={id}
-              className={`border p-2 text-xs ${done ? 'border-friendly/40 bg-friendly/5' : active ? 'border-signal/80 bg-ink-800' : why ? 'border-line/60 bg-ink-900 opacity-60' : 'border-line bg-ink-850'}`}
+              className={`border p-2 text-xs ${done ? 'border-good/40 bg-good/5' : active ? 'border-signal/80 bg-ink-800' : why ? 'border-line/60 bg-ink-900 opacity-60' : 'border-line bg-ink-850'}`}
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-semibold">{t.name}</span>
@@ -392,7 +392,7 @@ export function Research() {
               )}
               <div className="mt-1.5">
                 {done ? (
-                  <span className="text-[11px] font-semibold text-friendly">Researched</span>
+                  <span className="text-[11px] font-semibold text-good">Researched</span>
                 ) : active ? (
                   <Button onClick={() => setResearch(null)}>Stop</Button>
                 ) : (
@@ -435,7 +435,7 @@ export function Diplomacy() {
                   </div>
                 </div>
                 <span
-                  className={`ml-auto border px-1.5 py-0.5 text-[10px] font-bold uppercase ${rel === 'war' ? 'border-hostile/60 text-hostile' : rel === 'alliance' ? 'border-friendly/60 text-friendly' : 'border-line text-muted'}`}
+                  className={`ml-auto border px-1.5 py-0.5 text-[10px] font-bold uppercase ${rel === 'war' ? 'border-hostile/60 text-hostile' : rel === 'alliance' ? 'border-good/60 text-good' : 'border-line text-muted'}`}
                 >
                   {rel}
                 </span>

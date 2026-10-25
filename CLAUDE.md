@@ -30,6 +30,7 @@ Run these, do not guess them. Healthy output is shown so a wrong result is obvio
 
 ## Architecture
 
+Design system: `docs/design-system.md` (APP-6 symbols, tokens, type).
 Entry points: `packages/simulation/src/resolve.ts` (`resolveTurn`), `packages/session/src/session.ts`
 (`GameSession`), `apps/web/src/engine.worker.ts`. State lives in one plain-JSON `WorldState`; the UI and
 AI only ever see `NationView` from `fog.ts`. Balance numbers are authored in `packages/game-data`.

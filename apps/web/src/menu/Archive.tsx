@@ -33,7 +33,7 @@ export function Archive({
                   <div className="flex flex-1 flex-col p-4">
                     <div className="flex items-center justify-between">
                       <Label>{slot}</Label>
-                      {info && info.slot === latest?.slot && <span className="text-[10px] font-semibold tracking-[0.2em] text-signal uppercase">Latest</span>}
+                      {info && info.slot === latest?.slot && <span className="font-display text-[10px] font-semibold tracking-[0.2em] text-signal uppercase">Latest</span>}
                     </div>
                     {info ? (
                       <>
@@ -64,7 +64,7 @@ export function Archive({
                         if (text) onLoad(text);
                         else onError('That slot could not be read');
                       }}
-                      className="mt-4 border border-signal/70 bg-signal/10 px-3 py-2 text-xs font-bold tracking-[0.2em] text-signal uppercase transition-colors hover:bg-signal hover:text-ink-950 disabled:cursor-not-allowed disabled:border-line disabled:bg-transparent disabled:text-faint"
+                      className="font-display mt-4 border border-signal/70 bg-signal/10 px-3 py-2 text-xs font-bold tracking-[0.2em] text-signal uppercase transition-colors hover:bg-signal hover:text-ink-950 disabled:cursor-not-allowed disabled:border-line disabled:bg-transparent disabled:text-faint"
                     >
                       Resume
                     </button>
@@ -77,7 +77,7 @@ export function Archive({
 
         <Frame className="enter-4 mt-4 p-4">
           <label className="flex cursor-pointer flex-wrap items-center gap-3 text-sm">
-            <span className="border border-line bg-ink-800 px-3 py-2 text-xs font-semibold tracking-[0.16em] uppercase hover:border-faint">Import file…</span>
+            <span className="font-display border border-line bg-ink-800 px-3 py-2 text-xs font-semibold tracking-[0.16em] uppercase hover:border-faint">Import file…</span>
             <span className="text-xs text-muted">Load a campaign exported as JSON. The engine validates it before play resumes.</span>
             <input
               type="file"

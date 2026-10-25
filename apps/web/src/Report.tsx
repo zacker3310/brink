@@ -191,7 +191,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
 function Kpi({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: string; sub?: ReactNode }) {
   return (
     <div className="border border-line/70 bg-ink-850 px-3 py-2">
-      <div className="text-[9px] tracking-[0.16em] text-faint uppercase">{label}</div>
+      <div className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">{label}</div>
       <div className={`font-mono text-xl leading-tight font-semibold tabular-nums ${tone ?? ''}`}>{value}</div>
       {sub && <div className="text-[10px] text-muted">{sub}</div>}
     </div>
@@ -212,7 +212,7 @@ function ReportSection({ title, rows, onShow }: { title: string; rows: Row[]; on
       <ul className="space-y-1">
         {shown.map((r, i) => (
           <li key={i} className="flex items-start gap-2 text-xs leading-snug">
-            <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 ${r.tone === 'good' ? 'bg-friendly' : r.tone === 'bad' ? 'bg-hostile' : 'bg-faint'}`} aria-hidden />
+            <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 ${r.tone === 'good' ? 'bg-good' : r.tone === 'bad' ? 'bg-hostile' : 'bg-faint'}`} aria-hidden />
             <span className="flex-1">{r.text}</span>
             {r.at && (
               <button type="button" className="shrink-0 text-[10px] font-semibold tracking-wider text-faint uppercase hover:text-signal" onClick={() => onShow(r.at!)}>
@@ -261,10 +261,10 @@ export function Report() {
       <div className="report-in flex max-h-full w-full max-w-5xl flex-col border border-line bg-ink-950 shadow-2xl">
         <header className="flex items-center gap-4 border-b border-line px-5 py-3" style={{ background: `linear-gradient(90deg, ${view.self.color}22, transparent 60%)` }}>
           <div>
-            <p className="text-[10px] font-bold tracking-[0.3em] text-signal uppercase">
+            <p className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">
               Situation report · Day {clock.day}, {clock.hour}
             </p>
-            <h2 id="report-title" className="text-xl font-black tracking-tight">
+            <h2 id="report-title" className="font-display text-xl font-black tracking-tight">
               Turn {report.turn} resolved
             </h2>
           </div>
@@ -272,7 +272,7 @@ export function Report() {
             type="button"
             onClick={() => setShowReport(false)}
             data-testid="close-report"
-            className="ml-auto border border-signal bg-signal px-4 py-2 text-xs font-black tracking-wider text-ink-950 uppercase hover:brightness-110"
+            className="font-display ml-auto border border-signal bg-signal px-4 py-2 text-xs font-black tracking-wider text-ink-950 uppercase hover:brightness-110"
           >
             Continue planning <span className="ml-1 font-mono text-[10px] font-normal opacity-70">Esc</span>
           </button>
@@ -280,11 +280,11 @@ export function Report() {
 
         <div className="overflow-y-auto p-5">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            <Kpi label="Victory points" value={myVp} sub={vpDelta === null ? `need ${view.victoryThreshold}` : vpDelta === 0 ? 'no change' : `${vpDelta > 0 ? '+' : ''}${vpDelta} this turn`} tone={vpDelta && vpDelta < 0 ? 'text-hostile' : vpDelta ? 'text-friendly' : ''} />
-            <Kpi label="Ground" value={`${totals.gained - totals.ceded >= 0 ? '+' : ''}${totals.gained - totals.ceded}`} sub={`${totals.gained} taken · ${totals.ceded} lost`} tone={totals.gained - totals.ceded < 0 ? 'text-hostile' : totals.gained ? 'text-friendly' : ''} />
-            <Kpi label="Engagements" value={totals.battles} sub={totals.battles ? `exchange ${exchange >= 0 ? '+' : ''}${exchange}` : 'quiet front'} tone={totals.battles ? (exchange >= 0 ? 'text-friendly' : 'text-hostile') : ''} />
+            <Kpi label="Victory points" value={myVp} sub={vpDelta === null ? `need ${view.victoryThreshold}` : vpDelta === 0 ? 'no change' : `${vpDelta > 0 ? '+' : ''}${vpDelta} this turn`} tone={vpDelta && vpDelta < 0 ? 'text-hostile' : vpDelta ? 'text-good' : ''} />
+            <Kpi label="Ground" value={`${totals.gained - totals.ceded >= 0 ? '+' : ''}${totals.gained - totals.ceded}`} sub={`${totals.gained} taken · ${totals.ceded} lost`} tone={totals.gained - totals.ceded < 0 ? 'text-hostile' : totals.gained ? 'text-good' : ''} />
+            <Kpi label="Engagements" value={totals.battles} sub={totals.battles ? `exchange ${exchange >= 0 ? '+' : ''}${exchange}` : 'quiet front'} tone={totals.battles ? (exchange >= 0 ? 'text-good' : 'text-hostile') : ''} />
             <Kpi label="Losses" value={totals.lost} sub={`${totals.ourDestroyed} formation${totals.ourDestroyed === 1 ? '' : 's'} destroyed`} tone={totals.lost ? 'text-hostile' : ''} />
-            <Kpi label="Inflicted" value={totals.dealt} sub={`${totals.theirDestroyed} enemy destroyed`} tone={totals.dealt ? 'text-friendly' : ''} />
+            <Kpi label="Inflicted" value={totals.dealt} sub={`${totals.theirDestroyed} enemy destroyed`} tone={totals.dealt ? 'text-good' : ''} />
           </div>
 
           <div className="mt-3 border border-line/60 bg-ink-900 p-3">
@@ -305,7 +305,7 @@ export function Report() {
                     </div>
                     <span className="w-14 text-right font-mono tabular-nums">
                       {v}
-                      {d !== 0 && <span className={`ml-1 text-[10px] ${d > 0 ? 'text-friendly' : 'text-hostile'}`}>{d > 0 ? `+${d}` : d}</span>}
+                      {d !== 0 && <span className={`ml-1 text-[10px] ${d > 0 ? 'text-good' : 'text-hostile'}`}>{d > 0 ? `+${d}` : d}</span>}
                     </span>
                   </div>
                 );

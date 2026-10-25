@@ -1,24 +1,28 @@
 import type { GovernmentId, UnitClass } from '@brink/contracts';
+import { symbolSvg, type Affiliation } from './design/symbols';
 
 // Small SVG marks shared by the menus and the game screen.
 
-/** A NATO-style unit frame with a class symbol, drawn small. */
-export function UnitGlyph({ unitClass, color, className = 'h-3.5 w-5' }: { unitClass: UnitClass; color: string; className?: string }) {
+/** A unit's APP-6 symbol, inline. Affiliation defaults to friend (the viewer's own). */
+export function UnitGlyph({
+  unitClass,
+  color,
+  className = 'h-3.5 w-5',
+  affiliation = 'friend',
+  planned = false,
+}: {
+  unitClass: UnitClass;
+  color: string;
+  className?: string;
+  affiliation?: Affiliation;
+  planned?: boolean;
+}) {
   return (
-    <svg viewBox="0 0 20 14" className={`${className} shrink-0`} aria-hidden>
-      <rect x="0.75" y="0.75" width="18.5" height="12.5" fill="none" stroke={color} strokeWidth="1.5" />
-      {unitClass === 'infantry' && <path d="M1 1 L19 13 M19 1 L1 13" stroke={color} strokeWidth="1.2" />}
-      {unitClass === 'mechanized' && (
-        <>
-          <path d="M1 1 L19 13 M19 1 L1 13" stroke={color} strokeWidth="1.2" />
-          <ellipse cx="10" cy="7" rx="6" ry="3.2" fill="none" stroke={color} strokeWidth="1.2" />
-        </>
-      )}
-      {unitClass === 'armor' && <ellipse cx="10" cy="7" rx="6.5" ry="3.4" fill="none" stroke={color} strokeWidth="1.4" />}
-      {unitClass === 'artillery' && <circle cx="10" cy="7" r="2.2" fill={color} />}
-      {unitClass === 'recon' && <path d="M1 13 L19 1" stroke={color} strokeWidth="1.2" />}
-      {unitClass === 'air' && <path d="M3 8 Q6.5 3 10 8 Q13.5 3 17 8" fill="none" stroke={color} strokeWidth="1.3" />}
-    </svg>
+    <span
+      className={`inline-flex shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full ${className}`}
+      aria-hidden
+      dangerouslySetInnerHTML={{ __html: symbolSvg({ cls: unitClass, aff: affiliation, fill: color, planned, size: 30, echelon: false }) }}
+    />
   );
 }
 

@@ -34,7 +34,7 @@ export function ModeBanner() {
     return (
       <div className="resolving-banner absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-4 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2" role="status" data-testid="replay">
         <div>
-          <div className="text-[10px] font-bold tracking-[0.3em] text-signal uppercase">Turn {playback.before.turn} · replay</div>
+          <div className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">Turn {playback.before.turn} · replay</div>
           <div className="flex gap-3 text-xs font-semibold">
             {steps.map((p) => (
               <span key={p} className={`capitalize transition-colors ${p === playback.phase ? 'text-text' : steps.indexOf(p) < steps.indexOf(playback.phase) ? 'text-faint line-through' : 'text-faint'}`}>
@@ -52,7 +52,7 @@ export function ModeBanner() {
   if (resolving) {
     return (
       <div className="resolving-banner pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2 text-center" role="status">
-        <div className="text-[10px] font-bold tracking-[0.3em] text-signal uppercase">Orders locked</div>
+        <div className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">Orders locked</div>
         <div className="text-sm font-semibold">Resolving turn {view.turn}…</div>
       </div>
     );
@@ -61,14 +61,14 @@ export function ModeBanner() {
   const tone = mode === 'attack' ? 'border-hostile/70 text-hostile' : 'border-signal/60 text-signal';
   return (
     <div className={`pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 border bg-ink-950/85 px-3 py-1.5 text-xs whitespace-nowrap backdrop-blur ${tone}`}>
-      <span className="font-bold tracking-[0.2em] uppercase">{UNITS[f.unitClass].ground ? mode : UNITS[f.unitClass].range ? 'strike' : 'rebase'}</span>
+      <span className="font-display font-bold tracking-[0.2em] uppercase">{UNITS[f.unitClass].ground ? mode : UNITS[f.unitClass].range ? 'strike' : 'rebase'}</span>
       <span className="ml-2 text-muted">{UNITS[f.unitClass].ground ? MODE_HINT[mode] : 'Click a target or one of your cities'} · right-click to deselect</span>
     </div>
   );
 }
 
 const OUTCOME_TEXT: Record<string, [string, string]> = {
-  attacker_victory: ['Decisive victory', 'text-friendly'],
+  attacker_victory: ['Decisive victory', 'text-good'],
   inconclusive: ['Indecisive', 'text-signal'],
   defender_held: ['Repulsed', 'text-hostile'],
 };
@@ -123,7 +123,7 @@ function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
   return (
     <div className="w-72 border-2 border-hostile/70 bg-ink-950/95 text-[11px] shadow-2xl backdrop-blur" data-testid="combat-preview">
       <div className="flex items-center justify-between bg-hostile/20 px-3 py-1.5">
-        <span className="text-[10px] font-black tracking-[0.24em] text-[#ff8d7d] uppercase">{ranged ? 'Strike' : 'Assault'}</span>
+        <span className="font-display text-[10px] font-black tracking-[0.24em] text-hostile uppercase">{ranged ? 'Strike' : 'Assault'}</span>
         <span className="text-[10px] text-muted">{confidence} intel</span>
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 pt-2.5">
@@ -131,7 +131,7 @@ function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
           <UnitGlyph unitClass={f.unitClass} color={view.self.color} className="h-5 w-8" />
           <div className="mt-1 leading-tight font-bold">{f.name}</div>
         </div>
-        <div className="text-lg font-black text-faint">VS</div>
+        <div className="font-display text-lg font-black text-faint">VS</div>
         <div className="flex flex-col items-center text-center">
           <UnitGlyph unitClass={enemy.unitClass} color={enemyNation?.color ?? '#888'} className="h-5 w-8" />
           <div className="mt-1 leading-tight font-bold" style={{ color: enemyNation?.color }}>
@@ -140,14 +140,14 @@ function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
         </div>
       </div>
       <div className="space-y-2 px-3 py-2.5">
-        {!ranged && bar(f.strength, ourLoss, '#5fd17a', 'Your strength', `−${ourLoss[0]}–${ourLoss[1]}`)}
+        {!ranged && bar(f.strength, ourLoss, 'var(--color-good)', 'Your strength', `−${ourLoss[0]}–${ourLoss[1]}`)}
         {bar(Math.min(1000, theirStrength), theirLoss, enemyNation?.color ?? '#888', 'Their strength (est.)', `−${theirLoss[0]}–${theirLoss[1]}`)}
       </div>
       {outcomes.length > 0 && (
         <div className="border-t border-line px-3 py-1.5 text-center">
-          <span className="text-[10px] tracking-[0.16em] text-faint uppercase">Likely result </span>
+          <span className="font-display text-[10px] tracking-[0.16em] text-faint uppercase">Likely result </span>
           {outcomes.map((o, i) => (
-            <span key={o} className={`font-black ${OUTCOME_TEXT[o]?.[1]}`}>
+            <span key={o} className={`font-display font-black ${OUTCOME_TEXT[o]?.[1]}`}>
               {i > 0 && <span className="font-normal text-faint"> or </span>}
               {OUTCOME_TEXT[o]?.[0]}
             </span>
@@ -158,7 +158,7 @@ function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
         <div className="grid grid-cols-2 gap-x-3 border-t border-line px-3 py-1.5 text-[10px]">
           <ul>
             {mods.map(([l, n]) => (
-              <li key={l} className={n >= 0 ? 'text-friendly' : 'text-hostile'}>
+              <li key={l} className={n >= 0 ? 'text-good' : 'text-hostile'}>
                 {n > 0 ? '+' : ''}
                 {n}% {l}
               </li>
@@ -212,7 +212,7 @@ export function HoverCard() {
   }
   return (
     <div
-      className="pointer-events-none absolute z-10 w-52 border border-line bg-ink-950/92 px-2.5 py-2 text-[11px] shadow-xl backdrop-blur"
+      className="pointer-events-none absolute z-10 w-52 ds-panel px-2.5 py-2 text-[11px] shadow-xl backdrop-blur"
       style={{ left: flip ? x - 208 - HEX_SIZE * cam.scale : x + HEX_SIZE * cam.scale, top: Math.max(8, Math.min(y - 20, cam.height - 140)) }}
       data-testid="hover-card"
     >
@@ -296,7 +296,7 @@ export function Minimap() {
   const vw = cam.width / cam.scale;
   const vh = cam.height / cam.scale;
   return (
-    <div className="w-full border border-line bg-ink-950/90 p-1 shadow-xl" data-testid="minimap">
+    <div className="w-full ds-panel p-1" data-testid="minimap">
       <svg
         viewBox={`${geo.minX} ${geo.minY} ${geo.w} ${geo.h}`}
         style={{ aspectRatio: `${geo.w} / ${geo.h}` }}

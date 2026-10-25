@@ -39,7 +39,7 @@ function TopBar() {
   const clock = turnClock(turn);
   return (
     <header className="relative z-20 flex items-stretch border-b border-line bg-ink-950" data-testid="top-bar">
-      <div className="flex items-center border-r border-line px-4 text-sm font-black tracking-[0.28em] text-signal" aria-label="Brink">
+      <div className="font-display flex items-center border-r border-line px-4 text-sm font-black tracking-[0.28em] text-signal" aria-label="Brink">
         BRINK
       </div>
       <div className="flex items-center gap-2.5 border-r border-line px-4" style={{ background: `linear-gradient(90deg, ${s.color}1f, transparent)` }}>
@@ -58,24 +58,24 @@ function TopBar() {
           const d = net?.[r];
           return (
             <div key={r} className="leading-tight" title={ledger ? `${label}: ${signed(d ?? 0)} last turn` : label}>
-              <dt className="text-[9px] tracking-[0.16em] text-faint uppercase">{label}</dt>
+              <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">{label}</dt>
               <dd className={`font-mono text-sm tabular-nums ${short ? 'text-hostile' : ''}`}>
                 {s.stockpile[r]}
-                {d !== undefined && d !== 0 && <span className={`ml-1 text-[10px] ${d > 0 ? 'text-friendly' : 'text-hostile'}`}>{signed(d)}</span>}
+                {d !== undefined && d !== 0 && <span className={`ml-1 text-[10px] ${d > 0 ? 'text-good' : 'text-hostile'}`}>{signed(d)}</span>}
               </dd>
             </div>
           );
         })}
         <div className="leading-tight">
-          <dt className="text-[9px] tracking-[0.16em] text-faint uppercase">Industry</dt>
+          <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">Industry</dt>
           <dd className="font-mono text-sm tabular-nums">{s.industrialCapacity}</dd>
         </div>
         <div className="leading-tight">
-          <dt className="text-[9px] tracking-[0.16em] text-faint uppercase">Research</dt>
+          <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">Research</dt>
           <dd className="font-mono text-sm tabular-nums">{s.researchOutput}</dd>
         </div>
         <div className="w-20 leading-tight">
-          <dt className="text-[9px] tracking-[0.16em] text-faint uppercase">Stability</dt>
+          <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">Stability</dt>
           <dd className={`font-mono text-sm tabular-nums ${s.stability < 40 ? 'text-hostile' : ''}`}>{s.stability}</dd>
           <Meter value={s.stability} tone={s.stability < 40 ? 'bad' : 'good'} />
         </div>
@@ -85,7 +85,7 @@ function TopBar() {
 
       <div className="ml-auto flex items-center gap-3 border-l border-line px-4">
         <div className="text-right leading-tight" data-testid="turn">
-          <div className="text-[9px] tracking-[0.16em] text-faint uppercase">
+          <div className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">
             Day {clock.day} · {clock.hour}
           </div>
           <div className="font-mono text-sm font-semibold">
@@ -143,7 +143,7 @@ function VpRace() {
   const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints || (a.id < b.id ? -1 : 1));
   return (
     <div className="hidden min-w-48 flex-1 flex-col justify-center gap-0.5 border-l border-line px-4 xl:flex" title={`${view.victoryThreshold} VP wins outright`} data-testid="vp-race">
-      <div className="flex justify-between text-[9px] tracking-[0.16em] text-faint uppercase">
+      <div className="font-display flex justify-between text-[9px] tracking-[0.16em] text-faint uppercase">
         <span>Victory points</span>
         <span>win at {view.victoryThreshold}</span>
       </div>
@@ -245,7 +245,7 @@ function KeyHelp({ onClose }: { onClose: () => void }) {
     ['Ctrl Enter', 'End turn'],
   ];
   return (
-    <div className="panel-in absolute top-14 right-14 z-30 w-80 border border-line bg-ink-950/95 p-4 text-xs shadow-2xl" data-testid="key-help">
+    <div className="panel-in absolute top-14 right-14 z-30 w-80 ds-panel p-4 text-xs shadow-2xl" data-testid="key-help">
       <div className="flex justify-between">
         <Label>Controls</Label>
         <button type="button" onClick={onClose} className="text-faint hover:text-text" aria-label="Close">
@@ -279,9 +279,9 @@ function VictoryOverlay() {
   const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints);
   return (
     <div className="screen-in absolute inset-0 z-20 flex items-center justify-center bg-ink-950/75 backdrop-blur-sm" data-testid="victory" role="status">
-      <div className="w-full max-w-md border border-line bg-ink-900 p-6 text-center shadow-2xl" style={{ borderTop: `3px solid ${won ? 'var(--color-friendly)' : 'var(--color-hostile)'}` }}>
-        <div className="text-[10px] font-bold tracking-[0.36em] text-faint uppercase">Campaign concluded · turn {view.victory.turn}</div>
-        <div className={`mt-2 text-5xl font-black tracking-tight ${won ? 'text-friendly' : 'text-hostile'}`}>{won ? 'VICTORY' : 'DEFEAT'}</div>
+      <div className="w-full max-w-md border border-line bg-ink-900 p-6 text-center shadow-2xl" style={{ borderTop: `3px solid ${won ? 'var(--color-good)' : 'var(--color-hostile)'}` }}>
+        <div className="font-display text-[10px] font-bold tracking-[0.36em] text-faint uppercase">Campaign concluded · turn {view.victory.turn}</div>
+        <div className={`font-display mt-2 text-5xl font-black tracking-tight ${won ? 'text-good' : 'text-hostile'}`}>{won ? 'VICTORY' : 'DEFEAT'}</div>
         <div className="mt-2 text-sm text-muted">
           <span style={{ color: winner.color }}>{winner.name}</span> wins {reason}.
         </div>

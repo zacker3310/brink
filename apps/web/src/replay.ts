@@ -1,7 +1,10 @@
 import { Graphics, Text, type Application, type Container } from 'pixi.js';
 import type { HexKey, UnitClass } from '@brink/contracts';
 import type { Point } from '@brink/map';
-import { COUNTER_H, COUNTER_W, drawCounter } from './counters';
+import { affiliationOf, counterSprite, drawCounterChrome, type CounterLook } from './counters';
+import type { Affiliation } from './design/symbols';
+import { AFFILIATION, FONT_DISPLAY } from './design/tokens';
+import type { Sprite } from 'pixi.js';
 import type { Playback } from './store';
 
 // Replays a resolved turn on the map: everything moves at once, then strikes and battles, then
@@ -14,6 +17,9 @@ interface Actor {
   id: string;
   cls: UnitClass;
   color: number;
+  /** Fill as #rrggbb, and affiliation, for the APP-6 symbol. */
+  fill: string;
+  aff: Affiliation;
   own: boolean;
   confirmed: boolean;
   /** Strength before and after the turn, 0..1000 (estimates for enemies). */
@@ -71,6 +77,8 @@ export function buildTimeline(pb: Playback): Timeline {
       id: f.id,
       cls: f.unitClass,
       color: hex(before.self.color),
+      fill: before.self.color,
+      aff: 'friend',
       own: true,
       confirmed: true,
       s0: f.strength,
@@ -88,6 +96,8 @@ export function buildTimeline(pb: Playback): Timeline {
       id: c.formation,
       cls: c.unitClass,
       color: colorOf(c.owner),
+      fill: before.nations[c.owner]?.color ?? '#888888',
+      aff: affiliationOf(false, before.relations[c.owner]),
       own: false,
       confirmed: c.confirmed,
       s0: c.estimatedStrength,
@@ -132,6 +142,8 @@ export function buildTimeline(pb: Playback): Timeline {
             id: e.formation,
             cls: e.unitClass,
             color: colorOf(e.owner),
+            fill: before.nations[e.owner]?.color ?? '#888888',
+            aff: affiliationOf(e.owner === me, before.relations[e.owner]),
             own: e.owner === me,
             confirmed: true,
             s0: c?.estimatedStrength ?? 1000,
@@ -239,18 +251,26 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
   const units = new Graphics();
   const fx = new Graphics();
   layer.addChild(fx, units);
+  const look = (a: Actor): CounterLook => ({ cls: a.cls, aff: a.aff, fill: a.fill, confirmed: a.confirmed, strength: a.s0 });
+  const sprites = new Map<string, Sprite>();
+  for (const a of tl.actors) {
+    const s = counterSprite(look(a));
+    s.alpha = 0;
+    layer.addChild(s);
+    sprites.set(a.id, s);
+  }
   const labels: { text: Text; at: Point; start: number }[] = [];
   for (const b of tl.battles) {
     const at = center(b.at);
     const start = tl.combat[0] + b.delay + 260;
     const mk = (s: string, fill: number, dx: number) => {
-      const text = new Text({ text: s, resolution: 3, style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 15, fontWeight: '900', fill, stroke: { color: 0x070b12, width: 3 } } });
+      const text = new Text({ text: s, resolution: 3, style: { fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: '800', fill, stroke: { color: 0x070b12, width: 3 } } });
       text.anchor.set(0.5, 1);
       text.alpha = 0;
       layer.addChild(text);
       labels.push({ text, at: { x: at.x + dx, y: at.y - 14 }, start });
     };
-    if (b.ours) mk(`−${b.ours}`, 0xd9534f, b.theirs ? -14 : 0);
+    if (b.ours) mk(`−${b.ours}`, AFFILIATION.hostile, b.theirs ? -14 : 0);
     if (b.theirs) mk(`−${b.theirs}`, 0x6fbf8e, b.ours ? 14 : 0);
   }
   const routes = new Map(tl.actors.map((a) => [a.id, a.route.map(center)]));
@@ -280,10 +300,18 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       let fade = 1;
       if (a.appears) fade = clamp(pm * 4);
       if (a.destroyed) fade *= 1 - pa;
-      if (fade <= 0.01) continue;
+      const sprite = sprites.get(a.id)!;
+      if (fade <= 0.01) {
+        sprite.alpha = 0;
+        continue;
+      }
       const strength = a.s0 + (a.s1 - a.s0) * pc;
-      const off = a.slot * 3.5;
-      drawCounter(units, pos.x - COUNTER_W / 2 - 3 + off, pos.y - COUNTER_H / 2 - 1 - off, { cls: a.cls, color: a.color, own: a.own, confirmed: a.confirmed, strength }, fade);
+      const off = a.slot * 4;
+      const x = pos.x - 3 + off;
+      const y = pos.y - 2 - off;
+      sprite.position.set(x, y);
+      sprite.alpha = (a.confirmed ? 1 : 0.55) * fade;
+      drawCounterChrome(units, x, y, { ...look(a), strength }, fade);
       if (a.destroyed && pa > 0 && pa < 1) {
         fx.circle(pos.x, pos.y, size * (0.3 + pa)).stroke({ width: 3, color: 0xf2a65a, alpha: 1 - pa });
         fx.circle(pos.x, pos.y, size * 0.5 * pa).fill({ color: 0xffd28a, alpha: 0.5 * (1 - pa) });
@@ -312,7 +340,7 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       const c = center(b.at);
       if (q < 0.12) fx.circle(c.x, c.y, size * 1.1).fill({ color: 0xffffff, alpha: 0.55 * (1 - q / 0.12) });
       fx.circle(c.x, c.y, size * (0.45 + 0.6 * q)).fill({ color: 0xffb35c, alpha: 0.55 * (1 - q) });
-      fx.circle(c.x, c.y, size * (0.5 + 1.1 * q)).stroke({ width: 4, color: 0xd9534f, alpha: 1 - q });
+      fx.circle(c.x, c.y, size * (0.5 + 1.1 * q)).stroke({ width: 4, color: AFFILIATION.hostile, alpha: 1 - q });
       fx.circle(c.x, c.y, size * (0.3 + 1.6 * q)).stroke({ width: 2, color: 0xffd28a, alpha: 0.8 * (1 - q) });
       const r = 9;
       fx.moveTo(c.x - r, c.y - r).lineTo(c.x + r, c.y + r).moveTo(c.x + r, c.y - r).lineTo(c.x - r, c.y + r).stroke({ width: 3, color: 0xffffff, alpha: Math.min(1, 3 * (1 - q)) });
