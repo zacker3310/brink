@@ -61,6 +61,10 @@ interface State {
   playback: Playback | null;
   /** Replay resolved turns on the map. */
   animate: boolean;
+  /** City whose production panel is open. */
+  selectedCity: string | null;
+  /** Notification ids dismissed for the current report. */
+  dismissed: string[];
 
   newGame(nation: NationId, seed: number): Promise<void>;
   loadGame(text: string): Promise<void>;
@@ -76,6 +80,10 @@ interface State {
   /** Apply the turn being replayed and open its report. Also used to skip the replay. */
   finishPlayback(): void;
   setAnimate(on: boolean): void;
+  /** Give an order from the map or unit panel, then move on to the next unit without orders. */
+  issueOrder(id: FormationId, order: FormationOrder): void;
+  openCity(id: string | null): void;
+  dismissNote(id: string): void;
   setOrder(id: FormationId, order: FormationOrder | null): void;
   addRecruit(siteId: string, unitClass: UnitClass): void;
   removeRecruit(index: number): void;
@@ -139,8 +147,10 @@ export const useGame = create<State>((set, get) => {
 
   const afterResolve = () => {
     const rejected = get().report?.events.filter((e) => e.kind === 'order_rejected') ?? [];
-    if (rejected.length > 0) get().notify(`${rejected.length} order(s) were rejected: see the report`, 'warn');
-    set({ showReport: true });
+    if (rejected.length > 0) get().notify(`${rejected.length} order(s) were rejected: see the turn summary`, 'warn');
+    // Results arrive as map notifications; the full summary is one click away.
+    set({ dismissed: [], selectedFormation: null });
+    get().nextIdle();
   };
 
   const editDraft = (fn: (d: NationOrders) => NationOrders) => {
@@ -168,21 +178,24 @@ export const useGame = create<State>((set, get) => {
     notices: [],
     slots: listSlots(),
     hoverHex: null,
-    panelOpen: true,
+    panelOpen: false,
     playback: null,
     animate: readPrefs().animate ?? !prefersReducedMotion(),
+    selectedCity: null,
+    dismissed: [],
 
     async newGame(nation, seed) {
       if (apply(await engine.call({ type: 'new', seed, nation }))) {
         const capital = Object.values(get().view!.sites).find((s) => s.owner === nation && s.kind === 'capital');
-        set({ selectedHex: capital?.key ?? null, selectedFormation: null, showReport: false, tab: 'overview' });
-        if (capital) get().focusOn(capital.key);
+        set({ selectedHex: capital?.key ?? null, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
+        get().nextIdle();
       }
     },
     async loadGame(text) {
       if (apply(await engine.call({ type: 'load', text }))) {
-        set({ selectedHex: null, selectedFormation: null, showReport: false });
+        set({ selectedHex: null, selectedFormation: null, showReport: false, dismissed: [] });
         get().notify(`Loaded turn ${get().view!.turn}`);
+        get().nextIdle();
       }
     },
     toMenu: () => {
@@ -197,7 +210,7 @@ export const useGame = create<State>((set, get) => {
     selectHex: (key) => set({ selectedHex: key }),
     selectFormation: (id) => {
       const f = id ? get().view?.formations[id] : null;
-      set({ selectedFormation: id, selectedHex: f?.key ?? get().selectedHex, mode: 'move' });
+      set({ selectedFormation: id, selectedHex: f?.key ?? get().selectedHex, mode: 'move', ...(id ? { selectedCity: null } : {}) });
     },
     setMode: (mode) => set({ mode }),
     setTab: (tab) => set({ tab, panelOpen: true }),
@@ -262,6 +275,16 @@ export const useGame = create<State>((set, get) => {
       apply(pb.result);
       afterResolve();
     },
+    issueOrder(id, order) {
+      get().setOrder(id, order);
+      // Civ-style flow: the next unit that needs orders comes up on its own.
+      setTimeout(() => {
+        const s = get();
+        if (s.selectedFormation === id && !s.resolving && s.draft?.formations[id]) s.nextIdle();
+      }, 260);
+    },
+    openCity: (id) => set({ selectedCity: id, ...(id ? { selectedFormation: null, panelOpen: false } : {}) }),
+    dismissNote: (id) => set({ dismissed: [...get().dismissed, id] }),
     setAnimate(on) {
       writePrefs({ animate: on });
       set({ animate: on });

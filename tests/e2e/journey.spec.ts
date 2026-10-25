@@ -31,28 +31,40 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await first.click();
   await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
 
-  // Issue a move order by clicking a reachable hex on the map.
+  // Hovering a reachable hex previews the move; clicking it orders it. The next unit that needs
+  // orders then comes up on its own, so check the order on the formation list.
   const target = await page.evaluate(() => window.__brink!.reachable().at(-1)!);
   expect(target).toBeTruthy();
   const at = await page.evaluate((k) => window.__brink!.hexToClient(k), target);
+  await page.mouse.move(at.x, at.y);
+  await expect(page.getByTestId('hover-card')).toContainText('Move');
   await page.mouse.click(at.x, at.y);
-  await expect(page.getByTestId('planned-order')).toContainText(/Move \d+ hex/);
+  await expect(first).toContainText(/Move \d+ hex/);
   await expect(page.locator('[data-testid="rejections"]')).toHaveCount(0);
 
   // Also order a defend, through the toolbar.
-  await page.locator('[data-testid^="formation-f"]').filter({ hasText: 'Armored' }).first().click();
+  const armored = page.locator('[data-testid^="formation-f"]').filter({ hasText: 'Armored' }).first();
+  await armored.click();
   await page.getByTestId('order-defend').click();
-  await expect(page.getByTestId('planned-order')).toContainText('Defend');
+  await expect(armored).toContainText('Defend');
 
   // Jump to the next formation without orders.
-  await expect(page.getByTestId('next-idle')).toContainText('2/9');
+  await expect(page.getByTestId('next-idle')).toContainText('7 of 9 units need orders');
   await page.getByTestId('next-idle').click();
   await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
 
-  // End the turn and read the after-action report.
+  // Choose production in the capital from its city banner.
+  await page.keyboard.press('Escape');
+  await page.getByTestId('city-korva-capital').click();
+  await page.getByTestId('build-infantry').click();
+  await expect(page.getByTestId('build-infantry')).toHaveAttribute('class', /border-signal/);
+  await page.getByTestId('close-city').click();
+
+  // End the turn: it replays on the map, results arrive as notifications, the summary is a click away.
   await page.getByTestId('end-turn').click();
-  // The turn replays on the map before the report opens.
   await expect(page.getByTestId('replay')).toBeVisible();
+  await expect(page.getByTestId('notifications')).toBeVisible();
+  await page.getByTestId('open-report').click();
   const report = page.getByTestId('report');
   await expect(report).toBeVisible();
   await expect(report).toContainText('Turn 1 resolved');

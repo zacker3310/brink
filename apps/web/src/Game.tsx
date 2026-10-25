@@ -1,18 +1,19 @@
-import { useState, type ReactNode } from 'react';
-import type { Formation, Resource } from '@brink/contracts';
-import { GOVERNMENTS, TERRAIN, UNITS } from '@brink/game-data';
+import { useState } from 'react';
+import type { Resource } from '@brink/contracts';
+import { GOVERNMENTS, UNITS } from '@brink/game-data';
 import { useCamera } from './camera';
 import { Kbd, Label, useKeys } from './chrome';
-import { CommandBar } from './CommandBar';
-import { Emblem, UnitGlyph } from './glyphs';
-import { hexLabel, netChange, selfLedger, turnClock } from './insight';
-import { HoverCard, Legend, Minimap, ModeBanner, Toasts, ZoomControls } from './MapOverlays';
+import { CityBanners, CityPanel } from './Cities';
+import { Emblem } from './glyphs';
+import { netChange, selfLedger, turnClock } from './insight';
+import { HoverCard, ModeBanner, Toasts, ZoomControls } from './MapOverlays';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
-import { describeOrder } from './planning';
+import { Notifications } from './Notifications';
 import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
 import { useGame, type Tab } from './store';
+import { TurnControls, UnitPanel } from './UnitPanel';
 import { Meter, signed, Swatch } from './ui';
 
 const RES: [Resource, string][] = [
@@ -211,9 +212,13 @@ function LeftRail() {
 function SidePanel() {
   const tab = useGame((s) => s.tab);
   const open = useGame((s) => s.panelOpen);
+  const togglePanel = useGame((s) => s.togglePanel);
   if (!open) return null;
   return (
-    <aside className="panel-in min-h-0 w-[300px] overflow-y-auto border-r border-line bg-ink-900" data-testid={`panel-${tab}`}>
+    <aside className="panel-in absolute top-0 bottom-0 left-0 z-20 w-[320px] overflow-y-auto border-r border-line bg-ink-900/97 shadow-2xl backdrop-blur" data-testid={`panel-${tab}`}>
+      <button type="button" onClick={() => togglePanel(false)} className="absolute top-2 right-2 z-10 text-faint hover:text-text" aria-label="Close panel">
+        ✕
+      </button>
       {tab === 'overview' && <Overview />}
       {tab === 'military' && <Military />}
       {tab === 'economy' && <Economy />}
@@ -223,178 +228,30 @@ function SidePanel() {
   );
 }
 
-function Section({ title, children, right }: { title: ReactNode; children: ReactNode; right?: ReactNode }) {
-  return (
-    <section className="border-b border-line px-3 py-3">
-      <header className="mb-2 flex items-center justify-between">
-        <Label>{title}</Label>
-        {right}
-      </header>
-      {children}
-    </section>
-  );
-}
-
-function Bar({ label, value, max }: { label: string; value: number; max: number }) {
-  const r = value / max;
-  return (
-    <div>
-      <div className="flex justify-between text-[10px]">
-        <span className="text-muted">{label}</span>
-        <span className="font-mono tabular-nums">{value}</span>
-      </div>
-      <div className="h-1 bg-ink-700">
-        <div className={`h-full ${r < 0.35 ? 'bg-hostile' : r < 0.6 ? 'bg-signal' : 'bg-friendly'}`} style={{ width: `${Math.min(100, r * 100)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function FormationCard({ f, selected, onSelect }: { f: Formation; selected: boolean; onSelect: () => void }) {
-  const view = useGame((s) => s.view)!;
-  const draft = useGame((s) => s.draft)!;
-  return (
-    <div className={`border p-2 ${selected ? 'border-signal/70 bg-ink-850' : 'border-line bg-ink-900'}`}>
-      <button type="button" className="flex w-full items-center gap-2 text-left" onClick={onSelect}>
-        <UnitGlyph unitClass={f.unitClass} color={view.self.color} />
-        <span className={`flex-1 truncate text-sm font-semibold ${selected ? 'text-signal' : 'hover:text-signal'}`}>{f.name}</span>
-        <span className="font-mono text-[10px] text-faint">{UNITS[f.unitClass].short}</span>
-      </button>
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
-        <Bar label="Strength" value={f.strength} max={1000} />
-        <Bar label="Organization" value={f.organization} max={100} />
-        <Bar label="Morale" value={f.morale} max={100} />
-        <Bar label="Readiness" value={f.readiness} max={100} />
-        <Bar label="Supply" value={f.supply} max={100} />
-        <Bar label="Fuel" value={f.fuel} max={100} />
-        <Bar label="Ammunition" value={f.ammunition} max={100} />
-        <Bar label="Dug in" value={f.entrenchment} max={100} />
-      </div>
-      <div className="mt-2 flex justify-between text-[10px] text-muted">
-        <span>XP {f.experience}</span>
-        <span className={draft.formations[f.id] ? 'text-signal' : ''}>{describeOrder(draft.formations[f.id], view)}</span>
-      </div>
-    </div>
-  );
-}
-
-function Inspector() {
-  const view = useGame((s) => s.view)!;
-  const key = useGame((s) => s.selectedHex);
-  const selectFormation = useGame((s) => s.selectFormation);
-  const selected = useGame((s) => s.selectedFormation);
-  if (!key) {
-    return (
-      <aside className="min-h-0 w-[288px] overflow-y-auto border-l border-line bg-ink-900 p-4 text-xs text-muted">
-        <Label>Inspector</Label>
-        <p className="mt-2">Select a hex, a city or a formation.</p>
-        <KeyHelp />
-      </aside>
-    );
-  }
-  const t = view.tiles[key]!;
-  const site = t.siteId ? view.sites[t.siteId] : undefined;
-  const own = Object.values(view.formations).filter((f) => f.key === key);
-  const contacts = Object.values(view.contacts).filter((c) => c.key === key);
-  const owner = t.owner ? view.nations[t.owner] : undefined;
-  return (
-    <aside className="min-h-0 w-[288px] overflow-y-auto border-l border-line bg-ink-900" data-testid="inspector">
-      <div className="border-b border-line px-3 py-3" style={owner ? { background: `linear-gradient(180deg, ${owner.color}1a, transparent)` } : undefined}>
-        <Label>{site ? site.kind : 'Terrain'}</Label>
-        <div className="mt-1 text-base font-bold">{hexLabel(view, key)}</div>
-        <div className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-muted">
-          <span>{t.terrain ? TERRAIN[t.terrain].name : 'Unknown'}</span>
-          {t.terrain && TERRAIN[t.terrain].defense > 0 && <span>+{TERRAIN[t.terrain].defense}% defense</span>}
-          {t.river && <span className="text-[#6e9cc6]">river</span>}
-          <span>roads {t.infrastructure}</span>
-          <span className="font-mono text-faint">{key}</span>
-        </div>
-        <div className="mt-1.5 flex items-center gap-1.5 text-xs">
-          {owner ? (
-            <>
-              <Swatch color={owner.color} />
-              {owner.name}
-            </>
-          ) : (
-            <span className="text-faint">Unclaimed</span>
-          )}
-          <span className="ml-auto text-[10px] text-faint">{t.visibility === 'observed' ? `last seen turn ${t.lastObserved}` : t.visibility}</span>
-        </div>
-      </div>
-      {site && (
-        <Section title={site.name} right={<span className="font-mono text-xs text-signal">{site.victoryPoints} VP</span>}>
-          <div className="grid grid-cols-3 gap-1.5 text-center font-mono text-[11px]">
-            {(
-              [
-                ['cr', site.yields.credits],
-                ['en', site.yields.energy],
-                ['mat', site.yields.materials],
-                ['food', site.yields.food],
-                ['ind', site.yields.industry],
-                ['res', site.yields.research],
-              ] as const
-            ).map(([l, v]) => (
-              <div key={l} className="border border-line/70 bg-ink-850 py-1">
-                <div className={v ? 'text-friendly' : 'text-faint'}>+{v}</div>
-                <div className="text-[9px] text-faint uppercase">{l}</div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-1.5 text-[11px] text-muted">Population {site.population}k</div>
-        </Section>
-      )}
-      {own.length > 0 && (
-        <Section title={`Your forces (${own.length})`}>
-          <div className="space-y-2">
-            {own.map((f) => (
-              <FormationCard key={f.id} f={f} selected={selected === f.id} onSelect={() => selectFormation(f.id)} />
-            ))}
-          </div>
-        </Section>
-      )}
-      {contacts.length > 0 && (
-        <Section title="Enemy contacts">
-          <div className="space-y-1.5">
-            {contacts.map((c) => {
-              const n = view.nations[c.owner];
-              return (
-                <div key={c.formation} className={`border border-line p-2 text-xs ${c.confirmed ? '' : 'opacity-60'}`}>
-                  <div className="flex items-center gap-2">
-                    <UnitGlyph unitClass={c.unitClass} color={n?.color ?? '#888'} />
-                    <span className="font-semibold">{UNITS[c.unitClass].name}</span>
-                    <span className={`ml-auto text-[10px] uppercase ${view.relations[c.owner] === 'war' ? 'text-hostile' : 'text-muted'}`}>{view.relations[c.owner]}</span>
-                  </div>
-                  <div className="mt-1 flex justify-between text-[11px] text-muted">
-                    <span>{n?.name}</span>
-                    <span>
-                      ~{Math.round(c.estimatedStrength / 10)}% · {c.confirmed ? 'seen now' : `turn ${c.lastSeen}`}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Section>
-      )}
-    </aside>
-  );
-}
-
-function KeyHelp() {
+function KeyHelp({ onClose }: { onClose: () => void }) {
   const rows: [string, string][] = [
+    ['Left-click', 'Select a unit or city; with a unit selected, order it there'],
+    ['Right-click', 'Order the selected unit: move, or attack an enemy'],
+    ['Drag  Wheel', 'Pan, zoom'],
     ['1–5', 'Panels'],
     ['Tab', 'Hide / show panel'],
-    ['N', 'Next idle formation'],
+    ['N', 'Next unit that needs orders'],
     ['H D', 'Hold, defend'],
     ['M A R W', 'Move, attack, recon, withdraw'],
     ['X', 'Clear order'],
-    ['Esc', 'Deselect'],
+    ['Esc', 'Deselect, close'],
+    ['?', 'This card'],
     ['F  + −', 'Fit, zoom'],
     ['Ctrl Enter', 'End turn'],
   ];
   return (
-    <div className="mt-6">
-      <Label>Keys</Label>
+    <div className="panel-in absolute top-14 right-14 z-30 w-80 border border-line bg-ink-950/95 p-4 text-xs shadow-2xl" data-testid="key-help">
+      <div className="flex justify-between">
+        <Label>Controls</Label>
+        <button type="button" onClick={onClose} className="text-faint hover:text-text" aria-label="Close">
+          ✕
+        </button>
+      </div>
       <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
@@ -451,7 +308,7 @@ function VictoryOverlay() {
   );
 }
 
-function useShortcuts() {
+function useShortcuts(toggleHelp: () => void) {
   const s = useGame;
   useKeys((e) => {
     const g = s.getState();
@@ -476,20 +333,23 @@ function useShortcuts() {
     const f = g.selectedFormation && g.view ? g.view.formations[g.selectedFormation] : undefined;
     const k = e.key.toLowerCase();
     const tab = Number(e.key);
-    if (tab >= 1 && tab <= TABS.length) g.setTab(TABS[tab - 1]![0]);
+    if (e.key === '?') toggleHelp();
+    else if (tab >= 1 && tab <= TABS.length) g.setTab(TABS[tab - 1]![0]);
     else if (e.key === 'Tab') {
       e.preventDefault();
       g.togglePanel();
     } else if (k === 'n') g.nextIdle();
     else if (e.key === 'Escape') {
+      if (g.selectedCity) return;
+      if (g.panelOpen) g.togglePanel(false);
       g.selectFormation(null);
       g.selectHex(null);
     } else if (k === 'f') cam?.fit();
     else if (e.key === '+' || e.key === '=') cam?.zoomBy(1.25);
     else if (e.key === '-' || e.key === '_') cam?.zoomBy(0.8);
     else if (f && !g.resolving) {
-      if (k === 'h') g.setOrder(f.id, { type: 'hold' });
-      else if (k === 'd' && UNITS[f.unitClass].ground) g.setOrder(f.id, { type: 'defend' });
+      if (k === 'h') g.issueOrder(f.id, { type: 'hold' });
+      else if (k === 'd' && UNITS[f.unitClass].ground) g.issueOrder(f.id, { type: 'defend' });
       else if (k === 'x') g.setOrder(f.id, null);
       else if (k === 'm') g.setMode('move');
       else if (k === 'a') g.setMode('attack');
@@ -501,27 +361,30 @@ function useShortcuts() {
 
 export function Game() {
   const showReport = useGame((s) => s.showReport);
-  useShortcuts();
+  const [help, setHelp] = useState(false);
+  useShortcuts(() => setHelp((h) => !h));
   return (
-    <div className="grid h-full grid-rows-[auto_1fr_auto] bg-ink-950">
+    <div className="grid h-full grid-rows-[auto_1fr] bg-ink-950">
       <TopBar />
       <div className="flex min-h-0">
         <LeftRail />
-        <SidePanel />
         <div className="map-stage relative min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="map">
           <MapView />
           <div className="map-vignette pointer-events-none absolute inset-0" aria-hidden />
+          <CityBanners />
           <ModeBanner />
           <HoverCard />
-          <ZoomControls />
-          <Minimap />
-          <Legend />
+          <ZoomControls onHelp={() => setHelp(!help)} />
+          <Notifications />
+          <UnitPanel />
+          <TurnControls />
+          <SidePanel />
+          <CityPanel />
           <Toasts />
+          {help && <KeyHelp onClose={() => setHelp(false)} />}
           <VictoryOverlay />
         </div>
-        <Inspector />
       </div>
-      <CommandBar />
       {showReport && <Report />}
     </div>
   );

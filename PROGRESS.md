@@ -47,6 +47,15 @@ Updated 2026-10-25. Milestone 1 (first playable).
   zoom controls and a clickable minimap; command bar with segmented orders, hotkeys, visual combat
   odds and next-idle-unit; compact inspector; situation report with headline KPIs, VP deltas, place
   names instead of coordinates and de-duplicated sightings; victory screen; keyboard map.
+- Civ-style play (map is the interface): full-bleed map with drawers closed by default; unit panel
+  bottom-left (portrait, health ring, MP, round action buttons); Next Turn, units-need-orders cycle
+  and minimap bottom-right; select on the map, blue movement range with a bright border, red rings
+  on attackable enemies, hover path preview, right-click to order, ghost counters at destinations,
+  auto-advance to the next unit; instant combat-odds card on hovering an enemy (both sides,
+  expected damage, likely result, modifiers) from the engine's own pure preview; city banners with
+  population, VP and production that open a production picker; turn results as notification icons
+  on the right edge, full summary on demand; terrain art (forests, hills, snow-capped mountains,
+  towns, connected rivers, coasts) and Civ-thick borders.
 - Turn replay: before the report, the map replays the resolved turn on the pre-turn board: all
   movement at once, then strike tracers, battle flashes and floating losses, then retreats,
   destroyed formations and site captures. Built only from events the player could see. Skip with

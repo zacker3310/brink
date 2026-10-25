@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import type { HexKey } from '@brink/contracts';
-import { TERRAIN, UNITS } from '@brink/game-data';
+import { GOVERNMENTS, RIVER_ASSAULT_PENALTY, TERRAIN, UNITS } from '@brink/game-data';
+import { nationModifiers, previewAssault, previewStrike } from '@brink/simulation';
 import { hexCorners, hexToPixel, parseKey } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
 import { hexLabel } from './insight';
+import { UnitGlyph } from './glyphs';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useGame } from './store';
 import { Swatch } from './ui';
@@ -65,6 +67,117 @@ export function ModeBanner() {
   );
 }
 
+const OUTCOME_TEXT: Record<string, [string, string]> = {
+  attacker_victory: ['Decisive victory', 'text-friendly'],
+  inconclusive: ['Indecisive', 'text-signal'],
+  defender_held: ['Repulsed', 'text-hostile'],
+};
+
+/** Civ-style combat preview: both sides, expected damage, and the modifiers in play. */
+function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
+  const view = useGame((s) => s.view)!;
+  const f = view.formations[fid]!;
+  const def = UNITS[f.unitClass];
+  const enemies = hostilesAt(view, target);
+  const tile = view.tiles[target]!;
+  const enemy = enemies[0]!;
+  const enemyNation = view.nations[enemy.owner];
+  const theirStrength = enemies.reduce((a, c) => a + c.estimatedStrength, 0) / enemies.length;
+  const ranged = def.range > 0;
+  const assault = ranged ? null : previewAssault(view, [fid], target);
+  const strike = ranged ? previewStrike(view, fid, target) : null;
+  const terrain = tile.terrain ? TERRAIN[tile.terrain] : null;
+  const mods: [string, number][] = [];
+  const mine = nationModifiers(view.self);
+  if (mine.attack) mods.push([`${GOVERNMENTS[view.self.government].name}`, mine.attack]);
+  if (!ranged && terrain && (f.unitClass === 'armor' || f.unitClass === 'mechanized') && terrain.armorPenalty) mods.push([`Armor in ${terrain.name.toLowerCase()}`, -terrain.armorPenalty]);
+  if (!ranged && tile.river) mods.push(['Attacking across a river', -RIVER_ASSAULT_PENALTY]);
+  if (!ranged && !enemies.every((c) => c.confirmed)) mods.push(['Target not in sight', -20]);
+  const theirMods: [string, number][] = [];
+  if (terrain?.defense) {
+    const cover = enemy.unitClass === 'infantry' ? Math.floor((terrain.defense * 3) / 2) : enemy.unitClass === 'armor' ? Math.floor(terrain.defense / 2) : terrain.defense;
+    theirMods.push([`${terrain.name} cover`, cover]);
+  }
+  const theirGov = enemyNation ? nationModifiers({ government: enemyNation.government, research: { current: null, progress: 0, unlocked: [] } }) : null;
+  if (theirGov?.homeDefense && tile.owner === enemy.owner) theirMods.push(['Defending home ground', theirGov.homeDefense]);
+  const ourLoss = assault?.attackerLoss ?? [0, 0];
+  const theirLoss = assault?.defenderLoss ?? strike?.loss ?? [0, 0];
+  const bar = (now: number, loss: readonly [number, number], color: string, label: string, sub: string) => {
+    const after = [Math.max(0, now - loss[1]), Math.max(0, now - loss[0])];
+    return (
+      <div>
+        <div className="flex justify-between text-[10px]">
+          <span className="font-semibold text-text">{label}</span>
+          <span className="font-mono text-muted">{sub}</span>
+        </div>
+        <div className="relative mt-0.5 h-2.5 bg-ink-700">
+          <div className="absolute inset-y-0 left-0 bg-hostile/70" style={{ width: `${now / 10}%` }} />
+          <div className="absolute inset-y-0 left-0 opacity-50" style={{ width: `${after[1]! / 10}%`, background: color }} />
+          <div className="absolute inset-y-0 left-0" style={{ width: `${after[0]! / 10}%`, background: color }} />
+        </div>
+      </div>
+    );
+  };
+  const outcomes = assault?.outcomes ?? [];
+  const confidence = assault?.confidence ?? strike?.confidence ?? 'blind';
+  return (
+    <div className="w-72 border-2 border-hostile/70 bg-ink-950/95 text-[11px] shadow-2xl backdrop-blur" data-testid="combat-preview">
+      <div className="flex items-center justify-between bg-hostile/20 px-3 py-1.5">
+        <span className="text-[10px] font-black tracking-[0.24em] text-[#ff8d7d] uppercase">{ranged ? 'Strike' : 'Assault'}</span>
+        <span className="text-[10px] text-muted">{confidence} intel</span>
+      </div>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 pt-2.5">
+        <div className="flex flex-col items-center text-center">
+          <UnitGlyph unitClass={f.unitClass} color={view.self.color} className="h-5 w-8" />
+          <div className="mt-1 leading-tight font-bold">{f.name}</div>
+        </div>
+        <div className="text-lg font-black text-faint">VS</div>
+        <div className="flex flex-col items-center text-center">
+          <UnitGlyph unitClass={enemy.unitClass} color={enemyNation?.color ?? '#888'} className="h-5 w-8" />
+          <div className="mt-1 leading-tight font-bold" style={{ color: enemyNation?.color }}>
+            {enemies.length > 1 ? `${enemies.length} formations` : UNITS[enemy.unitClass].name}
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2 px-3 py-2.5">
+        {!ranged && bar(f.strength, ourLoss, '#5fd17a', 'Your strength', `−${ourLoss[0]}–${ourLoss[1]}`)}
+        {bar(Math.min(1000, theirStrength), theirLoss, enemyNation?.color ?? '#888', 'Their strength (est.)', `−${theirLoss[0]}–${theirLoss[1]}`)}
+      </div>
+      {outcomes.length > 0 && (
+        <div className="border-t border-line px-3 py-1.5 text-center">
+          <span className="text-[10px] tracking-[0.16em] text-faint uppercase">Likely result </span>
+          {outcomes.map((o, i) => (
+            <span key={o} className={`font-black ${OUTCOME_TEXT[o]?.[1]}`}>
+              {i > 0 && <span className="font-normal text-faint"> or </span>}
+              {OUTCOME_TEXT[o]?.[0]}
+            </span>
+          ))}
+        </div>
+      )}
+      {(mods.length > 0 || theirMods.length > 0) && (
+        <div className="grid grid-cols-2 gap-x-3 border-t border-line px-3 py-1.5 text-[10px]">
+          <ul>
+            {mods.map(([l, n]) => (
+              <li key={l} className={n >= 0 ? 'text-friendly' : 'text-hostile'}>
+                {n > 0 ? '+' : ''}
+                {n}% {l}
+              </li>
+            ))}
+          </ul>
+          <ul className="text-right">
+            {theirMods.map(([l, n]) => (
+              <li key={l} className="text-hostile">
+                +{n}% {l}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="border-t border-line bg-ink-900 px-3 py-1 text-center text-[10px] text-muted">Right-click to {ranged ? 'strike' : 'attack'}</div>
+    </div>
+  );
+}
+
 export function HoverCard() {
   const view = useGame((s) => s.view)!;
   const key = useGame((s) => s.hoverHex);
@@ -88,7 +201,15 @@ export function HoverCard() {
     const r = orderForClick(view, f, key, mode, reach);
     action = 'error' in r ? { ok: false, text: r.error } : { ok: true, text: r.label.replace(/\d+,-?\d+|-?\d+,\d+/, hexLabel(view, key)) };
   }
-  const flip = x > cam.width - 240;
+  const flip = x > cam.width - 320;
+  const combat = f && reach && !resolving && hostiles.length > 0 && action?.ok;
+  if (combat) {
+    return (
+      <div className="pointer-events-none absolute z-10" style={{ left: flip ? x - 288 - HEX_SIZE * cam.scale : x + HEX_SIZE * cam.scale, top: Math.max(8, Math.min(y - 60, cam.height - 300)) }}>
+        <CombatCard fid={f.id} target={key} />
+      </div>
+    );
+  }
   return (
     <div
       className="pointer-events-none absolute z-10 w-52 border border-line bg-ink-950/92 px-2.5 py-2 text-[11px] shadow-xl backdrop-blur"
@@ -134,11 +255,11 @@ export function HoverCard() {
   );
 }
 
-export function ZoomControls() {
+export function ZoomControls({ onHelp }: { onHelp?: () => void }) {
   const control = useCamera((s) => s.control);
   const btn = 'flex h-7 w-7 items-center justify-center border border-line bg-ink-900/90 text-sm text-muted hover:border-faint hover:text-text';
   return (
-    <div className="absolute top-3 right-3 z-10 flex flex-col gap-1" aria-label="Map zoom">
+    <div className="absolute top-3 right-3 z-10 flex gap-1" aria-label="Map zoom">
       <button type="button" className={btn} onClick={() => control?.zoomBy(1.25)} title="Zoom in (+)" aria-label="Zoom in">
         +
       </button>
@@ -148,6 +269,11 @@ export function ZoomControls() {
       <button type="button" className={`${btn} text-[10px] font-bold`} onClick={() => control?.fit()} title="Fit map (F)" aria-label="Fit map" data-testid="map-fit">
         FIT
       </button>
+      {onHelp && (
+        <button type="button" className={btn} onClick={onHelp} title="Controls (?)" aria-label="Controls" data-testid="help">
+          ?
+        </button>
+      )}
     </div>
   );
 }
@@ -170,7 +296,7 @@ export function Minimap() {
   const vw = cam.width / cam.scale;
   const vh = cam.height / cam.scale;
   return (
-    <div className="absolute right-3 bottom-3 z-10 w-52 border border-line bg-ink-950/90 p-1 shadow-xl" data-testid="minimap">
+    <div className="w-full border border-line bg-ink-950/90 p-1 shadow-xl" data-testid="minimap">
       <svg
         viewBox={`${geo.minX} ${geo.minY} ${geo.w} ${geo.h}`}
         style={{ aspectRatio: `${geo.w} / ${geo.h}` }}
@@ -207,26 +333,6 @@ export function Minimap() {
         ))}
         <rect x={vx} y={vy} width={vw} height={vh} fill="none" stroke="#e0a84a" strokeWidth={6} opacity={0.9} />
       </svg>
-    </div>
-  );
-}
-
-export function Legend() {
-  return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[60%] flex-wrap gap-x-3 gap-y-0.5 border border-line/70 bg-ink-950/85 px-2 py-1 text-[10px] text-muted">
-      <span>
-        <span className="text-signal">━</span> planned
-      </span>
-      <span>
-        <span className="text-text">━</span> locked
-      </span>
-      <span>
-        <span className="text-signal">●</span> no orders
-      </span>
-      <span>
-        <span className="text-hostile">✕</span> last turn's fighting
-      </span>
-      <span>faded = last known</span>
     </div>
   );
 }
