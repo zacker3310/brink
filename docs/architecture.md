@@ -30,7 +30,7 @@ It clones its input, never reads the clock, and throws if the ruleset version di
 | # | Phase | What happens |
 |---|---|---|
 | 1 | validate | `lockOrders` checks every submission against the start-of-turn world. Illegal parts become `order_rejected` events; every formation without a legal order holds. Duplicate or stale submissions are dropped whole. |
-| 2 | diplomacy | War declarations apply at once. Peace or alliance applies when both sides have proposed it (this turn or within 2 turns). |
+| 2 | diplomacy | War declarations apply at once; units of the new enemies sharing a hex separate (the side not on its own ground falls back). Peace or alliance applies when both sides have proposed it (this turn or within 2 turns). |
 | 3 | production | Recruit costs, reserved at validation, are **consumed here** as items enter the queue. Last settlement's industrial capacity is spent down the queue; finished formations appear at their site. |
 | 4 | logistics | Dijkstra from cities and depots through own or allied ground; enemy hexes block and adjacency costs extra. Capacity is shared by priority tier, proportionally within a tier. Fuel and ammunition refills **consume** energy and materials now. |
 | 5 | reconnaissance | Vision per nation, with recon orders active. Decides whether strikes and assaults are spotted. |
@@ -39,7 +39,7 @@ It clones its input, never reads the clock, and throws if the ruleset version di
 | 8 | engagements | Assaults grouped by (attacking nation, target hex) and head-on meetings, all computed from the post-movement snapshot, then committed. |
 | 9 | territory | Beaten defenders retreat (joint choice), winners advance, then occupation and front consolidation transfer hexes. |
 | 10 | economy | Income, then upkeep, then discretionary budget spending. Unpaid upkeep is a shortage with a stated penalty; stockpiles never go negative. Recovery, entrenchment, reinforcement. |
-| 11 | victory | Eliminations (no capital or city), then victory points (45%), last standing, or turn limit. |
+| 11 | victory | Eliminations (no capital or city), then victory points (40%), last standing, or turn limit. |
 | 12 | reports | Final vision, intel update (observed hexes, last-known contacts), a `NationView` and a filtered report per nation, and the state hash. |
 
 ## Simultaneity and determinism

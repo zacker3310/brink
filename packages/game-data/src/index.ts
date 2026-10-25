@@ -7,7 +7,7 @@
 
 import type { GovernmentId, Resource, Stockpile, TechId, Terrain, UnitClass } from '@brink/contracts';
 
-export const RULESET_VERSION = '1.0.0';
+export const RULESET_VERSION = '1.1.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -320,6 +320,8 @@ export const RULES = {
   /** Assault outcome thresholds on attacker share of combat power, permille. */
   breakthrough: 600,
   repulse: 450,
+  /** Entrenchment a formation loses each time an artillery or air strike hits it. */
+  strikeEntrenchment: 25,
   /** Defenders whose organization falls to this level break and retreat. */
   breakOrganization: 15,
   /** At or below this strength a formation is destroyed. */
@@ -329,7 +331,7 @@ export const RULES = {
   defenderLethality: 5,
   /** Random swing on combat losses, percent either way. */
   combatSwing: 15,
-  victoryShare: 45,
+  victoryShare: 40,
   baseStability: 60,
   /** Credits per this many owned hexes. */
   hexesPerCredit: 4,

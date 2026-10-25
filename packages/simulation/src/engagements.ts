@@ -32,17 +32,19 @@ interface Effects {
   morale: number;
   ammunition: number;
   experience: number;
+  entrenchment: number;
 }
 
 class EffectBook {
   private map = new Map<FormationId, Effects>();
   add(id: FormationId, e: Partial<Effects>): void {
-    const cur = this.map.get(id) ?? { strength: 0, organization: 0, morale: 0, ammunition: 0, experience: 0 };
+    const cur = this.map.get(id) ?? { strength: 0, organization: 0, morale: 0, ammunition: 0, experience: 0, entrenchment: 0 };
     cur.strength += e.strength ?? 0;
     cur.organization += e.organization ?? 0;
     cur.morale += e.morale ?? 0;
     cur.ammunition += e.ammunition ?? 0;
     cur.experience += e.experience ?? 0;
+    cur.entrenchment += e.entrenchment ?? 0;
     this.map.set(id, cur);
   }
   /** Apply every recorded effect. Returns strength lost per nation. */
@@ -58,6 +60,7 @@ class EffectBook {
       f.morale = clamp(f.morale + e.morale, 0, 100);
       f.ammunition = clamp(f.ammunition - e.ammunition, 0, 100);
       f.experience = clamp(f.experience + e.experience, 0, 100);
+      f.entrenchment = clamp(f.entrenchment - e.entrenchment, 0, 100);
       lost.set(f.owner, (lost.get(f.owner) ?? 0) + loss);
     }
     for (const [n, l] of lost) world.nations[n]!.warLosses += l;
@@ -117,7 +120,7 @@ export function resolveStrikes(
       for (const v of victims) {
         const swing = rollRange(100 - RULES.combatSwing, 100 + RULES.combatSwing, seed, world.turn, 'strike', id, v.id);
         const loss = strikeLoss(f, v, ctx, swing);
-        book.add(v.id, { strength: loss, organization: Math.floor(loss / 3) + 5 });
+        book.add(v.id, { strength: loss, organization: Math.floor(loss / 3) + 5, entrenchment: RULES.strikeEntrenchment });
         hits.push({ formation: v.id, owner: v.owner, strengthLoss: loss });
         engaged.add(v.id);
       }

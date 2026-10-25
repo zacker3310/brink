@@ -62,6 +62,11 @@ Updated 2026-10-25. Milestone 1 (first playable).
   callsigns and chat, host-authoritative turns where each guest only receives its own view, seat
   status, force-resolve, rejoin by name; hotseat on one device behind a curtain. Engine: multi-human
   `GameSession` and saves.
+- Balance pass (ruleset 1.1.0): AI masses combined assaults with artillery and air support, spends
+  idle cash on research and recruits faster, makes peace to close a second front, stabs a weak
+  partner, and abandons a war stalled for 8 turns; strikes cost 25 entrenchment; victory at 40% of
+  VP. Engine fix: war declared between co-located nations pushes the trespasser off. Soak went from
+  25 to 58 decisive endings in 100.
 - Turn replay: before the report, the map replays the resolved turn on the pre-turn board: all
   movement at once, then strike tracers, battle flashes and floating losses, then retreats,
   destroyed formations and site captures. Built only from events the player could see. Skip with
@@ -69,9 +74,8 @@ Updated 2026-10-25. Milestone 1 (first playable).
 
 ## Outstanding
 
-- Balance: in the soak, 75 of 100 matches end at the turn limit and 25 by victory points. Matches
-  complete, but more should end decisively. Levers: AI aggression threshold (`mid < 520` in `ai`),
-  defender lethality, victory share.
+- Balance: 58 of 100 soak matches end by victory points, 42 at the turn limit (median turn 28).
+  Next levers if games should end sooner: stall threshold in `ai`, strike entrenchment, victory share.
 - No save-file export button in the UI yet (load from file exists).
 - Report has no per-turn history browser; past reports are kept in the save.
 - Multiplayer: no turn timer yet, no TURN relay for strict NATs, a loaded multi-human save resumes
@@ -84,6 +88,5 @@ None.
 
 ## Next recommended tasks
 
-1. Balance pass driven by the soak's ending distribution.
 2. Export save to file; report history.
 3. Multiplayer: planning timer, hand a dropped seat to the AI, resume a multi-human save as a room.

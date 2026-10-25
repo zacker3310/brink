@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Formation, GameEvent } from '@brink/contracts';
+import { RULES } from '@brink/game-data';
+import type { Formation, FormationOrder, GameEvent } from '@brink/contracts';
 import { hexKey } from '@brink/map';
 import { attackerPower, defenderPower, type AssaultContext } from './combat';
 import { makeWorld, orders, setTerrain, unit } from './fixture.test-util';
@@ -121,6 +122,20 @@ describe('assaults through the turn resolver', () => {
     if (strike?.kind !== 'strike') throw new Error('no strike');
     expect(strike.victims.map((v) => v.formation)).toEqual(['b1']);
     expect(strike.victims[0]!.strengthLoss).toBeGreaterThan(0);
+  });
+
+  it('bombardment wrecks fieldworks: a shelled formation loses entrenchment', () => {
+    const run = (shell: boolean) => {
+      const w = makeWorld();
+      unit(w, 'art', 'a', 'artillery', k(1, 2));
+      unit(w, 'b1', 'b', 'infantry', k(3, 2), { entrenchment: 80 });
+      const a: Record<string, FormationOrder> = shell ? { art: { type: 'attack', target: k(3, 2), path: [] } } : {};
+      return resolveTurn(w, [orders(w, 'a', a), orders(w, 'b', { b1: { type: 'hold' } })]).world.formations.b1!.entrenchment;
+    };
+    const quiet = run(false);
+    const shelled = run(true);
+    expect(quiet).toBe(90);
+    expect(shelled).toBe(quiet - RULES.strikeEntrenchment);
   });
 
   it('two attackers on one defender both fight it from the same snapshot', () => {

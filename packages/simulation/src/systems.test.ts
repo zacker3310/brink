@@ -175,6 +175,19 @@ describe('victory and diplomacy', () => {
     const three = resolveTurn(two.world, [orders(two.world, 'a', {}, { diplomacy: [{ target: 'b', action: 'declare_war' }] })]);
     expect(three.world.relations['a|b']).toBe('war');
   });
+
+  it('war breaking out between co-located nations pushes the trespasser off the host ground', () => {
+    const w = makeWorld();
+    setRelation(w, 'a', 'b', 'peace');
+    own(w, 'b', [k(4, 3), k(5, 3)]);
+    unit(w, 'b1', 'b', 'infantry', k(4, 3));
+    unit(w, 'a1', 'a', 'infantry', k(4, 3));
+    const r = resolveTurn(w, [orders(w, 'a', {}, { diplomacy: [{ target: 'b', action: 'declare_war' }] })]);
+    expect(r.world.relations['a|b']).toBe('war');
+    expect(r.world.formations.b1!.key).toBe(k(4, 3));
+    expect(r.world.formations.a1!.key).not.toBe(k(4, 3));
+    expect(r.events.some((e) => e.kind === 'retreat' && e.formation === 'a1')).toBe(true);
+  });
 });
 
 describe('determinism', () => {

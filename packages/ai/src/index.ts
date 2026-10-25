@@ -17,7 +17,7 @@ import type {
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, STACK_LIMIT, TECHS, UNITS } from '@brink/game-data';
-import { areAdjacent, findPath, keyDistance, neighborKeys } from '@brink/map';
+import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
 import { enterCost, movementAllowance, previewAssault, recruitCost, roll, sortedKeys } from '@brink/simulation';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
@@ -191,7 +191,7 @@ function planRecruitment(view: NationView, memory: AiMemory, own: Formation[]): 
   const queued = view.self.productionQueue.map((p) => p.unitClass);
   // Do not queue faster than industry can build.
   const backlog = view.self.productionQueue.reduce((a, p) => a + p.required - p.progress, 0);
-  if (backlog > view.self.industrialCapacity * 2) return out;
+  if (backlog > view.self.industrialCapacity * 3) return out;
   const sites = sortedKeys(view.sites)
     .map((id) => view.sites[id]!)
     .filter((s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city'));
@@ -202,7 +202,7 @@ function planRecruitment(view: NationView, memory: AiMemory, own: Formation[]): 
     for (const r of RESOURCES) left[r] -= cost[r];
     queued.push(c);
     out.push({ siteId: s.id, unitClass: c });
-    if (out.length >= 2) break;
+    if (out.length >= 3) break;
   }
   return out;
 }
@@ -211,6 +211,8 @@ function planBudget(view: NationView): Budget | undefined {
   const b = view.self.budget;
   if (view.self.stability < 45 && b.welfare < 20) return { ...b, welfare: 20 };
   if (view.self.stability > 70 && b.welfare > 5) return { ...b, welfare: 5 };
+  // Idle cash buys technology: combat techs compound over a long war.
+  if (view.self.stockpile.credits > 300 && b.research < 30 && b.research + b.infrastructure + b.welfare + 10 <= 60) return { ...b, research: b.research + 10 };
   return undefined;
 }
 
@@ -225,8 +227,56 @@ export function updateMemory(memory: AiMemory, view: NationView, events: readonl
       if (hitUs) for (const p of e.participants) if (p.role === 'attacker') m.aggressors[p.owner] = view.turn;
     }
     if (e.kind === 'strike' && e.victims.some((v) => v.owner === view.self.id)) m.aggressors[e.owner] = view.turn;
+    // Capturing ground, or starting a new war, restarts the clock on a stalled war.
+    if (e.kind === 'site_captured' && e.to === view.self.id) m.lastGain = view.turn;
+    if (e.kind === 'diplomacy' && e.relation === 'war' && (e.a === view.self.id || e.b === view.self.id)) m.lastGain = view.turn;
   }
   return m;
+}
+
+/**
+ * Diplomacy, Diplomacy-style: never fight on two fronts if a deal can close one, and never let a
+ * deal outlive its usefulness. Settles the most dangerous enemy that is not the current target,
+ * accepts peace from any non-target, and once down to one war (from turn 10) turns on the weakest
+ * peace partner if it has fallen well behind. A nation at peace with everyone picks a fight.
+ */
+/** Turns without a capture after which a war counts as stalled. */
+const STALL_TURNS = 8;
+
+function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory): NationOrders['diplomacy'] {
+  const self = view.self.id;
+  const out: NationOrders['diplomacy'] = [];
+  const focus = plan.target?.owner ?? null;
+  const alive = sortedKeys(view.nations).filter((n) => n !== self && !view.nations[n]!.eliminated);
+  const vp = (n: NationId) => view.nations[n]!.victoryPoints;
+  const enemies = alive.filter((n) => view.relations[n] === 'war');
+  const partners = alive.filter((n) => view.relations[n] === 'peace');
+  // A stalled war is a war to get out of: settle with the enemy we are stuck on and turn on the
+  // weakest power instead.
+  if (view.turn >= 10 && view.turn - (memory.lastGain ?? 0) >= STALL_TURNS && enemies.length > 0) {
+    const facing = new Map<NationId, number>();
+    for (const c of plan.contacts) facing.set(c.owner, (facing.get(c.owner) ?? 0) + c.estimatedStrength);
+    const stuck = [...enemies].sort((a, b) => (facing.get(b) ?? 0) - (facing.get(a) ?? 0) || vp(b) - vp(a) || (a < b ? -1 : 1))[0]!;
+    out.push({ target: stuck, action: 'propose_peace' });
+    const prey = alive.filter((n) => n !== stuck).sort((a, b) => vp(a) - vp(b) || (a < b ? -1 : 1))[0];
+    if (prey && view.relations[prey] === 'peace' && vp(prey) <= (view.nations[self]?.victoryPoints ?? 0)) out.push({ target: prey, action: 'declare_war' });
+    return out;
+  }
+  if (enemies.length > 1) {
+    const settle = enemies.filter((n) => n !== focus).sort((a, b) => vp(b) - vp(a) || (a < b ? -1 : 1))[0];
+    if (settle) out.push({ target: settle, action: 'propose_peace' });
+    for (const p of view.proposals) {
+      if (p.to === self && p.kind === 'peace' && p.from !== focus && view.relations[p.from] === 'war' && !out.some((d) => d.target === p.from)) {
+        out.push({ target: p.from, action: 'propose_peace' });
+      }
+    }
+  }
+  const weakest = [...partners].sort((a, b) => vp(a) - vp(b) || (a < b ? -1 : 1))[0];
+  const weakestAlive = [...alive].sort((a, b) => vp(a) - vp(b) || (a < b ? -1 : 1))[0];
+  if (weakest && (enemies.length === 0 || (enemies.length === 1 && view.turn >= 10 && weakest === weakestAlive && vp(weakest) + 6 <= (view.nations[self]?.victoryPoints ?? 0)))) {
+    out.push({ target: weakest, action: 'declare_war' });
+  }
+  return out;
 }
 
 /**
@@ -249,19 +299,6 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number): Na
   const hostileHexes = new Set(contacts.filter((c) => c.confirmed || view.turn - c.lastSeen <= 1).map((c) => c.key));
   const orders: Record<FormationId, FormationOrder> = {};
   const committed = new Set<FormationId>();
-
-  // Ranged: strike the most valuable contact in range.
-  for (const f of own) {
-    const def = UNITS[f.unitClass];
-    if (def.range === 0) continue;
-    const inRange = contacts
-      .filter((c) => keyDistance(c.key, f.key) >= 1 && keyDistance(c.key, f.key) <= def.range && c.confirmed)
-      .sort((a, b) => b.estimatedStrength - a.estimatedStrength || (a.formation < b.formation ? -1 : 1));
-    if (inRange[0] && f.ammunition >= def.ammoPerAttack) {
-      orders[f.id] = { type: 'attack', target: inRange[0].key, path: [] };
-      committed.add(f.id);
-    }
-  }
 
   // Withdraw what is spent.
   for (const f of own) {
@@ -303,20 +340,84 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number): Na
     }
   }
 
-  // Attack adjacent enemies where the local odds are good.
+  // Combined assaults. For every confirmed enemy hex, most valuable first, gather the free
+  // formations that can reach it this turn and judge them together; artillery and air in range
+  // strike the same hex first, so they lower the bar the mass has to clear.
   const byHex = new Map<HexKey, Contact[]>();
   for (const c of contacts) if (c.confirmed) byHex.set(c.key, [...(byHex.get(c.key) ?? []), c]);
-  for (const key of [...byHex.keys()].sort()) {
-    const adjacent = own.filter(
-      (f) => !committed.has(f.id) && UNITS[f.unitClass].ground && UNITS[f.unitClass].range === 0 && areAdjacent(f.key, key) && f.ammunition >= UNITS[f.unitClass].ammoPerAttack,
+  const siteVp = (k: HexKey) => {
+    const id = view.tiles[k]?.siteId;
+    return id ? (view.sites[id]?.victoryPoints ?? 0) : 0;
+  };
+  const held = (k: HexKey) => byHex.get(k)!.reduce((a, c) => a + c.estimatedStrength, 0);
+  const targets = [...byHex.keys()].sort((a, b) => siteVp(b) * 1000 - held(b) - (siteVp(a) * 1000 - held(a)) || (a < b ? -1 : 1));
+  for (const key of targets) {
+    if (enterCost(view.tiles[key], 'infantry') === null) continue;
+    const ends = new Map(plan.ends);
+    const group: { f: Formation; path: HexKey[] }[] = [];
+    const pool = own
+      .filter(
+        (f) =>
+          !committed.has(f.id) &&
+          UNITS[f.unitClass].ground &&
+          UNITS[f.unitClass].range === 0 &&
+          f.unitClass !== 'recon' &&
+          f.strength >= 350 &&
+          f.ammunition >= UNITS[f.unitClass].ammoPerAttack,
+      )
+      .sort((a, b) => keyDistance(a.key, key) - keyDistance(b.key, key) || (a.id < b.id ? -1 : 1));
+    for (const f of pool) {
+      if (group.length >= 4) break;
+      if (areAdjacent(f.key, key)) {
+        group.push({ f, path: [] });
+        continue;
+      }
+      if (keyDistance(f.key, key) > 6) continue;
+      const reach = reachable(f.key, movementAllowance(f), (_from, to) => (hostileHexes.has(to) ? null : enterCost(view.tiles[to], f.unitClass)));
+      const approach = neighborKeys(key)
+        .filter((k) => reach[k] && !hostileHexes.has(k) && (ends.get(k) ?? 0) < STACK_LIMIT)
+        .sort((x, y) => reach[x]!.cost - reach[y]!.cost || (x < y ? -1 : 1))[0];
+      if (!approach) continue;
+      const path = pathFromReach(reach, approach) ?? [];
+      if (path.length === 0) continue;
+      ends.set(f.key, (ends.get(f.key) ?? 1) - 1);
+      ends.set(approach, (ends.get(approach) ?? 0) + 1);
+      group.push({ f, path });
+    }
+    if (group.length === 0) continue;
+    const preview = previewAssault(view, group.map((g) => g.f.id), key);
+    if (!preview || preview.defenders === 0) continue;
+    const support = own.filter(
+      (f) =>
+        !committed.has(f.id) &&
+        UNITS[f.unitClass].range > 0 &&
+        f.ammunition >= UNITS[f.unitClass].ammoPerAttack &&
+        keyDistance(f.key, key) >= 1 &&
+        keyDistance(f.key, key) <= UNITS[f.unitClass].range,
     );
-    if (adjacent.length === 0 || enterCost(view.tiles[key], adjacent[0]!.unitClass) === null) continue;
-    const preview = previewAssault(view, adjacent.map((f) => f.id), key);
-    if (!preview) continue;
-    const mid = Math.floor((preview.share[0] + preview.share[1]) / 2);
-    if (mid < 520) continue;
-    for (const f of adjacent) {
+    const bar = 520 - (support.some((f) => f.unitClass === 'artillery') ? 40 : 0) - (support.some((f) => f.unitClass === 'air') ? 50 : 0);
+    if (Math.floor((preview.share[0] + preview.share[1]) / 2) < bar) continue;
+    for (const { f, path } of group) {
+      orders[f.id] = { type: 'attack', target: key, path };
+      committed.add(f.id);
+    }
+    for (const f of support) {
       orders[f.id] = { type: 'attack', target: key, path: [] };
+      committed.add(f.id);
+    }
+    plan.ends.clear();
+    for (const [k, n] of ends) plan.ends.set(k, n);
+  }
+
+  // Ranged: strike the most valuable contact in range.
+  for (const f of own) {
+    const def = UNITS[f.unitClass];
+    if (def.range === 0 || committed.has(f.id)) continue;
+    const inRange = contacts
+      .filter((c) => keyDistance(c.key, f.key) >= 1 && keyDistance(c.key, f.key) <= def.range && c.confirmed)
+      .sort((a, b) => b.estimatedStrength - a.estimatedStrength || (a.formation < b.formation ? -1 : 1));
+    if (inRange[0] && f.ammunition >= def.ammoPerAttack) {
+      orders[f.id] = { type: 'attack', target: inRange[0].key, path: [] };
       committed.add(f.id);
     }
   }
@@ -363,18 +464,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number): Na
     endAt(plan, f.key, end);
   }
 
-  // Diplomacy: take peace with a nation that is not the current objective's owner when
-  // fighting on more than one front.
-  const diplomacy: NationOrders['diplomacy'] = [];
-  const focus = plan.target?.owner ?? null;
-  if (plan.enemies.size > 1) {
-    for (const p of view.proposals) {
-      if (p.to === self && p.kind === 'peace' && p.from !== focus && isHostile(view, p.from)) {
-        diplomacy.push({ target: p.from, action: 'propose_peace' });
-        break;
-      }
-    }
-  }
+  const diplomacy = planDiplomacy(view, plan, memory);
 
   const research = chooseResearch(view);
   const budget = planBudget(view);

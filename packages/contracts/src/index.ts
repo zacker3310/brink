@@ -430,4 +430,6 @@ export interface AiMemory {
   pressure: Record<SiteId, number>;
   /** Nations that attacked this nation, with the turn of the latest attack. */
   aggressors: Record<NationId, number>;
+  /** Turn this nation last captured a site; absent until it does. Measures a stalled war. */
+  lastGain?: number;
 }

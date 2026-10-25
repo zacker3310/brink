@@ -1,4 +1,6 @@
 import type {
+  HexKey,
+  Formation,
   FormationId,
   GameEvent,
   NationId,
@@ -39,6 +41,31 @@ export const PHASES = [
 
 function living(world: WorldState): NationId[] {
   return sortedKeys(world.nations).filter((n) => !world.nations[n]!.eliminated);
+}
+
+/**
+ * Phase 2b. Nations at peace may share ground; once at war they cannot. When war breaks out over
+ * a shared hex, whoever is not on its own ground falls back (the declarer, on anyone else's).
+ */
+function separateNewEnemies(world: WorldState, events: GameEvent[]): void {
+  const wars = events.filter((e): e is Extract<GameEvent, { kind: 'diplomacy' }> => e.kind === 'diplomacy' && e.relation === 'war');
+  if (wars.length === 0) return;
+  const mustRetreat = new Map<FormationId, HexKey[]>();
+  const byHex = new Map<HexKey, Formation[]>();
+  for (const id of sortedKeys(world.formations)) {
+    const f = world.formations[id]!;
+    byHex.set(f.key, [...(byHex.get(f.key) ?? []), f]);
+  }
+  for (const key of [...byHex.keys()].sort()) {
+    const here = byHex.get(key)!;
+    for (const w of wars) {
+      if (!here.some((f) => f.owner === w.a) || !here.some((f) => f.owner === w.b)) continue;
+      const host = world.tiles[key]!.owner;
+      const leaver = host === w.a ? w.b : host === w.b ? w.a : w.proposedBy;
+      for (const f of here) if (f.owner === leaver) mustRetreat.set(f.id, [key]);
+    }
+  }
+  if (mustRetreat.size > 0) resolveRetreats(world, { mustRetreat, advances: new Map() }, events);
 }
 
 /** Phase 11a. A nation holding no capital or city is out; its formations surrender. */
@@ -157,6 +184,7 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
 
   // 2. Diplomacy.
   resolveDiplomacy(world, orders, events);
+  separateNewEnemies(world, events);
 
   // 3. Production and recruitment. Each nation touches only its own stockpile and queue.
   const production: Record<NationId, Stockpile> = {};
