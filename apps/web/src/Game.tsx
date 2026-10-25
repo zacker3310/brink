@@ -11,6 +11,7 @@ import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
 import { useNet } from './net/room';
 import { Notifications } from './Notifications';
+import { useReplay } from './replay';
 import { ChatOverlay, Curtain, RoomChip } from './RoomUi';
 import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
@@ -254,6 +255,7 @@ function KeyHelp({ onClose }: { onClose: () => void }) {
     ['F  + −', 'Fit, zoom'],
     ['V', 'Threat overlay'],
     ['Ctrl Enter', 'End turn'],
+    ['Space ← →', 'Replay: pause, step phases'],
   ];
   return (
     <div className="panel-in absolute top-14 right-14 z-30 w-80 ds-panel p-4 text-xs shadow-2xl" data-testid="key-help">
@@ -324,10 +326,17 @@ function useShortcuts(toggleHelp: () => void, openChat: () => void) {
   useKeys((e) => {
     const g = s.getState();
     if (g.playback) {
-      if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+      const r = useReplay.getState();
+      const order = ['movement', 'combat', 'aftermath'] as const;
+      const i = order.indexOf(g.playback.phase);
+      if (e.key === 'Escape' || e.key === 'Enter') {
         e.preventDefault();
         g.finishPlayback();
-      }
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        useReplay.setState({ paused: !r.paused });
+      } else if (e.key === 'ArrowRight') useReplay.setState({ seek: i < 2 ? r.marks[order[i + 1]!] : r.marks.end });
+      else if (e.key === 'ArrowLeft') useReplay.setState({ seek: r.marks[order[Math.max(0, i - (r.progress * r.marks.end - r.marks[order[i]!] < 300 ? 1 : 0))]!] });
       return;
     }
     if (g.showReport) {

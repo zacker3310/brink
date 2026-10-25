@@ -7,6 +7,7 @@ import { HEX_SIZE, useCamera } from './camera';
 import { hexLabel } from './insight';
 import { UnitGlyph } from './glyphs';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
+import { useReplay } from './replay';
 import { useGame } from './store';
 import { Swatch } from './ui';
 
@@ -27,28 +28,8 @@ export function ModeBanner() {
   const mode = useGame((s) => s.mode);
   const resolving = useGame((s) => s.resolving);
   const playback = useGame((s) => s.playback);
-  const finishPlayback = useGame((s) => s.finishPlayback);
   const f = fid ? view.formations[fid] : undefined;
-  if (playback) {
-    const steps = ['movement', 'combat', 'aftermath'] as const;
-    return (
-      <div className="resolving-banner absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-4 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2" role="status" data-testid="replay">
-        <div>
-          <div className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">Turn {playback.before.turn} · replay</div>
-          <div className="flex gap-3 text-xs font-semibold">
-            {steps.map((p) => (
-              <span key={p} className={`capitalize transition-colors ${p === playback.phase ? 'text-text' : steps.indexOf(p) < steps.indexOf(playback.phase) ? 'text-faint line-through' : 'text-faint'}`}>
-                {p}
-              </span>
-            ))}
-          </div>
-        </div>
-        <button type="button" onClick={finishPlayback} className="border border-line px-2 py-1 text-[11px] text-muted hover:border-faint hover:text-text" data-testid="skip-replay">
-          Skip <span className="font-mono text-[9px] text-faint">Esc</span>
-        </button>
-      </div>
-    );
-  }
+  if (playback) return <ReplayBar />;
   if (resolving) {
     return (
       <div className="resolving-banner pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2 text-center" role="status">
@@ -174,6 +155,58 @@ function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
         </div>
       )}
       <div className="border-t border-line bg-ink-900 px-3 py-1 text-center text-[10px] text-muted">Right-click to {ranged ? 'strike' : 'attack'}</div>
+    </div>
+  );
+}
+
+/** Replay transport: phases you can jump to, pause, speed, progress, skip. */
+function ReplayBar() {
+  const playback = useGame((s) => s.playback)!;
+  const finishPlayback = useGame((s) => s.finishPlayback);
+  const { paused, speed, marks, progress } = useReplay();
+  const steps = ['movement', 'combat', 'aftermath'] as const;
+  const btn = 'border border-line px-2 py-1 text-[11px] text-muted hover:border-faint hover:text-text';
+  return (
+    <div className="resolving-banner absolute top-3 left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/92 px-4 pt-2 pb-2.5" role="status" data-testid="replay">
+      <div className="flex items-center gap-4">
+        <div>
+          <div className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">
+            Turn {playback.before.turn} · {playback.rewatch ? 'rewatch' : 'replay'}
+          </div>
+          <div className="flex gap-3 text-xs font-semibold">
+            {steps.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => useReplay.setState({ seek: marks[p] })}
+                className={`capitalize transition-colors hover:text-signal ${p === playback.phase ? 'text-text' : steps.indexOf(p) < steps.indexOf(playback.phase) ? 'text-faint line-through' : 'text-faint'}`}
+                title={`Jump to ${p}`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => useReplay.setState({ seek: 0, paused: false })} className={btn} title="Restart" aria-label="Restart replay">
+            ⟲
+          </button>
+          <button type="button" onClick={() => useReplay.setState({ paused: !paused })} className={`${btn} w-8 ${paused ? 'border-signal text-signal' : ''}`} title="Pause / play (Space)" aria-pressed={paused} data-testid="replay-pause">
+            {paused ? '▶' : '❚❚'}
+          </button>
+          {[0.5, 1, 2].map((x) => (
+            <button key={x} type="button" onClick={() => useReplay.setState({ speed: x })} className={`${btn} font-mono ${speed === x ? 'border-signal text-signal' : ''}`} aria-pressed={speed === x}>
+              {x}×
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={finishPlayback} className={btn} data-testid="skip-replay">
+          {playback.rewatch ? 'Done' : 'Skip'} <span className="font-mono text-[9px] text-faint">Esc</span>
+        </button>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-ink-700">
+        <div className="h-full bg-signal" style={{ width: `${progress * 100}%` }} />
+      </div>
     </div>
   );
 }

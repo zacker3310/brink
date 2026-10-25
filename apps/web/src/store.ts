@@ -30,6 +30,8 @@ export interface Playback {
   /** The resolved state, applied when the replay ends. */
   result: Extract<Response, { type: 'state' }>;
   phase: 'movement' | 'combat' | 'aftermath';
+  /** Watching an already-applied turn again: finishing leaves the current state alone. */
+  rewatch?: boolean;
 }
 
 export interface Notice {
@@ -68,6 +70,8 @@ interface State {
   dismissed: string[];
   /** Show where seen enemies could strike next turn. */
   showThreat: boolean;
+  /** The last resolved turn, kept so it can be replayed again. */
+  lastTurn: { before: NationView; events: GameEvent[] } | null;
 
   newGame(nation: NationId, seed: number): Promise<void>;
   loadGame(text: string): Promise<void>;
@@ -92,6 +96,8 @@ interface State {
   openCity(id: string | null): void;
   dismissNote(id: string): void;
   toggleThreat(): void;
+  /** Replay the last resolved turn again. */
+  rewatch(): void;
   setOrder(id: FormationId, order: FormationOrder | null): void;
   addRecruit(siteId: string, unitClass: UnitClass): void;
   removeRecruit(index: number): void;
@@ -193,6 +199,7 @@ export const useGame = create<State>((set, get) => {
     selectedCity: null,
     dismissed: [],
     showThreat: false,
+    lastTurn: null,
 
     async newGame(nation, seed) {
       if (apply(await engine.call({ type: 'new', seed, nation }))) {
@@ -274,6 +281,7 @@ export const useGame = create<State>((set, get) => {
       }
       const r = await engine.call({ type: 'submit', orders: draft });
       const before = get().view;
+      if (r.type === 'state' && before && r.report) set({ lastTurn: { before, events: r.report.events } });
       // Replay the turn on the old board first when there is something to see.
       if (r.type === 'state' && before && get().animate && r.report && r.report.events.some(isVisual)) {
         set({ playback: { before, events: r.report.events, result: r, phase: 'movement' } });
@@ -287,17 +295,19 @@ export const useGame = create<State>((set, get) => {
       const pb = get().playback;
       if (!pb) return;
       set({ playback: null, resolving: false });
+      if (pb.rewatch) return;
       apply(pb.result);
       afterResolve();
     },
     enterGame(state) {
-      set({ playback: null, resolving: false, showReport: false, selectedFormation: null, selectedCity: null, dismissed: [], panelOpen: false });
+      set({ playback: null, resolving: false, showReport: false, selectedFormation: null, selectedCity: null, dismissed: [], panelOpen: false, lastTurn: null });
       apply({ type: 'state', ...state });
       get().nextIdle();
     },
     receiveTurn(state, before) {
       const from = before ?? get().view;
       const result = { type: 'state' as const, ...state };
+      if (from && state.report) set({ lastTurn: { before: from, events: state.report.events } });
       if (from && get().animate && state.report && state.report.events.some(isVisual)) {
         // Show the seat's own pre-turn board (hotseat may be coming from another player's).
         set({ view: from, draft: freshDraft(from), submitted: null, selectedFormation: null, selectedCity: null, playback: { before: from, events: state.report.events, result, phase: 'movement' }, resolving: true });
@@ -317,6 +327,15 @@ export const useGame = create<State>((set, get) => {
     openCity: (id) => set({ selectedCity: id, ...(id ? { selectedFormation: null, panelOpen: false } : {}) }),
     dismissNote: (id) => set({ dismissed: [...get().dismissed, id] }),
     toggleThreat: () => set({ showThreat: !get().showThreat }),
+    rewatch() {
+      const { lastTurn, view, report, history, resolving, playback } = get();
+      if (!lastTurn || !view || resolving || playback) return;
+      set({
+        playback: { before: lastTurn.before, events: lastTurn.events, result: { type: 'state', view, report, history }, phase: 'movement', rewatch: true },
+        resolving: true,
+        showReport: false,
+      });
+    },
     setAnimate(on) {
       writePrefs({ animate: on });
       set({ animate: on });

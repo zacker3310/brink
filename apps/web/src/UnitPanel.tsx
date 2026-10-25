@@ -253,6 +253,8 @@ export function TurnControls() {
   const report = useGame((s) => s.report);
   const setShowReport = useGame((s) => s.setShowReport);
   const playback = useGame((s) => s.playback);
+  const lastTurn = useGame((s) => s.lastTurn);
+  const rewatch = useGame((s) => s.rewatch);
   const role = useNet((s) => s.role);
   const total = Object.keys(view.formations).length;
   const idle = idleFormations(view, draft.formations).length;
@@ -264,6 +266,11 @@ export function TurnControls() {
   return (
     <div className="pointer-events-auto absolute right-3 bottom-3 z-10 flex w-56 flex-col items-stretch gap-1.5">
       <SeatBoard />
+      {lastTurn && !resolving && (
+        <button type="button" onClick={rewatch} data-testid="rewatch" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
+          ⟲ Rewatch turn {lastTurn.before.turn}
+        </button>
+      )}
       {report && (
         <button type="button" onClick={() => setShowReport(true)} data-testid="open-report" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
           📜 Turn {report.turn} summary

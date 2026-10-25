@@ -1,4 +1,5 @@
 import { Graphics, Text, type Application, type Container } from 'pixi.js';
+import { create } from 'zustand';
 import type { HexKey, UnitClass } from '@brink/contracts';
 import type { Point } from '@brink/map';
 import { affiliationOf, counterSprite, drawCounterChrome, type CounterLook } from './counters';
@@ -12,6 +13,18 @@ import type { Playback } from './store';
 // so it shows exactly what the player was entitled to see and nothing more.
 
 type Phase = Playback['phase'];
+
+/** Transport controls for the replay, read by the player every frame. */
+export const useReplay = create<{
+  paused: boolean;
+  speed: number;
+  /** Seek target in timeline ms, consumed by the player. */
+  seek: number | null;
+  /** Phase start times and total length of the replay being played. */
+  marks: Record<Phase, number> & { end: number };
+  /** 0..1, updated a few times a second. */
+  progress: number;
+}>(() => ({ paused: false, speed: 1, seek: null, marks: { movement: 0, combat: 0, aftermath: 0, end: 1 }, progress: 0 }));
 
 interface Actor {
   id: string;
@@ -274,13 +287,23 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     if (b.theirs) mk(`−${b.theirs}`, 0x6fbf8e, b.ours ? 14 : 0);
   }
   const routes = new Map(tl.actors.map((a) => [a.id, a.route.map(center)]));
-  const t0 = performance.now();
+  let t = 0;
+  let last = performance.now();
   let phase: Phase | null = null;
   let done = false;
+  useReplay.setState({ paused: false, seek: null, progress: 0, marks: { movement: tl.move[0], combat: tl.combat[0], aftermath: tl.after[0], end: tl.end } });
 
   const frame = () => {
     if (done) return;
-    const t = performance.now() - t0;
+    const now = performance.now();
+    const ctl = useReplay.getState();
+    if (ctl.seek !== null) {
+      t = Math.max(0, Math.min(tl.end, ctl.seek));
+      useReplay.setState({ seek: null });
+    } else if (!ctl.paused) t += (now - last) * ctl.speed;
+    last = now;
+    const progress = Math.min(1, t / tl.end);
+    if (Math.abs(progress - ctl.progress) > 0.02 || progress === 1) useReplay.setState({ progress });
     const p = phaseAt(tl, t);
     if (p !== phase) {
       phase = p;

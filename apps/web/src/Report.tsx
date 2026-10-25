@@ -241,6 +241,8 @@ export function Report() {
   const history = useGame((s) => s.history);
   const setShowReport = useGame((s) => s.setShowReport);
   const focusOn = useGame((s) => s.focusOn);
+  const lastTurn = useGame((s) => s.lastTurn);
+  const rewatch = useGame((s) => s.rewatch);
   if (!report) return null;
   const { totals, sections } = digest(view, report.events);
   const vp = report.victoryPoints;
@@ -268,6 +270,11 @@ export function Report() {
               Turn {report.turn} resolved
             </h2>
           </div>
+          {lastTurn && lastTurn.before.turn === report.turn && (
+            <button type="button" onClick={rewatch} className="ml-auto border border-line px-3 py-2 text-xs text-muted hover:border-faint hover:text-text">
+              ⟲ Watch it again
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowReport(false)}

@@ -63,6 +63,11 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   // End the turn: it replays on the map, results arrive as notifications, the summary is a click away.
   await page.getByTestId('end-turn').click();
   await expect(page.getByTestId('replay')).toBeVisible();
+  // The replay can be paused and resumed.
+  await page.keyboard.press(' ');
+  await expect(page.getByTestId('replay-pause')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press(' ');
+  await expect(page.getByTestId('replay-pause')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('notifications')).toBeVisible();
   await page.getByTestId('open-report').click();
   const report = page.getByTestId('report');
@@ -71,6 +76,13 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(report).toContainText('Economy');
   await expect(report).toContainText(`${name} moved`);
   await page.getByTestId('close-report').click();
+  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+
+  // Rewatch the turn; leaving it keeps the current turn.
+  await page.getByTestId('rewatch').click();
+  await expect(page.getByTestId('replay')).toContainText('rewatch');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('replay')).toHaveCount(0);
   await expect(page.getByTestId('turn')).toContainText('2 / 30');
 
   // Threat overlay: V toggles it; hovering a seen enemy names the threat.

@@ -70,6 +70,9 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
   where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
   `threatZones` in the simulation package, built from the viewer's NationView.
+- Replay controls: pause (Space), 0.5x/1x/2x, click a phase or use the arrow keys to jump, restart,
+  progress bar; rewatch the last turn from the turn controls or the summary without touching
+  the orders being drafted.
 - Turn replay: before the report, the map replays the resolved turn on the pre-turn board: all
   movement at once, then strike tracers, battle flashes and floating losses, then retreats,
   destroyed formations and site captures. Built only from events the player could see. Skip with
