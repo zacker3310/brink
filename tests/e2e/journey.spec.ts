@@ -9,7 +9,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
     if (m.type() === 'error') errors.push(m.text());
   });
 
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('nation-korva').click();
   await page.getByTestId('seed').fill('1234');
   await page.getByTestId('start-game').click();
