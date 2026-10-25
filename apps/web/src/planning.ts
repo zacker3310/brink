@@ -2,6 +2,7 @@ import type { Contact, Formation, FormationOrder, HexKey, NationView } from '@br
 import { AIR_REBASE_RANGE, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance, neighborKeys, pathFromReach, reachable, type Reach } from '@brink/map';
 import { enterCost, movementAllowance } from '@brink/simulation';
+import { hexLabel } from './insight';
 
 export type Mode = 'move' | 'attack' | 'recon' | 'withdraw';
 
@@ -58,7 +59,9 @@ export function orderForClick(view: NationView, f: Formation, key: HexKey, mode:
   return { order: { type: mode, path }, label };
 }
 
-export function describeOrder(order: FormationOrder | undefined): string {
+/** Plain-language order text; with a view, targets are named by place instead of coordinates. */
+export function describeOrder(order: FormationOrder | undefined, view?: NationView): string {
+  const place = (k: HexKey) => (view ? hexLabel(view, k) : k);
   if (!order) return 'Hold (default)';
   switch (order.type) {
     case 'hold':
@@ -72,6 +75,6 @@ export function describeOrder(order: FormationOrder | undefined): string {
     case 'withdraw':
       return `Withdraw ${order.path.length} hex${order.path.length === 1 ? '' : 'es'}`;
     case 'attack':
-      return order.path.length > 0 ? `Advance ${order.path.length}, assault ${order.target}` : `Attack ${order.target}`;
+      return order.path.length > 0 ? `Advance ${order.path.length}, assault ${place(order.target)}` : `Attack ${place(order.target)}`;
   }
 }

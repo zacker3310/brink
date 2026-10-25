@@ -1,9 +1,9 @@
 import { HOURS_PER_TURN, RIVER_MOVE_COST, STACK_LIMIT, TERRAIN, UNITS } from '@brink/game-data';
 import { SCENARIOS } from '@brink/scenarios';
 import { costText } from '../ui';
-import { Frame, Label, ScreenHeader, useKeys } from './chrome';
+import { Frame, Label, ScreenHeader, useKeys } from '../chrome';
 import { CLASS_ORDER, VICTORY_SHARE } from './intel';
-import { UnitGlyph } from './Setup';
+import { UnitGlyph } from '../glyphs';
 
 // Every number on this page is read from game-data, so the manual is never out of date.
 

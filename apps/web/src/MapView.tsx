@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Application, Container, Graphics, Text } from 'pixi.js';
-import type { FormationOrder, HexKey, NationView, Terrain } from '@brink/contracts';
-import { UNITS } from '@brink/game-data';
+import type { FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
 import { hexCorners, hexToPixel, keyOf, parseKey, pixelToHex } from '@brink/map';
+import { HEX_SIZE, useCamera } from './camera';
 import { hostilesAt, orderForClick, reachFor } from './planning';
 import { useGame } from './store';
 
-const SIZE = 30;
+const SIZE = HEX_SIZE;
 
 const TERRAIN_COLOR: Record<Terrain, number> = {
   plains: 0x56664a,
@@ -45,6 +45,18 @@ function drawPath(g: Graphics, from: HexKey, order: FormationOrder, color: numbe
   }
 }
 
+/** A NATO-style class symbol inside a w x h frame at (x, y). */
+function drawSymbol(g: Graphics, cls: UnitClass, x: number, y: number, w: number, h: number, color: number, alpha: number) {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const line = { width: 1.4, color, alpha };
+  if (cls === 'infantry' || cls === 'mechanized') g.moveTo(x, y).lineTo(x + w, y + h).moveTo(x + w, y).lineTo(x, y + h).stroke(line);
+  if (cls === 'mechanized' || cls === 'armor') g.ellipse(cx, cy, w * 0.32, h * 0.26).stroke({ ...line, width: cls === 'armor' ? 1.8 : 1.4 });
+  if (cls === 'artillery') g.circle(cx, cy, h * 0.18).fill({ color, alpha });
+  if (cls === 'recon') g.moveTo(x, y + h).lineTo(x + w, y).stroke(line);
+  if (cls === 'air') g.moveTo(x + w * 0.15, cy + 2).quadraticCurveTo(x + w * 0.32, cy - 5, cx, cy + 2).quadraticCurveTo(x + w * 0.68, cy - 5, x + w * 0.85, cy + 2).stroke(line);
+}
+
 declare global {
   interface Window {
     __brink?: { hexToClient(key: HexKey): { x: number; y: number }; reachable(): HexKey[] };
@@ -55,6 +67,8 @@ export function MapView() {
   const host = useRef<HTMLDivElement>(null);
   const appRef = useRef<{ app: Application; world: Container; layers: Record<string, Container> } | null>(null);
   const hover = useRef<HexKey | null>(null);
+  /** Set once the player pans or zooms; until then the map refits to its container. */
+  const userMoved = useRef(false);
   const view = useGame((s) => s.view);
   const draft = useGame((s) => s.draft);
   const submitted = useGame((s) => s.submitted);
@@ -73,6 +87,7 @@ export function MapView() {
   useEffect(() => {
     const el = host.current!;
     let destroyed = false;
+    let resize: ResizeObserver | null = null;
     const app = new Application();
     void app.init({ resizeTo: el, background: 0x0a0f18, antialias: true, autoDensity: true, resolution: window.devicePixelRatio || 1 }).then(() => {
       if (destroyed) {
@@ -96,9 +111,37 @@ export function MapView() {
       redrawHover();
       const v = useGame.getState().view;
       if (v) fitTo(v);
+      useCamera.setState({
+        control: {
+          zoomBy: (f) => {
+            userMoved.current = true;
+            zoomAt(app.screen.width / 2, app.screen.height / 2, f);
+          },
+          fit: () => {
+            userMoved.current = false;
+            const cur = useGame.getState().view;
+            if (cur) fitTo(cur);
+          },
+          centerOn: (x, y) => {
+            userMoved.current = true;
+            world.position.set(app.screen.width / 2 - x * world.scale.x, app.screen.height / 2 - y * world.scale.y);
+            publish();
+          },
+        },
+      });
+      // Refit when the container changes size, until the player takes the camera.
+      resize = new ResizeObserver(() => {
+        app.resize();
+        const cur = useGame.getState().view;
+        if (!userMoved.current && cur) fitTo(cur);
+        else publish();
+      });
+      resize.observe(el);
     });
     return () => {
       destroyed = true;
+      resize?.disconnect();
+      useCamera.setState({ control: null });
       if (appRef.current) {
         appRef.current.app.destroy(true);
         appRef.current = null;
@@ -118,6 +161,24 @@ export function MapView() {
     return useGame.getState().view?.tiles[key] ? key : null;
   }
 
+  function publish() {
+    const a = appRef.current;
+    if (!a) return;
+    useCamera.setState({ camera: { x: a.world.x, y: a.world.y, scale: a.world.scale.x, width: a.app.screen.width, height: a.app.screen.height } });
+  }
+
+  function zoomAt(px: number, py: number, factor: number) {
+    const a = appRef.current;
+    if (!a) return;
+    const w = a.world;
+    const bx = (px - w.x) / w.scale.x;
+    const by = (py - w.y) / w.scale.y;
+    const s = Math.min(3, Math.max(0.4, w.scale.x * factor));
+    w.scale.set(s);
+    w.position.set(px - bx * s, py - by * s);
+    publish();
+  }
+
   function fitTo(v: NationView) {
     const a = appRef.current;
     if (!a) return;
@@ -131,6 +192,7 @@ export function MapView() {
     const s = Math.min(w / (maxX - minX), h / (maxY - minY), 1.6);
     a.world.scale.set(s);
     a.world.position.set((w - (maxX - minX) * s) / 2 - minX * s, (h - (maxY - minY) * s) / 2 - minY * s);
+    publish();
   }
 
   function wireInput(app: Application, world: Container) {
@@ -147,13 +209,23 @@ export function MapView() {
         const dx = e.clientX - down.x;
         const dy = e.clientY - down.y;
         if (Math.abs(dx) + Math.abs(dy) > 5) dragged = true;
-        if (dragged) world.position.set(down.wx + dx, down.wy + dy);
+        if (dragged) {
+          userMoved.current = true;
+          world.position.set(down.wx + dx, down.wy + dy);
+          publish();
+        }
       }
       const k = hexAt(e.clientX, e.clientY);
       if (k !== hover.current) {
         hover.current = k;
         redrawHover();
+        useGame.getState().setHover(k);
       }
+    });
+    canvas.addEventListener('pointerleave', () => {
+      hover.current = null;
+      redrawHover();
+      useGame.getState().setHover(null);
     });
     canvas.addEventListener('pointerup', (e) => {
       const wasDrag = dragged;
@@ -170,11 +242,9 @@ export function MapView() {
       'wheel',
       (e) => {
         e.preventDefault();
-        const before = toWorld(e.clientX, e.clientY);
-        const s = Math.min(3, Math.max(0.4, world.scale.x * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
-        world.scale.set(s);
+        userMoved.current = true;
         const rect = canvas.getBoundingClientRect();
-        world.position.set(e.clientX - rect.left - before.x * s, e.clientY - rect.top - before.y * s);
+        zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
       },
       { passive: false },
     );
@@ -228,7 +298,7 @@ export function MapView() {
     layer.removeChildren().forEach((c) => c.destroy());
     if (!hover.current) return;
     const g = new Graphics();
-    g.poly(poly(hover.current, 1.5)).stroke({ width: 2, color: 0xe8e2d0, alpha: 0.55 });
+    g.poly(poly(hover.current, 1.5)).fill({ color: 0xffffff, alpha: 0.06 }).stroke({ width: 2, color: 0xe8e2d0, alpha: 0.6 });
     layer.addChild(g);
   }
 
@@ -246,7 +316,7 @@ export function MapView() {
     for (const key of Object.keys(v.tiles).sort()) {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown' || !t.terrain) {
-        terrain.poly(poly(key)).fill({ color: 0x0d121c }).stroke({ width: 1, color: 0x1a2130 });
+        terrain.poly(poly(key, 1)).fill({ color: 0x111a27 }).stroke({ width: 1, color: 0x223047, alpha: 0.9 });
         continue;
       }
       terrain.poly(poly(key)).fill({ color: TERRAIN_COLOR[t.terrain] }).stroke({ width: 1, color: 0x0a0f18, alpha: 0.6 });
@@ -314,10 +384,21 @@ export function MapView() {
       } else {
         sites.poly([c.x, y - 7, c.x + 7, y, c.x, y + 7, c.x - 7, y]).fill({ color: 0x0a0f18 }).stroke({ width: 2, color: 0xe0b44a });
       }
-      const label = new Text({ text: site.name, style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10, fill: 0xe6e1d3, fontWeight: '600' } });
+      const label = new Text({
+        text: site.kind === 'depot' ? site.name : site.name.toUpperCase(),
+        resolution: 3,
+        style: {
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: site.kind === 'capital' ? 10 : 8.5,
+          fill: site.kind === 'objective' ? 0xe0b44a : 0xe6e1d3,
+          fontWeight: site.kind === 'depot' ? '500' : '700',
+          letterSpacing: site.kind === 'depot' ? 0 : 0.6,
+          stroke: { color: 0x070b12, width: 3, join: 'round' },
+        },
+      });
       label.anchor.set(0.5, 0);
       label.position.set(c.x, c.y + 15);
-      label.alpha = 0.9;
+      label.alpha = site.kind === 'depot' ? 0.75 : 0.95;
       a.layers.sites!.addChild(label);
     }
     a.layers.sites!.addChildAt(sites, 0);
@@ -326,7 +407,10 @@ export function MapView() {
     const hl = new Graphics();
     if (reach && s.selectedFormation) {
       for (const k of Object.keys(reach)) {
-        if (k !== v.formations[s.selectedFormation]?.key) hl.poly(poly(k, 4)).fill({ color: 0xf2e6b8, alpha: 0.22 }).stroke({ width: 1, color: 0xf2e6b8, alpha: 0.5 });
+        if (k !== v.formations[s.selectedFormation]?.key) {
+          const tint = s.mode === 'attack' ? 0xd9534f : s.mode === 'withdraw' ? 0x8fb3d9 : 0xf2e6b8;
+          hl.poly(poly(k, 3)).fill({ color: tint, alpha: 0.16 }).stroke({ width: 1, color: tint, alpha: 0.45 });
+        }
       }
     }
     if (s.report && !s.showReport) {
@@ -353,37 +437,45 @@ export function MapView() {
     }
     a.layers.paths!.addChild(paths);
 
-    // Formations: own markers, then contacts.
-    const byHex = new Map<HexKey, { label: string; color: number; own: boolean; confirmed: boolean; strength: number; selected: boolean }[]>();
+    // Formations: own counters, then contacts, stacked per hex.
+    type Marker = { cls: UnitClass; color: number; own: boolean; confirmed: boolean; strength: number; selected: boolean; ordered: boolean };
+    const byHex = new Map<HexKey, Marker[]>();
+    const planned = (s.submitted ?? s.draft)?.formations ?? {};
     for (const f of Object.values(v.formations).sort((x, y) => (x.id < y.id ? -1 : 1))) {
       byHex.set(f.key, [
         ...(byHex.get(f.key) ?? []),
-        { label: UNITS[f.unitClass].short, color: hex(v.self.color), own: true, confirmed: true, strength: f.strength, selected: f.id === s.selectedFormation },
+        { cls: f.unitClass, color: hex(v.self.color), own: true, confirmed: true, strength: f.strength, selected: f.id === s.selectedFormation, ordered: !!planned[f.id] },
       ]);
     }
     for (const c of Object.values(v.contacts).sort((x, y) => (x.formation < y.formation ? -1 : 1))) {
       byHex.set(c.key, [
         ...(byHex.get(c.key) ?? []),
-        { label: UNITS[c.unitClass].short, color: hex(v.nations[c.owner]?.color ?? '#888888'), own: false, confirmed: c.confirmed, strength: c.estimatedStrength, selected: false },
+        { cls: c.unitClass, color: hex(v.nations[c.owner]?.color ?? '#888888'), own: false, confirmed: c.confirmed, strength: c.estimatedStrength, selected: false, ordered: false },
       ]);
     }
     const units = new Graphics();
+    const W = 24;
+    const H = 16;
     for (const [key, list] of byHex) {
       const c = center(key);
-      list.forEach((m, i) => {
-        const x = c.x - 14 + i * 4;
-        const y = c.y - 4 - i * 4;
+      // Selected counter draws last so it sits on top of its stack.
+      const order = [...list].sort((m, n) => Number(m.selected) - Number(n.selected));
+      order.forEach((m, i) => {
+        const x = c.x - W / 2 - 3 + i * 3.5;
+        const y = c.y - H / 2 - 1 - i * 3.5;
         const alpha = m.confirmed ? 1 : 0.45;
-        units.roundRect(x, y, 28, 16, 2).fill({ color: m.own ? m.color : 0x0d121c, alpha }).stroke({ width: m.selected ? 2.5 : 1.5, color: m.selected ? 0xffffff : m.own ? 0x0a0f18 : m.color, alpha });
-        units.rect(x + 2, y + 13, Math.max(1, Math.round((24 * m.strength) / 1000)), 2).fill({ color: m.own ? 0x0a0f18 : m.color, alpha });
-        if (i === list.length - 1) {
-          const t = new Text({
-            text: m.confirmed ? m.label : `${m.label}?`,
-            style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 9, fontWeight: '700', fill: m.own ? 0x0a0f18 : m.color },
-          });
+        if (m.selected) units.roundRect(x - 3, y - 3, W + 6, H + 9, 3).fill({ color: 0xffffff, alpha: 0.18 });
+        units.rect(x, y, W, H).fill({ color: m.own ? m.color : 0x0d121c, alpha }).stroke({ width: m.selected ? 2 : 1.2, color: m.selected ? 0xffffff : m.own ? 0x070b12 : m.color, alpha });
+        drawSymbol(units, m.cls, x, y, W, H, m.own ? 0x070b12 : m.color, alpha);
+        // Strength strip under the counter.
+        units.rect(x, y + H + 1, W, 2.5).fill({ color: 0x070b12, alpha: 0.8 * alpha });
+        const sw = Math.max(1, Math.round((W * m.strength) / 1000));
+        units.rect(x, y + H + 1, sw, 2.5).fill({ color: m.strength < 400 ? 0xd9534f : m.own ? 0x6fbf8e : m.color, alpha });
+        if (m.own && !m.ordered && !s.submitted) units.circle(x + W, y, 2.6).fill({ color: 0xe0a84a }).stroke({ width: 1, color: 0x070b12 });
+        if (!m.confirmed && i === order.length - 1) {
+          const t = new Text({ text: '?', resolution: 3, style: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10, fontWeight: '800', fill: m.color } });
           t.anchor.set(0.5, 0.5);
-          t.position.set(x + 14, y + 7);
-          t.alpha = alpha;
+          t.position.set(x + W + 5, y + H / 2);
           a.layers.units!.addChild(t);
         }
       });
@@ -408,6 +500,7 @@ export function MapView() {
     const p = center(focus.key);
     const s = a.world.scale.x;
     a.world.position.set(a.app.screen.width / 2 - p.x * s, a.app.screen.height / 2 - p.y * s);
+    publish();
   }, [focus]);
 
   return <div ref={host} className="absolute inset-0" />;

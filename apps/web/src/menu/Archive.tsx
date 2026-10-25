@@ -1,6 +1,6 @@
 import { NATIONS, SCENARIOS } from '@brink/scenarios';
 import { latestSlot, readSlot, SLOT_NAMES, type SlotInfo } from '../saves';
-import { Frame, Label, relativeTime, ScreenHeader, useKeys } from './chrome';
+import { Frame, Label, relativeTime, ScreenHeader, useKeys } from '../chrome';
 
 export function Archive({
   slots,

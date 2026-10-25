@@ -41,6 +41,12 @@ Updated 2026-10-25. Milestone 1 (first playable).
   intelligence dossier computed from the real starting world (traits, territory, VP share, income,
   order of battle, contested borders) and a seed codename; operations archive with progress per slot;
   field manual whose tables read straight from `game-data`; menu toasts; favicon.
+- Game screen overhaul: HUD with per-turn resource deltas, stability meter, VP race and turn clock;
+  icon rail with collapsible panel; map that auto-fits its container, NATO-style counters with
+  strength strips and no-orders markers, visible fog, hover card that previews what a click will do,
+  zoom controls and a clickable minimap; command bar with segmented orders, hotkeys, visual combat
+  odds and next-idle-unit; compact inspector; situation report with headline KPIs, VP deltas, place
+  names instead of coordinates and de-duplicated sightings; victory screen; keyboard map.
 
 ## Outstanding
 
@@ -49,7 +55,7 @@ Updated 2026-10-25. Milestone 1 (first playable).
   defender lethality, victory share.
 - No save-file export button in the UI yet (load from file exists).
 - Report has no per-turn history browser; past reports are kept in the save.
-- Map: no minimap, no animation of resolved movement.
+- Map: no animation of resolved movement.
 - Multiplayer: not started (see architecture.md).
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 

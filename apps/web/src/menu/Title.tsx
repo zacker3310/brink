@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { RULESET_VERSION } from '@brink/game-data';
 import { NATIONS, SCENARIOS, createScenario } from '@brink/scenarios';
 import { latestSlot, type SlotInfo } from '../saves';
-import { Kbd, relativeTime, useKeys } from './chrome';
+import { Kbd, relativeTime, useKeys } from '../chrome';
 import { MapPreview } from './MapPreview';
 
 export type MenuScreen = 'title' | 'setup' | 'archive' | 'manual';

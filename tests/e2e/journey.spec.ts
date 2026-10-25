@@ -44,6 +44,11 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('order-defend').click();
   await expect(page.getByTestId('planned-order')).toContainText('Defend');
 
+  // Jump to the next formation without orders.
+  await expect(page.getByTestId('next-idle')).toContainText('2/9');
+  await page.getByTestId('next-idle').click();
+  await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
+
   // End the turn and read the after-action report.
   await page.getByTestId('end-turn').click();
   const report = page.getByTestId('report');

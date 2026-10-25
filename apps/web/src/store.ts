@@ -15,6 +15,7 @@ import type {
   UnitClass,
 } from '@brink/contracts';
 import { engine } from './engine';
+import { idleFormations } from './insight';
 import type { Mode } from './planning';
 import type { Response } from './protocol';
 import { listSlots, writeSlot, type SlotInfo } from './saves';
@@ -45,6 +46,8 @@ interface State {
   focus: { key: HexKey; n: number } | null;
   notices: Notice[];
   slots: SlotInfo[];
+  hoverHex: HexKey | null;
+  panelOpen: boolean;
 
   newGame(nation: NationId, seed: number): Promise<void>;
   loadGame(text: string): Promise<void>;
@@ -53,6 +56,10 @@ interface State {
   selectFormation(id: FormationId | null): void;
   setMode(mode: Mode): void;
   setTab(tab: Tab): void;
+  setHover(key: HexKey | null): void;
+  togglePanel(open?: boolean): void;
+  /** Select the next own formation without an order, after the current one. */
+  nextIdle(): void;
   setOrder(id: FormationId, order: FormationOrder | null): void;
   addRecruit(siteId: string, unitClass: UnitClass): void;
   removeRecruit(index: number): void;
@@ -118,6 +125,8 @@ export const useGame = create<State>((set, get) => {
     focus: null,
     notices: [],
     slots: listSlots(),
+    hoverHex: null,
+    panelOpen: true,
 
     async newGame(nation, seed) {
       if (apply(await engine.call({ type: 'new', seed, nation }))) {
@@ -139,7 +148,20 @@ export const useGame = create<State>((set, get) => {
       set({ selectedFormation: id, selectedHex: f?.key ?? get().selectedHex, mode: 'move' });
     },
     setMode: (mode) => set({ mode }),
-    setTab: (tab) => set({ tab }),
+    setTab: (tab) => set({ tab, panelOpen: true }),
+    setHover: (key) => {
+      if (get().hoverHex !== key) set({ hoverHex: key });
+    },
+    togglePanel: (open) => set({ panelOpen: open ?? !get().panelOpen }),
+    nextIdle: () => {
+      const { view, draft, selectedFormation } = get();
+      if (!view || !draft) return;
+      const idle = idleFormations(view, draft.formations);
+      if (idle.length === 0) return;
+      const next = idle.find((f) => selectedFormation !== null && f.id > selectedFormation) ?? idle[0]!;
+      get().selectFormation(next.id);
+      get().focusOn(next.key);
+    },
     setOrder: (id, order) =>
       editDraft((d) => {
         if (order) d.formations[id] = order;
