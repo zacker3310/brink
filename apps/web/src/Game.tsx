@@ -31,6 +31,7 @@ function TopBar({ onChat }: { onChat: () => void }) {
   const report = useGame((s) => s.report);
   const toMenu = useGame((s) => s.toMenu);
   const save = useGame((s) => s.save);
+  const exportSave = useGame((s) => s.exportSave);
   const resolving = useGame((s) => s.resolving);
   const animate = useGame((s) => s.animate);
   const setAnimate = useGame((s) => s.setAnimate);
@@ -137,6 +138,18 @@ function TopBar({ onChat }: { onChat: () => void }) {
                   Save to {slot}
                 </button>
               ))}
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="save-export"
+                className="block w-full border-t border-line px-2 py-1.5 text-left text-xs hover:bg-ink-700"
+                onClick={() => {
+                  setSaving(false);
+                  void exportSave();
+                }}
+              >
+                Export to file…
+              </button>
             </div>
           )}
         </div>

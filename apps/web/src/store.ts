@@ -107,6 +107,8 @@ interface State {
   setPriority(id: FormationId, p: SupplyPriority): void;
   submit(): Promise<void>;
   save(slot: string): Promise<void>;
+  /** Download the campaign as a save file. */
+  exportSave(): Promise<void>;
   focusOn(key: HexKey): void;
   setShowReport(show: boolean): void;
   notify(text: string, tone?: Notice['tone']): void;
@@ -352,6 +354,28 @@ export const useGame = create<State>((set, get) => {
       if (ok) get().notify(`Saved to ${slot}`);
       else get().notify('Could not save: browser storage is unavailable or full', 'error');
       set({ slots: listSlots() });
+    },
+
+    async exportSave() {
+      const r = await engine.call({ type: 'save', label: 'Exported', savedAt: new Date().toISOString() });
+      if (r.type !== 'saved') {
+        apply(r);
+        return;
+      }
+      const view = get().view!;
+      try {
+        const url = URL.createObjectURL(new Blob([r.text], { type: 'application/json' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `brink-${view.self.id}-turn-${r.turn}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        get().notify(`Exported turn ${r.turn} to a file`);
+      } catch {
+        get().notify('Could not export the save', 'error');
+      }
     },
 
     focusOn: (key) => set({ focus: { key, n: (get().focus?.n ?? 0) + 1 }, selectedHex: key }),

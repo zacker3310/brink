@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { GameEvent, HexKey, NationView, TurnReport, UnitClass } from '@brink/contracts';
 import { TECHS, UNITS } from '@brink/game-data';
-import { Label } from './chrome';
+import { Label, useKeys } from './chrome';
 import { UnitGlyph } from './glyphs';
 import { atPlace, hexLabel, netChange, toPlace, turnClock } from './insight';
 import { useGame } from './store';
@@ -237,12 +237,29 @@ function previousVp(history: TurnReport[], turn: number): Record<string, number>
 
 export function Report() {
   const view = useGame((s) => s.view)!;
-  const report = useGame((s) => s.report);
   const history = useGame((s) => s.history);
   const setShowReport = useGame((s) => s.setShowReport);
   const focusOn = useGame((s) => s.focusOn);
   const lastTurn = useGame((s) => s.lastTurn);
   const rewatch = useGame((s) => s.rewatch);
+  const latest = useGame((s) => s.report);
+  // Browse every past report; the newest by default.
+  const turns = history.map((h) => h.turn);
+  const [picked, setPicked] = useState<number | null>(null);
+  const shown = (picked !== null ? history.find((h) => h.turn === picked) : undefined) ?? latest;
+  const at = shown ? turns.indexOf(shown.turn) : -1;
+  const step = (d: number) => {
+    const t = turns[at + d];
+    if (t !== undefined) setPicked(t);
+  };
+  useKeys(
+    (e) => {
+      if (e.key === 'ArrowLeft') step(-1);
+      if (e.key === 'ArrowRight') step(1);
+    },
+    [at, turns.length],
+  );
+  const report = shown;
   if (!report) return null;
   const { totals, sections } = digest(view, report.events);
   const vp = report.victoryPoints;
@@ -266,9 +283,18 @@ export function Report() {
             <p className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">
               Situation report · Day {clock.day}, {clock.hour}
             </p>
-            <h2 id="report-title" className="font-display text-xl font-black tracking-tight">
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => step(-1)} disabled={at <= 0} className="border border-line px-2 text-sm text-muted hover:text-text disabled:opacity-30" aria-label="Previous turn" data-testid="report-prev">
+                ‹
+              </button>
+              <h2 id="report-title" className="font-display text-xl font-black tracking-tight">
               Turn {report.turn} resolved
             </h2>
+              <button type="button" onClick={() => step(1)} disabled={at < 0 || at >= turns.length - 1} className="border border-line px-2 text-sm text-muted hover:text-text disabled:opacity-30" aria-label="Next turn" data-testid="report-next">
+                ›
+              </button>
+              {at >= 0 && turns.length > 1 && <span className="font-mono text-[10px] text-faint">{at + 1}/{turns.length}</span>}
+            </div>
           </div>
           {lastTurn && lastTurn.before.turn === report.turn && (
             <button type="button" onClick={rewatch} className="ml-auto border border-line px-3 py-2 text-xs text-muted hover:border-faint hover:text-text">

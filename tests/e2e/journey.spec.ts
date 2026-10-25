@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 // The core journey: title screen, campaign setup, pick a nation, select a formation, order it, end the turn, read the
 // report, save, and resume from the save.
 test('start, order, resolve, report, save and resume', async ({ page }) => {
+  // The whole campaign loop in one test: longer than the default budget.
+  test.setTimeout(120_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -109,6 +111,29 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(page.getByTestId('turn')).toContainText('2 / 30');
   await page.getByTestId('open-report').click();
   await expect(page.getByTestId('report')).toContainText('Turn 1 resolved');
+  await page.getByTestId('close-report').click();
+
+  // Export a save file and load it back from the archive.
+  await page.getByTestId('save-menu').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('save-export').click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('brink-korva-turn-2.json');
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByTestId('menu-load').click();
+  await page.getByTestId('load-file').setInputFiles((await file.path())!);
+  await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
+  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+
+  // Play another turn, then browse back through the report history.
+  await page.getByTestId('end-turn').click();
+  await expect(page.getByTestId('turn')).toContainText('3 / 30', { timeout: 15000 });
+  await page.getByTestId('open-report').click();
+  await expect(page.getByTestId('report')).toContainText('Turn 2 resolved');
+  await page.getByTestId('report-prev').click();
+  await expect(page.getByTestId('report')).toContainText('Turn 1 resolved');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('report')).toContainText('Turn 2 resolved');
 
   expect(errors).toEqual([]);
 });
