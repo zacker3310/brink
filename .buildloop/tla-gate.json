@@ -1,0 +1,4 @@
+{
+  "_comment": "Formal checks run by VERIFY. Empty until a spec exists; the gate exits 0 with nothing to verify.",
+  "checks": []
+}

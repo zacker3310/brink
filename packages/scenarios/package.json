@@ -1,0 +1,13 @@
+{
+  "name": "@brink/scenarios",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": { "@brink/contracts": "workspace:*","@brink/map": "workspace:*","@brink/game-data": "workspace:*","@brink/simulation": "workspace:*" }
+}

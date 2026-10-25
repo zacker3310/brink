@@ -1,0 +1,15 @@
+
+# build loop: keep artifacts, drop run output
+.buildloop/tla/logs/
+.buildloop/tla/verdict.json
+.buildloop/**/states/
+
+node_modules/
+dist/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.DS_Store
+.env

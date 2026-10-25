@@ -1,0 +1,19 @@
+{
+  "name": "@brink/tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint soak",
+    "soak": "vitest run --config vitest.soak.config.ts",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@brink/contracts": "workspace:*",
+    "@brink/game-data": "workspace:*",
+    "@brink/simulation": "workspace:*",
+    "@brink/session": "workspace:*",
+    "@brink/scenarios": "workspace:*"
+  }
+}

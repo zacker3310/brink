@@ -1,0 +1,48 @@
+# Control bands for WATCH.
+#
+# A deterministic monitor classifies each observation against the metric's own
+# history and escalates by band. The bands must come from the metric's history,
+# not from a round number someone liked - a threshold nobody derived is a
+# threshold nobody trusts, and it gets muted the first week it is noisy.
+#
+# Actions, fixed by the playbook:
+#   1 sigma  log       no human, no agent
+#   2 sigma  diagnose  agent with read-only tools; gathers context, writes it up
+#   3 sigma  propose   agent drafts the change and opens a PR - NO human in the
+#                      invocation path. The human reviews the PR, not the alert.
+#
+# Direction: above | below | both. A latency metric only alarms upward; a
+# conversion metric only alarms downward. "both" is the lazy default and it
+# doubles your false positives.
+
+metrics:
+  error_rate:
+    baseline: 0.02
+    sigma: 0.008
+    direction: above
+    owner: platform
+
+  p95_latency_ms:
+    baseline: 180
+    sigma: 35
+    direction: above
+    owner: platform
+
+  build_first_pass_rate:
+    baseline: 0.85
+    sigma: 0.07
+    direction: below
+    owner: build
+
+  verify_yield:
+    # HIGH/MEDIUM findings per VERIFY run. Zero forever means VERIFY is
+    # rubber-stamping, so this one alarms in BOTH directions on purpose.
+    #
+    # sigma is deliberately tight: at 0.5 a yield of zero lands at -3 sigma and
+    # opens an intent. A wider sigma would leave the exact condition this metric
+    # exists to catch permanently inside the band, which is a metric that cannot
+    # fire dressed up as a metric that is healthy.
+    baseline: 1.5
+    sigma: 0.5
+    direction: both
+    owner: build
