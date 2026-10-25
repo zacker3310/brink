@@ -67,6 +67,9 @@ Updated 2026-10-25. Milestone 1 (first playable).
   partner, and abandons a war stalled for 8 turns; strikes cost 25 entrenchment; victory at 40% of
   VP. Engine fix: war declared between co-located nations pushes the trespasser off. Soak went from
   25 to 58 decisive endings in 100.
+- Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
+  where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
+  `threatZones` in the simulation package, built from the viewer's NationView.
 - Turn replay: before the report, the map replays the resolved turn on the pre-turn board: all
   movement at once, then strike tracers, battle flashes and floating losses, then retreats,
   destroyed formations and site captures. Built only from events the player could see. Skip with

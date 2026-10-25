@@ -90,3 +90,5 @@ In React use `<UnitGlyph unitClass color affiliation planned />`; in Pixi use `a
 Blue (`friend`) fill and a bright border mark the selected unit's movement range; red (`hostile`)
 rings mark enemies it can hit. Hover draws a dashed path in the colour of the order it would give.
 Locked orders draw solid, white once submitted. Borders between nations are 4px in nation colour.
+The threat overlay fills hexes in `hostile` with alpha rising per enemy that could strike there, with a
+bright edge on its boundary; hovering an enemy draws the same for that unit alone.

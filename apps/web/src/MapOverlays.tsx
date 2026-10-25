@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { HexKey } from '@brink/contracts';
 import { GOVERNMENTS, RIVER_ASSAULT_PENALTY, TERRAIN, UNITS } from '@brink/game-data';
-import { nationModifiers, previewAssault, previewStrike } from '@brink/simulation';
+import { nationModifiers, previewAssault, previewStrike, threatZones } from '@brink/simulation';
 import { hexCorners, hexToPixel, parseKey } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
 import { hexLabel } from './insight';
@@ -201,6 +201,7 @@ export function HoverCard() {
     const r = orderForClick(view, f, key, mode, reach);
     action = 'error' in r ? { ok: false, text: r.error } : { ok: true, text: r.label.replace(/\d+,-?\d+|-?\d+,\d+/, hexLabel(view, key)) };
   }
+  const threatCount = threatZones(view).get(key) ?? 0;
   const flip = x > cam.width - 320;
   const combat = f && reach && !resolving && hostiles.length > 0 && action?.ok;
   if (combat) {
@@ -225,6 +226,11 @@ export function HoverCard() {
         <div className="mt-0.5 flex items-center gap-1.5 text-muted">
           <Swatch color={view.nations[t.owner]?.color ?? '#888'} />
           {view.nations[t.owner]?.name}
+        </div>
+      )}
+      {threatCount > 0 && (
+        <div className="mt-0.5 font-semibold text-hostile" data-testid="hover-threat">
+          ⚠ {threatCount} enemy {threatCount === 1 ? 'unit' : 'units'} could strike here next turn
         </div>
       )}
       {(own.length > 0 || others.length > 0) && (
@@ -257,6 +263,8 @@ export function HoverCard() {
 
 export function ZoomControls({ onHelp }: { onHelp?: () => void }) {
   const control = useCamera((s) => s.control);
+  const showThreat = useGame((s) => s.showThreat);
+  const toggleThreat = useGame((s) => s.toggleThreat);
   const btn = 'flex h-7 w-7 items-center justify-center border border-line bg-ink-900/90 text-sm text-muted hover:border-faint hover:text-text';
   return (
     <div className="absolute top-3 right-3 z-10 flex gap-1" aria-label="Map zoom">
@@ -268,6 +276,16 @@ export function ZoomControls({ onHelp }: { onHelp?: () => void }) {
       </button>
       <button type="button" className={`${btn} text-[10px] font-bold`} onClick={() => control?.fit()} title="Fit map (F)" aria-label="Fit map" data-testid="map-fit">
         FIT
+      </button>
+      <button
+        type="button"
+        className={`${btn} text-[10px] font-bold ${showThreat ? 'border-hostile bg-hostile/20 text-hostile' : ''}`}
+        onClick={toggleThreat}
+        title="Threat: where seen enemies could strike next turn (V)"
+        aria-pressed={showThreat}
+        data-testid="toggle-threat"
+      >
+        ⚠
       </button>
       {onHelp && (
         <button type="button" className={btn} onClick={onHelp} title="Controls (?)" aria-label="Controls" data-testid="help">

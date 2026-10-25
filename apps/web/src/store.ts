@@ -66,6 +66,8 @@ interface State {
   selectedCity: string | null;
   /** Notification ids dismissed for the current report. */
   dismissed: string[];
+  /** Show where seen enemies could strike next turn. */
+  showThreat: boolean;
 
   newGame(nation: NationId, seed: number): Promise<void>;
   loadGame(text: string): Promise<void>;
@@ -89,6 +91,7 @@ interface State {
   issueOrder(id: FormationId, order: FormationOrder): void;
   openCity(id: string | null): void;
   dismissNote(id: string): void;
+  toggleThreat(): void;
   setOrder(id: FormationId, order: FormationOrder | null): void;
   addRecruit(siteId: string, unitClass: UnitClass): void;
   removeRecruit(index: number): void;
@@ -189,6 +192,7 @@ export const useGame = create<State>((set, get) => {
     animate: readPrefs().animate ?? !prefersReducedMotion(),
     selectedCity: null,
     dismissed: [],
+    showThreat: false,
 
     async newGame(nation, seed) {
       if (apply(await engine.call({ type: 'new', seed, nation }))) {
@@ -312,6 +316,7 @@ export const useGame = create<State>((set, get) => {
     },
     openCity: (id) => set({ selectedCity: id, ...(id ? { selectedFormation: null, panelOpen: false } : {}) }),
     dismissNote: (id) => set({ dismissed: [...get().dismissed, id] }),
+    toggleThreat: () => set({ showThreat: !get().showThreat }),
     setAnimate(on) {
       writePrefs({ animate: on });
       set({ animate: on });

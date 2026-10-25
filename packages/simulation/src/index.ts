@@ -3,6 +3,7 @@ export * from './economy';
 export * from './fog';
 export * from './hash';
 export * from './preview';
+export * from './threat';
 export * from './production';
 export * from './resolve';
 export * from './rng';

@@ -73,6 +73,18 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('close-report').click();
   await expect(page.getByTestId('turn')).toContainText('2 / 30');
 
+  // Threat overlay: V toggles it; hovering a seen enemy names the threat.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('v');
+  await expect(page.getByTestId('toggle-threat')).toHaveAttribute('aria-pressed', 'true');
+  const enemy = await page.evaluate(() => window.__brink!.enemies()[0]);
+  if (enemy) {
+    const e = await page.evaluate((k) => window.__brink!.hexToClient(k), enemy);
+    await page.mouse.move(e.x, e.y);
+    await expect(page.getByTestId('hover-card')).toBeVisible();
+  }
+  await page.keyboard.press('v');
+
   // Save, reload the page, and resume from the slot.
   await page.getByTestId('save-menu').click();
   await page.getByTestId('save-slot-2').click();

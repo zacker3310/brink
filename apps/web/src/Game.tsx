@@ -252,6 +252,7 @@ function KeyHelp({ onClose }: { onClose: () => void }) {
     ['Esc', 'Deselect, close'],
     ['?', 'This card'],
     ['F  + −', 'Fit, zoom'],
+    ['V', 'Threat overlay'],
     ['Ctrl Enter', 'End turn'],
   ];
   return (
@@ -359,6 +360,7 @@ function useShortcuts(toggleHelp: () => void, openChat: () => void) {
       g.selectFormation(null);
       g.selectHex(null);
     } else if (k === 'f') cam?.fit();
+    else if (k === 'v') g.toggleThreat();
     else if (e.key === '+' || e.key === '=') cam?.zoomBy(1.25);
     else if (e.key === '-' || e.key === '_') cam?.zoomBy(0.8);
     else if (f && !g.resolving) {

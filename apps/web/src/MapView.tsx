@@ -7,6 +7,7 @@ import { HEX_SIZE, useCamera } from './camera';
 import { addCounter, affiliationOf, counterExtent, type CounterLook } from './counters';
 import { AFFILIATION, FONT_DATA, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
+import { threatZones } from '@brink/simulation';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useGame } from './store';
 
@@ -155,7 +156,7 @@ export function contextualOrder(view: NationView, f: Formation, key: HexKey, mod
 
 declare global {
   interface Window {
-    __brink?: { hexToClient(key: HexKey): { x: number; y: number }; reachable(): HexKey[] };
+    __brink?: { hexToClient(key: HexKey): { x: number; y: number }; reachable(): HexKey[]; enemies(): HexKey[] };
   }
 }
 
@@ -205,7 +206,7 @@ export function MapView() {
       const world = new Container();
       app.stage.addChild(world);
       const layers: Record<string, Container> = {};
-      for (const name of ['terrain', 'overlay', 'sites', 'highlight', 'paths', 'units', 'anim', 'hover']) {
+      for (const name of ['terrain', 'overlay', 'threat', 'sites', 'highlight', 'paths', 'units', 'anim', 'hover']) {
         layers[name] = new Container();
         world.addChild(layers[name]);
       }
@@ -361,6 +362,10 @@ export function MapView() {
         const r = currentReach();
         return r ? Object.keys(r.reach).filter((k) => k !== r.f.key).sort() : [];
       },
+      enemies() {
+        const v = useGame.getState().view;
+        return v ? [...new Set(Object.values(v.contacts).filter((c) => c.confirmed && v.relations[c.owner] === 'war').map((c) => c.key))].sort() : [];
+      },
     };
   }
 
@@ -439,6 +444,21 @@ export function MapView() {
     } else {
       g.poly(poly(k, 1.5)).fill({ color: 0xffffff, alpha: 0.07 }).stroke({ width: 2, color: 0xe8e2d0, alpha: 0.6 });
     }
+    // Hovering an enemy shows its intent: everywhere it could hit next turn.
+    if (v && !s.playback) {
+      const here = new Set(Object.values(v.contacts).filter((c) => c.key === k && v.relations[c.owner] === 'war').map((c) => c.formation));
+      if (here.size > 0) {
+        const zone = threatZones(v, here);
+        for (const z of zone.keys()) {
+          g.poly(poly(z, 1)).fill({ color: ATTACK, alpha: 0.13 });
+          for (const nb of neighborKeys(z)) {
+            if (zone.has(nb) || !v.tiles[nb]) continue;
+            const [p, q] = edge(z, nb, 1.5);
+            g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.5, color: ATTACK, alpha: 0.95, cap: 'round' });
+          }
+        }
+      }
+    }
     layer.addChild(g);
   }
 
@@ -449,7 +469,7 @@ export function MapView() {
     const v = s.playback?.before ?? s.view;
     const replaying = s.playback !== null;
     if (!a || !v) return;
-    for (const name of ['terrain', 'overlay', 'sites', 'highlight', 'paths', 'units']) {
+    for (const name of ['terrain', 'overlay', 'threat', 'sites', 'highlight', 'paths', 'units']) {
       a.layers[name]!.removeChildren().forEach((c) => c.destroy());
     }
     const keys = Object.keys(v.tiles).sort();
@@ -512,6 +532,21 @@ export function MapView() {
       if (t.visibility === 'observed') overlay.poly(poly(key)).fill({ color: 0x05080e, alpha: 0.45 });
     }
     a.layers.overlay!.addChild(overlay);
+
+    // Threat: where seen enemies could hit next turn, darker where more of them could.
+    if (s.showThreat && !replaying) {
+      const zones = threatZones(v);
+      const threat = new Graphics();
+      for (const [k, n] of zones) {
+        threat.poly(poly(k, 1)).fill({ color: ATTACK, alpha: Math.min(0.5, 0.04 + 0.11 * (n - 1) + (n > 1 ? 0.06 : 0)) });
+        for (const nb of neighborKeys(k)) {
+          if (zones.has(nb) || !v.tiles[nb]) continue;
+          const [p, q] = edge(k, nb, 1.5);
+          threat.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.5, color: ATTACK, alpha: 0.85, cap: 'round' });
+        }
+      }
+      a.layers.threat!.addChild(threat);
+    }
 
     // Site markers. Names are HTML city banners; only depots get a small label here.
     const sites = new Graphics();
@@ -663,7 +698,7 @@ export function MapView() {
 
   useEffect(() => {
     const unsub = useGame.subscribe((s, prev) => {
-      if (s.showReport !== prev.showReport || s.playback !== prev.playback) redraw();
+      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat) redraw();
     });
     return unsub;
   }, []);
