@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// The core journey: start, pick a nation, select a formation, order it, end the turn, read the
+// The core journey: title screen, campaign setup, pick a nation, select a formation, order it, end the turn, read the
 // report, save, and resume from the save.
 test('start, order, resolve, report, save and resume', async ({ page }) => {
   const errors: string[] = [];
@@ -10,7 +10,10 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   });
 
   await page.goto('./');
+  await expect(page.getByTestId('menu-continue')).toHaveCount(0);
+  await page.getByTestId('menu-new').click();
   await page.getByTestId('nation-korva').click();
+  await expect(page.getByTestId('dossier-name')).toHaveText('Korva Directorate');
   await page.getByTestId('seed').fill('1234');
   await page.getByTestId('start-game').click();
 
@@ -53,6 +56,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('save-slot-2').click();
   await expect(page.getByText('Saved to Slot 2')).toBeVisible();
   await page.reload();
+  await expect(page.getByTestId('menu-continue')).toContainText('Korva Directorate, turn 2');
+  await page.getByTestId('menu-load').click();
   await page.getByTestId('load-slot-2').click();
   await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
   await expect(page.getByTestId('turn')).toContainText('2 / 30');

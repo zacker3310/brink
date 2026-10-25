@@ -1,5 +1,5 @@
 import { Game } from './Game';
-import { Menu } from './Menu';
+import { Menu } from './menu/Menu';
 import { useGame } from './store';
 
 export function App() {

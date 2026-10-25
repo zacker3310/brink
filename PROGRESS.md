@@ -36,6 +36,11 @@ Updated 2026-10-25. Milestone 1 (first playable).
   previews, fog, borders, sites, markers), inspector, order bar with previews, after-action report with
   jump-to-map, three save slots plus load-from-file, victory banner.
 - API: health, scenarios, headless simulation.
+- Front end (menu overhaul): title screen over the live theatre map (radar sweep, news ticker, keyboard
+  nav, Continue from the latest save); campaign setup with nation roster, per-seed map preview, an
+  intelligence dossier computed from the real starting world (traits, territory, VP share, income,
+  order of battle, contested borders) and a seed codename; operations archive with progress per slot;
+  field manual whose tables read straight from `game-data`; menu toasts; favicon.
 
 ## Outstanding
 

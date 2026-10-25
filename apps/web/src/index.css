@@ -36,3 +36,244 @@ body {
   outline: 2px solid var(--color-signal);
   outline-offset: 2px;
 }
+
+/* ---------- Front end: title, setup, archive, manual ---------- */
+
+.screen-in {
+  animation: screen-in 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.enter-1,
+.enter-2,
+.enter-3,
+.enter-4 {
+  animation: enter 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.enter-2 {
+  animation-delay: 80ms;
+}
+.enter-3 {
+  animation-delay: 160ms;
+}
+.enter-4 {
+  animation-delay: 240ms;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(3px);
+  }
+}
+
+.toast-in {
+  animation: enter 260ms ease-out both;
+}
+
+/* Bracketed frame corners, tinted by --accent. */
+.frame {
+  --accent: var(--color-signal);
+}
+.frame-tick {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--accent);
+  border-style: solid;
+  border-width: 0;
+  pointer-events: none;
+  transition: border-color 300ms;
+}
+.frame-tick.tl {
+  top: -1px;
+  left: -1px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+.frame-tick.tr {
+  top: -1px;
+  right: -1px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+.frame-tick.bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+.frame-tick.br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+.scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+
+/* Title */
+.title-screen {
+  background: radial-gradient(ellipse at 70% 40%, #101a28 0%, var(--color-ink-950) 70%);
+}
+.title-map {
+  opacity: 0.8;
+  transform-origin: 66% 50%;
+  animation: drift 60s ease-in-out infinite alternate;
+}
+@keyframes drift {
+  from {
+    transform: scale(0.98) translate(16%, 2%);
+  }
+  to {
+    transform: scale(1.12) translate(12%, -2%);
+  }
+}
+.title-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, var(--color-ink-950) 0%, rgb(7 11 18 / 0.88) 30%, rgb(7 11 18 / 0.2) 65%, rgb(7 11 18 / 0.6) 100%),
+    linear-gradient(0deg, var(--color-ink-950) 0%, transparent 30%);
+}
+.title-sweep {
+  position: absolute;
+  left: 66%;
+  top: 50%;
+  width: 140vmax;
+  height: 140vmax;
+  margin: -70vmax 0 0 -70vmax;
+  background: conic-gradient(from 0deg, rgb(224 168 74 / 0.16), rgb(224 168 74 / 0) 40deg, transparent 360deg);
+  border-radius: 50%;
+  animation: sweep 9s linear infinite;
+  mix-blend-mode: screen;
+}
+@keyframes sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.title-wordmark {
+  background: linear-gradient(180deg, #f3eee2 0%, #c9c2b0 55%, #8f8878 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 60px rgb(224 168 74 / 0.12);
+}
+.menu-item::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--color-signal);
+  transform: scaleY(0);
+  transition: transform 200ms;
+}
+.menu-item[class*='bg-signal']::before {
+  transform: scaleY(1);
+}
+
+.ticker {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.ticker-track {
+  display: inline-flex;
+  animation: ticker 90s linear infinite;
+}
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Map preview */
+.mp-tint {
+  transition: opacity 400ms;
+}
+.mp-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 2.6s ease-out infinite;
+}
+@keyframes pulse {
+  from {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.mp-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sweep 14s linear infinite;
+}
+.mp-blip {
+  animation: blip 4s ease-in-out infinite;
+}
+@keyframes blip {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Setup */
+.setup-screen {
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--nation) 14%, transparent) 0%, transparent 55%),
+    var(--color-ink-950);
+  transition: background 500ms;
+}
+.nation-card-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%);
+  pointer-events: none;
+}
+.dossier-swap {
+  animation: enter 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.begin-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.35) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: shine 3.2s ease-in-out infinite;
+}
+@keyframes shine {
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

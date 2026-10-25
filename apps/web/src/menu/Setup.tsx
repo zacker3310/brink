@@ -1,0 +1,339 @@
+import { useMemo, useState } from 'react';
+import type { NationId } from '@brink/contracts';
+import { GOVERNMENTS, UNITS } from '@brink/game-data';
+import { NATIONS, SCENARIOS, createScenario } from '@brink/scenarios';
+import { readPrefs, writePrefs } from '../saves';
+import { Swatch } from '../ui';
+import { Frame, Kbd, Label, ScreenHeader, useKeys } from './chrome';
+import { CLASS_ORDER, DOCTRINE, dossier, operationName, randomSeed, traits, VICTORY_SHARE } from './intel';
+import { MapPreview } from './MapPreview';
+
+export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number) => Promise<void> }) {
+  const scenario = SCENARIOS[0]!;
+  const [nation, setNation] = useState<NationId>(() => {
+    const p = readPrefs().nation;
+    return NATIONS.some((n) => n.id === p) ? p! : NATIONS[0]!.id;
+  });
+  const [seed, setSeed] = useState(randomSeed);
+  const [starting, setStarting] = useState(false);
+
+  const world = useMemo(() => createScenario(scenario.id, seed), [scenario.id, seed]);
+  const spec = NATIONS.find((n) => n.id === nation)!;
+  const gov = GOVERNMENTS[spec.government];
+  const info = useMemo(() => dossier(world, nation), [world, nation]);
+  const op = operationName(seed);
+
+  const pick = (id: NationId) => {
+    setNation(id);
+    writePrefs({ nation: id });
+  };
+  const begin = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      await onBegin(nation, seed);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  useKeys(
+    (e) => {
+      const i = NATIONS.findIndex((n) => n.id === nation);
+      if (e.key === 'Escape') onBack();
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') pick(NATIONS[(i + 1) % NATIONS.length]!.id);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') pick(NATIONS[(i - 1 + NATIONS.length) % NATIONS.length]!.id);
+      else if (e.key === 'r') setSeed(randomSeed());
+      else if (e.key === 'Enter' && document.activeElement === document.body) void begin();
+      else {
+        const n = Number(e.key);
+        if (n >= 1 && n <= NATIONS.length) pick(NATIONS[n - 1]!.id);
+      }
+    },
+    [nation, seed, starting],
+  );
+
+  return (
+    <main className="setup-screen flex min-h-full flex-col" style={{ ['--nation' as string]: spec.color }}>
+      <ScreenHeader
+        kicker="New campaign"
+        title={scenario.name}
+        onBack={onBack}
+        right={
+          <div className="text-right leading-tight">
+            <div className="text-[10px] tracking-[0.24em] text-faint uppercase">Operation</div>
+            <div className="font-mono text-sm font-semibold tracking-wider text-signal uppercase" data-testid="operation">
+              {op}
+            </div>
+          </div>
+        }
+      />
+
+      <div className="grid flex-1 gap-4 p-4 sm:p-6 lg:grid-cols-[300px_minmax(0,1fr)_360px]">
+        {/* Roster */}
+        <section aria-labelledby="roster" className="enter-1 flex flex-col gap-2">
+          <Label className="mb-1">
+            <span id="roster">Choose your nation</span>
+          </Label>
+          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Nation">
+            {NATIONS.map((n, i) => {
+              const g = GOVERNMENTS[n.government];
+              const active = n.id === nation;
+              return (
+                <button
+                  key={n.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  data-testid={`nation-${n.id}`}
+                  onClick={() => pick(n.id)}
+                  className={`nation-card group relative overflow-hidden border p-3 pl-4 text-left transition-all ${
+                    active ? 'border-[color:var(--c)] bg-ink-800' : 'border-line bg-ink-900/70 hover:border-faint hover:bg-ink-850'
+                  }`}
+                  style={{ ['--c' as string]: n.color }}
+                >
+                  <span className="absolute inset-y-0 left-0 w-1 transition-all group-hover:w-1.5" style={{ background: n.color }} aria-hidden />
+                  {active && <span className="nation-card-glow" aria-hidden />}
+                  <div className="relative flex items-center gap-2">
+                    <Emblem color={n.color} government={n.government} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-bold">{n.name}</div>
+                      <div className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: n.color }}>
+                        {g.name}
+                      </div>
+                    </div>
+                    <Kbd>{i + 1}</Kbd>
+                  </div>
+                  <p className="relative mt-2 text-xs leading-snug text-muted">{DOCTRINE[n.government]}</p>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 hidden gap-1.5 text-[11px] text-faint lg:flex">
+            <Kbd>←</Kbd>
+            <Kbd>→</Kbd> cycle · <Kbd>R</Kbd> new seed · <Kbd>Enter</Kbd> begin
+          </p>
+        </section>
+
+        {/* Theatre */}
+        <section aria-label="Theatre" className="enter-2 flex min-w-0 flex-col gap-3">
+          <Frame className="relative flex-1 overflow-hidden p-2" accent={spec.color}>
+            <div className="pointer-events-none absolute top-3 left-4 z-10 text-[10px] tracking-[0.24em] text-faint uppercase">
+              Theatre map · seed <span className="font-mono text-muted">{seed}</span>
+            </div>
+            <MapPreview world={world} focus={nation} labels forces className="setup-map h-full max-h-[62vh] min-h-[280px] w-full" />
+            <div className="scanlines opacity-40" aria-hidden />
+            <MapLegend />
+          </Frame>
+
+          <Frame className="flex flex-wrap items-end gap-x-6 gap-y-3 p-4">
+            <div>
+              <Label>Seed</Label>
+              <div className="mt-1 flex items-center gap-1">
+                <input
+                  type="number"
+                  min={1}
+                  className="w-28 border border-line bg-ink-850 px-2 py-1.5 font-mono text-sm text-text focus:border-signal focus:outline-none"
+                  value={seed}
+                  onChange={(e) => setSeed(Math.max(1, Math.floor(Number(e.target.value))) || 1)}
+                  data-testid="seed"
+                  aria-label="Seed"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSeed(randomSeed())}
+                  className="border border-line bg-ink-800 px-2 py-1.5 text-sm text-muted hover:border-faint hover:text-text"
+                  title="Roll a new seed (R)"
+                  data-testid="seed-reroll"
+                  aria-label="Roll a new seed"
+                >
+                  ⚄
+                </button>
+              </div>
+            </div>
+            <Fact label="Turn limit" value={`${scenario.maxTurns} turns`} />
+            <Fact label="Rivals" value={`${scenario.nations - 1} AI powers`} />
+            <div className="min-w-[220px] flex-1">
+              <Label>Victory</Label>
+              <p className="mt-1 text-xs leading-snug text-muted">
+                Hold <span className="text-text">{VICTORY_SHARE}% of victory points</span>, be the{' '}
+                <span className="text-text">last power standing</span>, or <span className="text-text">lead at turn {scenario.maxTurns}</span>.
+              </p>
+            </div>
+          </Frame>
+        </section>
+
+        {/* Dossier */}
+        <section aria-labelledby="dossier" className="enter-3 flex flex-col gap-3">
+          <Frame className="flex-1 p-4" accent={spec.color}>
+            <Label>
+              <span id="dossier">Intelligence dossier</span>
+            </Label>
+            <div key={nation} className="dossier-swap">
+              <h2 className="mt-2 text-2xl leading-tight font-black tracking-tight" style={{ color: spec.color }} data-testid="dossier-name">
+                {spec.name}
+              </h2>
+              <p className="text-xs font-semibold tracking-wider text-text/80 uppercase">{gov.name}</p>
+              <p className="mt-1 text-xs text-muted">
+                {gov.summary} Seat of government: <span className="text-text">{spec.capital[2]}</span>.
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {traits(gov.modifiers).map((t) => (
+                  <span
+                    key={t.label}
+                    className={`border px-1.5 py-0.5 font-mono text-[11px] ${t.good ? 'border-friendly/40 bg-friendly/10 text-friendly' : 'border-hostile/40 bg-hostile/10 text-hostile'}`}
+                  >
+                    {t.value} <span className="font-sans text-text/70">{t.label}</span>
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <Big label="Territory" value={info.hexes} unit="hex" />
+                <Big label="Cities" value={info.cities} />
+                <Big label="VP held" value={info.victoryPoints} unit={`${info.vpShare}%`} />
+                <Big label="Population" value={`${(info.population / 1000).toFixed(1)}`} unit="M" />
+                <Big label="Stability" value={info.stability} />
+                <Big label="To objective" value={info.toObjective} unit="hex" />
+              </div>
+
+              <Label className="mt-4">Income per turn</Label>
+              <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-xs tabular-nums">
+                <Res label="Credits" v={info.income.credits} />
+                <Res label="Energy" v={info.income.energy} />
+                <Res label="Materials" v={info.income.materials} />
+                <Res label="Food" v={info.income.food} />
+                <Res label="Industry" v={info.industry} />
+                <Res label="Research" v={info.research} />
+              </div>
+
+              <Label className="mt-4">Order of battle · {info.formations} formations</Label>
+              <ul className="mt-1.5 grid grid-cols-3 gap-1.5">
+                {CLASS_ORDER.map((c) => (
+                  <li key={c} className="flex items-center gap-1.5 border border-line/70 bg-ink-850 px-1.5 py-1" title={UNITS[c].name}>
+                    <UnitGlyph unitClass={c} color={spec.color} />
+                    <span className="font-mono text-[10px] text-muted">{UNITS[c].short}</span>
+                    <span className="ml-auto font-mono text-xs font-semibold">×{info.forces[c]}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Label className="mt-4">Contested borders</Label>
+              <div className="mt-1.5 flex flex-wrap gap-2 text-xs">
+                {info.fronts.length === 0 && <span className="text-faint">None. Every rival is beyond the basin.</span>}
+                {info.fronts.map((f) => {
+                  const r = NATIONS.find((n) => n.id === f)!;
+                  return (
+                    <span key={f} className="flex items-center gap-1.5 border border-line/70 bg-ink-850 px-1.5 py-0.5">
+                      <Swatch color={r.color} />
+                      {r.name}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </Frame>
+
+          <button
+            type="button"
+            onClick={() => void begin()}
+            disabled={starting}
+            data-testid="start-game"
+            className="begin-btn group relative overflow-hidden border border-signal bg-signal px-5 py-4 text-left text-ink-950 transition-all hover:brightness-110 disabled:opacity-70"
+          >
+            <span className="relative z-10 flex items-center justify-between">
+              <span>
+                <span className="block text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">{starting ? 'Establishing command link' : `Operation ${op}`}</span>
+                <span className="block text-lg font-black tracking-wide uppercase">{starting ? 'Deploying…' : 'Begin campaign'}</span>
+              </span>
+              <span className="text-2xl transition-transform group-hover:translate-x-1" aria-hidden>
+                ▸
+              </span>
+            </span>
+          </button>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="mt-1 text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function Big({ label, value, unit }: { label: string; value: number | string; unit?: string }) {
+  return (
+    <div className="border border-line/70 bg-ink-850/80 px-2 py-1.5">
+      <div className="text-[9px] tracking-[0.18em] text-faint uppercase">{label}</div>
+      <div className="font-mono text-lg leading-tight font-semibold tabular-nums">
+        {value}
+        {unit && <span className="ml-1 text-[10px] font-normal text-muted">{unit}</span>}
+      </div>
+    </div>
+  );
+}
+
+function Res({ label, v }: { label: string; v: number }) {
+  return (
+    <div className="flex justify-between border-b border-line/40 py-0.5">
+      <span className="font-sans text-muted">{label}</span>
+      <span className="text-friendly">+{v}</span>
+    </div>
+  );
+}
+
+function MapLegend() {
+  return (
+    <div className="pointer-events-none absolute right-3 bottom-3 flex flex-wrap gap-x-3 gap-y-1 border border-line/70 bg-ink-950/80 px-2 py-1 text-[10px] text-muted">
+      <span>★ capital</span>
+      <span>■ city</span>
+      <span>◇ depot</span>
+      <span className="text-signal">◎ objective</span>
+      <span>• formation</span>
+    </div>
+  );
+}
+
+/** A NATO-style unit frame with a class symbol, drawn small. */
+export function UnitGlyph({ unitClass, color }: { unitClass: keyof typeof UNITS; color: string }) {
+  return (
+    <svg viewBox="0 0 20 14" className="h-3.5 w-5 shrink-0" aria-hidden>
+      <rect x="0.75" y="0.75" width="18.5" height="12.5" fill="none" stroke={color} strokeWidth="1.5" />
+      {unitClass === 'infantry' && <path d="M1 1 L19 13 M19 1 L1 13" stroke={color} strokeWidth="1.2" />}
+      {unitClass === 'mechanized' && (
+        <>
+          <path d="M1 1 L19 13 M19 1 L1 13" stroke={color} strokeWidth="1.2" />
+          <ellipse cx="10" cy="7" rx="6" ry="3.2" fill="none" stroke={color} strokeWidth="1.2" />
+        </>
+      )}
+      {unitClass === 'armor' && <ellipse cx="10" cy="7" rx="6.5" ry="3.4" fill="none" stroke={color} strokeWidth="1.4" />}
+      {unitClass === 'artillery' && <circle cx="10" cy="7" r="2.2" fill={color} />}
+      {unitClass === 'recon' && <path d="M1 13 L19 1" stroke={color} strokeWidth="1.2" />}
+      {unitClass === 'air' && <path d="M3 8 Q6.5 3 10 8 Q13.5 3 17 8" fill="none" stroke={color} strokeWidth="1.3" />}
+    </svg>
+  );
+}
+
+/** A simple heraldic mark per government, so the roster reads at a glance. */
+function Emblem({ color, government }: { color: string; government: keyof typeof GOVERNMENTS }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-8 w-8 shrink-0" aria-hidden>
+      <path d="M12 1.5 L21.5 6 V13 C21.5 18 17 21.5 12 22.5 C7 21.5 2.5 18 2.5 13 V6 Z" fill="#0b111b" stroke={color} strokeWidth="1.4" />
+      {government === 'commonwealth' && <path d="M7 15 L12 7 L17 15 Z M9.5 15 V17.5 H14.5 V15" fill="none" stroke={color} strokeWidth="1.3" />}
+      {government === 'directorate' && <path d="M12 6 L13.6 10.4 L18 10.6 L14.5 13.3 L15.8 17.6 L12 15 L8.2 17.6 L9.5 13.3 L6 10.6 L10.4 10.4 Z" fill={color} />}
+      {government === 'federation' && (
+        <>
+          <circle cx="12" cy="12" r="4.5" fill="none" stroke={color} strokeWidth="1.3" />
+          <path d="M12 5.5 V18.5 M5.5 12 H18.5" stroke={color} strokeWidth="1.1" />
+        </>
+      )}
+      {government === 'union' && <path d="M12 6 V18 M8 9 Q12 12 16 9 M8 13 Q12 16 16 13" fill="none" stroke={color} strokeWidth="1.4" />}
+    </svg>
+  );
+}

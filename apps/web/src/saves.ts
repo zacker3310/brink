@@ -41,3 +41,31 @@ export function readSlot(slot: string): string | null {
     return null;
   }
 }
+
+/** The most recently written slot, for "Continue". */
+export function latestSlot(slots: readonly SlotInfo[]): SlotInfo | null {
+  return slots.reduce<SlotInfo | null>((best, s) => (!best || s.savedAt > best.savedAt ? s : best), null);
+}
+
+const PREFS = 'brink.prefs.v1';
+
+export interface Prefs {
+  nation?: string;
+}
+
+export function readPrefs(): Prefs {
+  try {
+    const raw = localStorage.getItem(PREFS);
+    return raw ? (JSON.parse(raw) as Prefs) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writePrefs(p: Prefs): void {
+  try {
+    localStorage.setItem(PREFS, JSON.stringify({ ...readPrefs(), ...p }));
+  } catch {
+    // Preferences are a convenience; losing them is fine.
+  }
+}
