@@ -144,6 +144,8 @@ function Lobby() {
   const meName = useNet((s) => s.me);
   const claim = useNet((s) => s.claim);
   const setSeed = useNet((s) => s.setSeed);
+  const turnSeconds = useNet((s) => s.turnSeconds);
+  const setTurnSeconds = useNet((s) => s.setTurnSeconds);
   const start = useNet((s) => s.start);
   const busy = useNet((s) => s.busy);
   const error = useNet((s) => s.error);
@@ -242,6 +244,25 @@ function Lobby() {
           </div>
           <div className="mt-2 text-xs text-muted">
             {humans} human{humans === 1 ? '' : 's'} · {4 - humans} AI
+          </div>
+          <div className="mt-3">
+            <Label>Planning timer</Label>
+            <div className="mt-1 flex gap-1" role="radiogroup" aria-label="Planning timer">
+              {[0, 60, 120, 300].map((secs) => (
+                <button
+                  key={secs}
+                  type="button"
+                  role="radio"
+                  aria-checked={turnSeconds === secs}
+                  disabled={!isHost}
+                  onClick={() => setTurnSeconds(secs)}
+                  data-testid={`timer-${secs}`}
+                  className={`flex-1 border py-1 text-xs ${turnSeconds === secs ? 'border-signal text-signal' : 'border-line text-muted'} ${isHost ? 'hover:text-text' : 'cursor-default'}`}
+                >
+                  {secs === 0 ? 'Off' : `${secs / 60} min`}
+                </button>
+              ))}
+            </div>
           </div>
           {error && <p className="mt-2 text-xs text-hostile">{error}</p>}
           {isHost ? (

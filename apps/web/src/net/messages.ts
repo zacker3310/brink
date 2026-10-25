@@ -10,6 +10,8 @@ export interface Seat {
   player: string | null;
   host: boolean;
   connected: boolean;
+  /** The AI is holding this seat for a player who dropped. */
+  ai?: boolean;
 }
 
 export interface ChatLine {
@@ -28,8 +30,9 @@ export type NetMessage =
   | { t: 'chat'; line: ChatLine }
   // host -> guest
   /** `you` is the name the host gave this guest (made unique within the room). */
-  | { t: 'lobby'; seats: Seat[]; seed: number; started: boolean; you: string }
+  | { t: 'lobby'; seats: Seat[]; seed: number; started: boolean; you: string; turnSeconds: number }
   | { t: 'start'; nation: NationId; state: SeatState }
   | { t: 'turn'; state: SeatState }
-  | { t: 'status'; locked: NationId[] }
+  /** `remaining` is milliseconds left on the planning timer, or null when there is none. */
+  | { t: 'status'; locked: NationId[]; remaining: number | null }
   | { t: 'denied'; reason: string };

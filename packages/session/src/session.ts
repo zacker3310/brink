@@ -20,7 +20,7 @@ export interface AdvanceResult {
 export class GameSession {
   private constructor(
     private world: WorldState,
-    readonly humans: readonly NationId[],
+    private seats: NationId[],
     private memory: Record<NationId, AiMemory>,
     private histories: Record<NationId, TurnReport[]>,
     private lastReports: Record<NationId, TurnReport>,
@@ -49,9 +49,30 @@ export class GameSession {
     return new GameSession(clone(save.world), humans, clone(save.aiMemory), histories, lastReports);
   }
 
+  /** Human seats, the local one first. */
+  get humans(): readonly NationId[] {
+    return this.seats;
+  }
+
+  /** A human seat's player has gone: the AI plays it until `reclaimSeat`. Its history stays. */
+  releaseSeat(nation: NationId): void {
+    if (nation === this.playerNation) throw new Error('the local seat cannot be handed to the AI');
+    if (!this.seats.includes(nation)) return;
+    this.seats = this.seats.filter((n) => n !== nation);
+    this.memory[nation] = emptyMemory();
+  }
+
+  /** A player returns to a seat the AI was holding. */
+  reclaimSeat(nation: NationId): void {
+    if (this.seats.includes(nation) || !this.world.nations[nation]) return;
+    this.seats = [...this.seats, nation];
+    delete this.memory[nation];
+    this.histories[nation] ??= [];
+  }
+
   /** The local seat, or null for an AI-only session. */
   get playerNation(): NationId | null {
-    return this.humans[0] ?? null;
+    return this.seats[0] ?? null;
   }
 
   get turn(): number {

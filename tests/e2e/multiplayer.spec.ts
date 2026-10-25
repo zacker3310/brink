@@ -87,3 +87,59 @@ test('hotseat passes the device between players behind a curtain', async ({ page
 
   expect(errors).toEqual([]);
 });
+
+async function room(context: import('@playwright/test').BrowserContext, errors: string[], setup?: (host: Page) => Promise<void>) {
+  const host = await context.newPage();
+  watchErrors(host, errors);
+  await host.goto('./?net=local');
+  await host.getByTestId('menu-multiplayer').click();
+  await host.getByTestId('mp-name').fill('Alpha');
+  await host.getByTestId('mp-host').click();
+  const code = (await host.getByTestId('room-code').textContent())!.trim();
+  const guest = await context.newPage();
+  watchErrors(guest, errors);
+  await guest.goto(`./?net=local&join=${code}`);
+  await guest.getByTestId('mp-name').fill('Bravo');
+  await guest.getByTestId('mp-join').click();
+  await guest.getByTestId('claim-korva').click();
+  await expect(host.getByTestId('seats')).toContainText('Bravo');
+  if (setup) await setup(host);
+  await host.getByTestId('mp-start').click();
+  await expect(guest.getByTestId('top-bar')).toContainText('Korva Directorate');
+  return { host, guest, code };
+}
+
+test('the planning timer locks every draft and moves the world when it runs out', async ({ context }) => {
+  const errors: string[] = [];
+  await context.clock.install();
+  const { host, guest } = await room(context, errors, async (h) => {
+    await h.getByTestId('timer-60').click();
+  });
+  await expect(guest.getByTestId('turn-clock')).toContainText(/0:5\d|1:00/);
+  await context.clock.fastForward('01:05');
+  await expect(host.getByTestId('turn')).toContainText('2 / 30', { timeout: 15000 });
+  await expect(guest.getByTestId('turn')).toContainText('2 / 30', { timeout: 15000 });
+  expect(errors).toEqual([]);
+});
+
+test('a dropped seat goes to the AI and back to its player', async ({ context }) => {
+  const errors: string[] = [];
+  const { host, guest, code } = await room(context, errors);
+  await guest.close({ runBeforeUnload: true });
+  await expect(host.getByTestId('seat-board')).toContainText('offline');
+  await host.getByTestId('hand-to-ai-korva').click();
+  await expect(host.getByTestId('seat-board')).toContainText('AI holds');
+  // With the seat in AI hands, the host's lock alone moves the world.
+  await host.getByTestId('end-turn').click();
+  await expect(host.getByTestId('turn')).toContainText('2 / 30', { timeout: 15000 });
+
+  const back = await context.newPage();
+  watchErrors(back, errors);
+  await back.goto(`./?net=local&join=${code}`);
+  await back.getByTestId('mp-name').fill('Bravo');
+  await back.getByTestId('mp-join').click();
+  await expect(back.getByTestId('top-bar')).toContainText('Korva Directorate');
+  await expect(back.getByTestId('turn')).toContainText('2 / 30');
+  await expect(host.getByTestId('seat-board')).toContainText('planning');
+  expect(errors).toEqual([]);
+});

@@ -70,6 +70,8 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
   where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
   `threatZones` in the simulation package, built from the viewer's NationView.
+- Multiplayer cadence: planning timer chosen in the lobby (auto-locks every draft at zero), host hands
+  an offline seat to the AI, the player reclaims it by rejoining.
 - Turn summary history: ‹ › (or arrow keys) through every past report. Save menu exports the
   campaign to a JSON file, which the archive's import loads back.
 - Replay controls: pause (Space), 0.5x/1x/2x, click a phase or use the arrow keys to jump, restart,
@@ -84,8 +86,8 @@ Updated 2026-10-25. Milestone 1 (first playable).
 
 - Balance: 58 of 100 soak matches end by victory points, 42 at the turn limit (median turn 28).
   Next levers if games should end sooner: stall threshold in `ai`, strike entrenchment, victory share.
-- Multiplayer: no turn timer yet, no TURN relay for strict NATs, a loaded multi-human save resumes
-  single-player (other seats hold), guests cannot save.
+- Multiplayer: no TURN relay for strict NATs, a loaded multi-human save resumes single-player (other
+  seats hold), guests cannot save.
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
 ## Blockers
@@ -94,4 +96,4 @@ None.
 
 ## Next recommended tasks
 
-1. Multiplayer: planning timer, hand a dropped seat to the AI, resume a multi-human save as a room.
+1. Multiplayer: resume a multi-human save as a room.

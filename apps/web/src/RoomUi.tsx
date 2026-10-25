@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { NATIONS } from '@brink/scenarios';
 import { Chat } from './Chat';
 import { Emblem } from './glyphs';
@@ -76,13 +77,15 @@ export function SeatBoard() {
   const locked = useNet((s) => s.locked);
   const me = useNet((s) => s.me);
   const forceResolve = useNet((s) => s.forceResolve);
+  const handToAi = useNet((s) => s.handToAi);
   const resolving = useGame((s) => s.resolving);
   const playback = useGame((s) => s.playback);
   if (role !== 'host' && role !== 'guest') return null;
   const humans = seats.filter((s) => s.player !== null);
-  const waiting = humans.filter((s) => !locked.includes(s.nation));
+  const waiting = humans.filter((s) => !locked.includes(s.nation) && !s.ai);
   return (
     <div className="ds-panel px-2.5 py-2 text-[11px]" data-testid="seat-board">
+      <TurnClock />
       <div className="mb-1 flex justify-between">
         <span className="ds-label">Commanders</span>
         <span className="font-mono text-faint">
@@ -97,8 +100,13 @@ export function SeatBoard() {
             <li key={s.nation} className="flex items-center gap-1.5">
               <Emblem color={spec.color} government={spec.government} className="h-3.5 w-3.5" />
               <span className={s.player === me || (role === 'host' && s.host) ? 'font-semibold' : ''}>{s.player}</span>
-              <span className={`ml-auto font-display text-[10px] font-bold tracking-wider uppercase ${!s.connected ? 'text-hostile' : done ? 'text-good' : 'text-signal'}`}>
-                {!s.connected ? 'offline' : done ? '✓ locked' : 'planning'}
+              {role === 'host' && !s.connected && !s.ai && !s.host && (
+                <button type="button" onClick={() => handToAi(s.nation)} className="ml-auto border border-line px-1 text-[9px] text-muted hover:text-text" data-testid={`hand-to-ai-${s.nation}`}>
+                  hand to AI
+                </button>
+              )}
+              <span className={`${role === 'host' && !s.connected && !s.ai && !s.host ? '' : 'ml-auto'} font-display text-[10px] font-bold tracking-wider uppercase ${s.ai ? 'text-friend' : !s.connected ? 'text-hostile' : done ? 'text-good' : 'text-signal'}`}>
+                {s.ai ? 'AI holds' : !s.connected ? 'offline' : done ? '✓ locked' : 'planning'}
               </span>
             </li>
           );
@@ -109,6 +117,35 @@ export function SeatBoard() {
           Resolve now · {waiting.length} will hold
         </button>
       )}
+    </div>
+  );
+}
+
+/** The planning clock, counting down to the moment the world moves; locks your draft at zero. */
+export function TurnClock() {
+  const deadline = useNet((s) => s.deadline);
+  const [now, setNow] = useState(() => Date.now());
+  const fired = useRef<number | null>(null);
+  useEffect(() => {
+    if (deadline === null) return;
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [deadline]);
+  useEffect(() => {
+    if (deadline === null || now < deadline || fired.current === deadline) return;
+    fired.current = deadline;
+    const g = useGame.getState();
+    if (!g.resolving && !g.playback && g.draft) void g.submit();
+  }, [now, deadline]);
+  if (deadline === null) return null;
+  const left = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const urgent = left <= 10;
+  return (
+    <div className={`mb-1.5 flex items-center justify-between border px-2 py-1 ${urgent ? 'ds-hazard border-signal text-ink-950' : 'border-line'}`} data-testid="turn-clock">
+      <span className={`font-display text-[10px] font-bold tracking-[0.2em] uppercase ${urgent ? '' : 'text-faint'}`}>{left === 0 ? 'Time up' : 'World moves in'}</span>
+      <span className={`font-mono text-sm font-semibold tabular-nums ${urgent ? '' : 'text-signal'}`}>
+        {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}
+      </span>
     </div>
   );
 }

@@ -17,6 +17,8 @@ export type Request =
   | { type: 'stateFor'; nation: NationId }
   /** Resolve the turn with every human seat's orders; returns each human seat's new state. */
   | { type: 'resolve'; orders: NationOrders[] }
+  /** Hand a human seat to the AI, or give it back to a returning player. */
+  | { type: 'seat'; nation: NationId; to: 'ai' | 'human' }
   | { type: 'load'; text: string }
   | { type: 'check'; orders: NationOrders }
   | { type: 'previewAssault'; attackers: string[]; target: string }
@@ -27,6 +29,7 @@ export type Request =
 export type Response =
   | ({ type: 'state' } & SeatState)
   | { type: 'resolved'; states: Record<NationId, SeatState> }
+  | { type: 'ok' }
   | { type: 'checked'; rejected: GameEvent[] }
   | { type: 'assault'; preview: AssaultPreview | null }
   | { type: 'strike'; preview: StrikePreview | null }

@@ -35,6 +35,10 @@ function handle(req: Request): Response {
     case 'submit':
       session.advance(req.orders);
       return state();
+    case 'seat':
+      if (req.to === 'ai') session.releaseSeat(req.nation);
+      else session.reclaimSeat(req.nation);
+      return { type: 'ok' };
     case 'stateFor':
       return state(req.nation);
     case 'resolve': {

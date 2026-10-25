@@ -74,4 +74,20 @@ describe('GameSession', () => {
     expect(loaded.reports('drevan')).toEqual(s.reports('drevan'));
     expect(loaded.advance().hash).toBe(s.advance().hash);
   });
+
+  it('hands a dropped seat to the AI and back, keeping its history', () => {
+    const s = GameSession.create(MERIDIAN_ID, 8, 'aster', ['korva']);
+    s.advance();
+    s.releaseSeat('korva');
+    expect(s.humans).toEqual(['aster']);
+    expect(s.aiOrders().map((o) => o.nation)).toContain('korva');
+    s.advance();
+    expect(s.reports('korva')).toHaveLength(1);
+    s.reclaimSeat('korva');
+    expect(s.humans).toEqual(['aster', 'korva']);
+    expect(s.aiOrders().map((o) => o.nation)).not.toContain('korva');
+    s.advance();
+    expect(s.reports('korva')).toHaveLength(2);
+    expect(() => s.releaseSeat('aster')).toThrow(/local/);
+  });
 });

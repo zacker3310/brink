@@ -36,6 +36,10 @@ interface NetState {
   busy: boolean;
   /** Hotseat: the seat waiting behind the curtain, or null when someone is playing. */
   curtain: NationId | null;
+  /** Planning time per turn in seconds; 0 for no timer. Set by the host in the lobby. */
+  turnSeconds: number;
+  /** Local time (ms) the current turn's planning timer runs out, or null. */
+  deadline: number | null;
 
   setName(name: string): void;
   host(): Promise<void>;
@@ -47,6 +51,9 @@ interface NetState {
   lockLocal(orders: NationOrders): void;
   /** Host only: resolve without seats that have not locked (they hold). */
   forceResolve(): void;
+  setTurnSeconds(seconds: number): void;
+  /** Host only: the AI plays an offline seat until its player returns. */
+  handToAi(nation: NationId): void;
   say(text: string): void;
   readChat(): void;
   leave(): void;
@@ -68,7 +75,19 @@ const hotseatStash = new Map<NationId, SeatState>();
 const hotseatBefore = new Map<NationId, NationView>();
 const hotseatResolved = new Map<NationId, SeatState>();
 
+// The host's planning clock: when time runs out, the turn resolves and missing seats hold.
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+
 export const useNet = create<NetState>((set, get) => {
+  clockTimer ??= setInterval(() => {
+    const s = get();
+    // Two seconds' grace past the deadline for the drafts every client auto-locks at zero.
+    if (s.role === 'host' && s.started && s.deadline !== null && Date.now() >= s.deadline + 2000) {
+      set({ deadline: null });
+      addChat({ from: 'Room', nation: null, text: 'Time is up: the world moves', at: Date.now() });
+      void resolve();
+    }
+  }, 500);
   const humanSeats = () => get().seats.filter((s) => s.player !== null);
   const seatOf = (name: string) => get().seats.find((s) => s.player === name && !s.host);
 
@@ -76,7 +95,16 @@ export const useNet = create<NetState>((set, get) => {
     for (const g of guests.values()) g.link.send(msg);
   };
   const pushLobby = () => {
-    for (const g of guests.values()) g.link.send({ t: 'lobby', seats: get().seats, seed: get().seed, started: get().started, you: g.name });
+    for (const g of guests.values()) g.link.send({ t: 'lobby', seats: get().seats, seed: get().seed, started: get().started, you: g.name, turnSeconds: get().turnSeconds });
+  };
+  const remaining = () => {
+    const d = get().deadline;
+    return d === null ? null : Math.max(0, d - Date.now());
+  };
+  /** A new planning turn: restart the clock if the room has one. */
+  const startClock = () => {
+    const secs = get().turnSeconds;
+    set({ deadline: secs > 0 && get().started ? Date.now() + secs * 1000 : null });
   };
   const uniqueName = (wanted: string, linkId: string) => {
     const base = wanted.trim().slice(0, 24) || 'Commander';
@@ -90,7 +118,7 @@ export const useNet = create<NetState>((set, get) => {
   const pushStatus = () => {
     const locked = [...pending.keys()].sort();
     set({ locked });
-    broadcast({ t: 'status', locked });
+    broadcast({ t: 'status', locked, remaining: remaining() });
   };
   const addChat = (line: ChatLine) => set({ chat: [...get().chat.slice(-60), line], unread: get().unread + 1 });
 
@@ -108,14 +136,15 @@ export const useNet = create<NetState>((set, get) => {
       // The guest already has its history; send only the new report to keep messages small.
       if (state) g.link.send({ t: 'turn', state: { ...state, history: [] } });
     }
+    startClock();
     pushStatus();
     const mine = get().seats.find((s) => s.host)?.nation;
     if (mine && r.states[mine]) useGame.getState().receiveTurn(r.states[mine]!);
   };
 
   const maybeResolve = () => {
-    // Every human seat with someone connected must be in; disconnected seats hold.
-    const waiting = humanSeats().filter((s) => s.connected && !pending.has(s.nation));
+    // Every human seat with someone connected must be in; disconnected seats hold, AI seats are the AI's.
+    const waiting = humanSeats().filter((s) => s.connected && !s.ai && !pending.has(s.nation));
     if (waiting.length === 0) void resolve();
   };
 
@@ -132,11 +161,14 @@ export const useNet = create<NetState>((set, get) => {
             link.send({ t: 'denied', reason: 'The campaign has already started' });
             return;
           }
-          set({ seats: get().seats.map((s) => (s === seat ? { ...s, connected: true } : s)) });
-          void engine.call({ type: 'stateFor', nation: seat.nation }).then((r) => {
-            if (r.type === 'state') link.send({ t: 'start', nation: seat.nation, state: r });
-            link.send({ t: 'status', locked: get().locked });
-          });
+          const wasAi = seat.ai === true;
+          set({ seats: get().seats.map((s) => (s === seat ? { ...s, connected: true, ai: false } : s)) });
+          void (wasAi ? engine.call({ type: 'seat', nation: seat.nation, to: 'human' }) : Promise.resolve())
+            .then(() => engine.call({ type: 'stateFor', nation: seat.nation }))
+            .then((r) => {
+              if (r.type === 'state') link.send({ t: 'start', nation: seat.nation, state: r });
+              link.send({ t: 'status', locked: get().locked, remaining: remaining() });
+            });
         } else if (seat) {
           set({ seats: get().seats.map((s) => (s === seat ? { ...s, connected: true } : s)) });
         }
@@ -194,7 +226,7 @@ export const useNet = create<NetState>((set, get) => {
   const onGuestMessage = (_link: Link, msg: NetMessage) => {
     switch (msg.t) {
       case 'lobby':
-        set({ seats: msg.seats, seed: msg.seed, started: msg.started, me: msg.you });
+        set({ seats: msg.seats, seed: msg.seed, started: msg.started, me: msg.you, turnSeconds: msg.turnSeconds });
         break;
       case 'start':
         set({ started: true, locked: [] });
@@ -206,7 +238,7 @@ export const useNet = create<NetState>((set, get) => {
         break;
       }
       case 'status':
-        set({ locked: msg.locked });
+        set({ locked: msg.locked, deadline: msg.remaining === null ? null : Date.now() + msg.remaining });
         break;
       case 'chat':
         addChat(msg.line);
@@ -247,6 +279,8 @@ export const useNet = create<NetState>((set, get) => {
     error: null,
     busy: false,
     curtain: null,
+    turnSeconds: 0,
+    deadline: null,
 
     setName(name) {
       writePrefs({ name });
@@ -320,6 +354,7 @@ export const useNet = create<NetState>((set, get) => {
         return;
       }
       set({ started: true, busy: false, locked: [] });
+      startClock();
       pushLobby();
       for (const g of guests.values()) {
         const seat = seatOf(g.name);
@@ -328,6 +363,7 @@ export const useNet = create<NetState>((set, get) => {
         if (st.type === 'state') g.link.send({ t: 'start', nation: seat.nation, state: st });
       }
       useGame.getState().enterGame(r);
+      pushStatus();
     },
 
     lockLocal(orders) {
@@ -370,6 +406,23 @@ export const useNet = create<NetState>((set, get) => {
       if (get().role === 'host' && get().started) void resolve();
     },
 
+    setTurnSeconds(seconds) {
+      if (get().role !== 'host' || get().started) return;
+      set({ turnSeconds: seconds });
+      pushLobby();
+    },
+
+    handToAi(nation) {
+      const seat = get().seats.find((s) => s.nation === nation);
+      if (get().role !== 'host' || !seat || seat.host || seat.connected || seat.ai) return;
+      void engine.call({ type: 'seat', nation, to: 'ai' }).then(() => {
+        set({ seats: get().seats.map((s) => (s.nation === nation ? { ...s, ai: true } : s)) });
+        addChat({ from: 'Room', nation: null, text: `The AI takes command of ${NATIONS.find((n) => n.id === nation)?.name} until ${seat.player} returns`, at: Date.now() });
+        pushLobby();
+        maybeResolve();
+      });
+    },
+
     say(text) {
       const t = text.trim();
       if (!t) return;
@@ -387,6 +440,7 @@ export const useNet = create<NetState>((set, get) => {
 
     leave() {
       reset();
+      set({ deadline: null, turnSeconds: 0 });
       set({ role: null, code: null, me: null, seats: emptySeats(), started: false, locked: [], chat: [], unread: 0, error: null, curtain: null, busy: false });
     },
 
