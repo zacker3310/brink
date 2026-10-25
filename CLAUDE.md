@@ -8,7 +8,10 @@
 
 ## What this is
 
-<one paragraph: what the project does, who uses it, what it talks to>
+WORLD WAR (repo `brink`): a single-player, simultaneous-turn modern strategy game. One human and three
+AIs plan in secret; a pure deterministic engine resolves all orders at once. Runs fully in the browser
+(engine in a Web Worker); `apps/api` is optional. Design: `docs/architecture.md`. Shared agent rules:
+`AGENTS.md`. Status: `PROGRESS.md`.
 
 ## Commands
 
@@ -16,31 +19,38 @@ Run these, do not guess them. Healthy output is shown so a wrong result is obvio
 
 | Job | Command | Healthy output |
 |---|---|---|
-| install | `<cmd>` | `<what success looks like>` |
-| test | `<cmd>` | `<n passed, 0 failed>` |
-| lint | `<cmd>` | `<no output, exit 0>` |
-| types | `<cmd>` | `<no output, exit 0>` |
-| build | `<cmd>` | `<artifact written to ...>` |
-| run | `<cmd>` | `<listening on ...>` |
+| install | `pnpm install` | `Done in ...` |
+| test | `pnpm test` | every package `Tests  N passed`, turbo `successful` |
+| lint | `pnpm lint` | turbo `N successful, N total` |
+| types | `pnpm typecheck` | turbo `N successful, N total` |
+| soak | `pnpm test:soak` | `endings {...} rejected AI orders 0`, `1 passed` |
+| e2e | `pnpm test:e2e` | `1 passed` |
+| build | `pnpm build` | `apps/web/dist/index.html` written |
+| run | `pnpm dev` | Vite on http://localhost:5173 |
 
 ## Architecture
 
-<entry points, the seams, where state lives, what is generated vs authored>
+Entry points: `packages/simulation/src/resolve.ts` (`resolveTurn`), `packages/session/src/session.ts`
+(`GameSession`), `apps/web/src/engine.worker.ts`. State lives in one plain-JSON `WorldState`; the UI and
+AI only ever see `NationView` from `fog.ts`. Balance numbers are authored in `packages/game-data`.
 
 ## Conventions
 
-<language versions, naming, patterns this codebase uses that an agent would
-otherwise get wrong>
+- Integers only in authoritative state; percentages via `pct()`.
+- Iterate with `sortedKeys()`; randomness via `roll(seed, ...ids)`.
+- Compute a phase from one snapshot, then commit.
+- Test files sit next to source; fixtures in `simulation/src/fixture.test-util.ts`.
 
 ## Common mistakes
 
-<!-- The highest-value section. Every line here is a defect that already happened. -->
-
-- <the mistake> - <what to do instead>
+- A test fixture nation without a city is eliminated at the end of the turn - `makeWorld()` gives each one.
+- Units on unowned ground are out of supply and lose 10 strength in logistics - account for it in asserts.
+- Playwright reuses a running server on :4173 - kill stale `vite preview` before e2e after a rebuild.
 
 ## Shipping contract
 
-<branch naming, what must be green before a PR, who merges, how it deploys>
+Trunk-based: commit and push to `main` when `pnpm check`, the soak and e2e are green. GitHub Pages
+serves `main` root (currently the README, not the game).
 
 ## Method
 

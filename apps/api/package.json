@@ -1,0 +1,23 @@
+{
+  "name": "@brink/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@brink/contracts": "workspace:*",
+    "@brink/game-data": "workspace:*",
+    "@brink/scenarios": "workspace:*",
+    "@brink/session": "workspace:*",
+    "fastify": "5.12.7"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

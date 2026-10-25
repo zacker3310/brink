@@ -5,15 +5,18 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint soak",
+    "lint": "eslint soak e2e",
     "soak": "vitest run --config vitest.soak.config.ts",
     "e2e": "playwright test"
   },
   "dependencies": {
     "@brink/contracts": "workspace:*",
     "@brink/game-data": "workspace:*",
-    "@brink/simulation": "workspace:*",
+    "@brink/scenarios": "workspace:*",
     "@brink/session": "workspace:*",
-    "@brink/scenarios": "workspace:*"
+    "@brink/simulation": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
   }
 }
