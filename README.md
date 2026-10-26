@@ -3,6 +3,9 @@
 **Brink**, a modern geopolitical strategy game built on simultaneous turns. Every nation plans in
 secret; when orders lock, the world moves at once.
 
+**Play it now: https://zacker3310.github.io/brink/** (runs entirely in your browser; host a room and
+send friends the code).
+
 ```sh
 pnpm install
 pnpm dev          # http://localhost:5173

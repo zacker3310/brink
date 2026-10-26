@@ -106,4 +106,7 @@ None.
 
 ## Next recommended tasks
 
-1. Multiplayer: resume a multi-human save as a room.
+1. Online reliability: TURN relay, lobby connection diagnostics, guest auto-retry; verify a real
+   two-network match.
+2. Async turns on `apps/api` (resolve when all are in or at a deadline; notify on turn).
+3. Guided first match. 4. More maps. 5. Shareable end-of-game recap. Touch input if friends play on phones.
