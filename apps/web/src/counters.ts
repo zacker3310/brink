@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
+import { getArt, type Art, type UnitArt } from './art';
 import { AFFILIATION, healthColor, SIGNAL, SURFACE } from './design/tokens';
 import { camoFor, MODEL_RES, modelCanvas, type Part } from './design/models';
 import { symbolCanvas, type Affiliation } from './design/symbols';
@@ -59,6 +60,16 @@ function chipSprite(m: CounterLook): Sprite {
   return s;
 }
 
+/** A sprite of imported art, centred, at its true world size. */
+function artSprite(art: Art, key: UnitArt): Sprite {
+  const s = new Sprite(art.units[key]);
+  s.anchor.set(0.5);
+  s.scale.set(art.size[key] / s.texture.width);
+  return s;
+}
+
+const hexOf = (c: string) => Number.parseInt(c.replace('#', ''), 16);
+
 const live = new Set<UnitModel>();
 let zoom = 1;
 
@@ -94,7 +105,10 @@ export class UnitModel extends Container {
   private readonly chrome = new Graphics();
   private readonly badge = new Container();
   private readonly bar = new Graphics();
+  /** Everything that turns with the unit's heading. */
+  private readonly craft = new Container();
   private rotor: Sprite | null = null;
+  private shadow: Sprite | null = null;
   private drones: { craft: Container; shade: Graphics; phase: number }[] = [];
   private readonly airborne: boolean;
   private readonly seed: number;
@@ -105,33 +119,50 @@ export class UnitModel extends Container {
     this.airborne = !UNITS[look.cls].ground;
     this.seed = Math.random() * 1000;
     this.addChild(this.ground, this.body, this.chrome);
-    const facing = look.facing ?? 0;
+    this.body.addChild(this.craft);
+    this.craft.rotation = look.facing ?? 0;
+    const art = getArt();
     if (look.cls === 'drone') {
       for (let i = 0; i < 3; i++) {
         const shade = new Graphics().ellipse(0, 0, 3, 2).fill({ color: 0x000000, alpha: 0.28 });
         const craft = new Container();
-        craft.addChild(partSprite('drone', look.fill, 'drone'));
+        craft.addChild(art ? artSprite(art, 'drone') : partSprite('drone', look.fill, 'drone'));
         this.ground.addChild(shade);
         this.body.addChild(craft);
         this.drones.push({ craft, shade, phase: (i * Math.PI * 2) / 3 });
       }
     } else if (look.cls === 'air') {
-      const shade = partSprite('air', look.fill, 'body');
+      // The airframe flies above its own shadow; the rotor turns on its real hub.
+      const shade = art ? artSprite(art, 'air') : partSprite('air', look.fill, 'body');
       shade.tint = 0x000000;
       shade.alpha = 0.32;
       shade.position.set(5, 7);
-      shade.rotation = facing;
-      shade.scale.set(0.9 / MODEL_RES);
+      shade.rotation = look.facing ?? 0;
+      shade.scale.set(shade.scale.x * 0.9);
+      this.shadow = shade;
       this.ground.addChild(shade);
-      const airframe = partSprite('air', look.fill, 'body');
-      airframe.rotation = facing;
-      this.rotor = partSprite('air', look.fill, 'rotor');
-      this.body.addChild(airframe, this.rotor);
+      if (art) {
+        this.craft.addChild(artSprite(art, 'air'));
+        const rotor = new Sprite(art.units.air_rotor);
+        const k = art.size.air_rotor / rotor.texture.width;
+        rotor.anchor.set(art.hub[0], art.hub[1]);
+        rotor.scale.set(k);
+        rotor.position.set((art.hub[0] - 0.5) * art.size.air_rotor, (art.hub[1] - 0.5) * art.size.air_rotor);
+        this.rotor = rotor;
+        this.craft.addChild(rotor);
+      } else {
+        this.craft.addChild(partSprite('air', look.fill, 'body'));
+        this.rotor = partSprite('air', look.fill, 'rotor');
+        this.craft.addChild(this.rotor);
+      }
       this.body.y = -5;
     } else {
-      const s = partSprite(look.cls, look.fill, 'body');
-      s.rotation = facing;
-      this.body.addChild(s);
+      this.craft.addChild(art ? artSprite(art, look.cls) : partSprite(look.cls, look.fill, 'body'));
+    }
+    // Recognition panel in the nation colour, the way real vehicles mark themselves from the air.
+    if (art && look.cls !== 'infantry' && look.cls !== 'drone') {
+      const mark = new Graphics().rect(-5, -1.6, 3.2, 3.2).fill({ color: hexOf(look.fill), alpha: 0.95 }).stroke({ width: 0.5, color: 0x000000, alpha: 0.6 });
+      this.craft.addChild(mark);
     }
     if (look.planned) {
       this.body.alpha = 0.42;
@@ -179,8 +210,8 @@ export class UnitModel extends Container {
   /** Turn ground vehicles and aircraft to a new heading. */
   setFacing(rad: number) {
     if (this.look.cls === 'drone') return;
-    for (const c of this.body.children) if (c !== this.rotor) c.rotation = rad;
-    for (const c of this.ground.children) c.rotation = rad;
+    this.craft.rotation = rad;
+    if (this.shadow) this.shadow.rotation = rad;
   }
 
   tick(now: number) {
@@ -207,16 +238,18 @@ export class UnitModel extends Container {
 
 /** Formation slots inside a hex for 1, 2 or 3 units, so a stack reads as a deployment. */
 export function slotOffsets(n: number): { x: number; y: number; scale: number }[] {
-  if (n <= 1) return [{ x: 0, y: 2, scale: 1.3 }];
+  // Imported renders are drawn at true size (a tank is about 32 world px); the fallback art is smaller.
+  const k = getArt() ? 0.8 : 1.3;
+  if (n <= 1) return [{ x: 0, y: 2, scale: k }];
   if (n === 2)
     return [
-      { x: -10, y: -5, scale: 1.05 },
-      { x: 10, y: 7, scale: 1.05 },
+      { x: -10, y: -5, scale: k * 0.8 },
+      { x: 10, y: 7, scale: k * 0.8 },
     ];
   return [
-    { x: -12, y: -8, scale: 0.92 },
-    { x: 12, y: -5, scale: 0.92 },
-    { x: 0, y: 12, scale: 0.92 },
+    { x: -12, y: -8, scale: k * 0.7 },
+    { x: 12, y: -5, scale: k * 0.7 },
+    { x: 0, y: 12, scale: k * 0.7 },
   ];
 }
 

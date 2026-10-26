@@ -1,0 +1,38 @@
+{
+ "plains": {
+  "scene": "S2B_36UWA_20230819_0_L2A",
+  "lat": 49.7,
+  "lon": 34.3,
+  "cloud": 0.0
+ },
+ "forest": {
+  "scene": "S2A_35UNS_20230806_0_L2A",
+  "lat": 51.3,
+  "lon": 28.0,
+  "cloud": 0.0
+ },
+ "hills": {
+  "scene": "S2B_35TNN_20230828_0_L2A",
+  "lat": 47.1,
+  "lon": 28.3,
+  "cloud": 0.0
+ },
+ "mountains": {
+  "scene": "S2A_38TMN_20230713_0_L2A",
+  "lat": 42.7,
+  "lon": 44.6,
+  "cloud": 2.770153
+ },
+ "urban": {
+  "scene": "S2B_36UXU_20230921_0_L2A",
+  "lat": 48.47,
+  "lon": 35.03,
+  "cloud": 1.4e-05
+ },
+ "water": {
+  "scene": "S2B_36TUS_20230805_0_L2A",
+  "lat": 46.4,
+  "lon": 31.4,
+  "cloud": 0.003912
+ }
+}

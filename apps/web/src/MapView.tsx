@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Application, Container, Graphics, Matrix, Text } from 'pixi.js';
+import { Application, Container, Graphics, Matrix, Sprite, Text } from 'pixi.js';
 import type { Formation, FormationOrder, HexKey, NationView, UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
@@ -8,6 +8,7 @@ import { addUnit, affiliationOf, keepScreenSize, setModelZoom, slotOffsets, tick
 import { AFFILIATION, FONT_UI, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
 import { terrainTexture } from './design/terrain';
+import { getArt, loadArt, URBAN_SPOTS } from './art';
 import { threatZones } from '@brink/simulation';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useGame } from './store';
@@ -174,6 +175,10 @@ export function MapView() {
       // Rotors turn and drone teams circle whether or not anything else changes.
       app.ticker.add(() => tickModels(performance.now()));
       wireInput(app, world);
+      // Imported art arrives after the first frame; redraw with it as soon as it lands.
+      void loadArt().then((loaded) => {
+        if (loaded && !destroyed) redraw();
+      });
       redraw();
       redrawHover();
       const v = useGame.getState().view;
@@ -445,6 +450,14 @@ export function MapView() {
     const terrain = new Graphics();
     const grid = new Graphics();
     const groundMatrix = new Matrix().scale(0.5, 0.5);
+    // Satellite imagery: one real 10 km scene per terrain, stretched once across the whole theatre so
+    // no stretch of ground ever repeats.
+    const art = getArt();
+    const pts = keys.map(center);
+    const minX = Math.min(...pts.map((p) => p.x)) - SIZE;
+    const minY = Math.min(...pts.map((p) => p.y)) - SIZE;
+    const span = Math.max(Math.max(...pts.map((p) => p.x)) + SIZE - minX, Math.max(...pts.map((p) => p.y)) + SIZE - minY);
+    const satMatrix = art ? new Matrix().scale(span / art.ground.plains.width, span / art.ground.plains.width).translate(minX, minY) : null;
     for (const key of keys) {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown' || !t.terrain) {
@@ -452,7 +465,15 @@ export function MapView() {
         grid.poly(poly(key)).stroke({ width: 0.8, color: 0x2a302d, alpha: 0.7 });
         continue;
       }
-      terrain.poly(poly(key)).fill({ texture: terrainTexture(t.terrain), textureSpace: 'global', matrix: groundMatrix });
+      if (satMatrix && t.terrain === 'urban') {
+        // Cities always sit on dense blocks of the real city, never on its river or fields.
+        const k = satMatrix.a;
+        const [px, py] = URBAN_SPOTS[Math.floor((jitter(key, 9) + 0.5) * URBAN_SPOTS.length) % URBAN_SPOTS.length]!;
+        const c = center(key);
+        const m = new Matrix().scale(k, k).translate(c.x - px * k, c.y - py * k);
+        terrain.poly(poly(key)).fill({ texture: art!.ground.urban, textureSpace: 'global', matrix: m });
+      } else if (satMatrix) terrain.poly(poly(key)).fill({ texture: art!.ground[t.terrain], textureSpace: 'global', matrix: satMatrix });
+      else terrain.poly(poly(key)).fill({ texture: terrainTexture(t.terrain), textureSpace: 'global', matrix: groundMatrix });
       // Hex-to-hex variation in light, as imagery tiles taken at different hours.
       const shade = jitter(key, 3);
       terrain.poly(poly(key)).fill({ color: shade > 0 ? 0xffffff : 0x000000, alpha: Math.abs(shade) * 0.07 });
@@ -531,13 +552,22 @@ export function MapView() {
         sites.circle(c.x, c.y, SIZE * 0.62).stroke({ width: 2.5, color: 0xe0b44a, alpha: 0.9 });
         sites.poly([c.x, c.y - 9, c.x + 9, c.y, c.x, c.y + 9, c.x - 9, c.y]).fill({ color: 0x0a0f18 }).stroke({ width: 2.5, color: 0xe0b44a });
       } else if (site.kind === 'depot') {
-        // A supply dump at the edge of the hex: fenced compound, out from under the units.
+        // A supply dump at the edge of the hex: a fenced compound out from under the units.
         const dx = c.x - SIZE * 0.5;
         const dy = c.y + SIZE * 0.42;
-        sites.rect(dx - 5, dy - 4, 10, 8).fill({ color: 0x2c2f2a, alpha: 0.9 }).stroke({ width: 1.2, color });
-        sites.rect(dx - 3.2, dy - 2.4, 2.6, 1.8).fill({ color: 0x77705a });
-        sites.rect(dx + 0.6, dy - 2.4, 2.6, 1.8).fill({ color: 0x77705a });
-        sites.rect(dx - 3.2, dy + 0.6, 2.6, 1.8).fill({ color: 0x5c6650 });
+        if (art) {
+          const depot = new Sprite(art.units.depot);
+          depot.anchor.set(0.5);
+          depot.scale.set((art.size.depot * 0.55) / depot.width);
+          depot.position.set(c.x - SIZE * 0.38, c.y + SIZE * 0.3);
+          a.layers.sites!.addChild(depot);
+          sites.rect(dx - 3, dy + 4, 6, 1.5).fill({ color, alpha: 0.95 });
+        } else {
+          sites.rect(dx - 5, dy - 4, 10, 8).fill({ color: 0x2c2f2a, alpha: 0.9 }).stroke({ width: 1.2, color });
+          sites.rect(dx - 3.2, dy - 2.4, 2.6, 1.8).fill({ color: 0x77705a });
+          sites.rect(dx + 0.6, dy - 2.4, 2.6, 1.8).fill({ color: 0x77705a });
+          sites.rect(dx - 3.2, dy + 0.6, 2.6, 1.8).fill({ color: 0x5c6650 });
+        }
         const label = new Text({
           text: site.name,
           resolution: 3,

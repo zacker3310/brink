@@ -60,8 +60,15 @@ Scale (px): 9, 10, 11, 12, 13, 15, 18, 22, 28, 40, 64+. Numerals are tabular eve
 
 ## Units and ground
 
-The map is an ISR picture: satellite-style ground (`design/terrain.ts`, seamless world-space
-textures per terrain) under top-down models of every formation (`design/models.ts`): tanks with
+The map is an ISR picture made of real imagery (`apps/web/public/art`, credits in `art/CREDITS.md`,
+pipeline in `tools/art`). Ground is Copernicus Sentinel-2: one real 10 km scene per terrain, stretched
+once across the theatre so it never repeats; city hexes always sample dense blocks of a real city.
+Units are top-down renders of open-licensed 3D models (T-72, AH-64D with its rotor turning on the real
+hub, a quadcopter team, posed infantry, a howitzer battery, troop truck and patrol vehicle) lit from the
+north-west with cast shadows, each with a recognition panel in the nation colour. Depots are a compound
+of containers, Hesco walls, a tent and a watch tower. The replay fires explosion and smoke frames on
+strikes, battles and kills. If the art cannot load, the procedural fallback below draws instead:
+satellite-style ground (`design/terrain.ts`) under top-down models of every formation (`design/models.ts`): tanks with
 turret and gun, an IFV with dismounts, a rifle section in a wedge, a self-propelled gun, a wheeled
 recon vehicle, an attack helicopter whose rotor turns over its ground shadow, and a drone team
 circling its hex. Vehicles wear their nation's camouflage (woodland, Eastern green, desert, urban

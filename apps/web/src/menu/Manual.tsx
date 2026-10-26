@@ -150,6 +150,23 @@ export function Manual({ onBack }: { onBack: () => void }) {
             <dd className="text-muted">Switch between move, attack, recon and withdraw; defend in place.</dd>
           </dl>
         </Frame>
+
+        <Frame className="enter-4 p-4 lg:col-span-2">
+          <Label>Credits</Label>
+          <ul className="mt-3 space-y-1 text-xs text-muted" data-testid="credits">
+            <li>Ground: contains modified Copernicus Sentinel data 2023 (ESA), Poltava, Polesia, Codri, Greater Caucasus, Dnipro, Black Sea.</li>
+            <li>T-72 tank by Nekis5_3D. AH-64D Apache by Muhamad Mirza Arrafi (CC BY 4.0). Quadcopter drone by Annelida (CC BY 4.0).</li>
+            <li>Hesco barrier by polbrainstorm, watch tower by _SeF_, military tent by dark-minaz, containers by Sousinho and Sebastian Webster (all CC BY 4.0).</li>
+            <li>Soldiers and animation from Mixamo (Adobe). Vehicles, explosions and smoke by Kenney (CC0).</li>
+            <li>
+              Full list with sources and licenses:{' '}
+              <a className="text-signal underline" href={`${import.meta.env.BASE_URL}art/CREDITS.md`} target="_blank" rel="noreferrer">
+                art credits
+              </a>
+              . Renders modify the originals; no endorsement implied.
+            </li>
+          </ul>
+        </Frame>
       </div>
     </main>
   );

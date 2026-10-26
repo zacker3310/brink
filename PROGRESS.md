@@ -70,6 +70,10 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
   where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
   `threatZones` in the simulation package, built from the viewer's NationView.
+- Real art: Copernicus Sentinel-2 ground (Poltava farmland, Polesia forest, Codri hills, Caucasus
+  ridges, Dnipro city blocks, Black Sea); units rendered top-down from open 3D models (T-72, AH-64D,
+  quadcopter, Mixamo infantry, Kenney vehicles, howitzer); depot compound; Kenney explosions and smoke
+  in the replay. Credits in the Field Manual and `apps/web/public/art/CREDITS.md`; pipeline in `tools/art`.
 - Ruleset 1.4.0: drone companies (cheap, fragile, vision 5, strike range 3, hit armour hardest,
   fly from sites like aviation); Air Support is now Attack Helicopters. Every nation starts with one
   drone company. Soak: 45 decisive endings of 100, 0 rejected AI orders.

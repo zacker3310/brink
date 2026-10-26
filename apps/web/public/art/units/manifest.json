@@ -1,0 +1,33 @@
+{
+ "air": {
+  "size": 45.5
+ },
+ "air_rotor": {
+  "size": 45.0,
+  "hub": [
+   0.612,
+   0.499
+  ]
+ },
+ "armor": {
+  "size": 41.0
+ },
+ "artillery": {
+  "size": 41.0
+ },
+ "depot": {
+  "size": 38.5
+ },
+ "drone": {
+  "size": 10.0
+ },
+ "infantry": {
+  "size": 38.5
+ },
+ "mechanized": {
+  "size": 41.0
+ },
+ "recon": {
+  "size": 28.5
+ }
+}

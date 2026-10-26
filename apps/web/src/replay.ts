@@ -1,7 +1,8 @@
-import { Graphics, Text, type Application, type Container } from 'pixi.js';
+import { Graphics, Sprite, Text, type Application, type Container, type Texture } from 'pixi.js';
 import { create } from 'zustand';
 import type { HexKey, UnitClass } from '@brink/contracts';
 import type { Point } from '@brink/map';
+import { getArt } from './art';
 import { addUnit, affiliationOf, slotOffsets, type CounterLook, type UnitModel } from './counters';
 import type { Affiliation } from './design/symbols';
 import { AFFILIATION, FONT_DISPLAY } from './design/tokens';
@@ -290,6 +291,26 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     if (b.theirs) mk(`−${b.theirs}`, 0x6fbf8e, b.ours ? 14 : 0);
   }
   const routes = new Map(tl.actors.map((a) => [a.id, a.route.map(center)]));
+  // Explosion and smoke frames from the imported art, drawn from a small pool each frame.
+  const art = getArt();
+  const pool: Sprite[] = [];
+  let used = 0;
+  const burst = (frames: Texture[] | undefined, x: number, y: number, q: number, px: number, alpha = 1, rise = 0) => {
+    if (!frames?.length || q <= 0 || q >= 1) return;
+    let sp = pool[used];
+    if (!sp) {
+      sp = new Sprite(frames[0]);
+      sp.anchor.set(0.5);
+      layer.addChild(sp);
+      pool.push(sp);
+    }
+    used += 1;
+    sp.texture = frames[Math.min(frames.length - 1, Math.floor(q * frames.length))]!;
+    sp.scale.set(px / sp.texture.width);
+    sp.position.set(x, y - rise * q);
+    sp.alpha = alpha * (q > 0.7 ? (1 - q) / 0.3 : 1);
+    sp.visible = true;
+  };
   let t = 0;
   let last = performance.now();
   let phase: Phase | null = null;
@@ -317,6 +338,7 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     const pa = ease(span(t, tl.after));
     units.clear();
     fx.clear();
+    used = 0;
 
     // Formations.
     for (const a of tl.actors) {
@@ -346,6 +368,10 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       }
       sprite.alpha = (a.confirmed ? 1 : 0.55) * fade;
       sprite.setStrength(strength);
+      if (a.destroyed) {
+        burst(art?.explosion, pos.x, pos.y, pa * 1.4, size * 1.6);
+        burst(art?.smoke, pos.x + 4, pos.y - 2, (pa - 0.15) / 0.85, size * 1.5, 0.75, size * 0.6);
+      }
       if (a.destroyed && pa > 0 && pa < 1) {
         fx.circle(pos.x, pos.y, size * (0.3 + pa)).stroke({ width: 3, color: 0xf2a65a, alpha: 1 - pa });
         fx.circle(pos.x, pos.y, size * 0.5 * pa).fill({ color: 0xffd28a, alpha: 0.5 * (1 - pa) });
@@ -366,8 +392,26 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       fx.moveTo(tail.x, tail.y).quadraticCurveTo((tail.x + head.x) / 2, (tail.y + head.y) / 2 - 2, head.x, head.y).stroke({ width: 2, color: s.color, alpha: 0.9 });
       fx.circle(head.x, head.y, 3).fill({ color: 0xfff1c9 });
     }
+    // Impacts: a fireball where each strike lands, then drifting smoke.
+    for (const s of tl.strikes) {
+      const b = center(s.to);
+      const land = t - tl.combat[0] - s.delay - 420;
+      burst(art?.explosion, b.x, b.y, land / 650, size * 1.3);
+      burst(art?.smoke, b.x + 3, b.y - 3, (land - 150) / 1500, size * 1.4, 0.65, size * 0.7);
+    }
 
-    // Battles: flash, shock rings and a crossed mark.
+    // Battles: shell bursts across the hex, smoke over it, then the flash and shock rings.
+    for (const b of tl.battles) {
+      const c0 = center(b.at);
+      const since = t - tl.combat[0] - b.delay;
+      for (const [dx, dy, d] of [
+        [-0.35, 0.1, 0],
+        [0.3, -0.25, 160],
+        [0.05, 0.35, 330],
+      ] as const)
+        burst(art?.explosion, c0.x + dx * size, c0.y + dy * size, (since - d) / 600, size * 1.05);
+      burst(art?.smoke, c0.x, c0.y - 4, (since - 250) / 1700, size * 2, 0.6, size * 0.8);
+    }
     for (const b of tl.battles) {
       const q = clamp((t - tl.combat[0] - b.delay - 200) / 700);
       if (q <= 0 || q >= 1) continue;
@@ -396,6 +440,8 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
         fx.circle(p0.x, p0.y, size * (0.4 + 1.2 * q)).stroke({ width: 3, color: c.color, alpha: 1 - q });
       }
     }
+
+    for (let i = used; i < pool.length; i++) pool[i]!.visible = false;
 
     if (t >= tl.end) {
       done = true;
