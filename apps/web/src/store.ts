@@ -74,7 +74,8 @@ interface State {
   lastTurn: { before: NationView; events: GameEvent[] } | null;
 
   newGame(nation: NationId, seed: number): Promise<void>;
-  loadGame(text: string): Promise<void>;
+  /** Load a save. A room save reopens its lobby and a hotseat save its curtain; says which. */
+  loadGame(text: string): Promise<'single' | 'room' | 'hotseat' | null>;
   toMenu(): void;
   selectHex(key: HexKey | null): void;
   selectFormation(id: FormationId | null): void;
@@ -136,6 +137,13 @@ function prefersReducedMotion(): boolean {
   } catch {
     return false;
   }
+}
+
+/** A hosted room's seats by callsign, so its save resumes as the same room. */
+function roomCallsigns(): Record<NationId, string> | undefined {
+  const net = useNet.getState();
+  if (net.role !== 'host' || !net.started) return undefined;
+  return Object.fromEntries(net.seats.filter((s) => s.player !== null).map((s) => [s.nation, s.player!]));
 }
 
 function freshDraft(view: NationView): NationOrders {
@@ -212,11 +220,24 @@ export const useGame = create<State>((set, get) => {
       }
     },
     async loadGame(text) {
-      if (apply(await engine.call({ type: 'load', text }))) {
-        set({ selectedHex: null, selectedFormation: null, showReport: false, dismissed: [] });
-        get().notify(`Loaded turn ${get().view!.turn}`);
-        get().nextIdle();
+      const r = await engine.call({ type: 'load', text });
+      if (r.type !== 'loaded') {
+        apply(r);
+        return null;
       }
+      set({ selectedHex: null, selectedFormation: null, showReport: false, dismissed: [] });
+      if (r.callsigns) {
+        await useNet.getState().resumeRoom(r.humans, r.callsigns, r.state);
+        return 'room';
+      }
+      if (r.humans.length > 1) {
+        useNet.getState().resumeHotseat(r.humans, r.state);
+        return 'hotseat';
+      }
+      apply(r.state);
+      get().notify(`Loaded turn ${get().view!.turn}`);
+      get().nextIdle();
+      return 'single';
     },
     toMenu: () => {
       // The engine has already resolved a replaying turn; apply it rather than drop it.
@@ -346,20 +367,21 @@ export const useGame = create<State>((set, get) => {
     },
 
     async save(slot) {
-      const r = await engine.call({ type: 'save', label: slot, savedAt: new Date().toISOString() });
+      const callsigns = roomCallsigns();
+      const r = await engine.call({ type: 'save', label: slot, savedAt: new Date().toISOString(), callsigns });
       if (r.type !== 'saved') {
         apply(r);
         return;
       }
       const view = get().view!;
-      const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString() }, r.text);
+      const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}${callsigns ? ' · room' : ''}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString() }, r.text);
       if (ok) get().notify(`Saved to ${slot}`);
       else get().notify('Could not save: browser storage is unavailable or full', 'error');
       set({ slots: listSlots() });
     },
 
     async exportSave() {
-      const r = await engine.call({ type: 'save', label: 'Exported', savedAt: new Date().toISOString() });
+      const r = await engine.call({ type: 'save', label: 'Exported', savedAt: new Date().toISOString(), callsigns: roomCallsigns() });
       if (r.type !== 'saved') {
         apply(r);
         return;

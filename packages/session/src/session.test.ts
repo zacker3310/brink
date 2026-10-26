@@ -90,4 +90,22 @@ describe('GameSession', () => {
     expect(s.reports('korva')).toHaveLength(2);
     expect(() => s.releaseSeat('aster')).toThrow(/local/);
   });
+
+  it('records room callsigns and keeps a dropped seat\'s history for a resume', () => {
+    const s = GameSession.create(MERIDIAN_ID, 9, 'aster', ['korva', 'selmar']);
+    s.advance();
+    s.releaseSeat('korva');
+    const callsigns = { aster: 'Viper', korva: 'Ghost', selmar: 'Rook' };
+    const save = parseSave(serializeSave(s.toSave('room', '2026-10-26T12:00:00Z', callsigns)));
+    expect(save.callsigns).toEqual(callsigns);
+    expect(save.humans).toEqual(['aster', 'selmar']);
+    const loaded = GameSession.fromSave(save);
+    loaded.reclaimSeat('korva');
+    expect(loaded.reports('korva')).toEqual(s.reports('korva'));
+    expect(loaded.reports('korva')).toHaveLength(1);
+    const bad = { ...save, callsigns: { aster: 'Viper', nowhere: 'X' } };
+    expect(() => parseSave(JSON.stringify(bad))).toThrow(SaveError);
+    // Hotseat and single-player saves carry no callsigns.
+    expect(parseSave(serializeSave(s.toSave('local', '2026-10-26T12:00:00Z'))).callsigns).toBeUndefined();
+  });
 });

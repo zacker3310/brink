@@ -24,10 +24,13 @@ export type Request =
   | { type: 'previewAssault'; attackers: string[]; target: string }
   | { type: 'previewStrike'; source: string; target: string }
   | { type: 'submit'; orders: NationOrders }
-  | { type: 'save'; label: string; savedAt: string };
+  /** `callsigns` marks a room save so it can resume as a room. */
+  | { type: 'save'; label: string; savedAt: string; callsigns?: Record<NationId, string> };
 
 export type Response =
   | ({ type: 'state' } & SeatState)
+  /** A loaded save: the local seat's state and who else sat at the table. */
+  | { type: 'loaded'; state: { type: 'state' } & SeatState; humans: NationId[]; callsigns: Record<NationId, string> | null }
   | { type: 'resolved'; states: Record<NationId, SeatState> }
   | { type: 'ok' }
   | { type: 'checked'; rejected: GameEvent[] }

@@ -93,7 +93,7 @@ history). Guests never hold the world, so they cannot see through fog. A guest t
 with the same name and gets its seat back; meanwhile the host can hand the seat to the AI
 (`GameSession.releaseSeat`, reversed by `reclaimSeat` on rejoin). An optional planning timer (1, 2 or
 5 minutes) counts down on every client; at zero each client locks its current draft and the host
-resolves two seconds later. Remaining time travels as a duration, so clock skew does not matter. Saves record every human seat (`SaveFile.humans`).
+resolves two seconds later. Remaining time travels as a duration, so clock skew does not matter. Saves record every human seat (`SaveFile.humans`). A host's save also records each seat's callsign (`SaveFile.callsigns`): loading it opens a host lobby with those seats reserved, only the saved callsigns may join (each into its own seat, reclaiming one the AI held), and Resume carries on from the saved world. A multi-human save without callsigns is hotseat and resumes behind the curtain.
 
 A dedicated server (Fastify plus WebSocket, persistence, planning deadlines) would reuse the same
 `GameSession` and message shapes; nothing in the engine changes.

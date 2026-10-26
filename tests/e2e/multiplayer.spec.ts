@@ -85,6 +85,19 @@ test('hotseat passes the device between players behind a curtain', async ({ page
   await expect(page.getByTestId('top-bar')).toContainText('Aster Commonwealth');
   await expect(page.getByTestId('turn')).toContainText('2 / 30', { timeout: 15000 });
 
+  // A hotseat save picks back up behind the curtain, both seats still human.
+  await page.getByTestId('save-menu').click();
+  await page.getByTestId('save-slot-3').click();
+  await expect(page.getByText('Saved to Slot 3')).toBeVisible();
+  await page.reload();
+  await page.getByTestId('menu-load').click();
+  await page.getByTestId('load-slot-3').click();
+  await expect(page.getByTestId('curtain')).toContainText('Aster Commonwealth');
+  await page.getByTestId('reveal').click();
+  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+  await page.getByTestId('end-turn').click();
+  await expect(page.getByTestId('curtain')).toContainText('Korva Directorate');
+
   expect(errors).toEqual([]);
 });
 
@@ -178,5 +191,55 @@ test('private channels: a whisper reaches its target and nobody else, even the h
   await charlie.getByTestId('chat-input').press('Enter');
   await expect(host.getByTestId('chat')).toContainText('deal');
   await expect(host.getByTestId('chat')).not.toContainText('north is yours');
+  expect(errors).toEqual([]);
+});
+
+test('a room save reopens as a room with every seat held for its callsign', async ({ context }) => {
+  const errors: string[] = [];
+  const { host, guest } = await room(context, errors);
+  await guest.getByTestId('end-turn').click();
+  await host.getByTestId('end-turn').click();
+  await expect(host.getByTestId('turn')).toContainText('2 / 30', { timeout: 15000 });
+  await host.getByTestId('save-menu').click();
+  await host.getByTestId('save-slot-1').click();
+  await expect(host.getByText('Saved to Slot 1')).toBeVisible();
+  await guest.close({ runBeforeUnload: true });
+
+  // Next evening: the host loads the save and gets a lobby, not a solo game.
+  await host.reload();
+  await expect(host.getByTestId('menu-continue')).toContainText('room');
+  await host.getByTestId('menu-load').click();
+  await host.getByTestId('load-slot-1').click();
+  await expect(host.getByTestId('resume-turn')).toContainText('Resuming turn 2');
+  await expect(host.getByTestId('seats')).toContainText('Bravo');
+  await expect(host.getByTestId('claim-drevan')).toHaveCount(0);
+  const code = (await host.getByTestId('room-code').textContent())!.trim();
+
+  // A stranger is turned away; the saved player walks back into their seat.
+  const stranger = await context.newPage();
+  await stranger.goto(`./?net=local&join=${code}`);
+  await stranger.getByTestId('mp-name').fill('Charlie');
+  await stranger.getByTestId('mp-join').click();
+  await expect(stranger.getByText('resumes with its saved players: Bravo')).toBeVisible();
+  await stranger.close();
+
+  const back = await context.newPage();
+  watchErrors(back, errors);
+  await back.goto(`./?net=local&join=${code}`);
+  await back.getByTestId('mp-name').fill('Bravo');
+  await back.getByTestId('mp-join').click();
+  await expect(back.getByTestId('resume-turn')).toContainText('Resuming turn 2');
+  await host.getByTestId('mp-start').click();
+  await expect(host.getByTestId('turn')).toContainText('2 / 30', { timeout: 15000 });
+  await expect(back.getByTestId('top-bar')).toContainText('Korva Directorate', { timeout: 15000 });
+  await expect(back.getByTestId('turn')).toContainText('2 / 30');
+  // The returning player keeps their own history.
+  await back.getByTestId('open-report').click();
+  await expect(back.getByTestId('report')).toContainText('Turn 1 resolved');
+  // And the room plays on.
+  await back.keyboard.press('Escape');
+  await back.getByTestId('end-turn').click();
+  await host.getByTestId('end-turn').click();
+  await expect(back.getByTestId('turn')).toContainText('3 / 30', { timeout: 15000 });
   expect(errors).toEqual([]);
 });

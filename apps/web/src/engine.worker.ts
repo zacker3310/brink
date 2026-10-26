@@ -20,9 +20,11 @@ function handle(req: Request): Response {
     case 'new':
       session = GameSession.create(MERIDIAN_ID, req.seed, req.nation, req.others ?? []);
       return state();
-    case 'load':
-      session = GameSession.fromSave(parseSave(req.text));
-      return state();
+    case 'load': {
+      const save = parseSave(req.text);
+      session = GameSession.fromSave(save);
+      return { type: 'loaded', state: { type: 'state', ...seat() }, humans: [...session.humans], callsigns: save.callsigns ?? null };
+    }
   }
   if (!session) return { type: 'error', message: 'no game in progress' };
   switch (req.type) {
@@ -47,7 +49,7 @@ function handle(req: Request): Response {
       return { type: 'resolved', states: Object.fromEntries(s.humans.map((n) => [n, seat(n)])) };
     }
     case 'save':
-      return { type: 'saved', text: serializeSave(session.toSave(req.label, req.savedAt)), turn: session.turn };
+      return { type: 'saved', text: serializeSave(session.toSave(req.label, req.savedAt, req.callsigns)), turn: session.turn };
   }
 }
 

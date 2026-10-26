@@ -40,6 +40,8 @@ interface NetState {
   turnSeconds: number;
   /** Local time (ms) the current turn's planning timer runs out, or null. */
   deadline: number | null;
+  /** A room reopened from a save: the turn it resumes at. Seats are reserved by callsign. */
+  resumeTurn: number | null;
 
   setName(name: string): void;
   host(): Promise<void>;
@@ -59,6 +61,10 @@ interface NetState {
   readChat(): void;
   leave(): void;
   startHotseat(humans: NationId[], seed: number): Promise<void>;
+  /** Host a room from a loaded save; only the saved callsigns can take their seats. */
+  resumeRoom(humans: NationId[], callsigns: Record<NationId, string>, state: SeatState): Promise<void>;
+  /** Pick a loaded hotseat save back up behind the curtain. */
+  resumeHotseat(humans: NationId[], state: SeatState): void;
   reveal(): void;
 }
 
@@ -96,7 +102,7 @@ export const useNet = create<NetState>((set, get) => {
     for (const g of guests.values()) g.link.send(msg);
   };
   const pushLobby = () => {
-    for (const g of guests.values()) g.link.send({ t: 'lobby', seats: get().seats, seed: get().seed, started: get().started, you: g.name, turnSeconds: get().turnSeconds });
+    for (const g of guests.values()) g.link.send({ t: 'lobby', seats: get().seats, seed: get().seed, started: get().started, you: g.name, turnSeconds: get().turnSeconds, resumeTurn: get().resumeTurn });
   };
   const remaining = () => {
     const d = get().deadline;
@@ -111,7 +117,7 @@ export const useNet = create<NetState>((set, get) => {
     const base = wanted.trim().slice(0, 24) || 'Commander';
     const used = new Set([get().me ?? '', ...[...guests.entries()].filter(([id]) => id !== linkId).map(([, g]) => g.name)]);
     // A rejoining player keeps the name their seat holds.
-    if (get().started && seatOf(base)) return base;
+    if ((get().started || get().resumeTurn !== null) && seatOf(base)) return base;
     let name = base;
     for (let i = 2; used.has(name); i++) name = `${base} ${i}`;
     return name;
@@ -182,6 +188,16 @@ export const useNet = create<NetState>((set, get) => {
               if (r.type === 'state') link.send({ t: 'start', nation: seat.nation, state: r });
               link.send({ t: 'status', locked: get().locked, remaining: remaining() });
             });
+        } else if (get().resumeTurn !== null) {
+          // A resumed room: only the saved players, each into the seat their callsign holds.
+          if (!seat || seat.connected) {
+            guests.delete(link.id);
+            const names = get().seats.filter((s) => s.player && !s.host).map((s) => s.player).join(', ');
+            link.send({ t: 'denied', reason: seat ? `${name} is already in the room` : `This campaign resumes with its saved players: ${names}. Join with your callsign.` });
+            return;
+          }
+          if (seat.ai) void engine.call({ type: 'seat', nation: seat.nation, to: 'human' });
+          set({ seats: get().seats.map((s) => (s === seat ? { ...s, connected: true, ai: false } : s)) });
         } else if (seat) {
           set({ seats: get().seats.map((s) => (s === seat ? { ...s, connected: true } : s)) });
         }
@@ -190,7 +206,7 @@ export const useNet = create<NetState>((set, get) => {
         break;
       }
       case 'claim': {
-        if (!g || get().started) return;
+        if (!g || get().started || get().resumeTurn !== null) return;
         const target = msg.nation;
         if (target && get().seats.some((s) => s.nation === target && s.player !== null && s.player !== g.name)) return;
         set({
@@ -239,7 +255,7 @@ export const useNet = create<NetState>((set, get) => {
   const onGuestMessage = (_link: Link, msg: NetMessage) => {
     switch (msg.t) {
       case 'lobby':
-        set({ seats: msg.seats, seed: msg.seed, started: msg.started, me: msg.you, turnSeconds: msg.turnSeconds });
+        set({ seats: msg.seats, seed: msg.seed, started: msg.started, me: msg.you, turnSeconds: msg.turnSeconds, resumeTurn: msg.resumeTurn });
         break;
       case 'start':
         set({ started: true, locked: [] });
@@ -278,6 +294,23 @@ export const useNet = create<NetState>((set, get) => {
 
   const showSeat = (n: NationId) => set({ curtain: n });
 
+  /** Seat the hotseat players on a world the engine already holds, first seat behind the curtain. */
+  const beginHotseat = (humans: NationId[], seed: number, first: SeatState) => {
+    reset();
+    hotseatOrder = [...humans];
+    hotseatStash.set(humans[0]!, first);
+    set({
+      role: 'hotseat',
+      code: null,
+      seed,
+      started: true,
+      seats: NATIONS.map((n) => ({ nation: n.id, player: humans.includes(n.id) ? n.name : null, host: false, connected: humans.includes(n.id) })),
+      locked: [],
+    });
+    useGame.getState().enterGame(first);
+    showSeat(humans[0]!);
+  };
+
   return {
     role: null,
     code: null,
@@ -294,6 +327,7 @@ export const useNet = create<NetState>((set, get) => {
     curtain: null,
     turnSeconds: 0,
     deadline: null,
+    resumeTurn: null,
 
     setName(name) {
       writePrefs({ name });
@@ -313,7 +347,7 @@ export const useNet = create<NetState>((set, get) => {
         const me = get().name.trim() || 'Host';
         const seats = emptySeats();
         seats[0] = { ...seats[0]!, player: me, host: true, connected: true };
-        set({ role: 'host', code, me, seats, started: false, locked: [], chat: [], unread: 0, busy: false });
+        set({ role: 'host', code, me, seats, started: false, locked: [], chat: [], unread: 0, busy: false, resumeTurn: null });
       } catch (e) {
         set({ busy: false, error: e instanceof Error ? e.message : String(e) });
       }
@@ -325,7 +359,7 @@ export const useNet = create<NetState>((set, get) => {
       set({ busy: true, error: null });
       try {
         hostLink = await joinHost(c, { onMessage: onGuestMessage, onClose: () => set({ error: 'Lost connection to the host' }) });
-        set({ role: 'guest', code: c, seats: emptySeats(), started: false, locked: [], chat: [], unread: 0, busy: false });
+        set({ role: 'guest', code: c, seats: emptySeats(), started: false, locked: [], chat: [], unread: 0, busy: false, resumeTurn: null });
         hostLink.send({ t: 'hello', name: get().name.trim() || 'Commander' });
       } catch (e) {
         set({ busy: false, error: e instanceof Error ? e.message : String(e) });
@@ -334,7 +368,7 @@ export const useNet = create<NetState>((set, get) => {
 
     claim(nation) {
       const s = get();
-      if (s.started) return;
+      if (s.started || s.resumeTurn !== null) return;
       if (s.role === 'guest') {
         hostLink?.send({ t: 'claim', nation });
         return;
@@ -361,12 +395,13 @@ export const useNet = create<NetState>((set, get) => {
       if (!mine) return;
       const others = s.seats.filter((x) => x.player !== null && !x.host).map((x) => x.nation);
       set({ busy: true });
-      const r = await engine.call({ type: 'new', seed: s.seed, nation: mine.nation, others });
+      // A resumed room already holds its world; a new one generates it.
+      const r = s.resumeTurn !== null ? await engine.call({ type: 'stateFor', nation: mine.nation }) : await engine.call({ type: 'new', seed: s.seed, nation: mine.nation, others });
       if (r.type !== 'state') {
         set({ busy: false, error: r.type === 'error' ? r.message : 'Could not start' });
         return;
       }
-      set({ started: true, busy: false, locked: [] });
+      set({ started: true, busy: false, locked: [], resumeTurn: null });
       startClock();
       pushLobby();
       for (const g of guests.values()) {
@@ -450,27 +485,32 @@ export const useNet = create<NetState>((set, get) => {
 
     leave() {
       reset();
-      set({ deadline: null, turnSeconds: 0 });
+      set({ deadline: null, turnSeconds: 0, resumeTurn: null });
       set({ role: null, code: null, me: null, seats: emptySeats(), started: false, locked: [], chat: [], unread: 0, error: null, curtain: null, busy: false });
     },
 
     async startHotseat(humans, seed) {
-      reset();
       if (humans.length < 2) return;
-      hotseatOrder = [...humans];
       const r = await engine.call({ type: 'new', seed, nation: humans[0]!, others: humans.slice(1) });
       if (r.type !== 'state') return;
-      hotseatStash.set(humans[0]!, r);
-      set({
-        role: 'hotseat',
-        code: null,
-        seed,
-        started: true,
-        seats: NATIONS.map((n) => ({ nation: n.id, player: humans.includes(n.id) ? n.name : null, host: false, connected: humans.includes(n.id) })),
-        locked: [],
+      beginHotseat(humans, seed, r);
+    },
+
+    resumeHotseat(humans, state) {
+      beginHotseat(humans, state.view.turn, state);
+      addChat({ from: 'Room', nation: null, text: `Resumed at turn ${state.view.turn}`, at: Date.now() });
+    },
+
+    async resumeRoom(humans, callsigns, state) {
+      await get().host();
+      if (get().role !== 'host') return;
+      const local = humans[0]!;
+      const seats = NATIONS.map((n): Seat => {
+        const player = callsigns[n.id] ?? null;
+        return { nation: n.id, player, host: n.id === local, connected: n.id === local, ...(player && !humans.includes(n.id) ? { ai: true } : {}) };
       });
-      useGame.getState().enterGame(r);
-      showSeat(humans[0]!);
+      set({ seats, me: callsigns[local]!, resumeTurn: state.view.turn });
+      addChat({ from: 'Room', nation: null, text: `Resuming at turn ${state.view.turn}. Seats are held for their callsigns.`, at: Date.now() });
     },
 
     reveal() {

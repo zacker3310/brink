@@ -24,7 +24,11 @@ export function Menu() {
   const [screen, setScreen] = useState<MenuScreen>(joinCode ? 'multiplayer' : 'title');
   const back = () => setScreen('title');
 
-  const load = (text: string) => void loadGame(text);
+  const load = (text: string) =>
+    void loadGame(text).then((kind) => {
+      // A room save reopens its lobby so the saved players can rejoin.
+      if (kind === 'room') setScreen('multiplayer');
+    });
 
   return (
     <div key={screen} className="screen-in h-full overflow-y-auto">

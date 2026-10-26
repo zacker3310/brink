@@ -439,8 +439,10 @@ export interface SaveFile {
   hash: string;
   /** Every human seat, `playerNation` first. Absent in single-player saves. */
   humans?: NationId[];
-  /** Report history per human seat beyond `playerNation`. */
+  /** Report history per seat beyond `playerNation`, including seats the AI is holding. */
   histories?: Record<NationId, TurnReport[]>;
+  /** A room save: each seat's player callsign, so the room can resume with seats reserved. */
+  callsigns?: Record<NationId, string>;
 }
 
 /** What an AI nation remembers between turns. Built only from its own views and reports. */

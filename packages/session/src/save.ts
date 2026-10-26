@@ -34,6 +34,12 @@ export function parseSave(text: string): SaveFile {
     if (!Array.isArray(s.humans) || s.humans[0] !== s.playerNation) throw new SaveError('save lists human seats that do not start with the player');
     if (new Set(s.humans).size !== s.humans.length || s.humans.some((n) => !s.world!.nations[n])) throw new SaveError('save lists an unknown or repeated human seat');
   }
+  if (s.callsigns !== undefined) {
+    const c = s.callsigns;
+    if (!c || typeof c !== 'object' || Object.entries(c).some(([n, name]) => !s.world!.nations[n] || typeof name !== 'string' || !name.trim()))
+      throw new SaveError('save lists a callsign for an unknown seat');
+    if (!c[s.playerNation] || (s.humans ?? []).some((n) => !c[n])) throw new SaveError('save is missing a callsign for a human seat');
+  }
   if (hashState(s.world) !== s.hash) throw new SaveError('save is corrupted: world hash does not match');
   return s as SaveFile;
 }

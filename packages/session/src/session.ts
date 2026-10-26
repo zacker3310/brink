@@ -140,7 +140,8 @@ export class GameSession {
     return nation ? (this.lastReports[nation] ?? null) : null;
   }
 
-  toSave(label: string, savedAt: string): SaveFile {
+  /** `callsigns` marks a room save: who held each seat, so a resumed room can reserve them. */
+  toSave(label: string, savedAt: string, callsigns?: Record<NationId, string>): SaveFile {
     if (!this.playerNation) throw new Error('an AI-only session cannot be saved');
     return {
       format: SAVE_FORMAT,
@@ -156,9 +157,13 @@ export class GameSession {
       reports: clone(this.histories[this.playerNation]!),
       aiMemory: clone(this.memory),
       hash: hashState(this.world),
-      ...(this.humans.length > 1
-        ? { humans: [...this.humans], histories: Object.fromEntries(this.humans.slice(1).map((n) => [n, clone(this.histories[n]!)])) }
+      ...(this.humans.length > 1 || callsigns
+        ? {
+            humans: [...this.humans],
+            histories: Object.fromEntries(sortedKeys(this.histories).filter((n) => n !== this.playerNation).map((n) => [n, clone(this.histories[n]!)])),
+          }
         : {}),
+      ...(callsigns ? { callsigns: { ...callsigns } } : {}),
     };
   }
 }

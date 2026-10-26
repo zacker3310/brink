@@ -149,6 +149,8 @@ function Lobby() {
   const start = useNet((s) => s.start);
   const busy = useNet((s) => s.busy);
   const error = useNet((s) => s.error);
+  const resumeTurn = useNet((s) => s.resumeTurn);
+  const resuming = resumeTurn !== null;
   const [copied, setCopied] = useState(false);
   const isHost = role === 'host';
   const me = (s: (typeof seats)[number]) => (isHost ? s.host : s.player !== null && s.player === meName);
@@ -208,17 +210,18 @@ function Lobby() {
                         {s.player}
                         {s.host && <span className="ml-1.5 text-[10px] text-signal uppercase">host</span>}
                         {isMine && <span className="ml-1.5 text-[10px] text-friend uppercase">you</span>}
+                        {resuming && !s.connected && <span className="ml-1.5 text-[10px] text-faint uppercase">{s.ai ? 'reserved · AI held' : 'reserved'}</span>}
                       </span>
                     ) : (
                       <span className="text-faint">AI commander</span>
                     )}
                   </div>
-                  {!taken && (
+                  {!taken && !resuming && (
                     <button type="button" onClick={() => claim(s.nation)} data-testid={`claim-${s.nation}`} className="border border-signal/60 px-2.5 py-1 text-xs font-semibold text-signal hover:bg-signal/10">
                       Take seat
                     </button>
                   )}
-                  {isMine && !isHost && (
+                  {isMine && !isHost && !resuming && (
                     <button type="button" onClick={() => claim(null)} className="text-xs text-faint hover:text-text">
                       Leave seat
                     </button>
@@ -233,8 +236,14 @@ function Lobby() {
       <div className="flex flex-col gap-4">
         <Frame className="p-4">
           <Label>Operation</Label>
-          <div className="mt-1 font-display text-2xl font-bold tracking-wide text-signal uppercase">{operationName(seed)}</div>
-          <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+          {resuming ? (
+            <div className="mt-1 font-display text-2xl font-bold tracking-wide text-signal uppercase" data-testid="resume-turn">
+              Resuming turn {resumeTurn}
+            </div>
+          ) : (
+            <div className="mt-1 font-display text-2xl font-bold tracking-wide text-signal uppercase">{operationName(seed)}</div>
+          )}
+          <div className={`mt-2 flex items-center gap-2 text-xs text-muted ${resuming ? 'hidden' : ''}`}>
             Seed <span className="font-mono text-text">{seed}</span>
             {isHost && (
               <button type="button" onClick={() => setSeed(randomSeed())} className="border border-line px-1.5 hover:text-text" aria-label="New seed">
@@ -273,10 +282,10 @@ function Lobby() {
               data-testid="mp-start"
               className="mt-4 w-full bg-signal px-4 py-3 font-display text-lg font-bold tracking-wider text-ink-950 uppercase hover:brightness-110 disabled:opacity-50"
             >
-              {busy ? 'Deploying…' : 'Start campaign'}
+              {busy ? 'Deploying…' : resuming ? 'Resume campaign' : 'Start campaign'}
             </button>
           ) : (
-            <div className="mt-4 border border-line px-3 py-2 text-center text-xs text-muted">{mine ? 'Ready. Waiting for the host…' : 'Take a seat to play.'}</div>
+            <div className="mt-4 border border-line px-3 py-2 text-center text-xs text-muted">{mine ? 'Ready. Waiting for the host…' : resuming ? 'Seats are held for the saved players.' : 'Take a seat to play.'}</div>
           )}
           <p className="mt-2 text-[10px] text-faint">
             <Kbd>Esc</Kbd> leaves the room.

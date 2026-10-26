@@ -77,6 +77,9 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Diplomacy with teeth (ruleset 1.2.0): perfidy costs 10 stability for breaking a peace, 20 for an
   alliance, shown on the button before you commit; betrayal notifications; private chat channels to
   one player, routed by the host so nobody else (the host included) receives them.
+- Resume a room: a host's save remembers who sat where. Loading it reopens the lobby with each seat
+  held for its callsign; strangers are turned away, returning players keep their history, Resume
+  plays on. Hotseat saves resume behind the curtain.
 - Multiplayer cadence: planning timer chosen in the lobby (auto-locks every draft at zero), host hands
   an offline seat to the AI, the player reclaims it by rejoining.
 - Turn summary history: ‹ › (or arrow keys) through every past report. Save menu exports the
