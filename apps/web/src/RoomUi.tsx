@@ -124,6 +124,7 @@ export function SeatBoard() {
 /** The planning clock, counting down to the moment the world moves; locks your draft at zero. */
 export function TurnClock() {
   const deadline = useNet((s) => s.deadline);
+  const turnSeconds = useNet((s) => s.turnSeconds);
   const [now, setNow] = useState(() => Date.now());
   const fired = useRef<number | null>(null);
   useEffect(() => {
@@ -138,7 +139,8 @@ export function TurnClock() {
     if (!g.resolving && !g.playback && g.draft) void g.submit();
   }, [now, deadline]);
   if (deadline === null) return null;
-  const left = Math.max(0, Math.ceil((deadline - now) / 1000));
+  // Never show more than the room's timer: a guest's clock can trail the host's by a moment.
+  const left = Math.min(turnSeconds || Infinity, Math.max(0, Math.ceil((deadline - now) / 1000)));
   const urgent = left <= 10;
   return (
     <div className={`mb-1.5 flex items-center justify-between border px-2 py-1 ${urgent ? 'ds-hazard border-signal text-ink-950' : 'border-line'}`} data-testid="turn-clock">

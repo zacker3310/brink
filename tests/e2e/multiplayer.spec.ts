@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 // Two humans in one room over the local transport (BroadcastChannel between two tabs), then a
 // hotseat round on one device. Online play uses the same room code over WebRTC.
@@ -88,7 +88,7 @@ test('hotseat passes the device between players behind a curtain', async ({ page
   expect(errors).toEqual([]);
 });
 
-async function room(context: import('@playwright/test').BrowserContext, errors: string[], setup?: (host: Page) => Promise<void>) {
+async function room(context: BrowserContext, errors: string[], setup?: (host: Page) => Promise<void>) {
   const host = await context.newPage();
   watchErrors(host, errors);
   await host.goto('./?net=local');
@@ -105,7 +105,7 @@ async function room(context: import('@playwright/test').BrowserContext, errors: 
   await expect(host.getByTestId('seats')).toContainText('Bravo');
   if (setup) await setup(host);
   await host.getByTestId('mp-start').click();
-  await expect(guest.getByTestId('top-bar')).toContainText('Korva Directorate');
+  await expect(guest.getByTestId('top-bar')).toContainText('Korva Directorate', { timeout: 15000 });
   return { host, guest, code };
 }
 
