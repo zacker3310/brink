@@ -7,7 +7,7 @@
 
 import type { GovernmentId, Resource, Stockpile, TechId, Terrain, UnitClass } from '@brink/contracts';
 
-export const RULESET_VERSION = '1.1.0';
+export const RULESET_VERSION = '1.2.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -320,6 +320,8 @@ export const RULES = {
   /** Assault outcome thresholds on attacker share of combat power, permille. */
   breakthrough: 600,
   repulse: 450,
+  /** Stability a nation loses for declaring war on a nation it is at peace or allied with. */
+  perfidy: { peace: 10, alliance: 20 },
   /** Entrenchment a formation loses each time an artillery or air strike hits it. */
   strikeEntrenchment: 25,
   /** Defenders whose organization falls to this level break and retreat. */

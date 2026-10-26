@@ -19,6 +19,8 @@ export interface ChatLine {
   nation: NationId | null;
   text: string;
   at: number;
+  /** A private line for one nation's player; absent for the whole room. */
+  to?: NationId | null;
 }
 
 export type NetMessage =

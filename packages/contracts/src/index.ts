@@ -303,7 +303,8 @@ export type GameEvent =
   | { kind: 'supply'; nation: NationId; formation: FormationId; key: HexKey; supply: number }
   | { kind: 'intel'; nation: NationId; formation: FormationId; owner: NationId; unitClass: UnitClass; key: HexKey }
   | { kind: 'research'; nation: NationId; tech: TechId }
-  | { kind: 'diplomacy'; a: NationId; b: NationId; relation: Relation; proposedBy: NationId }
+  /** `broke` is the treaty a declaration of war tore up, if any. */
+  | { kind: 'diplomacy'; a: NationId; b: NationId; relation: Relation; proposedBy: NationId; broke?: 'peace' | 'alliance' }
   | { kind: 'proposal'; from: NationId; to: NationId; proposal: 'peace' | 'alliance' }
   | { kind: 'elimination'; nation: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason }

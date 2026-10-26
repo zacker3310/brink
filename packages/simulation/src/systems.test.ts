@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { RULES } from '@brink/game-data';
 import type { Ledger, Stockpile, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { hexKey, rangeKeys } from '@brink/map';
@@ -174,6 +175,19 @@ describe('victory and diplomacy', () => {
     setRelation(two.world, 'a', 'b', 'peace');
     const three = resolveTurn(two.world, [orders(two.world, 'a', {}, { diplomacy: [{ target: 'b', action: 'declare_war' }] })]);
     expect(three.world.relations['a|b']).toBe('war');
+  });
+
+  it('perfidy: breaking a peace or an alliance costs the declarer stability, open war does not', () => {
+    const declare = (rel: 'war' | 'peace' | 'alliance') => {
+      const w = makeWorld(8, 6, ['a', 'b', 'c']);
+      setRelation(w, 'a', 'b', rel);
+      const before = w.nations.a!.stability;
+      const r = resolveTurn(w, [orders(w, 'a', {}, { diplomacy: rel === 'war' ? [] : [{ target: 'b', action: 'declare_war' }] })]);
+      return { drop: before - r.world.nations.a!.stability, victim: r.world.nations.b!.stability - w.nations.b!.stability };
+    };
+    const baseline = declare('war').drop;
+    expect(declare('peace').drop - baseline).toBe(RULES.perfidy.peace);
+    expect(declare('alliance').drop - baseline).toBe(RULES.perfidy.alliance);
   });
 
   it('war breaking out between co-located nations pushes the trespasser off the host ground', () => {

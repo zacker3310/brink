@@ -70,6 +70,9 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
   where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
   `threatZones` in the simulation package, built from the viewer's NationView.
+- Diplomacy with teeth (ruleset 1.2.0): perfidy costs 10 stability for breaking a peace, 20 for an
+  alliance, shown on the button before you commit; betrayal notifications; private chat channels to
+  one player, routed by the host so nobody else (the host included) receives them.
 - Multiplayer cadence: planning timer chosen in the lobby (auto-locks every draft at zero), host hands
   an offline seat to the AI, the player reclaims it by rejoining.
 - Turn summary history: ‹ › (or arrow keys) through every past report. Save menu exports the
@@ -84,7 +87,7 @@ Updated 2026-10-25. Milestone 1 (first playable).
 
 ## Outstanding
 
-- Balance: 58 of 100 soak matches end by victory points, 42 at the turn limit (median turn 28).
+- Balance: 55 of 100 soak matches end by victory points, 45 at the turn limit (median turn 29).
   Next levers if games should end sooner: stall threshold in `ai`, strike entrenchment, victory share.
 - Multiplayer: no TURN relay for strict NATs, a loaded multi-human save resumes single-player (other
   seats hold), guests cannot save.

@@ -143,3 +143,40 @@ test('a dropped seat goes to the AI and back to its player', async ({ context })
   await expect(host.getByTestId('seat-board')).toContainText('planning');
   expect(errors).toEqual([]);
 });
+
+test('private channels: a whisper reaches its target and nobody else, even the host', async ({ context }) => {
+  const errors: string[] = [];
+  const host = await context.newPage();
+  watchErrors(host, errors);
+  await host.goto('./?net=local');
+  await host.getByTestId('menu-multiplayer').click();
+  await host.getByTestId('mp-name').fill('Alpha');
+  await host.getByTestId('mp-host').click();
+  const code = (await host.getByTestId('room-code').textContent())!.trim();
+  const join = async (name: string, nation: string) => {
+    const p = await context.newPage();
+    watchErrors(p, errors);
+    await p.goto(`./?net=local&join=${code}`);
+    await p.getByTestId('mp-name').fill(name);
+    await p.getByTestId('mp-join').click();
+    await p.getByTestId(`claim-${nation}`).click();
+    await expect(host.getByTestId('seats')).toContainText(name);
+    return p;
+  };
+  const bravo = await join('Bravo', 'korva');
+  const charlie = await join('Charlie', 'selmar');
+  await expect(bravo.getByTestId('seats')).toContainText('Charlie');
+
+  await bravo.getByTestId('chat-channel').selectOption('selmar');
+  await bravo.getByTestId('chat-input').fill('north is yours if you leave Vessa to me');
+  await bravo.getByTestId('chat-input').press('Enter');
+  await expect(charlie.getByTestId('chat')).toContainText('north is yours');
+  await expect(charlie.locator('[data-private="true"]')).toContainText('private');
+  await expect(bravo.getByTestId('chat')).toContainText('north is yours');
+  // A room-wide line still reaches the host, so the host's silence above is privacy, not lag.
+  await charlie.getByTestId('chat-input').fill('deal');
+  await charlie.getByTestId('chat-input').press('Enter');
+  await expect(host.getByTestId('chat')).toContainText('deal');
+  await expect(host.getByTestId('chat')).not.toContainText('north is yours');
+  expect(errors).toEqual([]);
+});

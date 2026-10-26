@@ -54,7 +54,8 @@ interface NetState {
   setTurnSeconds(seconds: number): void;
   /** Host only: the AI plays an offline seat until its player returns. */
   handToAi(nation: NationId): void;
-  say(text: string): void;
+  /** Send a chat line to the room, or privately to one nation's player. */
+  say(text: string, to?: NationId | null): void;
   readChat(): void;
   leave(): void;
   startHotseat(humans: NationId[], seed: number): Promise<void>;
@@ -121,6 +122,18 @@ export const useNet = create<NetState>((set, get) => {
     broadcast({ t: 'status', locked, remaining: remaining() });
   };
   const addChat = (line: ChatLine) => set({ chat: [...get().chat.slice(-60), line], unread: get().unread + 1 });
+  /** Room lines go to everyone; a private line only to its sender and the target nation's player. */
+  const routeChat = (line: ChatLine, senderLink: string | null) => {
+    if (!line.to) {
+      addChat(line);
+      broadcast({ t: 'chat', line });
+      return;
+    }
+    const target = get().seats.find((s) => s.nation === line.to);
+    if (!target?.player) return;
+    if (target.host || senderLink === null) addChat(line);
+    for (const [id, g] of guests) if (id === senderLink || (!target.host && g.name === target.player)) g.link.send({ t: 'chat', line });
+  };
 
   const resolve = async () => {
     const orders = [...pending.values()];
@@ -202,9 +215,9 @@ export const useNet = create<NetState>((set, get) => {
       case 'chat':
         if (!g) return;
         {
-          const line = { from: g.name, nation: seatOf(g.name)?.nation ?? null, text: msg.line.text.slice(0, 280), at: Date.now() };
-          addChat(line);
-          broadcast({ t: 'chat', line });
+          const to = msg.line.to ?? null;
+          const line = { from: g.name, nation: seatOf(g.name)?.nation ?? null, text: msg.line.text.slice(0, 280), at: Date.now(), to };
+          routeChat(line, link.id);
         }
         break;
     }
@@ -423,17 +436,14 @@ export const useNet = create<NetState>((set, get) => {
       });
     },
 
-    say(text) {
+    say(text, to = null) {
       const t = text.trim();
       if (!t) return;
       const s = get();
       const nation = s.seats.find((x) => (s.role === 'host' ? x.host : x.player === s.me))?.nation ?? null;
-      const line = { from: s.me ?? (s.name.trim() || 'Commander'), nation, text: t.slice(0, 280), at: Date.now() };
+      const line = { from: s.me ?? (s.name.trim() || 'Commander'), nation, text: t.slice(0, 280), at: Date.now(), to };
       if (s.role === 'guest') hostLink?.send({ t: 'chat', line });
-      else {
-        set({ chat: [...s.chat.slice(-60), line] });
-        broadcast({ t: 'chat', line });
-      }
+      else routeChat(line, null);
     },
 
     readChat: () => set({ unread: 0 }),

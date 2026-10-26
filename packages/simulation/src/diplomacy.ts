@@ -17,8 +17,9 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
       const key = pairKey(nation, d.target);
       if (declared.has(key)) continue;
       declared.add(key);
+      const was = relationOf(world.relations, nation, d.target);
       world.relations[key] = 'war';
-      events.push({ kind: 'diplomacy', a: nation, b: d.target, relation: 'war', proposedBy: nation });
+      events.push({ kind: 'diplomacy', a: nation, b: d.target, relation: 'war', proposedBy: nation, ...(was === 'peace' || was === 'alliance' ? { broke: was } : {}) });
     }
   }
 

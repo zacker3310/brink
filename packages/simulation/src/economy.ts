@@ -111,6 +111,10 @@ export function settleEconomy(
   n.stability = clamp(n.stability + Math.trunc((target - n.stability) / 4), 0, 100);
   if (shortages.includes('food')) n.stability = clamp(n.stability - 8, 0, 100);
   if (shortages.includes('credits')) n.stability = clamp(n.stability - 5, 0, 100);
+  // Perfidy: tearing up a treaty this turn costs the declarer, in full.
+  for (const e of events) {
+    if (e.kind === 'diplomacy' && e.relation === 'war' && e.broke && e.proposedBy === nation) n.stability = clamp(n.stability - RULES.perfidy[e.broke], 0, 100);
+  }
 
   const order = (id: FormationId) => orders.formations[id]?.type ?? 'hold';
   for (const f of own) {

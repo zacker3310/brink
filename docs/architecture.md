@@ -30,7 +30,7 @@ It clones its input, never reads the clock, and throws if the ruleset version di
 | # | Phase | What happens |
 |---|---|---|
 | 1 | validate | `lockOrders` checks every submission against the start-of-turn world. Illegal parts become `order_rejected` events; every formation without a legal order holds. Duplicate or stale submissions are dropped whole. |
-| 2 | diplomacy | War declarations apply at once; units of the new enemies sharing a hex separate (the side not on its own ground falls back). Peace or alliance applies when both sides have proposed it (this turn or within 2 turns). |
+| 2 | diplomacy | War declarations apply at once (tearing up a peace or alliance costs the declarer stability in the economy phase: perfidy); units of the new enemies sharing a hex separate (the side not on its own ground falls back). Peace or alliance applies when both sides have proposed it (this turn or within 2 turns). |
 | 3 | production | Recruit costs, reserved at validation, are **consumed here** as items enter the queue. Last settlement's industrial capacity is spent down the queue; finished formations appear at their site. |
 | 4 | logistics | Dijkstra from cities and depots through own or allied ground; enemy hexes block and adjacency costs extra. Capacity is shared by priority tier, proportionally within a tier. Fuel and ammunition refills **consume** energy and materials now. |
 | 5 | reconnaissance | Vision per nation, with recon orders active. Decides whether strikes and assaults are spotted. |

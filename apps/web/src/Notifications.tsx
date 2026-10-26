@@ -112,7 +112,11 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
         if (e.nation === me) out.push({ id, icon: 'flask', tone: 'good', title: 'Research complete', text: `${TECHS[e.tech]?.name}. Pick the next project.` });
         break;
       case 'diplomacy':
-        if (e.a === me || e.b === me) {
+        if ((e.a === me || e.b === me) && e.broke && e.proposedBy !== me) {
+          out.push({ id, icon: 'skull', tone: 'bad', title: `Betrayed by ${nation(e.proposedBy)}`, text: `They tore up our ${e.broke} and declared war. Their stability pays for it.` });
+        } else if ((e.a === me || e.b === me) && e.broke) {
+          out.push({ id, icon: 'scroll', tone: 'bad', title: `We broke the ${e.broke}`, text: `War with ${nation(e.a === me ? e.b : e.a)}. Stability −${e.broke === 'alliance' ? 20 : 10}.` });
+        } else if (e.a === me || e.b === me) {
           const other = e.a === me ? e.b : e.a;
           out.push({ id, icon: 'scroll', tone: e.relation === 'war' ? 'bad' : 'good', title: `${e.relation === 'war' ? 'War' : e.relation === 'peace' ? 'Peace' : 'Alliance'} with ${nation(other)}`, text: `We are now at ${e.relation}.` });
         }

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { DiplomaticAction, UnitClass } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { GOVERNMENTS, TECH_IDS, TECHS, UNITS } from '@brink/game-data';
+import { GOVERNMENTS, RULES, TECH_IDS, TECHS, UNITS } from '@brink/game-data';
 import { Label } from './chrome';
 import { Emblem, UnitGlyph } from './glyphs';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
@@ -458,8 +458,13 @@ export function Diplomacy() {
                       </Button>
                     )}
                     {rel !== 'war' && (
-                      <Button tone="danger" active={planned(n.id) === 'declare_war'} onClick={() => toggle(n.id, 'declare_war')}>
-                        Declare war
+                      <Button
+                        tone="danger"
+                        active={planned(n.id) === 'declare_war'}
+                        onClick={() => toggle(n.id, 'declare_war')}
+                        title={`Breaking the ${rel} costs ${RULES.perfidy[rel === 'alliance' ? 'alliance' : 'peace']} stability`}
+                      >
+                        Declare war · −{RULES.perfidy[rel === 'alliance' ? 'alliance' : 'peace']} stability
                       </Button>
                     )}
                   </div>
