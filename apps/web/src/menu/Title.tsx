@@ -1,23 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { RULESET_VERSION } from '@brink/game-data';
 import { NATIONS, SCENARIOS, createScenario } from '@brink/scenarios';
 import { tutorialDone } from '../coach';
 import { latestSlot, type SlotInfo } from '../saves';
 import { Kbd, relativeTime, useKeys } from '../chrome';
+import { Icon } from '../icons';
 import { MapPreview } from './MapPreview';
 
 export type MenuScreen = 'title' | 'setup' | 'archive' | 'manual' | 'multiplayer';
 
-const HEADLINES = [
-  'VESSA — Free city council suspends the treaty assembly as columns mass on the basin road',
-  'HALDEN FIELDS — Pipeline output falls 40% after unexplained pressure loss',
-  'KORVAGRAD — Directorate calls a third class of reservists to the colours',
-  'PORT ASTER — Commonwealth exchange closes early; war-risk premiums triple',
-  'CORRIN MINES — Federation and Union survey teams turned back at the Spine passes',
-  'DREVANSK — Union assembly votes emergency grain requisitions',
-  'SELMAR — Federation signals directorate goes dark across all public channels',
-  'THE SPINE — Ridge-line observation posts report vehicle lights moving without headlamps',
-];
 
 interface Item {
   id: string;
@@ -74,21 +65,13 @@ export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]
     <main className="title-screen relative isolate min-h-full overflow-hidden">
       <div className="absolute inset-0 -z-10" aria-hidden>
         <MapPreview world={world} forces className="title-map h-full w-full" />
-        <div className="title-sweep" />
         <div className="title-vignette" />
-        <div className="scanlines" />
       </div>
 
       <div className="relative z-10 flex min-h-full flex-col px-4 pt-6 pb-4 sm:px-10 sm:pt-10">
-        <div className="font-display flex items-center gap-3 text-[10px] font-semibold tracking-[0.3em] uppercase">
-          <span className="rounded-[2px] bg-hostile/90 px-1.5 py-0.5 text-ink-950">Top secret</span>
-          <span className="text-muted">Strategic command // eyes only</span>
-          <Clock />
-        </div>
-
         <div className="mt-[8vh] max-w-xl">
-          <p className="font-display enter-1 text-[11px] font-semibold tracking-[0.42em] text-signal uppercase">{scenario.name}</p>
-          <h1 className="font-display enter-2 title-wordmark mt-2 text-7xl leading-[0.9] font-black tracking-[0.04em] sm:text-9xl" data-testid="wordmark">
+          <p className="ds-label enter-1 text-signal">{scenario.name}</p>
+          <h1 className="font-display enter-2 title-wordmark mt-3 text-7xl leading-[0.85] font-black sm:text-[9.5rem]" data-testid="wordmark">
             BRINK
           </h1>
           <p className="enter-3 mt-4 max-w-md text-sm leading-relaxed text-muted">
@@ -109,13 +92,13 @@ export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]
                     onMouseEnter={() => setCursor(i)}
                     onFocus={() => setCursor(i)}
                     onClick={it.go}
-                    className={`menu-item group relative flex w-full items-center gap-4 border px-4 py-3 text-left transition-all ${
-                      active ? 'border-signal/70 bg-signal/10' : 'border-line/60 bg-ink-900/60 hover:border-faint'
+                    className={`menu-item group relative flex w-full items-center gap-4 border-l-2 px-4 py-3 text-left transition-all ${
+                      active ? 'border-signal bg-ink-850/90' : 'border-transparent bg-ink-900/55 hover:bg-ink-850/70'
                     }`}
                   >
                     <span className={`font-mono text-[11px] ${active ? 'text-signal' : 'text-faint'}`}>{String(i + 1).padStart(2, '0')}</span>
                     <span className="min-w-0 flex-1">
-                      <span className={`block text-base font-bold tracking-wide uppercase ${active ? 'text-text' : 'text-text/85'}`}>{it.label}</span>
+                      <span className={`font-display block text-[15px] font-extrabold uppercase ${active ? 'text-text' : 'text-text/85'}`}>{it.label}</span>
                       <span className="block truncate text-xs text-muted">
                         {it.id === 'continue' && lastNation && (
                           <span className="mr-1.5 inline-block h-2 w-2 rounded-[1px] align-middle" style={{ background: lastNation.color }} />
@@ -124,7 +107,7 @@ export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]
                       </span>
                     </span>
                     <span className={`text-signal transition-all ${active ? 'translate-x-0 opacity-100' : '-translate-x-2 opacity-0'}`} aria-hidden>
-                      ▸
+                      <Icon name="next" />
                     </span>
                   </button>
                 </li>
@@ -138,17 +121,7 @@ export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]
         </nav>
 
         <div className="mt-auto pt-10">
-          <div className="ticker border-y border-line/60 bg-ink-950/70 py-1.5 text-[11px] text-muted" aria-hidden>
-            <div className="ticker-track">
-              {[...HEADLINES, ...HEADLINES].map((h, i) => (
-                <span key={i} className="mx-6 whitespace-nowrap">
-                  <span className="mr-2 text-hostile">●</span>
-                  {h}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="mt-2 flex flex-wrap justify-between gap-2 font-mono text-[10px] text-faint">
+          <div className="flex flex-wrap justify-between gap-2 font-mono text-[10px] text-faint">
             <span>
               Ruleset {RULESET_VERSION} · deterministic engine · {scenario.nations} powers · {scenario.maxTurns} turns
             </span>
@@ -157,18 +130,5 @@ export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]
         </div>
       </div>
     </main>
-  );
-}
-
-function Clock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <span className="ml-auto font-mono tracking-[0.12em] text-faint tabular-nums">
-      {now.toISOString().slice(11, 19)}Z <span className="text-good">● LINK</span>
-    </span>
   );
 }

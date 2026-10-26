@@ -19,6 +19,7 @@ import { SLOT_NAMES } from './saves';
 import { useGame, type Tab } from './store';
 import { TurnControls, UnitPanel } from './UnitPanel';
 import { Meter, signed, Swatch } from './ui';
+import { Icon } from './icons';
 
 const RES: [Resource, string][] = [
   ['credits', 'Treasury'],
@@ -51,26 +52,26 @@ function TopBar({ onChat }: { onChat: () => void }) {
   const clock = turnClock(turn);
   return (
     <header className="relative z-20 flex items-stretch border-b border-line bg-ink-950" data-testid="top-bar">
-      <div className="font-display flex items-center border-r border-line px-4 text-sm font-black tracking-[0.28em] text-signal" aria-label="Brink">
+      <div className="font-display flex items-center border-r border-line px-4 text-sm font-black tracking-[0.1em] text-signal" aria-label="Brink">
         BRINK
       </div>
       <div className="flex items-center gap-2.5 border-r border-line px-4" style={{ background: `linear-gradient(90deg, ${s.color}1f, transparent)` }}>
         <Emblem color={s.color} government={s.government} className="h-7 w-7" />
         <div className="leading-tight whitespace-nowrap">
           <div className="font-display text-base font-bold tracking-wide uppercase">{s.name}</div>
-          <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: s.color }}>
+          <div className="text-[10px] font-semibold tracking-wide uppercase" style={{ color: s.color }}>
             {GOVERNMENTS[s.government].name}
           </div>
         </div>
       </div>
 
-      <dl className="flex items-center gap-x-5 px-4">
+      <dl className="flex min-w-0 items-center gap-x-4 overflow-hidden px-4">
         {RES.map(([r, label]) => {
           const short = ledger?.shortages.includes(r);
           const d = net?.[r];
           return (
             <div key={r} className="leading-tight" title={ledger ? `${label}: ${signed(d ?? 0)} last turn` : label}>
-              <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">{label}</dt>
+              <dt className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">{label}</dt>
               <dd className={`font-mono text-sm tabular-nums ${short ? 'text-hostile' : ''}`}>
                 {s.stockpile[r]}
                 {d !== undefined && d !== 0 && <span className={`ml-1 text-[10px] ${d > 0 ? 'text-good' : 'text-hostile'}`}>{signed(d)}</span>}
@@ -79,15 +80,15 @@ function TopBar({ onChat }: { onChat: () => void }) {
           );
         })}
         <div className="leading-tight">
-          <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">Industry</dt>
+          <dt className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">Industry</dt>
           <dd className="font-mono text-sm tabular-nums">{s.industrialCapacity}</dd>
         </div>
         <div className="leading-tight">
-          <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">Research</dt>
+          <dt className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">Research</dt>
           <dd className="font-mono text-sm tabular-nums">{s.researchOutput}</dd>
         </div>
         <div className="w-20 leading-tight">
-          <dt className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">Stability</dt>
+          <dt className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">Stability</dt>
           <dd className={`font-mono text-sm tabular-nums ${s.stability < 40 ? 'text-hostile' : ''}`}>{s.stability}</dd>
           <Meter value={s.stability} tone={s.stability < 40 ? 'bad' : 'good'} />
         </div>
@@ -95,9 +96,9 @@ function TopBar({ onChat }: { onChat: () => void }) {
 
       <VpRace />
 
-      <div className="ml-auto flex items-center gap-3 border-l border-line px-4">
+      <div className="ml-auto flex shrink-0 items-center gap-3 border-l border-line px-4">
         <div className="text-right leading-tight" data-testid="turn">
-          <div className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">
+          <div className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">
             Day {clock.day} · {clock.hour}
           </div>
           <div className="font-mono text-sm font-semibold">
@@ -168,7 +169,7 @@ function VpRace() {
   const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints || (a.id < b.id ? -1 : 1));
   return (
     <div className="hidden min-w-48 flex-1 flex-col justify-center gap-0.5 border-l border-line px-4 xl:flex" title={`${view.victoryThreshold} VP wins outright`} data-testid="vp-race">
-      <div className="font-display flex justify-between text-[9px] tracking-[0.16em] text-faint uppercase">
+      <div className="font-display flex justify-between text-[9px] tracking-[0.06em] text-faint uppercase">
         <span>Victory points</span>
         <span>win at {view.victoryThreshold}</span>
       </div>
@@ -209,7 +210,7 @@ function LeftRail() {
             onClick={() => (tab === id && open ? togglePanel(false) : setTab(id))}
             aria-current={active ? 'page' : undefined}
             title={`${label} (${i + 1})`}
-            className={`group relative flex flex-col items-center gap-1 border-l-2 py-3 text-[9px] font-semibold tracking-wider uppercase transition-colors ${
+            className={`group relative flex flex-col items-center gap-1 border-l-2 py-3 text-[9px] font-semibold tracking-wide uppercase transition-colors ${
               active ? 'border-signal bg-ink-850 text-signal' : 'border-transparent text-faint hover:bg-ink-900 hover:text-text'
             }`}
           >
@@ -241,9 +242,11 @@ function SidePanel() {
   if (!open) return null;
   return (
     <aside className="panel-in absolute top-0 bottom-0 left-0 z-20 w-[320px] overflow-y-auto border-r border-line bg-ink-900/97 shadow-2xl backdrop-blur" data-testid={`panel-${tab}`}>
-      <button type="button" onClick={() => togglePanel(false)} className="absolute top-2 right-2 z-10 text-faint hover:text-text" aria-label="Close panel">
-        ✕
-      </button>
+      <div className="sticky top-0 z-10 flex h-0 justify-end">
+        <button type="button" onClick={() => togglePanel(false)} className="mt-1.5 mr-1.5 h-6 w-6 bg-ink-900 text-faint hover:text-text" aria-label="Close panel">
+          <Icon name="close" />
+        </button>
+      </div>
       {tab === 'overview' && <Overview />}
       {tab === 'military' && <Military />}
       {tab === 'economy' && <Economy />}
@@ -276,7 +279,7 @@ function KeyHelp({ onClose }: { onClose: () => void }) {
       <div className="flex justify-between">
         <Label>Controls</Label>
         <button type="button" onClick={onClose} className="text-faint hover:text-text" aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
       <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
@@ -307,7 +310,7 @@ function VictoryOverlay() {
   return (
     <div className="screen-in absolute inset-0 z-20 flex items-center justify-center bg-ink-950/75 backdrop-blur-sm" data-testid="victory" role="status">
       <div className="w-full max-w-md border border-line bg-ink-900 p-6 text-center shadow-2xl" style={{ borderTop: `3px solid ${won ? 'var(--color-good)' : 'var(--color-hostile)'}` }}>
-        <div className="font-display text-[10px] font-bold tracking-[0.36em] text-faint uppercase">Campaign concluded · turn {view.victory.turn}</div>
+        <div className="font-display text-[10px] font-bold tracking-[0.1em] text-faint uppercase">Campaign concluded · turn {view.victory.turn}</div>
         <div className={`font-display mt-2 text-5xl font-black tracking-tight ${won ? 'text-good' : 'text-hostile'}`}>{won ? 'VICTORY' : 'DEFEAT'}</div>
         <div className="mt-2 text-sm text-muted">
           <span style={{ color: winner.color }}>{winner.name}</span> wins {reason}.

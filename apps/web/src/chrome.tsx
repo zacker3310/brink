@@ -33,7 +33,7 @@ export function ScreenHeader({ title, kicker, onBack, right }: { title: string; 
       </button>
       <div className="h-6 w-px bg-line" aria-hidden />
       <div className="leading-tight">
-        <div className="font-display text-[10px] font-semibold tracking-[0.3em] text-signal uppercase">{kicker}</div>
+        <div className="font-display text-[10px] font-semibold tracking-[0.1em] text-signal uppercase">{kicker}</div>
         <h1 className="text-lg font-bold tracking-tight">{title}</h1>
       </div>
       <div className="ml-auto">{right}</div>

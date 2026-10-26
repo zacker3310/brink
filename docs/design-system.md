@@ -1,15 +1,17 @@
 # Brink design system
 
-Brink looks like a field headquarters, not a web app: dark gunmetal surfaces, one tactical-amber
-accent, condensed stencil-like headings, and real military symbology on the map. The system is
-built on existing standards rather than invented ones.
+Brink looks like the war as it is fought and watched now: an ISR picture. Satellite-style ground,
+top-down models of real vehicles, and a flat command-and-control HUD over it (the way Ukraine's
+DELTA puts drone and satellite feeds on one map, and the way WARNO and Regiments show models up close
+with NATO markers far out). Instrument-black glass, one sensor-lime accent, wide heavy caps for
+headings. No bevels, grain, corner brackets, scanlines or emoji.
 
 | Layer | Standard | Where |
 |---|---|---|
 | Unit symbols | NATO APP-6 / MIL-STD-2525 via [milsymbol](https://github.com/spatialillusions/milsymbol) (MIT) | `apps/web/src/design/symbols.ts` |
 | Affiliation colour | APP-6 affiliation colours (friend blue, hostile red, neutral green, unknown yellow) | `index.css` `@theme`, `design/tokens.ts` |
-| Body and data type | IBM Plex Sans and IBM Plex Mono (IBM Carbon's type family, OFL) | `main.tsx` via `@fontsource` |
-| Display type | Barlow Condensed (OFL) | `main.tsx` via `@fontsource` |
+| Body and display type | Archivo variable, width axis 100-125% (OFL) | `main.tsx` via `@fontsource-variable/archivo` |
+| Data type | Martian Mono (OFL) | `main.tsx` via `@fontsource/martian-mono` |
 
 Fonts are self-hosted from npm: no third-party requests, works offline and under test.
 
@@ -23,26 +25,26 @@ the values it needs. Change both together.
 
 | Token | Value | Use |
 |---|---|---|
-| `ink-950` … `ink-600` | `#0a0c0b` … `#2e3730` | Surfaces, darkest (page) to lightest (raised control) |
-| `line` | `#343e37` | Hairlines and panel borders |
-| `text` / `muted` / `faint` | `#ebe7da` / `#a7ab9e` / `#737a6f` | Primary, secondary and tertiary text |
-| `signal` | `#f2a93b` | The only accent: calls to action, planning, focus, idle warnings |
-| `good` | `#6fcf7f` | Positive outcomes: gains, income, health |
-| `hostile` | `#ff5a4e` | Enemies, attacks, losses, errors |
-| `friend` | `#4cc3ff` | You: selection, movement range, planned moves |
+| `ink-950` … `ink-600` | `#070909` … `#2a3134` | Surfaces, darkest (page) to lightest (raised control) |
+| `line` | `#252c2e` | Hairlines and panel borders |
+| `text` / `muted` / `faint` | `#eef1ee` / `#9fa8a6` / `#6a7472` | Primary, secondary and tertiary text |
+| `signal` | `#d2f249` | The only accent, sensor-overlay lime: calls to action, planning, focus, idle warnings |
+| `good` | `#57d3a0` | Positive outcomes: gains, income, health |
+| `hostile` | `#ff4d42` | Enemies, attacks, losses, errors |
+| `friend` | `#49b8ff` | You: selection, movement range, planned moves |
 | `neutral` / `unknown` | `#8fd694` / `#ffe14d` | Nations at peace / unidentified |
 
-Rules: one amber thing per region asks for action. Red always means enemy or loss, blue always
+Rules: one lime thing per region asks for action. Red always means enemy or loss, blue always
 means you. Nation colours identify *who*; they never replace affiliation colour for *friend or foe*.
 
 ### Type
 
 | Role | Face | Class | Use |
 |---|---|---|---|
-| Display | Barlow Condensed 600–800, uppercase, +0.04em | `ds-display` / `font-display` | Wordmark, headings, unit and city names, big numbers, buttons |
-| Label | Barlow Condensed 600, 11px, +0.22em, uppercase, `faint` | `ds-label` | Section labels |
-| UI | IBM Plex Sans 400–600 | default | Body copy, descriptions, tooltips |
-| Data | IBM Plex Mono 400–500, tabular | `font-mono` | Every number that changes |
+| Display | Archivo 700–900 at 112% width (125% for screen titles), uppercase | `ds-display` / `font-display` | Wordmark, headings, unit and city names, big numbers, buttons |
+| Label | Archivo 650 at 108% width, 10px, +0.08em, uppercase, `faint` | `ds-label` | Section labels |
+| UI | Archivo 400–600 | default | Body copy, descriptions, tooltips |
+| Data | Martian Mono 400–500, tabular | `font-mono` | Every number that changes |
 
 Scale (px): 9, 10, 11, 12, 13, 15, 18, 22, 28, 40, 64+. Numerals are tabular everywhere.
 
@@ -50,8 +52,8 @@ Scale (px): 9, 10, 11, 12, 13, 15, 18, 22, 28, 40, 64+. Numerals are tabular eve
 
 - 4px grid. Panels pad 12–16px; dense lists 6–8px.
 - Hard edges: radius 0–2px. Round shapes are reserved for actions (unit orders) and notifications.
-- Surfaces: `ds-panel` gives the background, hairline border, inner top highlight, drop shadow and film
-  grain. Framed panels (`Frame`) add amber corner brackets.
+- Surfaces: `ds-panel` is flat glass: translucent ink, hairline border, blur, a soft drop shadow.
+- Icons: `icons.tsx`, 16 px grid, square caps. Never emoji.
 - Motion: 120ms for hover, 220ms for panels, 380–620ms for screen entry, easing
   `cubic-bezier(0.2, 0.7, 0.2, 1)`. Everything respects `prefers-reduced-motion`.
 - `ds-hazard` warning tape is for blocking states only.

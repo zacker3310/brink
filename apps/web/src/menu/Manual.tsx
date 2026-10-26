@@ -71,7 +71,7 @@ export function Manual({ onBack }: { onBack: () => void }) {
         <Frame className="enter-3 overflow-x-auto p-4 lg:col-span-2">
           <Label>Order of battle</Label>
           <table className="mt-3 w-full min-w-[640px] text-left text-xs">
-            <thead className="font-display text-[10px] tracking-[0.16em] text-faint uppercase">
+            <thead className="font-display text-[10px] tracking-[0.06em] text-faint uppercase">
               <tr>
                 <th className="py-1 font-semibold">Class</th>
                 <th className="font-semibold">Move</th>
@@ -109,7 +109,7 @@ export function Manual({ onBack }: { onBack: () => void }) {
         <Frame className="enter-4 overflow-x-auto p-4">
           <Label>Terrain</Label>
           <table className="mt-3 w-full text-left text-xs">
-            <thead className="font-display text-[10px] tracking-[0.16em] text-faint uppercase">
+            <thead className="font-display text-[10px] tracking-[0.06em] text-faint uppercase">
               <tr>
                 <th className="py-1 font-semibold">Ground</th>
                 <th className="font-semibold">Move</th>

@@ -133,7 +133,7 @@ export function Coach() {
           </button>
         )}
         {!def.done && (
-          <button type="button" onClick={next} className="bg-signal px-3 py-1 font-display text-sm font-bold tracking-wider text-ink-950 uppercase hover:brightness-110" data-testid="coach-next">
+          <button type="button" onClick={next} className="bg-signal px-3 py-1 font-display text-sm font-bold tracking-wide text-ink-950 uppercase hover:brightness-110" data-testid="coach-next">
             {step === STEPS.length - 1 ? 'Dismissed' : 'Got it'}
           </button>
         )}

@@ -10,6 +10,7 @@ import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useReplay } from './replay';
 import { useGame } from './store';
 import { Swatch } from './ui';
+import { Icon } from './icons';
 
 // HTML overlays drawn over the Pixi map: mode banner, hover card, zoom, minimap, legend, toasts.
 
@@ -33,7 +34,7 @@ export function ModeBanner() {
   if (resolving) {
     return (
       <div className="resolving-banner pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2 text-center" role="status">
-        <div className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">Orders locked</div>
+        <div className="font-display text-[10px] font-bold tracking-[0.1em] text-signal uppercase">Orders locked</div>
         <div className="text-sm font-semibold">Resolving turn {view.turn}…</div>
       </div>
     );
@@ -42,7 +43,7 @@ export function ModeBanner() {
   const tone = mode === 'attack' ? 'border-hostile/70 text-hostile' : 'border-signal/60 text-signal';
   return (
     <div className={`pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 border bg-ink-950/85 px-3 py-1.5 text-xs whitespace-nowrap backdrop-blur ${tone}`}>
-      <span className="font-display font-bold tracking-[0.2em] uppercase">{UNITS[f.unitClass].ground ? mode : UNITS[f.unitClass].range ? 'strike' : 'rebase'}</span>
+      <span className="font-display font-bold tracking-[0.06em] uppercase">{UNITS[f.unitClass].ground ? mode : UNITS[f.unitClass].range ? 'strike' : 'rebase'}</span>
       <span className="ml-2 text-muted">{UNITS[f.unitClass].ground ? MODE_HINT[mode] : 'Click a target or one of your cities'} · right-click to deselect</span>
     </div>
   );
@@ -104,7 +105,7 @@ function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
   return (
     <div className="w-72 border-2 border-hostile/70 bg-ink-950/95 text-[11px] shadow-2xl backdrop-blur" data-testid="combat-preview">
       <div className="flex items-center justify-between bg-hostile/20 px-3 py-1.5">
-        <span className="font-display text-[10px] font-black tracking-[0.24em] text-hostile uppercase">{ranged ? 'Strike' : 'Assault'}</span>
+        <span className="font-display text-[10px] font-black tracking-[0.06em] text-hostile uppercase">{ranged ? 'Strike' : 'Assault'}</span>
         <span className="text-[10px] text-muted">{confidence} intel</span>
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 pt-2.5">
@@ -126,7 +127,7 @@ function CombatCard({ fid, target }: { fid: string; target: HexKey }) {
       </div>
       {outcomes.length > 0 && (
         <div className="border-t border-line px-3 py-1.5 text-center">
-          <span className="font-display text-[10px] tracking-[0.16em] text-faint uppercase">Likely result </span>
+          <span className="font-display text-[10px] tracking-[0.06em] text-faint uppercase">Likely result </span>
           {outcomes.map((o, i) => (
             <span key={o} className={`font-display font-black ${OUTCOME_TEXT[o]?.[1]}`}>
               {i > 0 && <span className="font-normal text-faint"> or </span>}
@@ -170,7 +171,7 @@ function ReplayBar() {
     <div className="resolving-banner absolute top-3 left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/92 px-4 pt-2 pb-2.5" role="status" data-testid="replay">
       <div className="flex items-center gap-4">
         <div>
-          <div className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">
+          <div className="font-display text-[10px] font-bold tracking-[0.1em] text-signal uppercase">
             Turn {playback.before.turn} · {playback.rewatch ? 'rewatch' : 'replay'}
           </div>
           <div className="flex gap-3 text-xs font-semibold">
@@ -192,7 +193,7 @@ function ReplayBar() {
             ⟲
           </button>
           <button type="button" onClick={() => useReplay.setState({ paused: !paused })} className={`${btn} w-8 ${paused ? 'border-signal text-signal' : ''}`} title="Pause / play (Space)" aria-pressed={paused} data-testid="replay-pause">
-            {paused ? '▶' : '❚❚'}
+            <Icon name={paused ? 'play' : 'pause'} className="h-3 w-3" />
           </button>
           {[0.5, 1, 2].map((x) => (
             <button key={x} type="button" onClick={() => useReplay.setState({ speed: x })} className={`${btn} font-mono ${speed === x ? 'border-signal text-signal' : ''}`} aria-pressed={speed === x}>
@@ -263,7 +264,7 @@ export function HoverCard() {
       )}
       {threatCount > 0 && (
         <div className="mt-0.5 font-semibold text-hostile" data-testid="hover-threat">
-          ⚠ {threatCount} enemy {threatCount === 1 ? 'unit' : 'units'} could strike here next turn
+          <Icon name="alert" className="mr-1 h-3 w-3 align-[-2px]" />{threatCount} enemy {threatCount === 1 ? 'unit' : 'units'} could strike here next turn
         </div>
       )}
       {(own.length > 0 || others.length > 0) && (
@@ -287,7 +288,7 @@ export function HoverCard() {
       )}
       {action && (
         <div className={`mt-1 border-t border-line/60 pt-1 font-semibold ${action.ok ? (hostiles.length || mode === 'attack' ? 'text-hostile' : 'text-signal') : 'text-faint'}`}>
-          {action.ok ? `▸ ${action.text}` : action.text}
+          {action.text}
         </div>
       )}
     </div>
@@ -318,7 +319,7 @@ export function ZoomControls({ onHelp }: { onHelp?: () => void }) {
         aria-pressed={showThreat}
         data-testid="toggle-threat"
       >
-        ⚠
+        <Icon name="alert" />
       </button>
       {onHelp && (
         <button type="button" className={btn} onClick={onHelp} title="Controls (?)" aria-label="Controls" data-testid="help">

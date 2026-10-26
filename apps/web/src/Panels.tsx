@@ -9,6 +9,7 @@ import { checkResearchView, recruitCostFor } from './rules-view';
 import { describeOrder } from './planning';
 import { useGame } from './store';
 import { Button, costText, Meter, Stat, Swatch } from './ui';
+import { Icon } from './icons';
 
 function Section({ title, children, right }: { title: ReactNode; children: ReactNode; right?: ReactNode }) {
   return (
@@ -46,13 +47,13 @@ export function Overview() {
           ).map(([l, v, tone]) => (
             <div key={l} className="border border-line/70 bg-ink-850 py-1.5">
               <div className={`font-mono text-lg leading-tight font-semibold ${tone}`}>{v}</div>
-              <div className="font-display text-[9px] tracking-[0.14em] text-faint uppercase">{l}</div>
+              <div className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">{l}</div>
             </div>
           ))}
         </div>
         {idle > 0 && (
           <button type="button" onClick={nextIdle} className="mt-2 w-full border border-signal/50 bg-signal/10 py-1.5 text-xs font-semibold text-signal hover:bg-signal/20">
-            Order idle formations ▸
+            Order idle formations <Icon name="next" className="h-3 w-3 align-[-2px]" />
           </button>
         )}
       </Section>
@@ -88,7 +89,7 @@ export function Overview() {
             return (
               <li key={s.id}>
                 <button type="button" className="flex w-full items-center gap-2 border border-line/60 bg-ink-850 px-2 py-1.5 text-left text-xs hover:border-signal/60" onClick={() => focusOn(s.key)}>
-                  <span className="text-signal">◎</span>
+                  <Icon name="objective" className="h-3 w-3 text-signal" />
                   <span className="font-semibold">{s.name}</span>
                   <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted">
                     {owner ? <Swatch color={owner.color} /> : null}
@@ -182,7 +183,7 @@ export function Military() {
                   onClick={() => setSite(s.id)}
                   className={`border px-2 py-1 text-[11px] ${site === s.id ? 'border-signal/70 bg-signal/10 text-signal' : 'border-line text-muted hover:text-text'}`}
                 >
-                  {s.kind === 'capital' ? '★ ' : ''}
+                  {s.kind === 'capital' && <Icon name="capital" className="mr-1 h-2.5 w-2.5 align-[-1px]" />}
                   {s.name}
                 </button>
               ))}
@@ -293,7 +294,7 @@ export function Economy() {
             const short = ledger?.shortages.includes(r);
             return (
               <div key={r} className={`border px-2 py-1.5 ${short ? 'border-hostile/60 bg-hostile/10' : 'border-line/70 bg-ink-850'}`}>
-                <div className="font-display text-[9px] tracking-[0.14em] text-faint uppercase">{r}</div>
+                <div className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">{r}</div>
                 <div className="font-mono text-base leading-tight font-semibold tabular-nums">
                   {view.self.stockpile[r]}
                   {d !== undefined && <span className={`ml-1 text-[10px] ${d >= 0 ? 'text-good' : 'text-hostile'}`}>{d >= 0 ? `+${d}` : d}</span>}
@@ -380,7 +381,7 @@ export function Research() {
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-semibold">{t.name}</span>
-                <span className="font-mono text-[10px] text-faint">{done ? '✓' : `${t.cost} pts`}</span>
+                <span className="font-mono text-[10px] text-faint">{done ? <Icon name="check" className="h-3 w-3 text-good" /> : `${t.cost} pts`}</span>
               </div>
               <p className="text-[11px] text-muted">{t.summary}</p>
               {t.requires.length > 0 && !done && <p className="text-[10px] text-faint">Requires {t.requires.map((r) => TECHS[r]?.name).join(', ')}</p>}
@@ -444,7 +445,7 @@ export function Diplomacy() {
                 <p className="mt-1 text-faint">Eliminated</p>
               ) : (
                 <>
-                  {incoming && <p className="mt-1.5 text-signal">⚑ They propose {incoming.kind}. Propose it back to accept.</p>}
+                  {incoming && <p className="mt-1.5 text-signal"><Icon name="flag" className="mr-1 h-3 w-3 align-[-2px]" />They propose {incoming.kind}. Propose it back to accept.</p>}
                   {outgoing && <p className="mt-1.5 text-faint">Your {outgoing.kind} proposal is pending.</p>}
                   <div className="mt-2 flex flex-wrap gap-1">
                     {rel === 'war' && (

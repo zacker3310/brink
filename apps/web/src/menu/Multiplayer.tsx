@@ -70,7 +70,7 @@ function Choose({ initialCode }: { initialCode?: string }) {
         <Label>Host online</Label>
         <h2 className="mt-1 font-display text-2xl font-bold tracking-wide uppercase">Open a war room</h2>
         <p className="mt-2 flex-1 text-sm text-muted">Get a room code to send your friends. Your browser runs the war; everyone else sees only what their own nation can see. Empty seats go to the AI.</p>
-        <button type="button" disabled={busy} onClick={() => void host()} data-testid="mp-host" className="mt-4 bg-signal px-4 py-3 font-display text-lg font-bold tracking-wider text-ink-950 uppercase hover:brightness-110 disabled:opacity-60">
+        <button type="button" disabled={busy} onClick={() => void host()} data-testid="mp-host" className="mt-4 bg-signal px-4 py-3 font-display text-lg font-bold tracking-wide text-ink-950 uppercase hover:brightness-110 disabled:opacity-60">
           {busy ? 'Opening…' : 'Host a game'}
         </button>
       </Frame>
@@ -83,7 +83,7 @@ function Choose({ initialCode }: { initialCode?: string }) {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5))}
           placeholder="K7QXR"
-          className="mt-3 border border-line bg-ink-850 px-3 py-2 text-center font-mono text-2xl tracking-[0.4em] text-text focus:border-signal focus:outline-none"
+          className="mt-3 border border-line bg-ink-850 px-3 py-2 text-center font-mono text-2xl tracking-[0.1em] text-text focus:border-signal focus:outline-none"
           data-testid="mp-code"
           aria-label="Room code"
         />
@@ -93,7 +93,7 @@ function Choose({ initialCode }: { initialCode?: string }) {
           disabled={busy || code.length !== 5}
           onClick={() => void join(code)}
           data-testid="mp-join"
-          className="mt-4 border border-signal px-4 py-3 font-display text-lg font-bold tracking-wider text-signal uppercase hover:bg-signal/10 disabled:opacity-40"
+          className="mt-4 border border-signal px-4 py-3 font-display text-lg font-bold tracking-wide text-signal uppercase hover:bg-signal/10 disabled:opacity-40"
         >
           {busy ? 'Connecting…' : 'Join game'}
         </button>
@@ -127,7 +127,7 @@ function Choose({ initialCode }: { initialCode?: string }) {
           disabled={seats.length < 2}
           onClick={() => void startHotseat(seats, randomSeed())}
           data-testid="mp-hotseat"
-          className="mt-4 border border-line bg-ink-800 px-4 py-3 font-display text-lg font-bold tracking-wider uppercase hover:border-faint disabled:opacity-40"
+          className="mt-4 border border-line bg-ink-800 px-4 py-3 font-display text-lg font-bold tracking-wide uppercase hover:border-faint disabled:opacity-40"
         >
           Start hotseat · {seats.length} players
         </button>
@@ -163,7 +163,7 @@ function Lobby() {
         <Frame className="enter-1 flex flex-wrap items-center gap-6 p-5">
           <div>
             <Label>Room code</Label>
-            <div className="font-mono text-5xl font-medium tracking-[0.3em] text-signal" data-testid="room-code">
+            <div className="font-mono text-5xl font-medium tracking-[0.1em] text-signal" data-testid="room-code">
               {code}
             </div>
           </div>
@@ -280,7 +280,7 @@ function Lobby() {
               disabled={busy || !mine}
               onClick={() => void start()}
               data-testid="mp-start"
-              className="mt-4 w-full bg-signal px-4 py-3 font-display text-lg font-bold tracking-wider text-ink-950 uppercase hover:brightness-110 disabled:opacity-50"
+              className="mt-4 w-full bg-signal px-4 py-3 font-display text-lg font-bold tracking-wide text-ink-950 uppercase hover:brightness-110 disabled:opacity-50"
             >
               {busy ? 'Deploying…' : resuming ? 'Resume campaign' : 'Start campaign'}
             </button>

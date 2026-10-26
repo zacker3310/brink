@@ -20,7 +20,7 @@ export function Curtain() {
       <div className="screen-in flex flex-col items-center text-center">
         <div className="ds-label">Hotseat · eyes only</div>
         <Emblem color={spec.color} government={spec.government} className="mt-6 h-24 w-24" />
-        <div className="mt-4 font-display text-xl tracking-[0.3em] text-muted uppercase">Pass to</div>
+        <div className="mt-4 font-display text-xl tracking-[0.1em] text-muted uppercase">Pass to</div>
         <div className="font-display text-6xl font-extrabold tracking-wide uppercase" style={{ color: spec.color }}>
           {spec.name}
         </div>
@@ -30,7 +30,7 @@ export function Curtain() {
           disabled={busy}
           onClick={reveal}
           data-testid="reveal"
-          className="mt-8 border-2 px-8 py-3 font-display text-xl font-bold tracking-wider uppercase transition-all hover:brightness-125 disabled:opacity-50"
+          className="mt-8 border-2 px-8 py-3 font-display text-xl font-bold tracking-wide uppercase transition-all hover:brightness-125 disabled:opacity-50"
           style={{ borderColor: spec.color, color: spec.color }}
         >
           {busy ? 'Resolving…' : `I'm ${spec.name.split(' ')[0]}: show my front`}
@@ -48,7 +48,7 @@ export function RoomChip({ onChat }: { onChat: () => void }) {
   if (!role) return null;
   return (
     <div className="flex items-center gap-2">
-      <span className="border border-friend/50 bg-friend/10 px-2 py-1 whitespace-nowrap font-display text-[11px] font-bold tracking-[0.18em] text-friend uppercase" data-testid="room-chip">
+      <span className="border border-friend/50 bg-friend/10 px-2 py-1 whitespace-nowrap font-display text-[11px] font-bold tracking-[0.06em] text-friend uppercase" data-testid="room-chip">
         {role === 'hotseat' ? 'Hotseat' : `Online · ${code}`}
       </span>
       {role !== 'hotseat' && (
@@ -105,8 +105,8 @@ export function SeatBoard() {
                   hand to AI
                 </button>
               )}
-              <span className={`${role === 'host' && !s.connected && !s.ai && !s.host ? '' : 'ml-auto'} font-display text-[10px] font-bold tracking-wider uppercase ${s.ai ? 'text-friend' : !s.connected ? 'text-hostile' : done ? 'text-good' : 'text-signal'}`}>
-                {s.ai ? 'AI holds' : !s.connected ? 'offline' : done ? '✓ locked' : 'planning'}
+              <span className={`${role === 'host' && !s.connected && !s.ai && !s.host ? '' : 'ml-auto'} font-display text-[10px] font-bold tracking-wide uppercase ${s.ai ? 'text-friend' : !s.connected ? 'text-hostile' : done ? 'text-good' : 'text-signal'}`}>
+                {s.ai ? 'AI holds' : !s.connected ? 'offline' : done ? 'locked' : 'planning'}
               </span>
             </li>
           );
@@ -144,7 +144,7 @@ export function TurnClock() {
   const urgent = left <= 10;
   return (
     <div className={`mb-1.5 flex items-center justify-between border px-2 py-1 ${urgent ? 'ds-hazard border-signal text-ink-950' : 'border-line'}`} data-testid="turn-clock">
-      <span className={`font-display text-[10px] font-bold tracking-[0.2em] uppercase ${urgent ? '' : 'text-faint'}`}>{left === 0 ? 'Time up' : 'World moves in'}</span>
+      <span className={`font-display text-[10px] font-bold tracking-[0.06em] uppercase ${urgent ? '' : 'text-faint'}`}>{left === 0 ? 'Time up' : 'World moves in'}</span>
       <span className={`font-mono text-sm font-semibold tabular-nums ${urgent ? '' : 'text-signal'}`}>
         {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}
       </span>

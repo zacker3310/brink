@@ -195,7 +195,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
 function Kpi({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: string; sub?: ReactNode }) {
   return (
     <div className="border border-line/70 bg-ink-850 px-3 py-2">
-      <div className="font-display text-[9px] tracking-[0.16em] text-faint uppercase">{label}</div>
+      <div className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">{label}</div>
       <div className={`font-mono text-xl leading-tight font-semibold tabular-nums ${tone ?? ''}`}>{value}</div>
       {sub && <div className="text-[10px] text-muted">{sub}</div>}
     </div>
@@ -219,7 +219,7 @@ function ReportSection({ title, rows, onShow }: { title: string; rows: Row[]; on
             <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 ${r.tone === 'good' ? 'bg-good' : r.tone === 'bad' ? 'bg-hostile' : 'bg-faint'}`} aria-hidden />
             <span className="flex-1">{r.text}</span>
             {r.at && (
-              <button type="button" className="shrink-0 text-[10px] font-semibold tracking-wider text-faint uppercase hover:text-signal" onClick={() => onShow(r.at!)}>
+              <button type="button" className="shrink-0 text-[10px] font-semibold tracking-wide text-faint uppercase hover:text-signal" onClick={() => onShow(r.at!)}>
                 show
               </button>
             )}
@@ -284,7 +284,7 @@ export function Report() {
       <div className="report-in flex max-h-full w-full max-w-5xl flex-col border border-line bg-ink-950 shadow-2xl">
         <header className="flex items-center gap-4 border-b border-line px-5 py-3" style={{ background: `linear-gradient(90deg, ${view.self.color}22, transparent 60%)` }}>
           <div>
-            <p className="font-display text-[10px] font-bold tracking-[0.3em] text-signal uppercase">
+            <p className="font-display text-[10px] font-bold tracking-[0.1em] text-signal uppercase">
               Situation report · Day {clock.day}, {clock.hour}
             </p>
             <div className="flex items-center gap-2">
@@ -309,7 +309,7 @@ export function Report() {
             type="button"
             onClick={() => setShowReport(false)}
             data-testid="close-report"
-            className="font-display ml-auto border border-signal bg-signal px-4 py-2 text-xs font-black tracking-wider text-ink-950 uppercase hover:brightness-110"
+            className="font-display ml-auto border border-signal bg-signal px-4 py-2 text-xs font-black tracking-wide text-ink-950 uppercase hover:brightness-110"
           >
             Continue planning <span className="ml-1 font-mono text-[10px] font-normal opacity-70">Esc</span>
           </button>

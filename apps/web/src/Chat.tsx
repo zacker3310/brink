@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NATIONS } from '@brink/scenarios';
 import { useNet } from './net/room';
+import { Icon } from './icons';
 
 // Room chat, shared by the lobby and the game. Friends talk trash; the host relays every line.
 
@@ -26,7 +27,7 @@ export function Chat({ className = '', autoFocus = false, onClose }: { className
         <span className="ds-label">Comms</span>
         {onClose && (
           <button type="button" onClick={onClose} className="text-faint hover:text-text" aria-label="Close chat">
-            ✕
+            <Icon name="close" />
           </button>
         )}
       </div>
@@ -37,7 +38,7 @@ export function Chat({ className = '', autoFocus = false, onClose }: { className
           const target = l.to ? NATIONS.find((n) => n.id === l.to) : undefined;
           return (
             <li key={i} className={l.to ? 'border-l-2 border-signal/70 bg-signal/5 pl-1.5' : ''} data-private={l.to ? 'true' : undefined}>
-              {target && <span className="mr-1 text-[10px] font-semibold text-signal uppercase">private → {target.name.split(' ')[0]}</span>}
+              {target && <span className="mr-1 text-[10px] font-semibold text-signal uppercase">private to {target.name.split(' ')[0]}</span>}
               <span className="font-display font-bold tracking-wide uppercase" style={{ color: color ?? 'var(--color-muted)' }}>
                 {l.from}
               </span>{' '}
@@ -65,7 +66,7 @@ export function Chat({ className = '', autoFocus = false, onClose }: { className
             <option value="">All</option>
             {others.map((s) => (
               <option key={s.nation} value={s.nation}>
-                🔒 {NATIONS.find((n) => n.id === s.nation)?.name.split(' ')[0]}
+                {NATIONS.find((n) => n.id === s.nation)?.name.split(' ')[0]}
               </option>
             ))}
           </select>

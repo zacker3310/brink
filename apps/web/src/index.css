@@ -1,36 +1,49 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Surfaces: gunmetal with an olive cast, darkest to lightest. */
-  --color-ink-950: #0a0c0b;
-  --color-ink-900: #101311;
-  --color-ink-850: #141815;
-  --color-ink-800: #1a1f1b;
-  --color-ink-700: #232a24;
-  --color-ink-600: #2e3730;
-  --color-line: #343e37;
-  /* Text on dark: field-manual paper, then two quieter steps. */
-  --color-text: #ebe7da;
-  --color-muted: #a7ab9e;
-  --color-faint: #737a6f;
-  /* Tactical amber: the one accent. Calls to action, planning, focus. */
-  --color-signal: #f2a93b;
+  /* Surfaces: cold instrument black, darkest (page) to lightest (raised control). */
+  --color-ink-950: #070909;
+  --color-ink-900: #0c0f10;
+  --color-ink-850: #111516;
+  --color-ink-800: #171c1d;
+  --color-ink-700: #1f2527;
+  --color-ink-600: #2a3134;
+  --color-line: #252c2e;
+  /* Text: plain white, then two quieter steps. */
+  --color-text: #eef1ee;
+  --color-muted: #9fa8a6;
+  --color-faint: #6a7472;
+  /* Signal: the one accent, a sensor-overlay lime. Actions, planning, focus, anything waiting on you. */
+  --color-signal: #d2f249;
   /* Outcomes. */
-  --color-good: #6fcf7f;
-  --color-hostile: #ff5a4e;
+  --color-good: #57d3a0;
+  --color-hostile: #ff4d42;
   /* APP-6 affiliation colours (friend blue, hostile red, neutral green, unknown yellow). */
-  --color-friend: #4cc3ff;
+  --color-friend: #49b8ff;
   --color-neutral: #8fd694;
   --color-unknown: #ffe14d;
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-display: 'Barlow Condensed', 'IBM Plex Sans Condensed', system-ui, sans-serif;
+  --font-sans: 'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
 }
 
-/* Film grain: a fixed noise texture laid over every panel surface. */
+/* Display type is Archivo set wide: flat, heavy caps, the way modern shooters set their HUDs. Full
+   width for screen titles; a little narrower in the dense game HUD. */
+.font-display,
+.ds-display {
+  font-stretch: 112%;
+}
+.ds-label,
+.city-banner {
+  font-stretch: 108%;
+}
+.title-wordmark,
+.screen-title {
+  font-stretch: 125%;
+}
+
 :root {
-  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  --hazard: repeating-linear-gradient(-45deg, var(--color-signal) 0 8px, #1a1408 8px 16px);
+  --hazard: repeating-linear-gradient(-45deg, var(--color-signal) 0 8px, #12160a 8px 16px);
 }
 
 
@@ -98,6 +111,7 @@ body {
   --accent: var(--color-signal);
 }
 .frame-tick {
+  display: none;
   position: absolute;
   width: 10px;
   height: 10px;
@@ -133,6 +147,7 @@ body {
 }
 
 .scanlines {
+  display: none;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -142,7 +157,7 @@ body {
 
 /* Title */
 .title-screen {
-  background: radial-gradient(ellipse at 70% 40%, #101a28 0%, var(--color-ink-950) 70%);
+  background: var(--color-ink-950);
 }
 .title-map {
   opacity: 0.8;
@@ -161,10 +176,11 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, var(--color-ink-950) 0%, rgb(7 11 18 / 0.88) 30%, rgb(7 11 18 / 0.2) 65%, rgb(7 11 18 / 0.6) 100%),
+    linear-gradient(90deg, var(--color-ink-950) 0%, rgb(7 9 9 / 0.9) 32%, rgb(7 9 9 / 0.15) 65%, rgb(7 9 9 / 0.55) 100%),
     linear-gradient(0deg, var(--color-ink-950) 0%, transparent 30%);
 }
 .title-sweep {
+  display: none;
   position: absolute;
   left: 66%;
   top: 50%;
@@ -182,11 +198,9 @@ body {
   }
 }
 .title-wordmark {
-  background: linear-gradient(180deg, #f3eee2 0%, #c9c2b0 55%, #8f8878 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow: 0 0 60px rgb(224 168 74 / 0.12);
+  color: var(--color-text);
+  font-stretch: 125%;
+  letter-spacing: -0.01em;
 }
 .menu-item::before {
   content: '';
@@ -271,6 +285,7 @@ body {
   animation: enter 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 .begin-btn::after {
+  display: none;
   content: '';
   position: absolute;
   inset: 0;
@@ -299,10 +314,10 @@ body {
   animation: enter 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 .map-stage {
-  background: radial-gradient(ellipse at 50% 45%, #0e1622 0%, #070b12 75%);
+  background: var(--color-ink-950);
 }
 .map-vignette {
-  background: radial-gradient(ellipse at 50% 50%, transparent 60%, rgb(7 11 18 / 0.55) 100%);
+  background: radial-gradient(ellipse at 50% 50%, transparent 70%, rgb(7 9 9 / 0.45) 100%);
 }
 .resolving-banner::after {
   content: '';
@@ -321,6 +336,7 @@ body {
   }
 }
 .end-turn::after {
+  display: none;
   content: '';
   position: absolute;
   inset: 0;
@@ -354,39 +370,27 @@ body {
 
 /* ---------- Brink design system primitives ---------- */
 
-/* A panel: surface, hairline border, inner top highlight and grain. */
+/* A panel: flat instrument glass with a hairline edge. No bevels, no grain. */
 .ds-panel {
   position: relative;
-  background-color: color-mix(in srgb, var(--color-ink-900) 94%, transparent);
+  background-color: color-mix(in srgb, var(--color-ink-900) 90%, transparent);
   border: 1px solid var(--color-line);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.04),
-    0 10px 30px rgb(0 0 0 / 0.45);
-  isolation: isolate;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(10px);
 }
-.ds-panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: var(--grain);
-  opacity: 0.07;
-  mix-blend-mode: overlay;
-  pointer-events: none;
-  z-index: -1;
-}
-/* Display type: condensed, uppercase, slightly tracked. Headlines, numbers that matter, buttons. */
+/* Display type: wide heavy caps. Headlines, numbers that matter, buttons. */
 .ds-display {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
 }
-/* Stencil-style section label. */
+/* Section label: small wide caps, lightly tracked. */
 .ds-label {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 11px;
-  letter-spacing: 0.22em;
+  font-weight: 650;
+  font-size: 10px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-faint);
 }
@@ -403,4 +407,9 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+}
+
+/* The side panel's close button floats over its first section header; keep that header clear. */
+aside[data-testid^='panel-'] section:first-of-type > header {
+  padding-right: 28px;
 }

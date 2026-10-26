@@ -8,6 +8,7 @@ import { ModelPortrait, UnitGlyph } from './glyphs';
 import { recruitCostFor } from './rules-view';
 import { useGame } from './store';
 import { costText } from './ui';
+import { Icon } from './icons';
 
 // Civ-style city banners floating over the map, and the production panel they open.
 
@@ -58,10 +59,10 @@ export function CityBanners() {
               title={mine ? `${s.name}: click to set production` : s.name}
             >
               <span className="flex items-center justify-center px-1.5 font-mono font-black text-ink-950" style={{ background: color }}>
-                {s.kind === 'objective' ? '◎' : Math.max(1, Math.round(s.population / 300))}
+                {s.kind === 'objective' ? <Icon name="objective" className="h-3 w-3" /> : Math.max(1, Math.round(s.population / 300))}
               </span>
               <span className="flex items-center gap-1 border-y border-ink-950/60 bg-ink-950/85 px-2 py-0.5 font-bold tracking-wide whitespace-nowrap text-text uppercase">
-                {capital && <span style={{ color }}>★</span>}
+                {capital && <Icon name="capital" className="h-2.5 w-2.5" />}
                 {s.name}
                 <span className="ml-1 font-mono text-[0.85em] font-semibold text-signal">{s.victoryPoints}</span>
               </span>
@@ -73,7 +74,7 @@ export function CityBanners() {
               )}
               {mine && !building && !pending && (s.kind === 'capital' || s.kind === 'city') && (
                 <span className="font-display flex items-center bg-signal/90 px-1.5 text-[0.85em] font-black text-ink-950" title="Idle: nothing in production">
-                  ⚒
+                  <Icon name="build" className="h-2.5 w-2.5" />
                 </span>
               )}
             </button>
@@ -123,14 +124,14 @@ export function CityPanel() {
           {Math.max(1, Math.round(site.population / 300))}
         </div>
         <div className="flex-1 leading-tight">
-          <div className="font-display text-[10px] font-bold tracking-[0.24em] text-muted uppercase">{site.kind}</div>
+          <div className="font-display text-[10px] font-bold tracking-[0.06em] text-muted uppercase">{site.kind}</div>
           <div className="font-display text-xl font-black tracking-tight">{site.name}</div>
           <div className="text-[11px] text-muted">
             {site.population}k people · <span className="text-signal">{site.victoryPoints} VP</span>
           </div>
         </div>
         <button type="button" onClick={() => openCity(null)} className="self-start text-faint hover:text-text" aria-label="Close" data-testid="close-city">
-          ✕
+          <Icon name="close" />
         </button>
       </header>
 
@@ -155,7 +156,7 @@ export function CityPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {here.length > 0 && (
           <section className="mb-3">
-            <h3 className="font-display mb-1.5 text-[10px] font-bold tracking-[0.2em] text-faint uppercase">In production</h3>
+            <h3 className="font-display mb-1.5 text-[10px] font-bold tracking-[0.06em] text-faint uppercase">In production</h3>
             {here.map((q) => (
               <div key={q.id} className="mb-1.5 border border-line bg-ink-900 p-2">
                 <div className="flex items-center gap-2 text-sm font-semibold">
@@ -173,7 +174,7 @@ export function CityPanel() {
 
         {canRecruit ? (
           <section>
-            <h3 className="font-display mb-1.5 flex justify-between text-[10px] font-bold tracking-[0.2em] text-faint uppercase">
+            <h3 className="font-display mb-1.5 flex justify-between text-[10px] font-bold tracking-[0.06em] text-faint uppercase">
               <span>Choose production</span>
               <span className="font-mono tracking-normal">{capacity} ind/turn</span>
             </h3>
@@ -203,7 +204,7 @@ export function CityPanel() {
                       <div className="text-right font-mono text-xs">
                         <div className={active ? 'text-signal' : ''}>{turnsFor(d.industry, 0, capacity, queue.length + 1)}t</div>
                         <div className="text-[9px] text-faint">
-                          ⚔{d.softAttack} ⛨{d.defense}
+                          atk {d.softAttack} · def {d.defense}
                         </div>
                       </div>
                     </button>
@@ -219,7 +220,7 @@ export function CityPanel() {
 
         {garrison.length > 0 && (
           <section className="mt-3">
-            <h3 className="font-display mb-1.5 text-[10px] font-bold tracking-[0.2em] text-faint uppercase">Garrison</h3>
+            <h3 className="font-display mb-1.5 text-[10px] font-bold tracking-[0.06em] text-faint uppercase">Garrison</h3>
             {garrison.map((f) => (
               <button key={f.id} type="button" onClick={() => selectFormation(f.id)} className="flex w-full items-center gap-2 border border-line/60 px-2 py-1.5 text-left text-xs hover:border-faint">
                 <UnitGlyph unitClass={f.unitClass} color={color} />

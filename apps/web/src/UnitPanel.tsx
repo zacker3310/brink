@@ -4,6 +4,7 @@ import { EVENTS, UNITS } from '@brink/game-data';
 import { movementAllowance, type AssaultPreview, type StrikePreview } from '@brink/simulation';
 import { engine } from './engine';
 import { ModelPortrait, UnitGlyph } from './glyphs';
+import { Icon } from './icons';
 import { describeEffect, hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
 import { useNet } from './net/room';
@@ -128,7 +129,7 @@ export function UnitPanel() {
       {rejected.length > 0 && (
         <ul className="mb-1.5 border border-hostile/50 bg-ink-950/95 px-3 py-1.5 text-[11px] text-hostile" data-testid="rejections">
           {rejected.slice(0, 3).map((e, i) => (
-            <li key={i}>⚠ {e.kind === 'order_rejected' ? `${e.formation ? `${view.formations[e.formation]?.name ?? e.formation}: ` : ''}${e.reason}` : ''}</li>
+            <li key={i} className="flex items-start gap-1.5"><Icon name="alert" className="mt-px h-3 w-3" /> {e.kind === 'order_rejected' ? `${e.formation ? `${view.formations[e.formation]?.name ?? e.formation}: ` : ''}${e.reason}` : ''}</li>
           ))}
         </ul>
       )}
@@ -146,16 +147,16 @@ export function UnitPanel() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-display truncate text-base leading-tight font-black">{f.name}</div>
-            <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color }}>
+            <div className="text-[10px] font-semibold tracking-wide uppercase" style={{ color }}>
               {def.name} · {hexLabel(view, f.key)}
             </div>
             <div className="mt-1.5 flex gap-3 font-mono text-xs">
               <span title="Strength">
-                <span style={{ color: hpColor }}>♥</span> {Math.round(hp)}%
+                <span style={{ color: hpColor }}><Icon name="health" className="h-3 w-3 align-[-2px]" /></span> {Math.round(hp)}%
               </span>
-              <span title="Movement points this turn">➜ {mp || '—'} MP</span>
-              <span title="Soft / hard attack">⚔ {def.softAttack}/{def.hardAttack}</span>
-              <span title="Defense">⛨ {def.defense}</span>
+              <span title="Movement points this turn"><Icon name="move" className="h-3 w-3 align-[-2px] text-faint" /> {mp || '—'} MP</span>
+              <span title="Soft / hard attack"><Icon name="attack" className="h-3 w-3 align-[-2px] text-faint" /> {def.softAttack}/{def.hardAttack}</span>
+              <span title="Defense"><Icon name="defense" className="h-3 w-3 align-[-2px] text-faint" /> {def.defense}</span>
             </div>
             <div className="mt-1 truncate text-[11px]" data-testid="planned-order">
               <span className={order ? 'font-semibold text-friend' : 'text-signal'}>{order ? describeOrder(order, view) : 'Needs orders · Hold (default)'}</span>
@@ -201,7 +202,7 @@ export function UnitPanel() {
           <Action icon="hold" label="Hold position" hotkey="H" testId="order-hold" active={order?.type === 'hold'} disabled={resolving} onClick={() => issueOrder(f.id, { type: 'hold' })} />
           <Action icon="clear" label="Cancel order" hotkey="X" testId="order-clear" disabled={resolving || !order} onClick={() => setOrder(f.id, null)} />
           <button type="button" onClick={() => setDetails(!details)} className="ml-auto text-[10px] text-faint hover:text-text" aria-expanded={details}>
-            {details ? 'less ▴' : 'more ▾'}
+            {details ? 'less' : 'more'} <Icon name={details ? 'up' : 'down'} className="h-2.5 w-2.5" />
           </button>
         </div>
         <div className="border-t border-line/60 px-3 py-1.5 text-[10px] text-faint">
@@ -309,17 +310,18 @@ export function TurnControls() {
       <EventCard />
       {lastTurn && !resolving && (
         <button type="button" onClick={rewatch} data-testid="rewatch" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
-          ⟲ Rewatch turn {lastTurn.before.turn}
+          <Icon name="replay" className="mr-1.5 h-3 w-3 align-[-2px]" />
+          Rewatch turn {lastTurn.before.turn}
         </button>
       )}
       {report && (
         <button type="button" onClick={() => setShowReport(true)} data-testid="open-report" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
-          📜 Turn {report.turn} summary
+          <Icon name="report" className="mr-1.5 h-3 w-3 align-[-2px]" />Turn {report.turn} summary
         </button>
       )}
       {idleCities > 0 && !resolving && (
         <div className="border border-signal/40 bg-ink-950/90 px-2.5 py-1.5 text-[11px] text-signal" title="Click a city banner on the map to choose what it builds">
-          ⚒ {idleCities} {idleCities === 1 ? 'city' : 'cities'} could be building
+          <Icon name="build" className="mr-1.5 h-3 w-3 align-[-2px]" />{idleCities} {idleCities === 1 ? 'city' : 'cities'} could be building
         </div>
       )}
       <button
@@ -330,17 +332,18 @@ export function TurnControls() {
         className={`border px-2.5 py-1.5 text-left text-xs font-semibold disabled:opacity-50 ${idle ? 'border-signal/60 bg-signal/15 text-signal hover:bg-signal/25' : 'border-good/40 bg-ink-950/90 text-good'}`}
         title="Select the next unit that needs orders (N)"
       >
-        {idle ? `▸ ${idle} of ${total} units need orders` : `✓ All ${total} units have orders`}
+        <Icon name={idle ? 'next' : 'check'} className="mr-1.5 h-3 w-3 align-[-2px]" />
+        {idle ? `${idle} of ${total} units need orders` : `All ${total} units have orders`}
       </button>
       <button
         type="button"
         onClick={() => void submit()}
         disabled={resolving || over}
         data-testid="end-turn"
-        className="end-turn relative overflow-hidden rounded-sm border-2 border-signal bg-gradient-to-b from-[#f2c06a] to-[#c98a2c] px-4 py-3 text-ink-950 shadow-[0_0_24px_rgba(224,168,74,0.35)] transition-all hover:brightness-110 disabled:opacity-60"
+        className="end-turn relative overflow-hidden bg-signal px-4 py-3 text-ink-950 transition-all hover:brightness-110 disabled:opacity-60"
       >
-        <div className="font-display text-lg leading-none font-black tracking-wider uppercase">{waitingOthers ? 'Waiting…' : resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
-        <div className="font-display mt-1 text-[10px] font-bold tracking-[0.2em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
+        <div className="font-display text-lg leading-none font-black uppercase">{waitingOthers ? 'Waiting…' : resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
+        <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
       </button>
       <Minimap />
     </div>
