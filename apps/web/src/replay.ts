@@ -2,10 +2,9 @@ import { Graphics, Text, type Application, type Container } from 'pixi.js';
 import { create } from 'zustand';
 import type { HexKey, UnitClass } from '@brink/contracts';
 import type { Point } from '@brink/map';
-import { affiliationOf, counterSprite, drawCounterChrome, type CounterLook } from './counters';
+import { addUnit, affiliationOf, slotOffsets, type CounterLook, type UnitModel } from './counters';
 import type { Affiliation } from './design/symbols';
 import { AFFILIATION, FONT_DISPLAY } from './design/tokens';
-import type { Sprite } from 'pixi.js';
 import type { Playback } from './store';
 
 // Replays a resolved turn on the map: everything moves at once, then strikes and battles, then
@@ -46,8 +45,9 @@ interface Actor {
   destroyed: boolean;
   /** Not on the board before the turn: fades in as it is first seen. */
   appears: boolean;
-  /** Stack slot at its resting hex, for small offsets. */
+  /** Formation slot at its resting hex, and how many share it. */
   slot: number;
+  slots: number;
 }
 
 interface Battle {
@@ -102,6 +102,7 @@ export function buildTimeline(pb: Playback): Timeline {
       destroyed: false,
       appears: false,
       slot: 0,
+      slots: 1,
     });
   }
   for (const c of Object.values(before.contacts)) {
@@ -121,6 +122,7 @@ export function buildTimeline(pb: Playback): Timeline {
       destroyed: false,
       appears: false,
       slot: 0,
+      slots: 1,
     });
   }
 
@@ -167,6 +169,7 @@ export function buildTimeline(pb: Playback): Timeline {
             destroyed: false,
             appears: true,
             slot: 0,
+            slots: 1,
           });
         }
         break;
@@ -222,6 +225,7 @@ export function buildTimeline(pb: Playback): Timeline {
     a.slot = rest.get(k) ?? 0;
     rest.set(k, a.slot + 1);
   }
+  for (const a of actors.values()) a.slots = rest.get(a.retreat?.[1] ?? a.route.at(-1)!) ?? 1;
 
   const hasCombat = battles.length > 0 || strikes.length > 0;
   const moveDur = hasMove ? 1300 : 0;
@@ -265,11 +269,10 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
   const fx = new Graphics();
   layer.addChild(fx, units);
   const look = (a: Actor): CounterLook => ({ cls: a.cls, aff: a.aff, fill: a.fill, confirmed: a.confirmed, strength: a.s0 });
-  const sprites = new Map<string, Sprite>();
+  const sprites = new Map<string, UnitModel>();
   for (const a of tl.actors) {
-    const s = counterSprite(look(a));
+    const s = addUnit(layer, 0, 0, look(a));
     s.alpha = 0;
-    layer.addChild(s);
     sprites.set(a.id, s);
   }
   const labels: { text: Text; at: Point; start: number }[] = [];
@@ -329,12 +332,20 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
         continue;
       }
       const strength = a.s0 + (a.s1 - a.s0) * pc;
-      const off = a.slot * 4;
-      const x = pos.x - 3 + off;
-      const y = pos.y - 2 - off;
+      const slot = slotOffsets(Math.max(1, a.slots))[Math.min(a.slot, Math.max(0, a.slots - 1))]!;
+      const x = pos.x + slot.x;
+      const y = pos.y + slot.y;
+      // Vehicles turn to the way they are driving.
+      const dx = x - sprite.x;
+      const dy = y - sprite.y;
+      if (dx * dx + dy * dy > 0.04) sprite.setFacing(Math.atan2(dy, dx));
       sprite.position.set(x, y);
+      if (sprite.scale.x !== slot.scale) {
+        sprite.scale.set(slot.scale);
+        sprite.applyZoom();
+      }
       sprite.alpha = (a.confirmed ? 1 : 0.55) * fade;
-      drawCounterChrome(units, x, y, { ...look(a), strength }, fade);
+      sprite.setStrength(strength);
       if (a.destroyed && pa > 0 && pa < 1) {
         fx.circle(pos.x, pos.y, size * (0.3 + pa)).stroke({ width: 3, color: 0xf2a65a, alpha: 1 - pa });
         fx.circle(pos.x, pos.y, size * 0.5 * pa).fill({ color: 0xffd28a, alpha: 0.5 * (1 - pa) });

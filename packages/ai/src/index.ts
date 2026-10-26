@@ -27,7 +27,7 @@ import { enterCost, movementAllowance, previewAssault, recruitCost, roll, sorted
 
 export function emptyMemory(): AiMemory {
   return {
-    enemySightings: { infantry: 0, mechanized: 0, armor: 0, artillery: 0, recon: 0, air: 0 },
+    enemySightings: { infantry: 0, mechanized: 0, armor: 0, artillery: 0, recon: 0, air: 0, drone: 0 },
     pressure: {},
     aggressors: {},
   };
@@ -168,7 +168,8 @@ function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[]): U
     armor: hard > soft ? 25 : 15,
     artillery: soft >= hard ? 18 : 10,
     recon: 7,
-    air: hard > soft ? 15 : 8,
+    air: hard > soft ? 12 : 7,
+    drone: hard > soft ? 12 : 8,
   };
   const total = [...have.values()].reduce((a, v) => a + v, 0) + 1;
   let best: UnitClass = 'infantry';
@@ -409,7 +410,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number): Na
         keyDistance(f.key, key) >= 1 &&
         keyDistance(f.key, key) <= UNITS[f.unitClass].range,
     );
-    const bar = 520 - (support.some((f) => f.unitClass === 'artillery') ? 40 : 0) - (support.some((f) => f.unitClass === 'air') ? 50 : 0);
+    const bar = 520 - (support.some((f) => f.unitClass === 'artillery') ? 40 : 0) - (support.some((f) => !UNITS[f.unitClass].ground) ? 50 : 0);
     if (Math.floor((preview.share[0] + preview.share[1]) / 2) < bar) continue;
     for (const { f, path } of group) {
       orders[f.id] = { type: 'attack', target: key, path };

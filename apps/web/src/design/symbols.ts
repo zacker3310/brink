@@ -13,7 +13,8 @@ const FUNCTION: Record<UnitClass, string> = {
   armor: 'UCA---',
   artillery: 'UCF---',
   recon: 'UCR---',
-  air: 'UCV---',
+  air: 'UCVRA-',
+  drone: 'UCVU--',
 };
 
 const AFF: Record<Affiliation, string> = { friend: 'F', hostile: 'H', neutral: 'N', unknown: 'U' };

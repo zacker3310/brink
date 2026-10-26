@@ -7,7 +7,7 @@
 
 import type { GovernmentId, Resource, Stockpile, TechId, Terrain, UnitClass, WorldEventId } from '@brink/contracts';
 
-export const RULESET_VERSION = '1.3.0';
+export const RULESET_VERSION = '1.4.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -170,8 +170,8 @@ export const UNITS: Record<UnitClass, UnitDef> = {
     supplyDemand: 3,
   },
   air: {
-    name: 'Air Support',
-    short: 'AIR',
+    name: 'Attack Helicopters',
+    short: 'HEL',
     movement: 0,
     softAttack: 50,
     hardAttack: 50,
@@ -187,6 +187,26 @@ export const UNITS: Record<UnitClass, UnitDef> = {
     industry: 90,
     upkeep: stock(5, 4, 0, 0),
     supplyDemand: 8,
+  },
+  /** FPV and loitering-munition teams: cheap, fragile, see far, kill armor. Fly from sites like air. */
+  drone: {
+    name: 'Drone Company',
+    short: 'UAV',
+    movement: 0,
+    softAttack: 25,
+    hardAttack: 45,
+    defense: 10,
+    hardness: 0,
+    range: 3,
+    vision: 5,
+    motorized: true,
+    ground: false,
+    fuelPerMove: 0,
+    ammoPerAttack: 25,
+    cost: stock(50, 10, 25, 0),
+    industry: 35,
+    upkeep: stock(2, 2, 0, 0),
+    supplyDemand: 4,
   },
 };
 
@@ -284,7 +304,7 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   precision_munitions: {
     name: 'Precision Munitions',
-    summary: '+20% artillery and air strikes.',
+    summary: '+20% artillery, helicopter and drone strikes.',
     cost: 200,
     requires: ['signals_intelligence'],
     modifiers: { ranged: 20 },

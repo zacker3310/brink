@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RULES } from '@brink/game-data';
+import { RULES, UNITS } from '@brink/game-data';
 import type { Formation, FormationOrder, GameEvent } from '@brink/contracts';
 import { hexKey } from '@brink/map';
 import { attackerPower, defenderPower, type AssaultContext } from './combat';
@@ -122,6 +122,22 @@ describe('assaults through the turn resolver', () => {
     if (strike?.kind !== 'strike') throw new Error('no strike');
     expect(strike.victims.map((v) => v.formation)).toEqual(['b1']);
     expect(strike.victims[0]!.strengthLoss).toBeGreaterThan(0);
+  });
+
+  it('drones strike from range, hunt armor hardest, and cannot reach past their range', () => {
+    const loss = (victim: Formation['unitClass'], at: number) => {
+      const w = makeWorld(10, 6);
+      unit(w, 'dr', 'a', 'drone', k(0, 2));
+      unit(w, 'b1', 'b', victim, k(at, 2));
+      const r = resolveTurn(w, [orders(w, 'a', { dr: { type: 'attack', target: k(at, 2), path: [] } })]);
+      const strike = r.events.find((e) => e.kind === 'strike');
+      return strike?.kind === 'strike' ? strike.victims[0]!.strengthLoss : 0;
+    };
+    expect(loss('armor', UNITS.drone.range)).toBeGreaterThan(0);
+    expect(loss('armor', UNITS.drone.range)).toBeGreaterThan(loss('infantry', UNITS.drone.range));
+    expect(loss('armor', UNITS.drone.range + 1)).toBe(0);
+    expect(UNITS.drone.ground).toBe(false);
+    expect(UNITS.drone.vision).toBeGreaterThan(UNITS.recon.vision);
   });
 
   it('bombardment wrecks fieldworks: a shelled formation loses entrenchment', () => {

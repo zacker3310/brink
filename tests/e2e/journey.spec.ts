@@ -51,7 +51,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(armored).toContainText('Defend');
 
   // Jump to the next formation without orders.
-  await expect(page.getByTestId('next-idle')).toContainText('7 of 9 units need orders');
+  await expect(page.getByTestId('next-idle')).toContainText('8 of 10 units need orders');
   await page.getByTestId('next-idle').click();
   await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
 

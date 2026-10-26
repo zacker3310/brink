@@ -56,6 +56,17 @@ Scale (px): 9, 10, 11, 12, 13, 15, 18, 22, 28, 40, 64+. Numerals are tabular eve
   `cubic-bezier(0.2, 0.7, 0.2, 1)`. Everything respects `prefers-reduced-motion`.
 - `ds-hazard` warning tape is for blocking states only.
 
+## Units and ground
+
+The map is an ISR picture: satellite-style ground (`design/terrain.ts`, seamless world-space
+textures per terrain) under top-down models of every formation (`design/models.ts`): tanks with
+turret and gun, an IFV with dismounts, a rifle section in a wedge, a self-propelled gun, a wheeled
+recon vehicle, an attack helicopter whose rotor turns over its ground shadow, and a drone team
+circling its hex. Vehicles wear their nation's camouflage (woodland, Eastern green, desert, urban
+grey) and carry the nation colour only as recognition markings. Units in one hex deploy in
+formation; aircraft fly over the ground units. The APP-6 chip and health bar ride above each
+model at a constant size on screen, so far out you read symbols and up close you see vehicles.
+
 ## Symbology
 
 Every formation is drawn as an APP-6 unit symbol (`design/symbols.ts`).

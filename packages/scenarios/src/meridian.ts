@@ -95,6 +95,7 @@ const STARTING_FORCES: readonly [UnitClass, 'capital' | 'city0' | 'city1' | 'dep
   ['infantry', 'capital'],
   ['armor', 'capital'],
   ['air', 'capital'],
+  ['drone', 'city0'],
   ['infantry', 'city0'],
   ['mechanized', 'city0'],
   ['infantry', 'city1'],
@@ -266,6 +267,6 @@ export function createMeridianScenario(seed: number): WorldState {
 }
 
 function unitClassName(c: UnitClass): string {
-  return { infantry: 'Infantry', mechanized: 'Mechanized', armor: 'Armored', artillery: 'Artillery', recon: 'Recon', air: 'Air Wing' }[c];
+  return { infantry: 'Infantry', mechanized: 'Mechanized', armor: 'Armored', artillery: 'Artillery', recon: 'Recon', air: 'Aviation', drone: 'Drone Company' }[c];
 }
 

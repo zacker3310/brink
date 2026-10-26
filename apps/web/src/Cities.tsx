@@ -4,7 +4,7 @@ import { UNITS } from '@brink/game-data';
 import { hexToPixel, parseKey } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
 import { useKeys } from './chrome';
-import { UnitGlyph } from './glyphs';
+import { ModelPortrait, UnitGlyph } from './glyphs';
 import { recruitCostFor } from './rules-view';
 import { useGame } from './store';
 import { costText } from './ui';
@@ -194,7 +194,7 @@ export function CityPanel() {
                       }`}
                     >
                       <div className="flex h-9 w-11 items-center justify-center border border-line" style={{ background: `${color}22` }}>
-                        <UnitGlyph unitClass={c} color={color} className="h-4 w-6" />
+                        <ModelPortrait unitClass={c} color={color} className="h-9 w-9 -rotate-90" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-bold">{d.name}</div>

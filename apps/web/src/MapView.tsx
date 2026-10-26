@@ -1,26 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { Application, Container, Graphics, Text } from 'pixi.js';
-import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
+import { Application, Container, Graphics, Matrix, Text } from 'pixi.js';
+import type { Formation, FormationOrder, HexKey, NationView, UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
-import { addCounter, affiliationOf, counterExtent, type CounterLook } from './counters';
-import { AFFILIATION, FONT_DATA, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
+import { addUnit, affiliationOf, keepScreenSize, setModelZoom, slotOffsets, tickModels, type CounterLook } from './counters';
+import { AFFILIATION, FONT_UI, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
+import { terrainTexture } from './design/terrain';
 import { threatZones } from '@brink/simulation';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useGame } from './store';
 
 const SIZE = HEX_SIZE;
 
-const TERRAIN_COLOR: Record<Terrain, number> = {
-  plains: 0x6b7a4f,
-  forest: 0x3f5a3a,
-  hills: 0x857356,
-  mountains: 0x77736e,
-  urban: 0x5d6068,
-  water: 0x1b3a55,
-};
 
 const MOVE = AFFILIATION.friend;
 const ATTACK = AFFILIATION.hostile;
@@ -29,6 +22,12 @@ const hex = (n: string) => Number.parseInt(n.replace('#', ''), 16);
 
 function center(key: HexKey) {
   return hexToPixel(parseKey(key), SIZE);
+}
+
+/** Middle of the known map, where units face when they have nowhere to go. */
+function mapMiddle(v: NationView): Point {
+  const pts = Object.keys(v.tiles).map(center);
+  return { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length };
 }
 
 function poly(key: HexKey, shrink = 0): number[] {
@@ -49,50 +48,6 @@ function jitter(key: HexKey, i: number): number {
   let h = 2166136261;
   for (const ch of `${key}:${i}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return ((h >>> 0) % 1000) / 1000 - 0.5;
-}
-
-function drawTerrainArt(g: Graphics, key: HexKey, t: Terrain) {
-  const c = center(key);
-  if (t === 'forest') {
-    for (let i = 0; i < 6; i++) {
-      const x = c.x + jitter(key, i) * SIZE * 1.1;
-      const y = c.y + jitter(key, i + 10) * SIZE * 0.9 + 4;
-      g.poly([x - 5, y + 4, x, y - 8, x + 5, y + 4]).fill({ color: 0x24402a });
-      g.poly([x - 4, y, x, y - 10, x + 4, y]).fill({ color: 0x2f5536 });
-    }
-  } else if (t === 'hills') {
-    for (const [dx, dy, r] of [
-      [-8, 5, 10],
-      [7, 1, 12],
-    ] as const) {
-      g.ellipse(c.x + dx, c.y + dy, r, r * 0.55).fill({ color: 0x9a8665 });
-      g.ellipse(c.x + dx + 2, c.y + dy + 2, r * 0.8, r * 0.35).fill({ color: 0x6f5f45, alpha: 0.6 });
-    }
-  } else if (t === 'mountains') {
-    for (const [dx, h, w] of [
-      [-9, 17, 11],
-      [6, 22, 13],
-    ] as const) {
-      const bx = c.x + dx;
-      const by = c.y + 9;
-      g.poly([bx - w, by, bx, by - h, bx + w, by]).fill({ color: 0x9c958c });
-      g.poly([bx, by - h, bx + w, by, bx + 2, by]).fill({ color: 0x6f6a63 });
-      g.poly([bx - w * 0.32, by - h * 0.68, bx, by - h, bx + w * 0.32, by - h * 0.68]).fill({ color: 0xf2f0ea });
-    }
-  } else if (t === 'urban') {
-    for (let i = 0; i < 6; i++) {
-      const x = c.x + ((i % 3) - 1) * 9 + jitter(key, i) * 3;
-      const y = c.y + (Math.floor(i / 3) - 0.5) * 11 + 3;
-      const h = 6 + (jitter(key, i + 5) + 0.5) * 7;
-      g.rect(x - 3.5, y - h, 7, h).fill({ color: 0x8b8f99 }).stroke({ width: 0.8, color: 0x3d4048 });
-    }
-  } else if (t === 'plains') {
-    for (let i = 0; i < 4; i++) {
-      const x = c.x + jitter(key, i) * SIZE;
-      const y = c.y + jitter(key, i + 7) * SIZE * 0.8;
-      g.moveTo(x - 2, y).lineTo(x, y - 4).lineTo(x + 2, y).stroke({ width: 1, color: 0x8a9a63, alpha: 0.7 });
-    }
-  }
 }
 
 function drawPath(g: Graphics, from: HexKey, order: FormationOrder, color: number, alpha: number, dashed = false) {
@@ -156,7 +111,12 @@ export function contextualOrder(view: NationView, f: Formation, key: HexKey, mod
 
 declare global {
   interface Window {
-    __brink?: { hexToClient(key: HexKey): { x: number; y: number }; reachable(): HexKey[]; enemies(): HexKey[] };
+    __brink?: {
+      hexToClient(key: HexKey): { x: number; y: number };
+      reachable(): HexKey[];
+      enemies(): HexKey[];
+      formations(): { id: string; cls: UnitClass; key: HexKey }[];
+    };
   }
 }
 
@@ -211,6 +171,8 @@ export function MapView() {
         world.addChild(layers[name]);
       }
       appRef.current = { app, world, layers };
+      // Rotors turn and drone teams circle whether or not anything else changes.
+      app.ticker.add(() => tickModels(performance.now()));
       wireInput(app, world);
       redraw();
       redrawHover();
@@ -269,6 +231,7 @@ export function MapView() {
     const a = appRef.current;
     if (!a) return;
     useCamera.setState({ camera: { x: a.world.x, y: a.world.y, scale: a.world.scale.x, width: a.app.screen.width, height: a.app.screen.height } });
+    setModelZoom(a.world.scale.x);
   }
 
   function zoomAt(px: number, py: number, factor: number) {
@@ -277,7 +240,7 @@ export function MapView() {
     const w = a.world;
     const bx = (px - w.x) / w.scale.x;
     const by = (py - w.y) / w.scale.y;
-    const s = Math.min(3, Math.max(0.4, w.scale.x * factor));
+    const s = Math.min(4.5, Math.max(0.4, w.scale.x * factor));
     w.scale.set(s);
     w.position.set(px - bx * s, py - by * s);
     publish();
@@ -361,6 +324,10 @@ export function MapView() {
       reachable() {
         const r = currentReach();
         return r ? Object.keys(r.reach).filter((k) => k !== r.f.key).sort() : [];
+      },
+      formations() {
+        const v = useGame.getState().view;
+        return v ? Object.values(v.formations).map((f) => ({ id: f.id, cls: f.unitClass, key: f.key })) : [];
       },
       enemies() {
         const v = useGame.getState().view;
@@ -474,27 +441,31 @@ export function MapView() {
     }
     const keys = Object.keys(v.tiles).sort();
 
-    // Terrain and rivers.
+    // Terrain: satellite-style ground mapped in world space, so the landscape runs on across hexes.
     const terrain = new Graphics();
-    const art = new Graphics();
+    const grid = new Graphics();
+    const groundMatrix = new Matrix().scale(0.5, 0.5);
     for (const key of keys) {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown' || !t.terrain) {
-        terrain.poly(poly(key, 1)).fill({ color: 0x111a27 }).stroke({ width: 1, color: 0x223047, alpha: 0.9 });
+        terrain.poly(poly(key)).fill({ color: 0x0e1110 });
+        grid.poly(poly(key)).stroke({ width: 0.8, color: 0x2a302d, alpha: 0.7 });
         continue;
       }
-      terrain.poly(poly(key)).fill({ color: TERRAIN_COLOR[t.terrain] }).stroke({ width: 1, color: 0x0a0f18, alpha: 0.35 });
-      // Light from the north-west: a soft highlight on the upper half of each hex.
-      terrain.poly(poly(key, 6)).fill({ color: 0xffffff, alpha: 0.035 });
+      terrain.poly(poly(key)).fill({ texture: terrainTexture(t.terrain), textureSpace: 'global', matrix: groundMatrix });
+      // Hex-to-hex variation in light, as imagery tiles taken at different hours.
+      const shade = jitter(key, 3);
+      terrain.poly(poly(key)).fill({ color: shade > 0 ? 0xffffff : 0x000000, alpha: Math.abs(shade) * 0.07 });
       if (t.terrain === 'water') {
         for (const n of neighborKeys(key)) {
           const u = v.tiles[n];
           if (u?.terrain && u.terrain !== 'water') {
-            const [p, q] = edge(key, n, 2);
-            terrain.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 4, color: 0x5c8fb3, alpha: 0.6 });
+            const [p, q] = edge(key, n, 1);
+            terrain.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 3, color: 0x8a8a6a, alpha: 0.45 });
           }
         }
-      } else drawTerrainArt(art, key, t.terrain);
+      }
+      grid.poly(poly(key)).stroke({ width: 0.7, color: 0x000000, alpha: 0.22 });
     }
     const water = new Graphics();
     for (const key of keys) {
@@ -508,12 +479,13 @@ export function MapView() {
         if (t.river && u.river) {
           const mx = (c.x + d.x) / 2 + jitter(key + n, 1) * 8;
           const my = (c.y + d.y) / 2 + jitter(key + n, 2) * 8;
-          water.moveTo(c.x, c.y).quadraticCurveTo(mx, my, d.x, d.y).stroke({ width: 7, color: 0x2c5c85, cap: 'round' });
-          water.moveTo(c.x, c.y).quadraticCurveTo(mx, my, d.x, d.y).stroke({ width: 3.5, color: 0x6aa6d3, cap: 'round' });
+          water.moveTo(c.x, c.y).quadraticCurveTo(mx, my, d.x, d.y).stroke({ width: 7, color: 0x3f4a2c, alpha: 0.8, cap: 'round' });
+          water.moveTo(c.x, c.y).quadraticCurveTo(mx, my, d.x, d.y).stroke({ width: 4, color: 0x29495a, cap: 'round' });
+          water.moveTo(c.x, c.y).quadraticCurveTo(mx, my, d.x, d.y).stroke({ width: 1.2, color: 0x6f95a6, alpha: 0.5, cap: 'round' });
         }
       }
     }
-    a.layers.terrain!.addChild(terrain, water, art);
+    a.layers.terrain!.addChild(terrain, water, grid);
 
     // Ownership: tint and Civ-style thick borders, fog on stale ground.
     const overlay = new Graphics();
@@ -522,14 +494,15 @@ export function MapView() {
       if (t.visibility === 'unknown') continue;
       if (t.owner) {
         const color = hex(v.nations[t.owner]?.color ?? '#888888');
-        overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.2 : 0.12 });
+        overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.1 : 0.06 });
         for (const n of neighborKeys(key)) {
           if (v.tiles[n]?.owner === t.owner) continue;
           const [p, q] = edge(key, n, 2.5);
-          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 4, color, alpha: 0.95, cap: 'round' });
+          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 5, color: 0x000000, alpha: 0.35, cap: 'round' });
+          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.5, color, alpha: 0.95, cap: 'round' });
         }
       }
-      if (t.visibility === 'observed') overlay.poly(poly(key)).fill({ color: 0x05080e, alpha: 0.45 });
+      if (t.visibility === 'observed') overlay.poly(poly(key)).fill({ color: 0x0a0c0b, alpha: 0.5 });
     }
     a.layers.overlay!.addChild(overlay);
 
@@ -558,15 +531,22 @@ export function MapView() {
         sites.circle(c.x, c.y, SIZE * 0.62).stroke({ width: 2.5, color: 0xe0b44a, alpha: 0.9 });
         sites.poly([c.x, c.y - 9, c.x + 9, c.y, c.x, c.y + 9, c.x - 9, c.y]).fill({ color: 0x0a0f18 }).stroke({ width: 2.5, color: 0xe0b44a });
       } else if (site.kind === 'depot') {
-        sites.poly([c.x - 8, c.y + 7, c.x, c.y - 8, c.x + 8, c.y + 7]).fill({ color: 0x0a0f18, alpha: 0.85 }).stroke({ width: 2, color });
+        // A supply dump at the edge of the hex: fenced compound, out from under the units.
+        const dx = c.x - SIZE * 0.5;
+        const dy = c.y + SIZE * 0.42;
+        sites.rect(dx - 5, dy - 4, 10, 8).fill({ color: 0x2c2f2a, alpha: 0.9 }).stroke({ width: 1.2, color });
+        sites.rect(dx - 3.2, dy - 2.4, 2.6, 1.8).fill({ color: 0x77705a });
+        sites.rect(dx + 0.6, dy - 2.4, 2.6, 1.8).fill({ color: 0x77705a });
+        sites.rect(dx - 3.2, dy + 0.6, 2.6, 1.8).fill({ color: 0x5c6650 });
         const label = new Text({
           text: site.name,
           resolution: 3,
           style: { fontFamily: FONT_UI, fontSize: 8, fill: TEXT, fontWeight: '600', stroke: { color: 0x070b12, width: 3, join: 'round' } },
         });
         label.anchor.set(0.5, 0);
-        label.position.set(c.x, c.y + SIZE * 0.55);
+        label.position.set(c.x, c.y + SIZE * 0.62);
         label.alpha = 0.8;
+        keepScreenSize(label);
         a.layers.sites!.addChild(label);
       } else {
         sites.poly(poly(site.key, 3)).stroke({ width: 2, color, alpha: 0.85 });
@@ -610,8 +590,7 @@ export function MapView() {
 
     // Planned orders: path, arrowhead and a ghost of the unit where it will end up.
     const paths = new Graphics();
-    const ghosts: { key: HexKey; cls: UnitClass; strength: number }[] = [];
-    const labels: Text[] = [];
+    const ghosts: { key: HexKey; cls: UnitClass; strength: number; facing: number }[] = [];
     const orders = s.submitted ?? s.draft;
     if (orders && !replaying) {
       for (const id of Object.keys(orders.formations).sort()) {
@@ -620,7 +599,13 @@ export function MapView() {
         if (!f) continue;
         const selected = id === s.selectedFormation;
         drawPath(paths, f.key, o, s.submitted ? 0xf4f1e8 : o.type === 'attack' ? ATTACK : MOVE, selected ? 1 : 0.7);
-        if ('path' in o && o.path.length > 0) ghosts.push({ key: o.path.at(-1)!, cls: f.unitClass, strength: f.strength });
+        if ('path' in o && o.path.length > 0) {
+          const end = o.path.at(-1)!;
+          const prev = o.path.length > 1 ? o.path.at(-2)! : f.key;
+          const p = center(prev);
+          const q = center(end);
+          ghosts.push({ key: end, cls: f.unitClass, strength: f.strength, facing: Math.atan2(q.y - p.y, q.x - p.x) });
+        }
         if (o.type === 'defend') {
           const c = center(f.key);
           paths.roundRect(c.x - 15, c.y + 12, 30, 6, 2).fill({ color: 0x0a0f18, alpha: 0.8 }).stroke({ width: 1.5, color: 0xe0b44a });
@@ -629,65 +614,66 @@ export function MapView() {
     }
     a.layers.paths!.addChild(paths);
 
-    // Formations: APP-6 counters, own first then contacts, stacked per hex.
-    type Marker = CounterLook & { ordered: boolean };
+    // Formations: top-down models deployed in formation within each hex, own first then contacts.
+    type Marker = CounterLook & { key: HexKey };
     const byHex = new Map<HexKey, Marker[]>();
     const planned = (s.submitted ?? s.draft)?.formations ?? {};
+    const mid = mapMiddle(v);
+    const toward = (from: HexKey, to: Point) => {
+      const p = center(from);
+      return Math.atan2(to.y - p.y, to.x - p.x);
+    };
     for (const f of Object.values(v.formations).sort((x, y) => (x.id < y.id ? -1 : 1))) {
+      const o = planned[f.id];
+      const next = o && 'path' in o && o.path.length ? o.path[0]! : o?.type === 'attack' ? o.target : null;
       byHex.set(f.key, [
         ...(byHex.get(f.key) ?? []),
-        { cls: f.unitClass, aff: 'friend', fill: v.self.color, confirmed: true, strength: f.strength, selected: f.id === s.selectedFormation, ordered: !!planned[f.id] },
+        {
+          key: f.key,
+          cls: f.unitClass,
+          aff: 'friend',
+          fill: v.self.color,
+          confirmed: true,
+          strength: f.strength,
+          selected: f.id === s.selectedFormation,
+          idle: !o && !s.submitted,
+          facing: toward(f.key, next ? center(next) : mid),
+        },
       ]);
     }
     for (const c of Object.values(v.contacts).sort((x, y) => (x.formation < y.formation ? -1 : 1))) {
       byHex.set(c.key, [
         ...(byHex.get(c.key) ?? []),
         {
+          key: c.key,
           cls: c.unitClass,
           aff: affiliationOf(false, v.relations[c.owner]),
           fill: v.nations[c.owner]?.color ?? '#888888',
           confirmed: c.confirmed,
           strength: c.estimatedStrength,
-          selected: false,
-          ordered: false,
+          facing: toward(c.key, mid),
         },
       ]);
     }
-    const units = new Graphics();
-    const top = new Graphics();
     const sprites = a.layers.units!;
-    sprites.addChild(units);
     if (!replaying) {
       for (const gh of ghosts) {
         const c = center(gh.key);
-        addCounter(sprites, units, c.x, c.y - 2, { cls: gh.cls, aff: 'friend', fill: v.self.color, confirmed: true, strength: gh.strength, planned: true });
+        addUnit(sprites, c.x, c.y, { cls: gh.cls, aff: 'friend', fill: v.self.color, confirmed: true, strength: gh.strength, planned: true, facing: gh.facing });
       }
     } else byHex.clear();
-    for (const [key, list] of byHex) {
+    // Draw back to front so lower models overlap the ones behind them.
+    for (const [key, list] of [...byHex].sort((x, y) => center(x[0]).y - center(y[0]).y)) {
       const c = center(key);
-      const order = [...list].sort((m, n) => Number(m.selected) - Number(n.selected));
+      const slots = slotOffsets(list.length);
+      // Aircraft fly over the ground units sharing their hex.
+      const air = (m: Marker) => (UNITS[m.cls].ground ? 0 : 1);
+      const order = [...list].sort((m, n) => air(m) - air(n) || Number(m.selected) - Number(n.selected));
       order.forEach((m, i) => {
-        const x = c.x - 3 + i * 4;
-        const y = c.y - 2 - i * 4;
-        addCounter(sprites, units, x, y, m);
-        if (m.aff === 'friend' && m.fill === v.self.color && !m.ordered && !s.submitted) {
-          const e = counterExtent(m);
-          top.circle(x + e.half - 2, y - e.up + 6, 3.6).fill({ color: SIGNAL }).stroke({ width: 1.2, color: SURFACE.ink950 });
-        }
+        const at = slots[Math.min(i, slots.length - 1)]!;
+        addUnit(sprites, c.x + at.x, c.y + at.y, m, at.scale);
       });
-      if (list.length > 1) {
-        const e = counterExtent(order.at(-1)!);
-        const x = c.x - 3 - e.half - 2;
-        const y = c.y - 2 - (list.length - 1) * 4 - e.up + 8;
-        top.circle(x, y, 6.5).fill({ color: SURFACE.ink950 }).stroke({ width: 1.2, color: TEXT });
-        const t = new Text({ text: String(list.length), resolution: 3, style: { fontFamily: FONT_DATA, fontSize: 8.5, fontWeight: '700', fill: TEXT } });
-        t.anchor.set(0.5, 0.5);
-        t.position.set(x, y);
-        labels.push(t);
-      }
     }
-    sprites.addChild(top);
-    for (const t of labels) sprites.addChild(t);
 
   }
 

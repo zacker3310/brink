@@ -1,3 +1,4 @@
+import { UNIT_CLASSES } from '@brink/contracts';
 import { describe, expect, it } from 'vitest';
 import { findPath } from '@brink/map';
 import { enterCost, hashState } from '@brink/simulation';
@@ -16,12 +17,12 @@ describe('the Meridian Crisis', () => {
     expect(tiles.some((t) => t.river)).toBe(true);
   });
 
-  it('gives every nation territory, three cities and all six unit classes', () => {
+  it('gives every nation territory, three cities and every unit class', () => {
     for (const n of Object.keys(w.nations)) {
       expect(Object.values(w.tiles).filter((t) => t.owner === n).length).toBeGreaterThan(20);
       expect(Object.values(w.sites).filter((s) => s.owner === n && s.kind !== 'depot').length).toBe(3);
       const classes = new Set(Object.values(w.formations).filter((f) => f.owner === n).map((f) => f.unitClass));
-      expect(classes.size).toBe(6);
+      expect(classes.size).toBe(UNIT_CLASSES.length);
     }
   });
 

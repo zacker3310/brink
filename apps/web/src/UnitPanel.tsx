@@ -3,7 +3,7 @@ import type { FormationOrder, SupplyPriority } from '@brink/contracts';
 import { EVENTS, UNITS } from '@brink/game-data';
 import { movementAllowance, type AssaultPreview, type StrikePreview } from '@brink/simulation';
 import { engine } from './engine';
-import { UnitGlyph } from './glyphs';
+import { ModelPortrait, UnitGlyph } from './glyphs';
 import { describeEffect, hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
 import { useNet } from './net/room';
@@ -135,7 +135,10 @@ export function UnitPanel() {
       <div className="ds-panel backdrop-blur">
         <div className="flex items-start gap-3 p-3">
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2" style={{ borderColor: color, background: `radial-gradient(circle at 35% 30%, ${color}55, #0b111b 70%)` }}>
-            <UnitGlyph unitClass={f.unitClass} color="#e6e1d3" className="h-6 w-9" />
+            <ModelPortrait unitClass={f.unitClass} color={color} className="h-14 w-14 -rotate-90" />
+            <span className="absolute -right-1 -bottom-1 bg-ink-950 p-0.5">
+              <UnitGlyph unitClass={f.unitClass} color={color} className="h-2.5 w-4" />
+            </span>
             <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden>
               <circle cx="18" cy="18" r="16.5" fill="none" stroke="#1b2738" strokeWidth="2.5" />
               <circle cx="18" cy="18" r="16.5" fill="none" stroke={hpColor} strokeWidth="2.5" strokeDasharray={`${(hp / 100) * 103.7} 103.7`} />

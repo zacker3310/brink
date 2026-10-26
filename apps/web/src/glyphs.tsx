@@ -1,7 +1,13 @@
 import type { GovernmentId, UnitClass } from '@brink/contracts';
+import { camoFor, modelDataUrl } from './design/models';
 import { symbolSvg, type Affiliation } from './design/symbols';
 
 // Small SVG marks shared by the menus and the game screen.
+
+/** The top-down model of a unit class in its nation's camouflage, as the map draws it. */
+export function ModelPortrait({ unitClass, color, className = 'h-10 w-10' }: { unitClass: UnitClass; color: string; className?: string }) {
+  return <img src={modelDataUrl(unitClass, camoFor(color), color)} alt="" draggable={false} className={`shrink-0 object-contain ${className}`} />;
+}
 
 /** A unit's APP-6 symbol, inline. Affiliation defaults to friend (the viewer's own). */
 export function UnitGlyph({

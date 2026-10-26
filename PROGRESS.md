@@ -70,6 +70,11 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
   where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
   `threatZones` in the simulation package, built from the viewer's NationView.
+- Ruleset 1.4.0: drone companies (cheap, fragile, vision 5, strike range 3, hit armour hardest,
+  fly from sites like aviation); Air Support is now Attack Helicopters. Every nation starts with one
+  drone company. Soak: 45 decisive endings of 100, 0 rejected AI orders.
+- ISR look: satellite-style terrain and top-down unit models on the map and in the replay, model
+  portraits in the unit panel and build list.
 - Guided first match ("Boot camp"): first on the title for a new player. A coach rides a real
   campaign as the Commonwealth and teaches eleven steps (move, orders for all, build, end turn, replay,
   summary, threat overlay, attack, diplomacy); each finishes when the player does it, with a "show me"

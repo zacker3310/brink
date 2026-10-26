@@ -10,7 +10,7 @@ export type HexKey = string;
 
 export type Terrain = 'plains' | 'forest' | 'hills' | 'mountains' | 'urban' | 'water';
 
-export type UnitClass = 'infantry' | 'mechanized' | 'armor' | 'artillery' | 'recon' | 'air';
+export type UnitClass = 'infantry' | 'mechanized' | 'armor' | 'artillery' | 'recon' | 'air' | 'drone';
 
 export const UNIT_CLASSES: readonly UnitClass[] = [
   'infantry',
@@ -19,6 +19,7 @@ export const UNIT_CLASSES: readonly UnitClass[] = [
   'artillery',
   'recon',
   'air',
+  'drone',
 ];
 
 export type GovernmentId = 'commonwealth' | 'directorate' | 'federation' | 'union';

@@ -6,7 +6,7 @@ import { grossYields, sortedKeys } from '@brink/simulation';
 // Read-only facts about a fresh scenario for the setup screens. Everything here is derived
 // from the real starting world, so the dossier can never drift from what the engine plays.
 
-export const CLASS_ORDER: readonly UnitClass[] = ['infantry', 'mechanized', 'armor', 'artillery', 'recon', 'air'];
+export const CLASS_ORDER: readonly UnitClass[] = ['infantry', 'mechanized', 'armor', 'artillery', 'recon', 'air', 'drone'];
 
 export interface Dossier {
   hexes: number;
