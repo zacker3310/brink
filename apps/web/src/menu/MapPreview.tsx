@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useId, useMemo } from 'react';
 import type { HexKey, NationId, Terrain, WorldState } from '@brink/contracts';
 import { hexCorners, hexToPixel, neighborKeys, parseKey, type Point } from '@brink/map';
 import { sortedKeys } from '@brink/simulation';
@@ -73,15 +73,25 @@ export const MapPreview = memo(function MapPreview({ world, focus = null, labels
       }
     }
     const pad = SIZE;
-    return { keys, borders, rivers, box: `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}` };
+    const span = Math.max(maxX - minX, maxY - minY) + pad * 2;
+    return { keys, borders, rivers, sat: { x: minX - pad, y: minY - pad, span }, box: `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}` };
   }, [world]);
 
   const colors = world.nations;
+  // The same Sentinel-2 ground as the game, one real scene per terrain stretched across the theatre.
+  const uid = useId().replace(/:/g, '');
+  const sat = (t: Terrain) => `url(#${uid}-${t})`;
   const dim = (owner: NationId | null) => focus !== null && owner !== focus;
 
   return (
     <svg viewBox={geo.box} className={className} role="img" aria-label="Map of the theatre" preserveAspectRatio="xMidYMid meet">
       <defs>
+        {(Object.keys(TERRAIN_FILL) as Terrain[]).map((t) => (
+          <pattern key={t} id={`${uid}-${t}`} patternUnits="userSpaceOnUse" x={geo.sat.x} y={geo.sat.y} width={geo.sat.span} height={geo.sat.span}>
+            <rect width={geo.sat.span} height={geo.sat.span} fill={TERRAIN_FILL[t]} />
+            <image href={`${import.meta.env.BASE_URL}art/terrain/${t}.jpg`} width={geo.sat.span} height={geo.sat.span} preserveAspectRatio="none" />
+          </pattern>
+        ))}
         <filter id="mp-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" result="b" />
           <feMerge>
@@ -94,7 +104,7 @@ export const MapPreview = memo(function MapPreview({ world, focus = null, labels
         {geo.keys.map((k) => {
           const t = world.tiles[k]!;
           const c = center(k);
-          return <polygon key={k} points={pts(c, SIZE - 0.35)} fill={TERRAIN_FILL[t.terrain]} />;
+          return <polygon key={k} points={pts(c, SIZE + 0.2)} fill={sat(t.terrain)} />;
         })}
       </g>
       <g>
@@ -107,7 +117,7 @@ export const MapPreview = memo(function MapPreview({ world, focus = null, labels
               points={pts(center(k), SIZE - 0.35)}
               fill={colors[t.owner]?.color}
               className="mp-tint"
-              opacity={dim(t.owner) ? 0.1 : focus ? 0.42 : 0.26}
+              opacity={dim(t.owner) ? 0.05 : focus ? 0.3 : 0.14}
             />
           );
         })}

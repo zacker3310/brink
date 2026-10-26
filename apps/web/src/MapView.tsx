@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Application, Container, Graphics, Matrix, Sprite, Text } from 'pixi.js';
-import type { Formation, FormationOrder, HexKey, NationView, UnitClass } from '@brink/contracts';
+import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, type Texture } from 'pixi.js';
+import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
@@ -8,7 +8,7 @@ import { addUnit, affiliationOf, keepScreenSize, setModelZoom, slotOffsets, tick
 import { AFFILIATION, FONT_UI, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
 import { terrainTexture } from './design/terrain';
-import { getArt, loadArt, URBAN_SPOTS } from './art';
+import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
 import { threatZones } from '@brink/simulation';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useGame } from './store';
@@ -23,6 +23,33 @@ const hex = (n: string) => Number.parseInt(n.replace('#', ''), 16);
 
 function center(key: HexKey) {
   return hexToPixel(parseKey(key), SIZE);
+}
+
+/**
+ * Each terrain's imagery seen through a blurred mask of its own hexes, layered water first, so
+ * fields fade into forest and forest into rock the way real ground does, instead of changing at a
+ * hex edge. The hard per-hex fill beneath keeps every hex covered.
+ */
+function softGround(app: Application, art: Art, sat: Matrix, keys: HexKey[], terrainOf: (k: HexKey) => Terrain, minX: number, minY: number, span: number, made: Texture[]): Container {
+  const out = new Container();
+  const pad = 40;
+  const frame = new Rectangle(minX - pad, minY - pad, span + pad * 2, span + pad * 2);
+  for (const t of ['water', 'plains', 'hills', 'forest', 'mountains'] as const) {
+    const mine = keys.filter((k) => terrainOf(k) === t);
+    if (mine.length === 0) continue;
+    const g = new Graphics();
+    for (const k of mine) g.poly(hexCorners(center(k), SIZE + 6).flatMap((p) => [p.x, p.y])).fill({ color: 0xffffff });
+    g.filters = [new BlurFilter({ strength: 10, quality: 4 })];
+    const tex = app.renderer.generateTexture({ target: g, frame, resolution: 0.5 });
+    made.push(tex);
+    g.destroy();
+    const mask = new Sprite(tex);
+    mask.position.set(frame.x, frame.y);
+    const fill = new Graphics().rect(frame.x, frame.y, frame.width, frame.height).fill({ texture: art.ground[t], textureSpace: 'global', matrix: sat });
+    fill.mask = mask;
+    out.addChild(fill, mask);
+  }
+  return out;
 }
 
 /** Middle of the known map, where units face when they have nowhere to go. */
@@ -127,6 +154,8 @@ export function MapView() {
   const hover = useRef<HexKey | null>(null);
   /** Set once the player pans or zooms; until then the map refits to its container. */
   const userMoved = useRef(false);
+  const groundSig = useRef('');
+  const groundTextures = useRef<Texture[]>([]);
   const reachCache = useRef<{ view: NationView; id: string; reach: Record<HexKey, Reach> } | null>(null);
   const view = useGame((s) => s.view);
   const draft = useGame((s) => s.draft);
@@ -434,25 +463,24 @@ export function MapView() {
     layer.addChild(g);
   }
 
-  function redraw() {
-    const a = appRef.current;
-    const s = useGame.getState();
-    // While a turn replays, the board shows the world it was planned against.
-    const v = s.playback?.before ?? s.view;
-    const replaying = s.playback !== null;
-    if (!a || !v) return;
-    for (const name of ['terrain', 'overlay', 'threat', 'sites', 'highlight', 'paths', 'units']) {
-      a.layers[name]!.removeChildren().forEach((c) => c.destroy());
-    }
-    const keys = Object.keys(v.tiles).sort();
-
+  /** The ground: rebuilt only when what the viewer knows of the land changes, not on every click. */
+  function drawGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: string[]) {
+    const art = getArt();
+    const sig = `${art ? 1 : 0}|${keys.map((k) => `${k}${v.tiles[k]!.visibility[0]}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
+    if (groundSig.current === sig) return;
+    groundSig.current = sig;
+    const layer = a.layers.terrain!;
+    layer.removeChildren().forEach((c) => c.destroy());
+    for (const t of groundTextures.current) t.destroy(true);
+    const made: Texture[] = [];
+    groundTextures.current = made;
     // Terrain: satellite-style ground mapped in world space, so the landscape runs on across hexes.
     const terrain = new Graphics();
+    const crisp = new Graphics();
     const grid = new Graphics();
     const groundMatrix = new Matrix().scale(0.5, 0.5);
     // Satellite imagery: one real 10 km scene per terrain, stretched once across the whole theatre so
     // no stretch of ground ever repeats.
-    const art = getArt();
     const pts = keys.map(center);
     const minX = Math.min(...pts.map((p) => p.x)) - SIZE;
     const minY = Math.min(...pts.map((p) => p.y)) - SIZE;
@@ -461,22 +489,32 @@ export function MapView() {
     for (const key of keys) {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown' || !t.terrain) {
-        terrain.poly(poly(key)).fill({ color: 0x0e1110 });
+        crisp.poly(poly(key)).fill({ color: 0x0e1110 });
         grid.poly(poly(key)).stroke({ width: 0.8, color: 0x2a302d, alpha: 0.7 });
         continue;
       }
-      if (satMatrix && t.terrain === 'urban') {
+      const site = t.siteId ? v.sites[t.siteId] : undefined;
+      if (art && site) {
+        // Sites stand on 50 cm imagery of a real place, one hex across.
+        const c = center(key);
+        const tex = art.sites[siteArt(site, Math.floor((jitter(key, 5) + 0.5) * 4))];
+        const k = (SIZE * 2.1) / tex.width;
+        const m = new Matrix().scale(k, k).translate(c.x - (tex.width * k) / 2, c.y - (tex.height * k) / 2);
+        crisp.poly(poly(key)).fill({ texture: tex, textureSpace: 'global', matrix: m });
+      } else if (satMatrix && t.terrain === 'urban') {
         // Cities always sit on dense blocks of the real city, never on its river or fields.
         const k = satMatrix.a;
         const [px, py] = URBAN_SPOTS[Math.floor((jitter(key, 9) + 0.5) * URBAN_SPOTS.length) % URBAN_SPOTS.length]!;
         const c = center(key);
         const m = new Matrix().scale(k, k).translate(c.x - px * k, c.y - py * k);
-        terrain.poly(poly(key)).fill({ texture: art!.ground.urban, textureSpace: 'global', matrix: m });
+        crisp.poly(poly(key)).fill({ texture: art!.ground.urban, textureSpace: 'global', matrix: m });
       } else if (satMatrix) terrain.poly(poly(key)).fill({ texture: art!.ground[t.terrain], textureSpace: 'global', matrix: satMatrix });
       else terrain.poly(poly(key)).fill({ texture: terrainTexture(t.terrain), textureSpace: 'global', matrix: groundMatrix });
-      // Hex-to-hex variation in light, as imagery tiles taken at different hours.
-      const shade = jitter(key, 3);
-      terrain.poly(poly(key)).fill({ color: shade > 0 ? 0xffffff : 0x000000, alpha: Math.abs(shade) * 0.07 });
+      // Without imagery, vary the light hex to hex as tiles taken at different hours.
+      if (!art) {
+        const shade = jitter(key, 3);
+        terrain.poly(poly(key)).fill({ color: shade > 0 ? 0xffffff : 0x000000, alpha: Math.abs(shade) * 0.07 });
+      }
       if (t.terrain === 'water') {
         for (const n of neighborKeys(key)) {
           const u = v.tiles[n];
@@ -486,7 +524,7 @@ export function MapView() {
           }
         }
       }
-      grid.poly(poly(key)).stroke({ width: 0.7, color: 0x000000, alpha: 0.22 });
+      grid.poly(poly(key)).stroke({ width: 0.7, color: 0x000000, alpha: art ? 0.16 : 0.22 });
     }
     const water = new Graphics();
     for (const key of keys) {
@@ -506,7 +544,38 @@ export function MapView() {
         }
       }
     }
-    a.layers.terrain!.addChild(terrain, water, grid);
+    if (art && satMatrix) {
+      // Bake the feathered landscape once into one texture: live masks would re-render the whole map
+      // at screen scale every frame and exhaust GPU memory when zoomed in.
+      const comp = new Container();
+      comp.addChild(terrain, softGround(a.app, art, satMatrix, keys.filter((k) => v.tiles[k]!.terrain && v.tiles[k]!.visibility !== 'unknown' && !v.tiles[k]!.siteId), (k) => v.tiles[k]!.terrain!, minX, minY, span, made));
+      const frame = new Rectangle(minX - 40, minY - 40, span + 80, span + 80);
+      const baked = a.app.renderer.generateTexture({ target: comp, frame, resolution: 1.5 });
+      for (const t of made) t.destroy(true);
+      made.length = 0;
+      made.push(baked);
+      comp.destroy({ children: true });
+      const ground = new Sprite(baked);
+      ground.position.set(frame.x, frame.y);
+      layer.addChild(ground);
+    } else layer.addChild(terrain);
+    layer.addChild(crisp, water, grid);
+  }
+
+  function redraw() {
+    const a = appRef.current;
+    const s = useGame.getState();
+    // While a turn replays, the board shows the world it was planned against.
+    const v = s.playback?.before ?? s.view;
+    const replaying = s.playback !== null;
+    if (!a || !v) return;
+    for (const name of ['overlay', 'threat', 'sites', 'highlight', 'paths', 'units']) {
+      a.layers[name]!.removeChildren().forEach((c) => c.destroy());
+    }
+    const keys = Object.keys(v.tiles).sort();
+    const art = getArt();
+    drawGround(a, v, keys);
+
 
     // Ownership: tint and Civ-style thick borders, fog on stale ground.
     const overlay = new Graphics();
@@ -515,7 +584,7 @@ export function MapView() {
       if (t.visibility === 'unknown') continue;
       if (t.owner) {
         const color = hex(v.nations[t.owner]?.color ?? '#888888');
-        overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.1 : 0.06 });
+        overlay.poly(poly(key, 1)).fill({ color, alpha: (t.visibility === 'visible' ? 0.1 : 0.06) * (art ? 0.6 : 1) });
         for (const n of neighborKeys(key)) {
           if (v.tiles[n]?.owner === t.owner) continue;
           const [p, q] = edge(key, n, 2.5);

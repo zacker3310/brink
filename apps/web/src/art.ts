@@ -1,5 +1,5 @@
 import { Assets, type Texture } from 'pixi.js';
-import type { Terrain, UnitClass } from '@brink/contracts';
+import type { SiteView, Terrain, UnitClass } from '@brink/contracts';
 
 // Imported art (public/art, credits in public/art/CREDITS.md): Sentinel-2 ground per terrain,
 // top-down renders of real 3D models per unit class, and effect frames for the replay. Loaded
@@ -9,8 +9,13 @@ const BASE = `${import.meta.env.BASE_URL}art/`;
 
 export type UnitArt = UnitClass | 'air_rotor' | 'depot';
 
+export type SiteArt = 'capital' | 'city1' | 'city2' | 'city3' | 'refinery' | 'yard' | 'fuel';
+const SITE_ART: SiteArt[] = ['capital', 'city1', 'city2', 'city3', 'refinery', 'yard', 'fuel'];
+
 export interface Art {
   ground: Record<Terrain, Texture>;
+  /** 50 cm imagery of real places, one hex each: city blocks, a refinery, a yard, a fuel farm. */
+  sites: Record<SiteArt, Texture>;
   units: Record<UnitArt, Texture>;
   /** Sprite edge length in world pixels, and the rotor hub as a fraction of its sprite. */
   size: Record<UnitArt, number>;
@@ -31,6 +36,14 @@ export const URBAN_SPOTS: readonly [number, number][] = [
   [750, 590],
 ];
 
+/** Which close-up imagery a site stands on: capitals and cities on one of four real city districts, an energy objective
+ * on a refinery, other objectives on an industrial yard, depots on a fuel farm. */
+export function siteArt(site: SiteView, variant: number): SiteArt {
+  if (site.kind === 'capital' || site.kind === 'city') return (['capital', 'city1', 'city2', 'city3'] as const)[variant % 4]!;
+  if (site.kind === 'depot') return 'fuel';
+  return site.yields.energy >= site.yields.materials ? 'refinery' : 'yard';
+}
+
 let art: Art | null = null;
 let pending: Promise<Art | null> | null = null;
 
@@ -49,14 +62,16 @@ export function loadArt(): Promise<Art | null> {
     try {
       const manifest = (await (await fetch(`${BASE}units/manifest.json`)).json()) as Record<string, { size: number; hub?: [number, number] }>;
       const tex = (url: string) => Assets.load<Texture>(url);
-      const [ground, units, explosion, smoke] = await Promise.all([
+      const [ground, sites, units, explosion, smoke] = await Promise.all([
         Promise.all(TERRAINS.map((t) => tex(`${BASE}terrain/${t}.jpg`))),
+        Promise.all(SITE_ART.map((s) => tex(`${BASE}sites/${s}.jpg`))),
         Promise.all(UNIT_ART.map((u) => tex(`${BASE}units/${u}.png`))),
         Promise.all(Array.from({ length: 9 }, (_, i) => tex(`${BASE}fx/explosion${i}.png`))),
         Promise.all(Array.from({ length: 8 }, (_, i) => tex(`${BASE}fx/smoke${i}.png`))),
       ]);
       art = {
         ground: Object.fromEntries(TERRAINS.map((t, i) => [t, ground[i]!])) as Record<Terrain, Texture>,
+        sites: Object.fromEntries(SITE_ART.map((s, i) => [s, sites[i]!])) as Record<SiteArt, Texture>,
         units: Object.fromEntries(UNIT_ART.map((u, i) => [u, units[i]!])) as Record<UnitArt, Texture>,
         size: Object.fromEntries(UNIT_ART.map((u) => [u, manifest[u]?.size ?? 32])) as Record<UnitArt, number>,
         hub: manifest.air_rotor?.hub ?? [0.5, 0.5],

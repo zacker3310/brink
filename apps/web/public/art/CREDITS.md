@@ -18,6 +18,16 @@ Scene IDs and coordinates: `terrain/scenes.json`.
 | Urban | Dnipro, Ukraine | S2B_36UXU_20230928 |
 | Water | Black Sea off Odesa | S2B_36TUS_20230805 |
 
+Relief on hills and mountains: produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and
+© Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA
+(GLO-30, AWS open data `copernicus-dem-30m`), as a hillshade blended in by `tools/art/satellite_refine.py`.
+
+## Sites: 50 cm imagery (`sites/`)
+
+City districts, the refinery, the fuel farm and the industrial yard are cut from the SpaceNet 6
+Rotterdam pan-sharpened RGB mosaic (WorldView-2, 2019; SpaceNet on AWS, `spacenet-dataset`), licensed
+CC BY-SA 4.0. The cut, graded tiles in `sites/` are shared under the same CC BY-SA 4.0 license.
+
 ## Units and props: rendered top-down from these 3D models (`tools/art/render.js`)
 
 | Use | Model | Author | License | Source |
@@ -26,12 +36,12 @@ Scene IDs and coordinates: `terrain/scenes.json`.
 | Aviation | Boeing AH-64D Apache Combat Helicopter (rotors separated) | Muhamad Mirza Arrafi | CC BY 4.0 | via github.com/Hejun-Coderlife/iron-man-mk85 |
 | Drones | Quadcopter drone | Annelida | CC BY 4.0 | sketchfab.com/3d-models/quadcopter-drone-ca8f0f70a1014e77a6777dc248e9bf5a, via github.com/adikleineiny/tiny-zoom |
 | Infantry, crews, dismounts | Soldier characters and rifle aiming animation | Mixamo (Adobe) | Mixamo terms (royalty-free in projects) | via github.com/Hejun-Coderlife/iron-man-mk85 |
-| Recon, troop truck | Car Kit (suv, truck), repainted | Kenney | CC0 1.0 | kenney.nl, via github.com/ETdoFresh/kenney.nl |
 | Depot | Hesco Barrier PBR | polbrainstorm | CC BY 4.0 | via github.com/Hejun-Coderlife/iron-man-mk85 |
 | Depot | Watch tower | _SeF_ | CC BY 4.0 | via github.com/Hejun-Coderlife/iron-man-mk85 |
 | Depot | Military Tent | dark-minaz | CC BY 4.0 | via github.com/Hejun-Coderlife/iron-man-mk85 |
 | Depot | Shipping containers | Sousinho, Sebastian Webster | CC BY 4.0 | via github.com/Hejun-Coderlife/iron-man-mk85 |
-| Artillery | Towed 155 mm howitzer | Brink (built from primitives) | Project license | `tools/art/render.js` |
+| Self-propelled gun, heavy IFV | T-72 chassis (as above) with turrets, guns and stowage built in `tools/art/render.js` | Nekis5_3D; Brink | As above | `tools/art/render.js` |
+| Scout car | BRDM-style armoured car built from primitives | Brink | Project license | `tools/art/render.js` |
 
 The renders modify the models (scaled, posed, repainted, lit and viewed from above). No endorsement
 by any author is implied.

@@ -155,9 +155,11 @@ export function Manual({ onBack }: { onBack: () => void }) {
           <Label>Credits</Label>
           <ul className="mt-3 space-y-1 text-xs text-muted" data-testid="credits">
             <li>Ground: contains modified Copernicus Sentinel data 2023 (ESA), Poltava, Polesia, Codri, Greater Caucasus, Dnipro, Black Sea.</li>
+            <li>Relief: Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the EU and ESA.</li>
+            <li>Cities, refinery, depots: SpaceNet 6 Rotterdam imagery (WorldView-2, SpaceNet on AWS), CC BY-SA 4.0.</li>
             <li>T-72 tank by Nekis5_3D. AH-64D Apache by Muhamad Mirza Arrafi (CC BY 4.0). Quadcopter drone by Annelida (CC BY 4.0).</li>
             <li>Hesco barrier by polbrainstorm, watch tower by _SeF_, military tent by dark-minaz, containers by Sousinho and Sebastian Webster (all CC BY 4.0).</li>
-            <li>Soldiers and animation from Mixamo (Adobe). Vehicles, explosions and smoke by Kenney (CC0).</li>
+            <li>Soldiers and animation from Mixamo (Adobe). Explosions and smoke by Kenney (CC0).</li>
             <li>
               Full list with sources and licenses:{' '}
               <a className="text-signal underline" href={`${import.meta.env.BASE_URL}art/CREDITS.md`} target="_blank" rel="noreferrer">
