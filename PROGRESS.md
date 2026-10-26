@@ -70,6 +70,10 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
   where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
   `threatZones` in the simulation package, built from the viewer's NationView.
+- Guided first match ("Boot camp"): first on the title for a new player. A coach rides a real
+  campaign as the Commonwealth and teaches eleven steps (move, orders for all, build, end turn, replay,
+  summary, threat overlay, attack, diplomacy); each finishes when the player does it, with a "show me"
+  shortcut and Later on the ones that may not apply yet. Finishing or ending it is remembered.
 - World events (ruleset 1.3.0): about one nation in five per turn draws a two-way decision (oil
   strike, harvest failure, general strike, defector, arms dealer, war bonds, volunteers, scandal).
   The card sits above the turn controls; no answer takes the first option. The AI weighs resources,
@@ -109,4 +113,4 @@ None.
 1. Online reliability: TURN relay, lobby connection diagnostics, guest auto-retry; verify a real
    two-network match.
 2. Async turns on `apps/api` (resolve when all are in or at a deadline; notify on turn).
-3. Guided first match. 4. More maps. 5. Shareable end-of-game recap. Touch input if friends play on phones.
+3. More maps. 5. Shareable end-of-game recap. Touch input if friends play on phones.

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RULESET_VERSION } from '@brink/game-data';
 import { NATIONS, SCENARIOS, createScenario } from '@brink/scenarios';
+import { tutorialDone } from '../coach';
 import { latestSlot, type SlotInfo } from '../saves';
 import { Kbd, relativeTime, useKeys } from '../chrome';
 import { MapPreview } from './MapPreview';
@@ -26,14 +27,18 @@ interface Item {
   disabled?: boolean;
 }
 
-export function Title({ slots, go, onContinue }: { slots: SlotInfo[]; go: (s: MenuScreen) => void; onContinue: (slot: SlotInfo) => void }) {
+export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]; go: (s: MenuScreen) => void; onContinue: (slot: SlotInfo) => void; onTutorial: () => void }) {
   const scenario = SCENARIOS[0]!;
   // The backdrop is a real scenario world; seed 1 is the canonical look.
   const world = useMemo(() => createScenario(scenario.id, 1), [scenario.id]);
   const last = latestSlot(slots);
   const lastNation = last ? NATIONS.find((n) => n.id === last.nation) : undefined;
 
+  // A first-time commander sees the guided match first; afterwards it sits below the campaign.
+  const fresh = !last && !tutorialDone();
+  const guided: Item = { id: 'tutorial', label: 'Guided first match', sub: fresh ? 'Recommended: learn the war on a real first turn, then keep playing' : 'Boot camp: a real campaign with a coach', go: onTutorial };
   const items: Item[] = [
+    ...(fresh ? [guided] : []),
     ...(last
       ? [
           {
@@ -45,6 +50,7 @@ export function Title({ slots, go, onContinue }: { slots: SlotInfo[]; go: (s: Me
         ]
       : []),
     { id: 'new', label: 'New campaign', sub: `${scenario.name} · you against three AI powers`, go: () => go('setup') },
+    ...(fresh ? [] : [guided]),
     { id: 'multiplayer', label: 'Multiplayer', sub: 'Host friends online, join by code, or hotseat', go: () => go('multiplayer') },
     { id: 'load', label: 'Load campaign', sub: slots.length ? `${slots.length} saved operation${slots.length === 1 ? '' : 's'} on file` : 'Save slots and files', go: () => go('archive') },
     { id: 'manual', label: 'Field manual', sub: 'Turns, victory, units and terrain', go: () => go('manual') },

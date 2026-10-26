@@ -4,6 +4,7 @@ import { GOVERNMENTS, UNITS } from '@brink/game-data';
 import { useCamera } from './camera';
 import { Kbd, Label, useKeys } from './chrome';
 import { CityBanners, CityPanel } from './Cities';
+import { Coach } from './Coach';
 import { Emblem } from './glyphs';
 import { netChange, selfLedger, turnClock } from './insight';
 import { HoverCard, ModeBanner, Toasts, ZoomControls } from './MapOverlays';
@@ -429,6 +430,7 @@ export function Game() {
         </div>
       </div>
       {showReport && <Report />}
+      <Coach />
       <Curtain />
     </div>
   );

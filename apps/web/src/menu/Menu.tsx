@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCoach } from '../coach';
 import { readSlot } from '../saves';
 import { useGame } from '../store';
 import { Archive } from './Archive';
@@ -6,6 +7,10 @@ import { Manual } from './Manual';
 import { Multiplayer } from './Multiplayer';
 import { Setup } from './Setup';
 import { Title, type MenuScreen } from './Title';
+
+/** The guided first match: the Commonwealth, on a seed with a clean opening. */
+const TUTORIAL_NATION = 'aster';
+const TUTORIAL_SEED = 1;
 
 export function Menu() {
   const newGame = useGame((s) => s.newGame);
@@ -36,6 +41,7 @@ export function Menu() {
         <Title
           slots={slots}
           go={setScreen}
+          onTutorial={() => void newGame(TUTORIAL_NATION, TUTORIAL_SEED).then(() => useCoach.getState().begin(1))}
           onContinue={(s) => {
             const text = readSlot(s.slot);
             if (text) load(text);

@@ -84,6 +84,7 @@ In React use `<UnitGlyph unitClass color affiliation planned />`; in Pixi use `a
 | City banners, city panel | `Cities.tsx` | Over-map banners, production picker |
 | Combat card, hover card, minimap | `MapOverlays.tsx` | Map overlays |
 | Notifications | `Notifications.tsx` | Right-edge turn results |
+| Coach | `Coach.tsx`, steps in `coach.ts` | Guided first match; bottom centre, a strip beneath the turn summary |
 
 ## Map overlays
 

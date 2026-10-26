@@ -53,6 +53,8 @@ export interface Prefs {
   nation?: string;
   animate?: boolean;
   name?: string;
+  /** The guided first match was finished or skipped. */
+  tutorialDone?: boolean;
 }
 
 export function readPrefs(): Prefs {

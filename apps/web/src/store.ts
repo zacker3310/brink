@@ -16,6 +16,7 @@ import type {
 } from '@brink/contracts';
 import { engine } from './engine';
 import { idleFormations } from './insight';
+import { useCoach } from './coach';
 import { useNet } from './net/room';
 import type { Mode } from './planning';
 import type { Response, SeatState } from './protocol';
@@ -240,6 +241,7 @@ export const useGame = create<State>((set, get) => {
       return 'single';
     },
     toMenu: () => {
+      useCoach.getState().stop();
       // The engine has already resolved a replaying turn; apply it rather than drop it.
       const pb = get().playback;
       if (pb) {
