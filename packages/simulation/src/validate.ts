@@ -202,6 +202,12 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
       else locked.research = sub.research;
     }
 
+    if (sub.eventChoice !== undefined) {
+      if (!n.event) reject('no world event is waiting for an answer');
+      else if (sub.eventChoice !== 0 && sub.eventChoice !== 1) reject('unknown event option');
+      else locked.eventChoice = sub.eventChoice;
+    }
+
     if (sub.supplyPriority) {
       const pri: Record<string, SupplyPriority> = {};
       for (const id of Object.keys(sub.supplyPriority).sort()) {

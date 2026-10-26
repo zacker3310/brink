@@ -102,4 +102,18 @@ describe('AI', () => {
     const m = updateMemory(emptyMemory(), buildView(w, 'a'), [{ kind: 'site_captured', site: 'x', key: hexKey(1, 1), from: 'b', to: 'a' }]);
     expect(m.lastGain).toBe(7);
   });
+
+  it('answers a pending world event legally, preferring stability when it is low', () => {
+    const w = makeWorld(8, 6, ['a', 'b']);
+    w.nations.a!.event = { id: 'general_strike', turn: 0 };
+    w.nations.a!.stability = 30;
+    const shaky = planOrders(buildView(w, 'a'), emptyMemory(), 1);
+    expect(shaky.eventChoice).toBe(1);
+    expect(lockOrders(w, [shaky]).rejected).toEqual([]);
+    w.nations.a!.event = { id: 'oil_strike', turn: 0 };
+    w.nations.a!.stability = 80;
+    expect(planOrders(buildView(w, 'a'), emptyMemory(), 1).eventChoice).toBeDefined();
+    w.nations.a!.event = null;
+    expect(planOrders(buildView(w, 'a'), emptyMemory(), 1).eventChoice).toBeUndefined();
+  });
 });

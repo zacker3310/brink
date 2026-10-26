@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { FormationOrder, SupplyPriority } from '@brink/contracts';
-import { UNITS } from '@brink/game-data';
+import { EVENTS, UNITS } from '@brink/game-data';
 import { movementAllowance, type AssaultPreview, type StrikePreview } from '@brink/simulation';
 import { engine } from './engine';
 import { UnitGlyph } from './glyphs';
-import { hexLabel, idleFormations } from './insight';
+import { describeEffect, hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
 import { useNet } from './net/room';
 import { describeOrder, type Mode } from './planning';
@@ -244,6 +244,43 @@ export function UnitPanel() {
   );
 }
 
+/** A world event awaiting an answer. The choice rides on the draft; no answer takes option 0. */
+function EventCard() {
+  const event = useGame((s) => s.view?.self.event);
+  const choice = useGame((s) => s.draft?.eventChoice);
+  const setEventChoice = useGame((s) => s.setEventChoice);
+  const resolving = useGame((s) => s.resolving);
+  if (!event) return null;
+  const def = EVENTS[event.id];
+  const picked = choice ?? 0;
+  return (
+    <div className="ds-panel border-signal/60 px-2.5 py-2" data-testid="world-event">
+      <div className="ds-label text-signal">Decision</div>
+      <div className="font-display text-sm font-bold tracking-wide uppercase">{def.title}</div>
+      <p className="mt-0.5 text-[11px] leading-snug text-muted">{def.text}</p>
+      <div className="mt-1.5 flex flex-col gap-1">
+        {def.options.map((o, i) => (
+          <button
+            key={o.label}
+            type="button"
+            disabled={resolving}
+            onClick={() => setEventChoice(i as 0 | 1)}
+            aria-pressed={picked === i}
+            data-testid={`event-option-${i}`}
+            className={`border px-2 py-1 text-left text-[11px] disabled:opacity-60 ${picked === i ? 'border-signal bg-signal/15 text-text' : 'border-line text-muted hover:border-faint hover:text-text'}`}
+          >
+            <div className="font-semibold">
+              {o.label}
+              {i === 0 && choice === undefined && <span className="ml-1 text-[9px] text-faint uppercase">default</span>}
+            </div>
+            <div className="font-mono text-[10px] text-faint">{describeEffect(o.effect)}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function TurnControls() {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
@@ -266,6 +303,7 @@ export function TurnControls() {
   return (
     <div className="pointer-events-auto absolute right-3 bottom-3 z-10 flex w-56 flex-col items-stretch gap-1.5">
       <SeatBoard />
+      <EventCard />
       {lastTurn && !resolving && (
         <button type="button" onClick={rewatch} data-testid="rewatch" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
           ⟲ Rewatch turn {lastTurn.before.turn}

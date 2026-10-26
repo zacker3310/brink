@@ -124,6 +124,23 @@ export interface Nation {
   /** Cumulative strength lost; drives war weariness. */
   warLosses: number;
   eliminated: boolean;
+  /** A world event awaiting this nation's answer, drawn at the end of `turn`. */
+  event?: PendingEvent | null;
+}
+
+export type WorldEventId =
+  | 'oil_strike'
+  | 'harvest_failure'
+  | 'general_strike'
+  | 'defector'
+  | 'arms_dealer'
+  | 'war_bonds'
+  | 'volunteers'
+  | 'scandal';
+
+export interface PendingEvent {
+  id: WorldEventId;
+  turn: number;
 }
 
 export type OrderType = 'hold' | 'move' | 'attack' | 'defend' | 'recon' | 'withdraw';
@@ -180,6 +197,8 @@ export interface NationOrders {
   research?: TechId | null;
   supplyPriority?: Record<FormationId, SupplyPriority>;
   diplomacy: DiplomacyOrder[];
+  /** Answer to the pending world event; unanswered events take option 0. */
+  eventChoice?: 0 | 1;
 }
 
 export interface LastKnownContact {
@@ -306,6 +325,7 @@ export type GameEvent =
   /** `broke` is the treaty a declaration of war tore up, if any. */
   | { kind: 'diplomacy'; a: NationId; b: NationId; relation: Relation; proposedBy: NationId; broke?: 'peace' | 'alliance' }
   | { kind: 'proposal'; from: NationId; to: NationId; proposal: 'peace' | 'alliance' }
+  | { kind: 'world_event'; nation: NationId; event: WorldEventId; choice: 0 | 1 | null }
   | { kind: 'elimination'; nation: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason }
   | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string };

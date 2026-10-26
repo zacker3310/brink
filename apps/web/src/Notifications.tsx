@@ -1,6 +1,6 @@
 import type { HexKey, NationView, TurnReport } from '@brink/contracts';
-import { TECHS, UNITS } from '@brink/game-data';
-import { atPlace, hexLabel } from './insight';
+import { EVENTS, TECHS, UNITS } from '@brink/game-data';
+import { atPlace, describeEffect, hexLabel } from './insight';
 import { useGame } from './store';
 
 // Civ-style turn notifications: a column of icons on the right edge of the map. Hover to read,
@@ -107,6 +107,10 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
         break;
       case 'production_cancelled':
         if (e.nation === me) out.push({ id, icon: 'gear', tone: 'bad', title: 'Production cancelled', text: `${view.sites[e.site]?.name}: ${e.reason}.` });
+        break;
+      case 'world_event':
+        if (e.nation === me && e.choice === null) out.push({ id, icon: 'scroll', tone: 'info', title: `Decision: ${EVENTS[e.event].title}`, text: 'Answer it before you end the turn, or the first option stands.' });
+        else if (e.nation === me && e.choice !== null) out.push({ id, icon: 'scroll', tone: 'info', title: EVENTS[e.event].title, text: `${EVENTS[e.event].options[e.choice].label}: ${describeEffect(EVENTS[e.event].options[e.choice].effect)}.` });
         break;
       case 'research':
         if (e.nation === me) out.push({ id, icon: 'flask', tone: 'good', title: 'Research complete', text: `${TECHS[e.tech]?.name}. Pick the next project.` });

@@ -1,5 +1,6 @@
 export * from './combat';
 export * from './economy';
+export * from './events';
 export * from './fog';
 export * from './hash';
 export * from './preview';

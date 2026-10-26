@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { GameEvent, HexKey, NationView, TurnReport, UnitClass } from '@brink/contracts';
-import { TECHS, UNITS } from '@brink/game-data';
+import { EVENTS, TECHS, UNITS } from '@brink/game-data';
 import { Label, useKeys } from './chrome';
 import { UnitGlyph } from './glyphs';
-import { atPlace, hexLabel, netChange, toPlace, turnClock } from './insight';
+import { atPlace, describeEffect, hexLabel, netChange, toPlace, turnClock } from './insight';
 import { useGame } from './store';
 import { Swatch } from './ui';
 
@@ -147,6 +147,10 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
         break;
       case 'production_cancelled':
         out.Production!.push({ tone: 'bad', text: `Production at ${view.sites[e.site]?.name ?? e.site} cancelled: ${e.reason}.` });
+        break;
+      case 'world_event':
+        if (e.choice !== null) out.Production!.push({ text: `${EVENTS[e.event].title}: ${EVENTS[e.event].options[e.choice].label.toLowerCase()} (${describeEffect(EVENTS[e.event].options[e.choice].effect)}).` });
+        else out.Production!.push({ tone: 'bad', text: `${EVENTS[e.event].title}: a decision awaits.` });
         break;
       case 'research':
         out.Production!.push({ tone: 'good', text: `Research complete: ${TECHS[e.tech]?.name ?? e.tech}.` });

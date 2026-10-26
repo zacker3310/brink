@@ -103,6 +103,7 @@ interface State {
   removeRecruit(index: number): void;
   setBudget(budget: Budget): void;
   setResearch(tech: TechId | null): void;
+  setEventChoice(choice: 0 | 1): void;
   setDiplomacy(target: NationId, action: DiplomaticAction | null): void;
   setPriority(id: FormationId, p: SupplyPriority): void;
   submit(): Promise<void>;
@@ -264,6 +265,7 @@ export const useGame = create<State>((set, get) => {
       }),
     setBudget: (budget) => editDraft((d) => ({ ...d, budget })),
     setResearch: (tech) => editDraft((d) => ({ ...d, research: tech })),
+    setEventChoice: (choice) => editDraft((d) => ({ ...d, eventChoice: choice })),
     setDiplomacy: (target, action) =>
       editDraft((d) => {
         d.diplomacy = d.diplomacy.filter((x) => x.target !== target);

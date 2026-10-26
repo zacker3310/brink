@@ -5,9 +5,9 @@
 // 0..1000; organization, morale, readiness, fuel, ammunition, experience, entrenchment and
 // supply are 0..100. One turn is six simulated hours.
 
-import type { GovernmentId, Resource, Stockpile, TechId, Terrain, UnitClass } from '@brink/contracts';
+import type { GovernmentId, Resource, Stockpile, TechId, Terrain, UnitClass, WorldEventId } from '@brink/contracts';
 
-export const RULESET_VERSION = '1.2.0';
+export const RULESET_VERSION = '1.3.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -347,3 +347,100 @@ export const RULES = {
   /** Materials spent per 5 strength regained. */
   reinforcementMaterialsPer5: 1,
 } as const;
+
+// ---------------------------------------------------------------------------
+// World events: a two-way decision now and then, so every nation's story diverges.
+
+export interface EventEffect {
+  /** Added to the stockpile; a cost the nation cannot cover is paid as far as it can. */
+  stockpile?: Partial<Stockpile>;
+  stability?: number;
+  /** Applied to every formation the nation owns. */
+  morale?: number;
+  /** Added to research progress toward the current (or banked) tech. */
+  research?: number;
+}
+
+export interface EventOption {
+  label: string;
+  effect: EventEffect;
+}
+
+export interface EventDef {
+  title: string;
+  text: string;
+  /** Option 0 is what happens if the nation does not answer. */
+  options: readonly [EventOption, EventOption];
+}
+
+export const EVENTS: Record<WorldEventId, EventDef> = {
+  oil_strike: {
+    title: 'Oil strike',
+    text: 'Surveyors hit a deep field in the interior. The ministries want it; so do the majors.',
+    options: [
+      { label: 'Nationalize it', effect: { stockpile: { energy: 120 }, stability: -4 } },
+      { label: 'Lease it out', effect: { stockpile: { credits: 150 } } },
+    ],
+  },
+  harvest_failure: {
+    title: 'Harvest failure',
+    text: 'Blight in the breadbasket. The cities will feel it by winter.',
+    options: [
+      { label: 'Ration and endure', effect: { stability: -8 } },
+      { label: 'Buy grain abroad', effect: { stockpile: { credits: -120, food: 80 } } },
+    ],
+  },
+  general_strike: {
+    title: 'General strike',
+    text: 'The rail and dock unions walk out. Freight stops at the yards.',
+    options: [
+      { label: 'Break the strike', effect: { stockpile: { materials: 40 }, stability: -10 } },
+      { label: 'Meet their terms', effect: { stockpile: { credits: -100 }, stability: 5 } },
+    ],
+  },
+  defector: {
+    title: 'A defector',
+    text: 'A weapons engineer crosses the line with a briefcase and a price.',
+    options: [
+      { label: 'Debrief the labs', effect: { research: 60 } },
+      { label: 'Parade him on air', effect: { stability: 6 } },
+    ],
+  },
+  arms_dealer: {
+    title: 'Arms dealer',
+    text: 'A broker offers surplus shells and spares, no questions asked.',
+    options: [
+      { label: 'Pass', effect: {} },
+      { label: 'Buy the lot', effect: { stockpile: { credits: -100, materials: 120 } } },
+    ],
+  },
+  war_bonds: {
+    title: 'War bonds',
+    text: 'Treasury proposes a bond drive. Patriotic, and a lien on the future.',
+    options: [
+      { label: 'Run the drive', effect: { stockpile: { credits: 160 }, stability: -5 } },
+      { label: 'Not now', effect: {} },
+    ],
+  },
+  volunteers: {
+    title: 'Volunteers',
+    text: 'Recruiting stations are swamped. Morale is high; factories are short of hands.',
+    options: [
+      { label: 'Send them to the front', effect: { morale: 10 } },
+      { label: 'Put them on the lines', effect: { stockpile: { materials: 80 } } },
+    ],
+  },
+  scandal: {
+    title: 'Scandal',
+    text: 'A procurement minister is caught with a contractor\'s money.',
+    options: [
+      { label: 'Pay to bury it', effect: { stockpile: { credits: -80 } } },
+      { label: 'Public trial', effect: { stockpile: { credits: 40 }, stability: -6 } },
+    ],
+  },
+};
+
+export const EVENT_IDS: readonly WorldEventId[] = Object.keys(EVENTS).sort() as WorldEventId[];
+
+/** Percent chance a nation without a pending event draws one at the end of a turn. */
+export const EVENT_CHANCE = 20;

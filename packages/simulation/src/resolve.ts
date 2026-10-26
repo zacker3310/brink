@@ -14,6 +14,7 @@ import type {
 import { RULESET_VERSION } from '@brink/game-data';
 import { settleEconomy } from './economy';
 import { resolveDiplomacy } from './diplomacy';
+import { resolveWorldEvents } from './events';
 import { resolveEngagements, resolveRetreats, resolveStrikes } from './engagements';
 import { buildView, canDetect, computeVision, detectedFormations, updateIntel, victoryPoints, victoryThreshold, type Vision } from './fog';
 import { hashState } from './hash';
@@ -148,6 +149,7 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
       case 'intel':
       case 'research':
       case 'order_rejected':
+      case 'world_event':
         if (e.nation === nation) out.push(e);
         break;
       case 'proposal':
@@ -219,6 +221,7 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
     if (world.nations[n]!.eliminated) continue;
     settleEconomy(world, n, orders[n]!, engaged, movement.moved, { production: production[n]!, logistics: logistics[n]! }, events);
   }
+  resolveWorldEvents(world, orders, events);
 
   // 11. Victory.
   resolveEliminations(world, events);

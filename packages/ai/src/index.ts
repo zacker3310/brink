@@ -16,7 +16,7 @@ import type {
   UnitClass,
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { AIR_REBASE_RANGE, STACK_LIMIT, TECHS, UNITS } from '@brink/game-data';
+import { AIR_REBASE_RANGE, EVENTS, STACK_LIMIT, TECHS, UNITS, type EventEffect } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
 import { enterCost, movementAllowance, previewAssault, recruitCost, roll, sortedKeys } from '@brink/simulation';
 
@@ -214,6 +214,20 @@ function planBudget(view: NationView): Budget | undefined {
   // Idle cash buys technology: combat techs compound over a long war.
   if (view.self.stockpile.credits > 300 && b.research < 30 && b.research + b.infrastructure + b.welfare + 10 <= 60) return { ...b, research: b.research + 10 };
   return undefined;
+}
+
+/** Rough worth of an event option: resources at face value, stability dearer when it is low. */
+function effectValue(view: NationView, e: EventEffect): number {
+  const cash = RESOURCES.reduce((a, r) => a + Math.max(e.stockpile?.[r] ?? 0, -view.self.stockpile[r]), 0);
+  const stability = (e.stability ?? 0) * (view.self.stability < 50 ? 15 : 8);
+  return cash + Math.floor((e.research ?? 0) * 1.5) + stability + (e.morale ?? 0) * 6;
+}
+
+function chooseEvent(view: NationView): 0 | 1 | undefined {
+  const pending = view.self.event;
+  if (!pending) return undefined;
+  const [a, b] = EVENTS[pending.id].options;
+  return effectValue(view, b.effect) > effectValue(view, a.effect) ? 1 : 0;
 }
 
 export function updateMemory(memory: AiMemory, view: NationView, events: readonly GameEvent[]): AiMemory {
@@ -477,5 +491,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number): Na
   };
   if (research !== undefined) out.research = research;
   if (budget) out.budget = budget;
+  const eventChoice = chooseEvent(view);
+  if (eventChoice !== undefined) out.eventChoice = eventChoice;
   return out;
 }

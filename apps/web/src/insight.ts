@@ -1,6 +1,6 @@
 import type { Formation, HexKey, Ledger, NationView, Stockpile, TurnReport } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { HOURS_PER_TURN } from '@brink/game-data';
+import { HOURS_PER_TURN, type EventEffect } from '@brink/game-data';
 import { keyDistance } from '@brink/map';
 
 // Read-only derivations for the game screen. Nothing here touches authoritative state.
@@ -57,4 +57,15 @@ export function idleFormations(view: NationView, planned: Record<string, unknown
   return Object.values(view.formations)
     .filter((f) => !planned[f.id])
     .sort((a, b) => (a.id < b.id ? -1 : 1));
+}
+
+/** "+120 energy · −4 stability" for a world event option. */
+export function describeEffect(e: EventEffect): string {
+  const sign = (v: number) => (v > 0 ? `+${v}` : `−${-v}`);
+  const parts: string[] = [];
+  for (const r of RESOURCES) if (e.stockpile?.[r]) parts.push(`${sign(e.stockpile[r]!)} ${r}`);
+  if (e.stability) parts.push(`${sign(e.stability)} stability`);
+  if (e.morale) parts.push(`${sign(e.morale)} morale, all units`);
+  if (e.research) parts.push(`${sign(e.research)} research`);
+  return parts.length ? parts.join(' · ') : 'No effect';
 }

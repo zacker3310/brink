@@ -38,7 +38,7 @@ It clones its input, never reads the clock, and throws if the ruleset version di
 | 7 | movement | Discrete-event clock (below). |
 | 8 | engagements | Assaults grouped by (attacking nation, target hex) and head-on meetings, all computed from the post-movement snapshot, then committed. |
 | 9 | territory | Beaten defenders retreat (joint choice), winners advance, then occupation and front consolidation transfer hexes. |
-| 10 | economy | Income, then upkeep, then discretionary budget spending. Unpaid upkeep is a shortage with a stated penalty; stockpiles never go negative. Recovery, entrenchment, reinforcement. |
+| 10 | economy | Income, then upkeep, then discretionary budget spending. Unpaid upkeep is a shortage with a stated penalty; stockpiles never go negative. Recovery, entrenchment, reinforcement. Then world events: a pending event resolves with the submitted `eventChoice` (option 0 if none), and a nation that answered nothing may draw a new one (`roll(seed, turn, 'event', nation)`, 20%). Effects pay what they can; nothing goes below zero. |
 | 11 | victory | Eliminations (no capital or city), then victory points (40%), last standing, or turn limit. |
 | 12 | reports | Final vision, intel update (observed hexes, last-known contacts), a `NationView` and a filtered report per nation, and the state hash. |
 

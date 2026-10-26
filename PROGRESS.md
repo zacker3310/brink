@@ -70,6 +70,10 @@ Updated 2026-10-25. Milestone 1 (first playable).
 - Threat overlay (V, or the map button): where every seen enemy could strike next turn, darker
   where more could; hovering an enemy outlines that unit's own reach; the hover card counts threats.
   `threatZones` in the simulation package, built from the viewer's NationView.
+- World events (ruleset 1.3.0): about one nation in five per turn draws a two-way decision (oil
+  strike, harvest failure, general strike, defector, arms dealer, war bonds, volunteers, scandal).
+  The card sits above the turn controls; no answer takes the first option. The AI weighs resources,
+  research, stability (dearer when low) and morale.
 - Diplomacy with teeth (ruleset 1.2.0): perfidy costs 10 stability for breaking a peace, 20 for an
   alliance, shown on the button before you commit; betrayal notifications; private chat channels to
   one player, routed by the host so nobody else (the host included) receives them.
