@@ -1,7 +1,7 @@
 // Brink offline cache. The game runs entirely in the browser, so once loaded it plays without a
 // network: navigations go network-first (a fresh deploy wins), everything else cache-first (hashed
 // bundles and art never change under the same name). Bump VERSION to drop old caches.
-const VERSION = 'brink-v1';
+const VERSION = 'brink-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest', './icons/apple-touch-icon.png'])).then(() => self.skipWaiting()));

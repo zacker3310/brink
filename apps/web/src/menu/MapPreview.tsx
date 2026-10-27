@@ -1,10 +1,12 @@
-import { memo, useId, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import type { HexKey, NationId, Terrain, WorldState } from '@brink/contracts';
 import { hexCorners, hexToPixel, neighborKeys, parseKey, type Point } from '@brink/map';
 import { sortedKeys } from '@brink/simulation';
 
 // A static SVG render of a world for the menus. The in-game map is Pixi; this one is cheap,
-// crisp at any size, and animatable with CSS.
+// crisp at any size, and animatable with CSS. The satellite ground is painted once into a single
+// bitmap: per-hex SVG image patterns made WebKit re-rasterise a full scene per hex on every frame of
+// the title's drift, which iOS Safari answered by killing the tab.
 
 const SIZE = 10;
 
@@ -16,6 +18,84 @@ const TERRAIN_FILL: Record<Terrain, string> = {
   urban: '#4a4e57',
   water: '#122233',
 };
+
+const TERRAINS = Object.keys(TERRAIN_FILL) as Terrain[];
+/** Longest edge of the painted ground, in pixels: sharp on a phone, small enough for any GPU. */
+const GROUND_PX = 1400;
+
+let scenes: Promise<Record<Terrain, HTMLImageElement>> | null = null;
+
+function loadScenes(): Promise<Record<Terrain, HTMLImageElement>> {
+  scenes ??= Promise.all(
+    TERRAINS.map(
+      (t) =>
+        new Promise<[Terrain, HTMLImageElement]>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve([t, img]);
+          img.onerror = reject;
+          img.src = `${import.meta.env.BASE_URL}art/terrain/${t}.jpg`;
+        }),
+    ),
+  ).then((pairs) => Object.fromEntries(pairs) as Record<Terrain, HTMLImageElement>);
+  return scenes;
+}
+
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const painted = new Map<string, Promise<string | null>>();
+
+/** The theatre's ground as one image (object URL): each hex cut from its terrain's scene. */
+function paintGround(world: WorldState, keys: HexKey[], box: Box, sat: { x: number; y: number; span: number }): Promise<string | null> {
+  const sig = keys.map((k) => `${k}${world.tiles[k]!.terrain}`).join(',');
+  const hit = painted.get(sig);
+  if (hit) return hit;
+  const job = loadScenes()
+    .then(async (img) => {
+      const k = GROUND_PX / Math.max(box.w, box.h);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(box.w * k);
+      canvas.height = Math.round(box.h * k);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.scale(k, k);
+      ctx.translate(-box.x, -box.y);
+      for (const t of TERRAINS) {
+        const mine = keys.filter((key) => world.tiles[key]!.terrain === t);
+        if (mine.length === 0) continue;
+        ctx.save();
+        ctx.beginPath();
+        for (const key of mine) {
+          const corners = hexCorners(center(key), SIZE + 0.2);
+          ctx.moveTo(corners[0]!.x, corners[0]!.y);
+          for (const c of corners.slice(1)) ctx.lineTo(c.x, c.y);
+          ctx.closePath();
+        }
+        ctx.clip();
+        ctx.fillStyle = TERRAIN_FILL[t];
+        ctx.fillRect(sat.x, sat.y, sat.span, sat.span);
+        ctx.drawImage(img[t], sat.x, sat.y, sat.span, sat.span);
+        ctx.restore();
+      }
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      canvas.width = 0;
+      canvas.height = 0;
+      return blob ? URL.createObjectURL(blob) : null;
+    })
+    .catch(() => null);
+  painted.set(sig, job);
+  // Setup rerolls seeds: keep only the last few grounds.
+  if (painted.size > 4) {
+    const [oldest, url] = painted.entries().next().value!;
+    painted.delete(oldest);
+    void url.then((u) => u && URL.revokeObjectURL(u));
+  }
+  return job;
+}
 
 const center = (key: HexKey) => hexToPixel(parseKey(key), SIZE);
 const pts = (c: Point, size: number) =>
@@ -74,24 +154,25 @@ export const MapPreview = memo(function MapPreview({ world, focus = null, labels
     }
     const pad = SIZE;
     const span = Math.max(maxX - minX, maxY - minY) + pad * 2;
-    return { keys, borders, rivers, sat: { x: minX - pad, y: minY - pad, span }, box: `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}` };
+    const area = { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 };
+    return { keys, borders, rivers, sat: { x: minX - pad, y: minY - pad, span }, area, box: `${area.x} ${area.y} ${area.w} ${area.h}` };
   }, [world]);
+  const [ground, setGround] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void paintGround(world, geo.keys, geo.area, geo.sat).then((url) => live && setGround(url));
+    return () => {
+      live = false;
+    };
+  }, [world, geo]);
 
   const colors = world.nations;
   // The same Sentinel-2 ground as the game, one real scene per terrain stretched across the theatre.
-  const uid = useId().replace(/:/g, '');
-  const sat = (t: Terrain) => `url(#${uid}-${t})`;
   const dim = (owner: NationId | null) => focus !== null && owner !== focus;
 
   return (
     <svg viewBox={geo.box} className={className} role="img" aria-label="Map of the theatre" preserveAspectRatio="xMidYMid meet">
       <defs>
-        {(Object.keys(TERRAIN_FILL) as Terrain[]).map((t) => (
-          <pattern key={t} id={`${uid}-${t}`} patternUnits="userSpaceOnUse" x={geo.sat.x} y={geo.sat.y} width={geo.sat.span} height={geo.sat.span}>
-            <rect width={geo.sat.span} height={geo.sat.span} fill={TERRAIN_FILL[t]} />
-            <image href={`${import.meta.env.BASE_URL}art/terrain/${t}.jpg`} width={geo.sat.span} height={geo.sat.span} preserveAspectRatio="none" />
-          </pattern>
-        ))}
         <filter id="mp-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" result="b" />
           <feMerge>
@@ -100,13 +181,15 @@ export const MapPreview = memo(function MapPreview({ world, focus = null, labels
           </feMerge>
         </filter>
       </defs>
-      <g>
-        {geo.keys.map((k) => {
-          const t = world.tiles[k]!;
-          const c = center(k);
-          return <polygon key={k} points={pts(c, SIZE + 0.2)} fill={sat(t.terrain)} />;
-        })}
-      </g>
+      {ground ? (
+        <image href={ground} x={geo.area.x} y={geo.area.y} width={geo.area.w} height={geo.area.h} preserveAspectRatio="none" />
+      ) : (
+        <g>
+          {geo.keys.map((k) => (
+            <polygon key={k} points={pts(center(k), SIZE + 0.2)} fill={TERRAIN_FILL[world.tiles[k]!.terrain]} />
+          ))}
+        </g>
+      )}
       <g>
         {geo.keys.map((k) => {
           const t = world.tiles[k]!;
