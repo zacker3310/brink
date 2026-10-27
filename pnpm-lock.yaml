@@ -69,15 +69,12 @@ importers:
       '@brink/simulation':
         specifier: workspace:*
         version: link:../../packages/simulation
-      '@fontsource-variable/archivo':
-        specifier: 5.2.8
-        version: 5.2.8
-      '@fontsource/martian-mono':
-        specifier: 5.2.7
-        version: 5.2.7
-      milsymbol:
-        specifier: 3.0.4
-        version: 3.0.4
+      '@fontsource/barlow':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/barlow-condensed':
+        specifier: ^5.3.0
+        version: 5.3.0
       peerjs:
         specifier: 1.5.5
         version: 1.5.5
@@ -431,11 +428,11 @@ packages:
   '@fastify/proxy-addr@5.1.2':
     resolution: {integrity: sha512-uqB4QsgVoro0XDC+DIftIMGXHdBPn+lK6Ek3xXAIxPMCJfqxnbtyEoMCm2KPUVOuIosd7Cyw9HawEqMFM/UA+g==}
 
-  '@fontsource-variable/archivo@5.2.8':
-    resolution: {integrity: sha512-R8EotpKHEsKv7d7oiUyjyPENRi2gtAlwdTlzDCOs5BfX/LJP7jvUYJ4fF/qyd3rnbgk3r1xp33g1P57bYJfhzQ==}
+  '@fontsource/barlow-condensed@5.3.0':
+    resolution: {integrity: sha512-RA7MmIx0v3eQ6Gcf74qLVLOwLB0GpPOzx+eU9iG/AmCnSJGcIWYeU8y6CEMGZ210MGwGg5CZhzLkkvyZdTTk1g==}
 
-  '@fontsource/martian-mono@5.2.7':
-    resolution: {integrity: sha512-DU0WVmso0FjwnNf7Z80FhnrF/pCMgNi9ZfHTn1Ws7TM6u00CwV6esjaFkn3blnchn0pRwt63/M/2vfBe6J4mFg==}
+  '@fontsource/barlow@5.3.0':
+    resolution: {integrity: sha512-tGR0y6QObRtKv71MOth44222+mdNFM/ZWFWDV1VLzNbG4oK9PNRlyJzmkck4vHAi9ibHBXgt4SlY51amFP55CA==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1305,9 +1302,6 @@ packages:
   magic-string@1.4.3:
     resolution: {integrity: sha512-z12OxmaPGE0F4xlpGdjuAUckipLpQlTAuAmyGhNoD7ODpYUzvDfvtxUbjM/jwznyP178oju/KDdyi220wNJ0RQ==}
 
-  milsymbol@3.0.4:
-    resolution: {integrity: sha512-Jrs1RBCag2IzyEJwI476i2+pNHdi8WMwAp2mDD23g3TR48ERdHmdQgPXZUosRKyhPMr58/eOPyyLE53lMPPAgw==}
-
   minimatch@10.2.6:
     resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
     engines: {node: 18 || 20 || >=22}
@@ -1832,9 +1826,9 @@ snapshots:
       '@fastify/forwarded': 3.1.2
       ipaddr.js: 2.5.0
 
-  '@fontsource-variable/archivo@5.2.8': {}
+  '@fontsource/barlow-condensed@5.3.0': {}
 
-  '@fontsource/martian-mono@5.2.7': {}
+  '@fontsource/barlow@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -2603,8 +2597,6 @@ snapshots:
   magic-string@1.4.3:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
-
-  milsymbol@3.0.4: {}
 
   minimatch@10.2.6:
     dependencies:

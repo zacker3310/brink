@@ -1,45 +1,32 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Surfaces: cold instrument black, darkest (page) to lightest (raised control). */
-  --color-ink-950: #070909;
-  --color-ink-900: #0c0f10;
-  --color-ink-850: #111516;
-  --color-ink-800: #171c1d;
-  --color-ink-700: #1f2527;
-  --color-ink-600: #2a3134;
-  --color-line: #252c2e;
-  /* Text: plain white, then two quieter steps. */
-  --color-text: #eef1ee;
-  --color-muted: #9fa8a6;
-  --color-faint: #6a7472;
-  /* Signal: the one accent, a sensor-overlay lime. Actions, planning, focus, anything waiting on you. */
-  --color-signal: #d2f249;
-  /* Outcomes. */
-  --color-good: #57d3a0;
-  --color-hostile: #ff4d42;
-  /* APP-6 affiliation colours (friend blue, hostile red, neutral green, unknown yellow). */
-  --color-friend: #49b8ff;
-  --color-neutral: #8fd694;
+  /* Command Table (design system v2, docs/design-system.md). Surfaces: warm slate, lifted enough
+     that panels separate from the map and text never sits on pure black. */
+  --color-ink-950: #0d1114;
+  --color-ink-900: #141a1e;
+  --color-ink-850: #1a2126;
+  --color-ink-800: #212a30;
+  --color-ink-700: #2b353c;
+  --color-ink-600: #36424a;
+  --color-line: #33404a;
+  /* Text: high contrast first, every step passes WCAG AA on ink-900. */
+  --color-text: #f3f5f6;
+  --color-muted: #b4bfc6;
+  --color-faint: #8794a0;
+  /* Command amber: the one accent. Whatever is waiting on you, and the button that moves the game. */
+  --color-signal: #ffc23d;
+  /* Outcomes: green good, red bad. Red is also every enemy. */
+  --color-good: #4fd18b;
+  --color-hostile: #ff5a4e;
+  /* You: blue for your selection, your reach and your moves. */
+  --color-friend: #4fb3ff;
+  --color-neutral: #9ad69c;
   --color-unknown: #ffe14d;
-  --font-sans: 'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'Martian Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-display: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
-}
-
-/* Display type is Archivo set wide: flat, heavy caps, the way modern shooters set their HUDs. Full
-   width for screen titles; a little narrower in the dense game HUD. */
-.font-display,
-.ds-display {
-  font-stretch: 112%;
-}
-.ds-label,
-.city-banner {
-  font-stretch: 108%;
-}
-.title-wordmark,
-.screen-title {
-  font-stretch: 125%;
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  /* Numbers use Barlow too, with tabular figures (set on body): one family, no code-font look. */
+  --font-mono: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
 }
 
 :root {
@@ -235,8 +222,7 @@ body {
 }
 .title-wordmark {
   color: var(--color-text);
-  font-stretch: 125%;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
 }
 .menu-item::before {
   content: '';
@@ -424,11 +410,11 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.01em;
 }
-/* Section label: small wide caps, lightly tracked. */
+/* Section label: small condensed caps, lightly tracked. */
 .ds-label {
   font-family: var(--font-display);
-  font-weight: 650;
-  font-size: 10px;
+  font-weight: 700;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-faint);

@@ -118,6 +118,23 @@ Updated 2026-10-25. Milestone 1 (first playable).
   sound (WebAudio: orders, lock-on, end turn, strikes, battles, win/lose), mutable from the menu.
   Solo campaigns autosave after every turn; Continue picks it up.
 
+- Design system v2, "Command Table" (`docs/design-system.md`), after "too hard, not intuitive":
+  - Units are wargame counters: a pictogram drawn for the game (rifleman, IFV, tank, howitzer,
+    armoured car, attack helicopter, quadcopter) and a strength from 1 to 10. Yours are solid in your
+    colour, theirs dark with a red war tab; one counter per hex with a stack count. APP-6 chips and
+    the milsymbol dependency (860 KB) are gone.
+  - Consequences before commitment: with a stack selected, every enemy it can hit is tagged WIN,
+    EVEN or RISKY on the map (`odds.ts`); locking on shows who attacks, the odds in words and the
+    expected losses.
+  - Stacks move as one on touch: tap a hex to select everyone there (led by the slowest ground
+    unit), toggle units in the card, tap a blue hex to move all, tap a target to attack together.
+  - Always an answer to "what now?": an amber goal ring and a "Take X +VP" chip name the best place
+    to take next (`objective.ts`).
+  - Phone HUD down to turn, victory bar, funds (with shortages named) and the goal. Barlow and
+    Barlow Condensed type, warm slate surfaces, command-amber accent, larger type; the ground
+    imagery is graded down and borders are bolder.
+  - Fixed: the silent autosave reported "Could not save" after every turn.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real

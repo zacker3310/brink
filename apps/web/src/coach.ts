@@ -52,7 +52,7 @@ export const STEPS: readonly CoachStep[] = [
       'A unit is selected: its card is bottom left. Blue hexes are where it can reach this turn. Click one to send it there. To pick a different unit, click it first.',
     done: (s) => s.ordered > 0,
     keys: ['Click', 'M'],
-    touch: () => 'A unit is selected: its card is at the bottom. Blue hexes are where it can reach this turn. Tap one to send it there. Tap any of your units to pick it instead.',
+    touch: () => 'Each tile is a unit: the picture says what it is, the number its strength (10 is full). Your stack is selected. Tap a blue hex and the whole stack moves there.',
   },
   {
     id: 'all',
@@ -63,7 +63,7 @@ export const STEPS: readonly CoachStep[] = [
     skippable: true,
     keys: ['N', 'H', 'D'],
     touch: (s) =>
-      `${s.idle} ${s.idle === 1 ? 'unit still waits' : 'units still wait'} for orders (amber dot). Next jumps to the next one, Dig in fortifies. In a hurry? Auto has your staff draft orders for everyone left.`,
+      `${s.idle} ${s.idle === 1 ? 'unit still waits' : 'units still wait'} for orders (amber dot). Next jumps to the next stack. Not sure what to do? The amber goal up top names the best target, and Plan has your staff draft orders for everyone left.`,
   },
   {
     id: 'build',
@@ -117,7 +117,7 @@ export const STEPS: readonly CoachStep[] = [
     skippable: true,
     keys: ['Right-click', 'A'],
     touch: () =>
-      'With a unit selected, enemies it can hit get a red ring. Tap one to lock on: the card shows the odds. Tap it again (or Confirm) to attack. Artillery and air strike from range.',
+      'With your units selected, every enemy they can hit is ringed in red and tagged WIN, EVEN or RISKY. Tap one for the details, tap again (or Attack) to go. Pick your fights: WIN first.',
   },
   {
     id: 'diplomacy',

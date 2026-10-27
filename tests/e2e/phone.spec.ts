@@ -23,8 +23,8 @@ async function endTurn(page: Page, turn: number) {
   await expect(page.getByTestId('turn')).toContainText(`${turn}/20`);
 }
 
-test('a campaign plays start to turn four on a phone, by touch alone', async ({ page }) => {
-  test.setTimeout(150_000);
+test('a campaign plays on a phone by touch alone: move a stack, attack, end turns', async ({ page }) => {
+  test.setTimeout(330_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -34,6 +34,8 @@ test('a campaign plays start to turn four on a phone, by touch alone', async ({ 
   await page.goto('./');
   await page.getByTestId('menu-new').tap();
   await expect(page.getByTestId('length-quick')).toHaveAttribute('aria-checked', 'true');
+  // A fixed seed: the engine and the staff planner are deterministic, so this is the same war every run.
+  await page.getByTestId('seed').fill('7');
   await page.getByTestId('start-game').tap();
   await expect(page.getByTestId('turn')).toContainText('1/20');
   // The whole command surface fits on the screen.
@@ -73,10 +75,47 @@ test('a campaign plays start to turn four on a phone, by touch alone', async ({ 
   await expect(page.getByTestId('panel-diplomacy')).toBeVisible();
   await page.getByTestId('close-sheet').tap();
 
+  // Attack by touch: find a stack with an enemy it can hit, tap the enemy (the odds come up), confirm.
+  let attacked = false;
+  for (let tries = 0; tries < 6 && !attacked; tries++) {
+    const stacks = await page.evaluate(() => [...new Set(window.__brink!.formations().map((f) => f.key))]);
+    for (const key of stacks) {
+      const at = await page.evaluate((k) => window.__brink!.hexToClient(k), key);
+      if (at.y < 170 || at.y > viewport.height - 330 || at.x < 20 || at.x > viewport.width - 20) continue;
+      await page.touchscreen.tap(at.x, at.y);
+      const target = await page.evaluate(
+        ([top, bottom, w]) =>
+          window
+            .__brink!.targets()
+            .map((k) => window.__brink!.hexToClient(k))
+            .find((p) => p.y > top && p.y < bottom && p.x > 20 && p.x < w - 20),
+        [170, viewport.height - 420, viewport.width] as const,
+      );
+      if (!target) continue;
+      await page.touchscreen.tap(target.x, target.y);
+      await expect(page.getByTestId('armed')).toBeVisible();
+      await page.getByTestId('confirm-attack').tap();
+      await expect(page.getByTestId('armed')).toHaveCount(0);
+      attacked = true;
+      break;
+    }
+    if (!attacked) {
+      // Close in on the enemy a few hexes at a time.
+      await page.getByTestId('auto-command').tap();
+      await page.getByTestId('end-turn').tap();
+      await expect(page.getByTestId('replay')).toBeVisible({ timeout: 15000 });
+      await page.getByTestId('skip-replay').tap({ timeout: 3000 }).catch(() => undefined);
+      await page.getByTestId('debrief-close').tap();
+    }
+  }
+  expect(attacked).toBe(true);
+
   await page.getByTestId('auto-command').tap();
-  await endTurn(page, 3);
+  await page.getByTestId('end-turn').tap();
+  await expect(page.getByTestId('replay')).toBeVisible({ timeout: 15000 });
+  await page.getByTestId('skip-replay').tap({ timeout: 3000 }).catch(() => undefined);
+  await page.getByTestId('debrief-close').tap();
   await page.getByTestId('auto-command').tap();
-  await endTurn(page, 4);
 
   // Menu: sound and replay toggles, then quit.
   await page.getByTestId('phone-menu').tap();

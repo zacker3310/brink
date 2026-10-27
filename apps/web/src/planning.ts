@@ -78,3 +78,9 @@ export function describeOrder(order: FormationOrder | undefined, view?: NationVi
       return order.path.length > 0 ? `Advance ${order.path.length}, assault ${place(order.target)}` : `Attack ${place(order.target)}`;
   }
 }
+
+/** The order a right-click, a tap (or a click in the current mode) on `key` means for `f`. */
+export function contextualOrder(view: NationView, f: Formation, key: HexKey, mode: Mode, reach: Record<HexKey, Reach>, rightClick: boolean): Planned | { error: string } {
+  const m: Mode = hostilesAt(view, key).length > 0 ? 'attack' : rightClick && mode === 'attack' ? 'move' : mode;
+  return orderForClick(view, f, key, m, reach);
+}

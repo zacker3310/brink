@@ -4,15 +4,17 @@ import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass 
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
-import { addUnit, affiliationOf, keepScreenSize, setModelZoom, slotOffsets, tickModels, type CounterLook } from './counters';
-import { AFFILIATION, FONT_UI, SURFACE, TEXT } from './design/tokens';
+import { addUnit, affiliationOf, keepScreenSize, setModelZoom, tickModels, type CounterLook } from './counters';
+import { AFFILIATION, FONT_DISPLAY, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
 import { terrainTexture } from './design/terrain';
 import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
 import { sfx } from './sfx';
 import { isPhone } from './phone';
 import { threatZones } from '@brink/simulation';
-import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
+import { contextualOrder, hostilesAt, orderForClick, reachFor } from './planning';
+import { nextObjective } from './objective';
+import { groupOrders, oddsFor, ODDS_TAG, type Odds } from './odds';
 import { useGame } from './store';
 
 const SIZE = HEX_SIZE;
@@ -52,12 +54,6 @@ function softGround(app: Application, art: Art, sat: Matrix, keys: HexKey[], ter
     out.addChild(fill, mask);
   }
   return out;
-}
-
-/** Middle of the known map, where units face when they have nowhere to go. */
-function mapMiddle(v: NationView): Point {
-  const pts = Object.keys(v.tiles).map(center);
-  return { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length };
 }
 
 function poly(key: HexKey, shrink = 0): number[] {
@@ -119,6 +115,20 @@ function drawPath(g: Graphics, from: HexKey, order: FormationOrder, color: numbe
   }
 }
 
+const ODDS_COLOR: Record<Odds, number> = { good: 0x4fd18b, even: 0xffc23d, bad: 0xff5a4e };
+
+/** A pill under an enemy hex: how an attack there would likely go. Holds its size on screen. */
+function oddsBadge(c: Point, odds: Odds): Container {
+  const box = new Container();
+  const t = new Text({ text: ODDS_TAG[odds], resolution: 4, style: { fontFamily: FONT_DISPLAY, fontSize: 11, fontWeight: '800', fill: 0x0d1114, letterSpacing: 0.4 } });
+  t.anchor.set(0.5);
+  const w = t.width + 10;
+  box.addChild(new Graphics().roundRect(-w / 2, -7.5, w, 15, 7.5).fill({ color: ODDS_COLOR[odds] }).stroke({ width: 1.5, color: 0x0d1114 }), t);
+  box.position.set(c.x, c.y + SIZE * 0.72);
+  keepScreenSize(box);
+  return box;
+}
+
 function drawCrosshair(g: Graphics, c: Point, color: number, alpha: number) {
   g.circle(c.x, c.y, SIZE * 0.55).stroke({ width: 3, color, alpha });
   for (const [dx, dy] of [
@@ -133,12 +143,6 @@ function drawCrosshair(g: Graphics, c: Point, color: number, alpha: number) {
   }
 }
 
-/** The order a right-click (or a click in the current mode) on `key` means for `f`. */
-export function contextualOrder(view: NationView, f: Formation, key: HexKey, mode: Mode, reach: Record<HexKey, Reach>, rightClick: boolean) {
-  const m: Mode = hostilesAt(view, key).length > 0 ? 'attack' : rightClick && mode === 'attack' ? 'move' : mode;
-  return orderForClick(view, f, key, m, reach);
-}
-
 declare global {
   interface Window {
     __brink?: {
@@ -146,6 +150,8 @@ declare global {
       reachable(): HexKey[];
       enemies(): HexKey[];
       formations(): { id: string; cls: UnitClass; key: HexKey }[];
+      /** Enemy hexes the selected stack can attack. */
+      targets(): HexKey[];
     };
   }
 }
@@ -287,7 +293,7 @@ export function MapView() {
     if (!isPhone()) return { top: 0, bottom: h };
     // The guided match's card sits under the status strip; keep the action below it.
     const coach = document.querySelector('[data-testid="coach"]')?.getBoundingClientRect().bottom ?? 0;
-    return { top: Math.max(130, coach), bottom: h - (useGame.getState().armed ? 350 : 270) };
+    return { top: Math.max(150, coach), bottom: h - (useGame.getState().armed ? 400 : 300) };
   }
 
   function fitTo(v: NationView, whole = false) {
@@ -435,6 +441,13 @@ export function MapView() {
         const v = useGame.getState().view;
         return v ? Object.values(v.formations).map((f) => ({ id: f.id, cls: f.unitClass, key: f.key })) : [];
       },
+      targets() {
+        const s = useGame.getState();
+        const v = s.view;
+        if (!v || s.group.length === 0) return [];
+        const keys = [...new Set(Object.values(v.contacts).filter((c) => v.relations[c.owner] === 'war').map((c) => c.key))].sort();
+        return keys.filter((k) => Object.values(groupOrders(v, s.group, k).orders).some((o) => o.type === 'attack'));
+      },
       enemies() {
         const v = useGame.getState().view;
         return v ? [...new Set(Object.values(v.contacts).filter((c) => c.confirmed && v.relations[c.owner] === 'war').map((c) => c.key))].sort() : [];
@@ -457,6 +470,10 @@ export function MapView() {
     const own = Object.values(v.formations)
       .filter((o) => o.key === key)
       .sort((a, b) => (a.id < b.id ? -1 : 1));
+    if (touch) {
+      onTap(key, own.length > 0);
+      return;
+    }
     if (r && !s.resolving) {
       const { f, reach } = r;
       const hostile = hostilesAt(v, key).length > 0;
@@ -504,6 +521,50 @@ export function MapView() {
       const site = v.tiles[key]?.siteId;
       if (site && v.sites[site]?.owner === v.self.id && v.sites[site]?.kind !== 'objective') s.openCity(site);
     }
+  }
+
+  /**
+   * A tap. Your own stack: select all of it. With a stack selected: a blue hex moves everyone who can
+   * reach it; an enemy locks on (the odds are already on the map) and a second tap attacks.
+   * Anywhere else: look at it, and open your city if it is one.
+   */
+  function onTap(key: HexKey, ownHere: boolean) {
+    const s = useGame.getState();
+    const v = s.view!;
+    const hostile = hostilesAt(v, key).length > 0;
+    if (ownHere && !hostile) {
+      s.selectStack(key);
+      return;
+    }
+    const group = s.group.filter((id) => v.formations[id]);
+    if (group.length > 0 && !s.resolving) {
+      const { orders, error } = groupOrders(v, group, key);
+      const ids = Object.keys(orders);
+      if (ids.length > 0) {
+        if (ids.some((id) => orders[id]!.type === 'attack')) {
+          const armed = s.armed;
+          if (armed && armed.target === key) s.issueGroup(armed.orders ?? { [armed.formation]: armed.order });
+          else {
+            const lead = s.selectedFormation && orders[s.selectedFormation] ? s.selectedFormation : ids[0]!;
+            s.armAttack({ formation: lead, target: key, order: orders[lead]!, orders });
+          }
+          s.focusOn(key);
+          return;
+        }
+        s.selectHex(key);
+        s.issueGroup(orders);
+        if (ids.length < group.length) s.notify(`${ids.length} of ${group.length} units can reach there this turn`, 'warn');
+        return;
+      }
+      if (hostile) {
+        s.notify(error ?? 'Out of reach this turn', 'warn');
+        return;
+      }
+    }
+    s.selectFormation(null);
+    s.selectHex(key);
+    const site = v.tiles[key]?.siteId;
+    if (site && v.sites[site]?.owner === v.self.id && v.sites[site]?.kind !== 'objective') s.openCity(site);
   }
 
   /** Hover: outline, and with a unit selected the path or attack it would order (Civ-style). */
@@ -667,14 +728,16 @@ export function MapView() {
     for (const key of keys) {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown') continue;
+      // The imagery is graded down so units, borders and highlights carry the picture.
+      if (art && !t.siteId) overlay.poly(poly(key)).fill({ color: 0x0d1418, alpha: 0.32 });
       if (t.owner) {
         const color = hex(v.nations[t.owner]?.color ?? '#888888');
-        overlay.poly(poly(key, 1)).fill({ color, alpha: (t.visibility === 'visible' ? 0.1 : 0.06) * (art ? 0.6 : 1) });
+        overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.2 : 0.12 });
         for (const n of neighborKeys(key)) {
           if (v.tiles[n]?.owner === t.owner) continue;
           const [p, q] = edge(key, n, 2.5);
-          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 5, color: 0x000000, alpha: 0.35, cap: 'round' });
-          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.5, color, alpha: 0.95, cap: 'round' });
+          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 6, color: 0x000000, alpha: 0.4, cap: 'round' });
+          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 3.5, color, alpha: 1, cap: 'round' });
         }
       }
       if (t.visibility === 'observed') overlay.poly(poly(key)).fill({ color: 0x0a0c0b, alpha: 0.5 });
@@ -740,6 +803,7 @@ export function MapView() {
 
     // Movement range (blue, Civ-style) with a bright outer border, attackable enemies in red.
     const hl = new Graphics();
+    const badges: Container[] = [];
     const r = replaying ? null : currentReach();
     if (r) {
       const tint = s.mode === 'withdraw' ? 0x9fb8d9 : MOVE;
@@ -752,13 +816,19 @@ export function MapView() {
           hl.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.5, color: tint, alpha: 0.9, cap: 'round' });
         }
       }
-      const targets = new Set<HexKey>();
+      // Every enemy the selected stack can hit, ringed, with how the fight would likely go.
+      const group = s.group.map((id) => v.formations[id]).filter((f): f is Formation => !!f);
+      const attackers = group.length ? group : [r.f];
+      const seen = new Set<HexKey>();
       for (const c of Object.values(v.contacts)) {
-        if (v.relations[c.owner] !== 'war' || targets.has(c.key)) continue;
-        const res = orderForClick(v, r.f, c.key, 'attack', r.reach);
-        if (!('error' in res)) targets.add(c.key);
+        if (v.relations[c.owner] !== 'war' || seen.has(c.key)) continue;
+        seen.add(c.key);
+        const able = attackers.filter((f) => !('error' in orderForClick(v, f, c.key, 'attack', f.id === r.f.id ? r.reach : reachFor(v, f))));
+        if (able.length === 0) continue;
+        hl.poly(poly(c.key, 2)).fill({ color: ATTACK, alpha: 0.18 }).stroke({ width: 3, color: ATTACK, alpha: 0.95 });
+        const odds = oddsFor(v, able, c.key);
+        if (odds) badges.push(oddsBadge(center(c.key), odds));
       }
-      for (const k of targets) hl.poly(poly(k, 2)).fill({ color: ATTACK, alpha: 0.18 }).stroke({ width: 3, color: ATTACK, alpha: 0.95 });
     }
     if (s.report && !s.showReport && !replaying) {
       for (const e of s.report.events) {
@@ -770,6 +840,13 @@ export function MapView() {
       }
     }
     if (s.selectedHex && !replaying) hl.poly(poly(s.selectedHex, 1)).stroke({ width: 2.5, color: 0xffffff, alpha: 0.9 });
+    // The suggested next objective: a ring in command amber.
+    const goal = replaying ? null : nextObjective(v);
+    if (goal) {
+      const c = center(goal.site.key);
+      hl.circle(c.x, c.y, SIZE * 0.95).stroke({ width: 3, color: SIGNAL, alpha: 0.95 });
+      hl.circle(c.x, c.y, SIZE * 1.12).stroke({ width: 1.5, color: SIGNAL, alpha: 0.5 });
+    }
     // A touch attack waiting for its second tap: the target in crosshairs.
     if (s.armed && !replaying) {
       const c = center(s.armed.target);
@@ -777,7 +854,7 @@ export function MapView() {
       hl.circle(c.x, c.y, SIZE * 0.55).stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) hl.moveTo(c.x + dx * SIZE * 0.35, c.y + dy * SIZE * 0.35).lineTo(c.x + dx * SIZE * 0.8, c.y + dy * SIZE * 0.8).stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
     }
-    a.layers.highlight!.addChild(hl);
+    a.layers.highlight!.addChild(hl, ...badges);
 
     // Planned orders: path, arrowhead and a ghost of the unit where it will end up.
     const paths = new Graphics();
@@ -805,65 +882,56 @@ export function MapView() {
     }
     a.layers.paths!.addChild(paths);
 
-    // Formations: top-down models deployed in formation within each hex, own first then contacts.
-    type Marker = CounterLook & { key: HexKey };
-    const byHex = new Map<HexKey, Marker[]>();
+    // Formations: one counter per hex for each side, standing for the whole stack.
     const planned = (s.submitted ?? s.draft)?.formations ?? {};
-    const mid = mapMiddle(v);
-    const toward = (from: HexKey, to: Point) => {
-      const p = center(from);
-      return Math.atan2(to.y - p.y, to.x - p.x);
-    };
-    for (const f of Object.values(v.formations).sort((x, y) => (x.id < y.id ? -1 : 1))) {
-      const o = planned[f.id];
-      const next = o && 'path' in o && o.path.length ? o.path[0]! : o?.type === 'attack' ? o.target : null;
-      byHex.set(f.key, [
-        ...(byHex.get(f.key) ?? []),
-        {
-          key: f.key,
-          cls: f.unitClass,
+    const sprites = a.layers.units!;
+    if (replaying) return;
+    for (const gh of ghosts) {
+      const c = center(gh.key);
+      addUnit(sprites, c.x, c.y, { cls: gh.cls, aff: 'friend', fill: v.self.color, confirmed: true, strength: gh.strength, planned: true, facing: gh.facing });
+    }
+    const counters: { key: HexKey; look: CounterLook; side: number }[] = [];
+    const ownByHex = new Map<HexKey, Formation[]>();
+    for (const f of Object.values(v.formations).sort((x, y) => (x.id < y.id ? -1 : 1))) ownByHex.set(f.key, [...(ownByHex.get(f.key) ?? []), f]);
+    for (const [key, list] of ownByHex) {
+      // The counter on top: the selected unit, else one still waiting for orders, else the strongest.
+      const lead = list.find((f) => f.id === s.selectedFormation) ?? list.find((f) => !planned[f.id]) ?? [...list].sort((x, y) => y.strength - x.strength)[0]!;
+      counters.push({
+        key,
+        side: 0,
+        look: {
+          cls: lead.unitClass,
           aff: 'friend',
           fill: v.self.color,
           confirmed: true,
-          strength: f.strength,
-          selected: f.id === s.selectedFormation,
-          idle: !o && !s.submitted,
-          facing: toward(f.key, next ? center(next) : mid),
+          strength: lead.strength,
+          selected: list.some((f) => f.id === s.selectedFormation),
+          idle: !s.submitted && list.some((f) => !planned[f.id]),
+          count: list.length,
         },
-      ]);
-    }
-    for (const c of Object.values(v.contacts).sort((x, y) => (x.formation < y.formation ? -1 : 1))) {
-      byHex.set(c.key, [
-        ...(byHex.get(c.key) ?? []),
-        {
-          key: c.key,
-          cls: c.unitClass,
-          aff: affiliationOf(false, v.relations[c.owner]),
-          fill: v.nations[c.owner]?.color ?? '#888888',
-          confirmed: c.confirmed,
-          strength: c.estimatedStrength,
-          facing: toward(c.key, mid),
-        },
-      ]);
-    }
-    const sprites = a.layers.units!;
-    if (!replaying) {
-      for (const gh of ghosts) {
-        const c = center(gh.key);
-        addUnit(sprites, c.x, c.y, { cls: gh.cls, aff: 'friend', fill: v.self.color, confirmed: true, strength: gh.strength, planned: true, facing: gh.facing });
-      }
-    } else byHex.clear();
-    // Draw back to front so lower models overlap the ones behind them.
-    for (const [key, list] of [...byHex].sort((x, y) => center(x[0]).y - center(y[0]).y)) {
-      const c = center(key);
-      const slots = slotOffsets(list.length);
-      // Aircraft fly over the ground units sharing their hex.
-      const air = (m: Marker) => (UNITS[m.cls].ground ? 0 : 1);
-      const order = [...list].sort((m, n) => air(m) - air(n) || Number(m.selected) - Number(n.selected));
-      order.forEach((m, i) => {
-        const at = slots[Math.min(i, slots.length - 1)]!;
-        addUnit(sprites, c.x + at.x, c.y + at.y, m, at.scale);
       });
+    }
+    const theirsByHex = new Map<HexKey, (typeof v.contacts)[string][]>();
+    for (const c of Object.values(v.contacts).sort((x, y) => (x.formation < y.formation ? -1 : 1))) theirsByHex.set(c.key, [...(theirsByHex.get(c.key) ?? []), c]);
+    for (const [key, list] of theirsByHex) {
+      const lead = [...list].sort((x, y) => Number(y.confirmed) - Number(x.confirmed) || y.estimatedStrength - x.estimatedStrength)[0]!;
+      counters.push({
+        key,
+        side: ownByHex.has(key) ? 1 : 0,
+        look: {
+          cls: lead.unitClass,
+          aff: affiliationOf(false, v.relations[lead.owner]),
+          fill: v.nations[lead.owner]?.color ?? '#888888',
+          confirmed: list.some((c) => c.confirmed),
+          strength: lead.estimatedStrength,
+          count: list.length,
+        },
+      });
+    }
+    // Back to front, so lower counters overlap the ones behind them.
+    for (const m of counters.sort((x, y) => center(x.key).y - center(y.key).y)) {
+      const c = center(m.key);
+      addUnit(sprites, c.x + m.side * 14, c.y + m.side * 6, m.look, m.side ? 0.85 : 1);
     }
 
   }

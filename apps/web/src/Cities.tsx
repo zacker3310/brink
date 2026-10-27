@@ -39,8 +39,10 @@ export function CityBanners() {
         .map((s) => {
           const p = hexToPixel(parseKey(s.key), HEX_SIZE);
           const x = cam.x + p.x * cam.scale;
-          // On a phone the banner rides clear of the hex, so the units in a city stay tappable.
-          const y = cam.y + (p.y - HEX_SIZE * (phone ? 1.02 : 0.78)) * cam.scale;
+          // On a phone the banner sits under the counter, inside its own hex, so every counter stays readable.
+          const y = cam.y + (p.y + (phone ? HEX_SIZE * 0.5 : -HEX_SIZE * 0.78)) * cam.scale;
+          // A city the selected stack could attack shows its odds there instead.
+          if (phone && selectedFormation && Object.values(v.contacts).some((c) => c.key === s.key && v.relations[c.owner] === 'war')) return null;
           const owner = s.owner ? v.nations[s.owner] : undefined;
           const mine = s.owner === v.self.id;
           const color = owner?.color ?? '#e0a84a';
@@ -55,10 +57,10 @@ export function CityBanners() {
               tabIndex={clickable ? 0 : -1}
               onClick={() => clickable && openCity(s.id)}
               data-testid={`city-${s.id}`}
-              className={`city-banner absolute flex -translate-x-1/2 -translate-y-full items-stretch overflow-hidden text-left shadow-lg ${clickable ? 'pointer-events-auto cursor-pointer' : ''} ${
+              className={`city-banner font-display absolute flex -translate-x-1/2 ${phone ? '' : '-translate-y-full'} items-stretch overflow-hidden text-left shadow-lg ${clickable ? 'pointer-events-auto cursor-pointer' : ''} ${
                 selectedCity === s.id ? 'ring-2 ring-white' : ''
               }`}
-              style={{ left: x, top: y, fontSize: Math.max(9, Math.min(phone ? 11 : 13, 11 * cam.scale)) }}
+              style={{ left: x, top: y, fontSize: Math.max(9, Math.min(phone ? 10 : 13, 11 * cam.scale)) }}
               title={mine ? `${s.name}: click to set production` : s.name}
             >
               <span className="flex items-center justify-center px-1.5 font-mono font-black text-ink-950" style={{ background: color }}>

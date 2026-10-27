@@ -15,7 +15,6 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             { name: 'pixi', test: /node_modules[\\/].*pixi/ },
-            { name: 'milsymbol', test: /node_modules[\\/].*milsymbol/ },
             { name: 'react', test: /node_modules[\\/].*(react|scheduler|zustand)/ },
           ],
         },

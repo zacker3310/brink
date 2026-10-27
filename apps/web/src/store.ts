@@ -18,6 +18,8 @@ import { RESOURCES } from '@brink/contracts';
 import { engine } from './engine';
 import { idleFormations, netChange, selfLedger } from './insight';
 import { recruitCostFor } from './rules-view';
+import { movementAllowance } from '@brink/simulation';
+import { UNITS } from '@brink/game-data';
 import { useCoach } from './coach';
 import { sfx } from './sfx';
 import { useNet } from './net/room';
@@ -38,6 +40,14 @@ export interface Playback {
   rewatch?: boolean;
 }
 
+/** A touch attack waiting for its confirming tap: the target, and every order the stack would get. */
+export interface Armed {
+  formation: FormationId;
+  target: HexKey;
+  order: FormationOrder;
+  orders?: Record<FormationId, FormationOrder>;
+}
+
 export interface Notice {
   id: number;
   tone: 'info' | 'warn' | 'error';
@@ -56,6 +66,8 @@ interface State {
   rejected: GameEvent[];
   selectedHex: HexKey | null;
   selectedFormation: FormationId | null;
+  /** Units ordered together: the selected unit's stack (on a touch screen). The selected unit leads. */
+  group: FormationId[];
   mode: Mode;
   tab: Tab;
   showReport: boolean;
@@ -75,7 +87,7 @@ interface State {
   /** Show where seen enemies could strike next turn. */
   showThreat: boolean;
   /** A touch attack waiting for its confirming second tap. */
-  armed: { formation: FormationId; target: HexKey; order: FormationOrder } | null;
+  armed: Armed | null;
   /** The last resolved turn, kept so it can be replayed again. */
   lastTurn: { before: NationView; events: GameEvent[] } | null;
 
@@ -87,6 +99,12 @@ interface State {
   toMenu(): void;
   selectHex(key: HexKey | null): void;
   selectFormation(id: FormationId | null): void;
+  /** Select every own unit in a hex (only those without orders, if asked), led by the slowest. */
+  selectStack(key: HexKey, idleOnly?: boolean): void;
+  /** Add a unit of the selected stack to the group, or take it out. */
+  toggleGroup(id: FormationId): void;
+  /** Give several units their orders at once (a stack moving or attacking together). */
+  issueGroup(orders: Record<FormationId, FormationOrder>): void;
   setMode(mode: Mode): void;
   setTab(tab: Tab): void;
   setHover(key: HexKey | null): void;
@@ -103,7 +121,7 @@ interface State {
   /** Give an order from the map or unit panel, then move on to the next unit without orders. */
   issueOrder(id: FormationId, order: FormationOrder): void;
   /** Arm a touch attack: shows the odds; the same tap again confirms. */
-  armAttack(a: { formation: FormationId; target: HexKey; order: FormationOrder } | null): void;
+  armAttack(a: Armed | null): void;
   openCity(id: string | null): void;
   dismissNote(id: string): void;
   toggleThreat(): void;
@@ -210,6 +228,7 @@ export const useGame = create<State>((set, get) => {
     rejected: [],
     selectedHex: null,
     selectedFormation: null,
+    group: [],
     mode: 'move',
     tab: 'overview',
     showReport: false,
@@ -267,7 +286,41 @@ export const useGame = create<State>((set, get) => {
     selectFormation: (id) => {
       const f = id ? get().view?.formations[id] : null;
       if (id && id !== get().selectedFormation) sfx.select();
-      set({ selectedFormation: id, selectedHex: f?.key ?? get().selectedHex, mode: 'move', armed: null, ...(id ? { selectedCity: null } : {}) });
+      set({ selectedFormation: id, group: id ? [id] : [], selectedHex: f?.key ?? get().selectedHex, mode: 'move', armed: null, ...(id ? { selectedCity: null } : {}) });
+    },
+    selectStack(key, idleOnly = false) {
+      const { view, draft } = get();
+      if (!view) return;
+      const here = Object.values(view.formations)
+        .filter((f) => f.key === key && (!idleOnly || !draft?.formations[f.id]))
+        // Led by the slowest ground unit: its range is where the whole stack can go. Aircraft lead only themselves.
+        .sort((a, b) => Number(!UNITS[a.unitClass].ground) - Number(!UNITS[b.unitClass].ground) || movementAllowance(a) - movementAllowance(b) || (a.id < b.id ? -1 : 1));
+      const lead = here[0];
+      if (!lead) return;
+      if (lead.id !== get().selectedFormation) sfx.select();
+      set({ selectedFormation: lead.id, group: here.map((f) => f.id), selectedHex: key, mode: 'move', armed: null, selectedCity: null });
+    },
+    toggleGroup(id) {
+      const { group, selectedFormation } = get();
+      const next = group.includes(id) ? group.filter((g) => g !== id) : [...group, id];
+      if (next.length === 0) return;
+      set({ group: next, armed: null, selectedFormation: next.includes(selectedFormation ?? '') ? selectedFormation : next[0]! });
+    },
+    issueGroup(orders) {
+      const ids = Object.keys(orders);
+      if (ids.length === 0) return;
+      set({ armed: null });
+      if (ids.some((id) => orders[id]!.type === 'attack')) sfx.boom();
+      else sfx.order();
+      editDraft((d) => {
+        for (const id of ids) d.formations[id] = orders[id]!;
+        return d;
+      });
+      const lead = get().selectedFormation;
+      setTimeout(() => {
+        const s = get();
+        if (lead && s.selectedFormation === lead && !s.resolving && s.draft?.formations[lead]) s.nextIdle();
+      }, 320);
     },
     armAttack: (a) => {
       if (a) sfx.arm();
@@ -315,12 +368,15 @@ export const useGame = create<State>((set, get) => {
     },
     togglePanel: (open) => set({ panelOpen: open ?? !get().panelOpen }),
     nextIdle: () => {
-      const { view, draft, selectedFormation } = get();
+      const { view, draft, selectedFormation, group } = get();
       if (!view || !draft) return;
       const idle = idleFormations(view, draft.formations);
       if (idle.length === 0) return;
-      const next = idle.find((f) => selectedFormation !== null && f.id > selectedFormation) ?? idle[0]!;
-      get().selectFormation(next.id);
+      const fresh = idle.filter((f) => !group.includes(f.id));
+      const next = fresh.find((f) => selectedFormation !== null && f.id > selectedFormation) ?? fresh[0] ?? idle[0]!;
+      // The whole idle stack comes up together: one order can move it.
+      get().selectStack(next.key, true);
+      if (!get().group.includes(next.id)) get().selectFormation(next.id);
       get().focusOn(next.key);
     },
     setOrder: (id, order) =>
@@ -434,8 +490,8 @@ export const useGame = create<State>((set, get) => {
       }
       const view = get().view!;
       const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}${callsigns ? ' · room' : ''}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString() }, r.text);
-      if (ok && !quiet) get().notify(`Saved to ${slot}`);
-      else get().notify('Could not save: browser storage is unavailable or full', 'error');
+      if (!ok) get().notify('Could not save: browser storage is unavailable or full', 'error');
+      else if (!quiet) get().notify(`Saved to ${slot}`);
       set({ slots: listSlots() });
     },
 

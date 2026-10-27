@@ -4,7 +4,7 @@ import type { HexKey, UnitClass } from '@brink/contracts';
 import type { Point } from '@brink/map';
 import { getArt } from './art';
 import { addUnit, affiliationOf, slotOffsets, type CounterLook, type UnitModel } from './counters';
-import type { Affiliation } from './design/symbols';
+import type { Affiliation } from './counters';
 import { AFFILIATION, FONT_DISPLAY } from './design/tokens';
 import type { Playback } from './store';
 

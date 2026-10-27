@@ -1,6 +1,6 @@
 import type { GovernmentId, UnitClass } from '@brink/contracts';
 import { unitImage } from './art';
-import { symbolSvg, type Affiliation } from './design/symbols';
+import { pictogramSvg } from './design/pictograms';
 
 // Small SVG marks shared by the menus and the game screen.
 
@@ -9,25 +9,13 @@ export function ModelPortrait({ unitClass, className = 'h-10 w-10' }: { unitClas
   return <img src={unitImage(unitClass)} alt="" draggable={false} className={`shrink-0 object-contain ${className}`} />;
 }
 
-/** A unit's APP-6 symbol, inline. Affiliation defaults to friend (the viewer's own). */
-export function UnitGlyph({
-  unitClass,
-  color,
-  className = 'h-3.5 w-5',
-  affiliation = 'friend',
-  planned = false,
-}: {
-  unitClass: UnitClass;
-  color: string;
-  className?: string;
-  affiliation?: Affiliation;
-  planned?: boolean;
-}) {
+/** A unit's pictogram, inline, as the map's counters show it. */
+export function UnitGlyph({ unitClass, color, className = 'h-3.5 w-5', planned = false }: { unitClass: UnitClass; color: string; className?: string; affiliation?: string; planned?: boolean }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full ${planned ? 'opacity-50' : ''} ${className}`}
       aria-hidden
-      dangerouslySetInnerHTML={{ __html: symbolSvg({ cls: unitClass, aff: affiliation, fill: color, planned, size: 30, echelon: false }) }}
+      dangerouslySetInnerHTML={{ __html: pictogramSvg(unitClass, color) }}
     />
   );
 }

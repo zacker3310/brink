@@ -5,5 +5,6 @@ interface Window {
     reachable(): string[];
     enemies(): string[];
     formations(): { id: string; cls: string; key: string }[];
+    targets(): string[];
   };
 }

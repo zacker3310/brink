@@ -1,92 +1,87 @@
 import { useEffect, useState } from 'react';
-import type { Resource } from '@brink/contracts';
+import type { Formation, FormationOrder, Resource } from '@brink/contracts';
 import { TERRAIN, UNITS } from '@brink/game-data';
-import { movementAllowance } from '@brink/simulation';
 import { useCamera } from './camera';
 import { CityBanners, CityPanel } from './Cities';
 import { Coach } from './Coach';
-import { healthColor } from './design/tokens';
+import { steps } from './counters';
 import { VictoryOverlay } from './Game';
-import { Emblem, ModelPortrait } from './glyphs';
+import { UnitGlyph } from './glyphs';
 import { Icon } from './icons';
-import { hexLabel, idleFormations, netChange, selfLedger, turnClock } from './insight';
+import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
 import { useNet } from './net/room';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
 import { describeOrder, hostilesAt } from './planning';
 import { useReplay } from './replay';
 import { ICON, notesFor, TONE } from './Notifications';
+import { nextObjective } from './objective';
 import { Report } from './Report';
 import { ChatOverlay, Curtain } from './RoomUi';
 import { SLOT_NAMES } from './saves';
 import { isMuted, setMuted } from './sfx';
 import { useGame, type Tab } from './store';
-import { EventCard, OUTCOME, usePreview } from './UnitPanel';
+import { EventCard } from './UnitPanel';
+import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
 import { signed } from './ui';
 
 // The game on a phone: the map edge to edge, a slim status strip under the notch, and everything
-// you do within reach of a thumb. Tap a unit, tap where it goes; tap an enemy twice to attack.
+// you do within reach of a thumb. Tap your units, tap where they go; enemies you can hit already say
+// how the fight would go, and a second tap attacks.
 
-const RES: [Resource, string, string][] = [
-  ['credits', '$', 'Treasury'],
-  ['energy', 'E', 'Energy'],
-  ['materials', 'M', 'Materials'],
-  ['food', 'F', 'Food'],
-];
+const RES_NAME: Record<Resource, string> = { credits: 'funds', energy: 'energy', materials: 'materials', food: 'food' };
 
-const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
-
-function Hud({ onMenu }: { onMenu: () => void }) {
+function Hud({ onMenu, onEconomy }: { onMenu: () => void; onEconomy: () => void }) {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report);
   const showThreat = useGame((s) => s.showThreat);
   const toggleThreat = useGame((s) => s.toggleThreat);
+  const selectStack = useGame((s) => s.selectStack);
+  const focusOn = useGame((s) => s.focusOn);
+  const resolving = useGame((s) => s.resolving);
   const s = view.self;
   const ledger = selfLedger(view, report);
   const net = ledger ? netChange(ledger) : null;
   const turn = Math.min(view.turn, view.maxTurns);
-  const clock = turnClock(turn);
   const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints);
-  const leader = ranked[0]!;
+  const rival = ranked.find((n) => n.id !== s.id)!;
   const mine = view.nations[s.id]?.victoryPoints ?? 0;
+  const short = ledger?.shortages ?? [];
+  const goal = nextObjective(view);
+  const pct = (n: number) => `${Math.min(100, (n / view.victoryThreshold) * 100)}%`;
   return (
-    <header className="safe-top safe-x pointer-events-auto absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-ink-950 via-ink-950/90 to-transparent pb-3" data-testid="top-bar">
-      <div className="flex items-center gap-2 px-2 pt-1">
-        <Emblem color={s.color} government={s.government} className="h-8 w-8 shrink-0" />
+    <header className="safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-ink-950 via-ink-950/90 to-transparent pb-4" data-testid="top-bar">
+      <div className="pointer-events-auto flex items-center gap-2.5 px-3 pt-1.5">
         <div className="leading-none" data-testid="turn">
-          <div className="font-mono text-base font-bold tabular-nums">
+          <div className="font-display text-[11px] font-bold tracking-[0.08em] text-muted uppercase">Turn</div>
+          <div className="font-display text-2xl font-extrabold tabular-nums">
             {turn}
-            <span className="text-faint">/{view.maxTurns}</span>
-          </div>
-          <div className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">
-            Day {clock.day} · {clock.hour}
+            <span className="text-base text-faint">/{view.maxTurns}</span>
           </div>
         </div>
-        <div className="min-w-0 flex-1 px-1" data-testid="vp-race" title={`${view.victoryThreshold} VP wins`}>
-          <div className="font-display flex justify-between text-[9px] tracking-[0.06em] uppercase">
-            <span style={{ color: s.color }}>
-              You {mine} VP
-            </span>
-            <span className="text-faint">
-              {leader.id === s.id ? 'leading' : `${leader.name.split(' ')[0]} ${leader.victoryPoints}`} · win {view.victoryThreshold}
+        <div className="min-w-0 flex-1" data-testid="vp-race">
+          <div className="flex items-baseline justify-between">
+            <span className="font-display text-[11px] font-bold tracking-[0.08em] text-muted uppercase">Victory</span>
+            <span className="font-display text-sm font-bold tabular-nums">
+              <span style={{ color: s.color }}>{mine}</span>
+              <span className="text-faint"> / {view.victoryThreshold}</span>
             </span>
           </div>
-          <div className="relative mt-1 h-1.5 bg-ink-700">
-            {ranked
-              .filter((n) => n.id !== s.id)
-              .map((n) => (
-                <span key={n.id} className="absolute top-[-2px] h-[10px] w-0.5" style={{ left: `${Math.min(100, (n.victoryPoints / view.victoryThreshold) * 100)}%`, background: n.color }} />
-              ))}
-            <div className="h-full" style={{ width: `${Math.min(100, (mine / view.victoryThreshold) * 100)}%`, background: s.color }} />
+          <div className="relative mt-1 h-2 rounded-full bg-ink-700">
+            <div className="h-full rounded-full" style={{ width: pct(mine), background: s.color }} />
+            <span className="absolute -top-1 h-4 w-1 rounded-full ring-2 ring-ink-950" style={{ left: pct(rival.victoryPoints), background: rival.color }} title={`${rival.name}: ${rival.victoryPoints}`} />
+          </div>
+          <div className="mt-0.5 truncate text-[11px] text-faint">
+            {mine >= rival.victoryPoints ? 'You lead' : `${rival.name} leads with ${rival.victoryPoints}`}
           </div>
         </div>
         <button
           type="button"
           onClick={toggleThreat}
           aria-pressed={showThreat}
-          aria-label="Threat overlay"
+          aria-label="Show where enemies can strike"
           data-testid="threat-toggle"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${showThreat ? 'border-hostile bg-hostile/25 text-hostile' : 'border-line bg-ink-900/80 text-muted'}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border ${showThreat ? 'border-hostile bg-hostile/25 text-hostile' : 'border-line bg-ink-900/80 text-muted'}`}
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
             <circle cx="12" cy="12" r="9" />
@@ -94,7 +89,7 @@ function Hud({ onMenu }: { onMenu: () => void }) {
             <path d="M12 12L18 6" strokeLinecap="round" />
           </svg>
         </button>
-        <button type="button" onClick={onMenu} aria-label="Menu" data-testid="phone-menu" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-ink-900/80 text-muted">
+        <button type="button" onClick={onMenu} aria-label="Menu" data-testid="phone-menu" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-ink-900/80 text-muted">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
             <circle cx="5" cy="12" r="1.8" />
             <circle cx="12" cy="12" r="1.8" />
@@ -102,25 +97,33 @@ function Hud({ onMenu }: { onMenu: () => void }) {
           </svg>
         </button>
       </div>
-      <dl className="mt-1.5 flex items-center justify-between gap-1 px-3 font-mono text-[12px] tabular-nums">
-        {RES.map(([r, short, label]) => {
-          const d = net?.[r];
-          const low = ledger?.shortages.includes(r);
-          return (
-            <div key={r} className="flex items-baseline gap-1" title={label}>
-              <dt className="font-display text-[10px] font-bold text-faint">{short}</dt>
-              <dd className={low ? 'text-hostile' : ''}>
-                {s.stockpile[r]}
-                {d !== undefined && d !== 0 && <span className={`ml-0.5 text-[9px] ${d > 0 ? 'text-good' : 'text-hostile'}`}>{signed(d)}</span>}
-              </dd>
-            </div>
-          );
-        })}
-        <div className="flex items-baseline gap-1" title="Stability">
-          <dt className="font-display text-[10px] font-bold text-faint">STB</dt>
-          <dd className={s.stability < 40 ? 'text-hostile' : ''}>{s.stability}</dd>
-        </div>
-      </dl>
+      <div className="pointer-events-auto mt-2 flex items-center gap-2 px-3">
+        <button type="button" onClick={onEconomy} className="flex items-center gap-2 rounded-full border border-line bg-ink-900/85 py-1 pr-3 pl-2 text-sm" data-testid="funds">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-signal text-[11px] font-bold text-ink-950">$</span>
+          <span className="font-semibold tabular-nums">{s.stockpile.credits}</span>
+          {net && net.credits !== 0 && <span className={`text-xs tabular-nums ${net.credits > 0 ? 'text-good' : 'text-hostile'}`}>{signed(net.credits)} last turn</span>}
+          {short.length > 0 && <span className="text-xs font-semibold text-hostile">· short of {short.map((r) => RES_NAME[r]).join(', ')}</span>}
+        </button>
+        {goal && !resolving && (
+          <button
+            type="button"
+            onClick={() => {
+              selectStack(goal.by.key);
+              focusOn(goal.site.key);
+            }}
+            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full border border-signal/60 bg-ink-900/85 py-1 pr-3 pl-2 text-sm"
+            data-testid="goal"
+          >
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-signal" aria-hidden>
+              <span className="h-1.5 w-1.5 rounded-full bg-signal" />
+            </span>
+            <span className="truncate">
+              <b className="font-semibold">Take {goal.site.name}</b> <span className="text-signal">+{goal.site.victoryPoints}</span>
+              <span className="text-faint"> · {goal.distance} hex{goal.distance === 1 ? '' : 'es'}</span>
+            </span>
+          </button>
+        )}
+      </div>
     </header>
   );
 }
@@ -278,7 +281,7 @@ function Toasts() {
   const notices = useGame((s) => s.notices);
   const dismiss = useGame((s) => s.dismiss);
   return (
-    <ul className="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top)+82px)] z-20 flex flex-col items-center gap-1.5" aria-live="polite">
+    <ul className="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top)+112px)] z-20 flex flex-col items-center gap-1.5" aria-live="polite">
       {notices.slice(-3).map((n) => (
         <li key={n.id} className="pointer-events-auto">
           <button
@@ -324,104 +327,113 @@ function ReplayDock() {
   );
 }
 
+/** A unit as a small counter, the same tile the map draws. */
+function Chip({ cls, color, strength, done, size = 'h-9 w-9' }: { cls: Formation['unitClass']; color: string; strength: number; done?: boolean; size?: string }) {
+  return (
+    <span className={`relative flex shrink-0 items-center justify-center rounded-md border-2 border-white/90 ${size}`} style={{ background: color }}>
+      <UnitGlyph unitClass={cls} color="#0d1114" className="h-[60%] w-[70%] -translate-y-1" />
+      <span className="font-display absolute right-0.5 bottom-0 text-[11px] leading-none font-extrabold text-ink-950">{steps(strength)}</span>
+      {done && (
+        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-friend text-ink-950">
+          <Icon name="check" className="h-2.5 w-2.5" />
+        </span>
+      )}
+    </span>
+  );
+}
+
 function UnitCard() {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
   const fid = useGame((s) => s.selectedFormation)!;
+  const group = useGame((s) => s.group);
   const armed = useGame((s) => s.armed);
   const armAttack = useGame((s) => s.armAttack);
-  const issueOrder = useGame((s) => s.issueOrder);
+  const issueGroup = useGame((s) => s.issueGroup);
   const setOrder = useGame((s) => s.setOrder);
+  const toggleGroup = useGame((s) => s.toggleGroup);
   const selectFormation = useGame((s) => s.selectFormation);
   const resolving = useGame((s) => s.resolving);
   const f = view.formations[fid];
-  const order = draft.formations[fid];
-  const locked = armed && armed.formation === fid ? armed : null;
-  const preview = usePreview(locked?.order ?? order, fid);
   if (!f) return null;
-  const def = UNITS[f.unitClass];
-  const ratio = f.strength / 1000;
   const color = view.self.color;
-  const target = locked ? hostilesAt(view, locked.target) : [];
-  const btn = 'flex h-11 flex-1 flex-col items-center justify-center gap-0.5 border border-line bg-ink-850 text-[10px] font-semibold tracking-wide uppercase active:bg-ink-700 disabled:opacity-30';
-  const odds = preview && (locked || order?.type === 'attack') && (
-    <div className="text-[12px]" data-testid="preview">
-      {preview.assault &&
-        (preview.assault.defenders === 0 ? (
-          <span className="text-muted">No enemy seen there: you will try to take the hex.</span>
-        ) : (
-          <span>
-            You −{preview.assault.attackerLoss[0]}–{preview.assault.attackerLoss[1]}, they −{preview.assault.defenderLoss[0]}–{preview.assault.defenderLoss[1]} ·{' '}
-            {preview.assault.outcomes.map((o) => (
-              <b key={o} className={`mr-1 ${OUTCOME[o]?.tone}`}>
-                {OUTCOME[o]?.text}
-              </b>
-            ))}
-          </span>
-        ))}
-      {preview.strike && (preview.strike.targets === 0 ? <span className="text-muted">No confirmed targets.</span> : <span>Strike {preview.strike.targets} target(s), −{preview.strike.loss[0]}–{preview.strike.loss[1]} each</span>)}
-    </div>
-  );
+  const stack = Object.values(view.formations)
+    .filter((x) => x.key === f.key)
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  const members = (group.length ? group : [fid]).map((id) => view.formations[id]).filter((x): x is Formation => !!x);
+  const order = draft.formations[fid];
+  const def = UNITS[f.unitClass];
+  const anyGround = members.some((m) => UNITS[m.unitClass].ground);
+  const attackers = armed?.orders ? Object.keys(armed.orders).filter((id) => armed.orders![id]!.type === 'attack').map((id) => view.formations[id]!).filter(Boolean) : [];
+  const odds = armed ? oddsFor(view, attackers, armed.target) : null;
+  const target = armed ? hostilesAt(view, armed.target) : [];
+  const forAll = (o: FormationOrder) => issueGroup(Object.fromEntries(members.filter((m) => o.type !== 'defend' || UNITS[m.unitClass].ground).map((m) => [m.id, o])));
+  const btn = 'flex h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-ink-850 text-[11px] font-semibold tracking-wide uppercase active:bg-ink-700 disabled:opacity-30';
+  const oddsTone = odds === 'good' ? 'text-good' : odds === 'bad' ? 'text-hostile' : 'text-signal';
   return (
-    <div className="pointer-events-auto border-t border-line bg-ink-950/95" data-testid="unit-panel">
-      <div className="flex items-center gap-3 px-3 pt-2.5">
-        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2" style={{ borderColor: color, background: `radial-gradient(circle at 35% 30%, ${color}55, #0b111b 70%)` }}>
-          <ModelPortrait unitClass={f.unitClass} className="h-12 w-12 -rotate-90" />
+    <div className="pointer-events-auto rounded-t-2xl border-t border-line bg-ink-900/97 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]" data-testid="unit-panel">
+      {stack.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto px-4 pt-2.5" data-testid="stack">
+          <span className="font-display shrink-0 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">
+            {members.length} of {stack.length} moving
+          </span>
+          {stack.map((m) => (
+            <button key={m.id} type="button" onClick={() => toggleGroup(m.id)} aria-pressed={group.includes(m.id)} aria-label={`${m.name}: ${group.includes(m.id) ? 'moving with the stack' : 'staying'}`} className={`rounded-lg p-0.5 transition-opacity ${group.includes(m.id) ? 'ring-2 ring-friend' : 'opacity-40'}`}>
+              <Chip cls={m.unitClass} color={color} strength={m.strength} done={!!draft.formations[m.id]} />
+            </button>
+          ))}
         </div>
+      )}
+      <div className="flex items-center gap-3 px-4 pt-2.5">
+        <Chip cls={f.unitClass} color={color} strength={f.strength} size="h-12 w-12" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="font-display truncate text-base leading-tight font-black">{f.name}</span>
-            <span className="font-mono text-xs" style={{ color: hex(healthColor(ratio)) }}>
-              {Math.round(ratio * 100)}%
-            </span>
-          </div>
-          <div className="text-[10px] font-semibold tracking-wide uppercase" style={{ color }}>
-            {def.name} · {movementAllowance(f) || '—'} MP · atk {def.softAttack}/{def.hardAttack} · def {def.defense}
-          </div>
-          <div className="mt-1 h-1 bg-ink-700">
-            <div className="h-full" style={{ width: `${ratio * 100}%`, background: hex(healthColor(ratio)) }} />
-          </div>
-          <div className="mt-1 truncate text-[12px]" data-testid="planned-order">
-            <span className={order ? 'font-semibold text-friend' : 'text-signal'}>{order ? describeOrder(order, view) : def.ground ? 'Tap a blue hex to move · an enemy to attack' : 'Tap a target to strike · a city to rebase'}</span>
-          </div>
+          <div className="font-display truncate text-lg leading-tight font-extrabold">{members.length > 1 ? `${def.name} + ${members.length - 1} more` : f.name}</div>
+          <div className="truncate text-[13px] text-muted">{ROLE[f.unitClass]}</div>
         </div>
       </div>
-      {locked ? (
-        <div className="lock-in mx-3 mt-2 border border-hostile/70 bg-hostile/10 px-3 py-2" data-testid="armed">
-          <div className="font-display text-[11px] font-black tracking-[0.1em] text-hostile uppercase">
-            Target locked · {target.length ? target.map((c) => UNITS[c.unitClass].name).join(', ') : hexLabel(view, locked.target)}
+      <div className={`mx-4 mt-2 rounded-lg bg-ink-850 px-3 py-1.5 text-[13px] leading-snug ${armed ? 'hidden' : ''}`} data-testid="planned-order">
+        {order ? (
+          <span className="font-semibold text-friend">{describeOrder(order, view)}</span>
+        ) : (
+          <span className="text-signal">{anyGround ? 'Tap a blue hex to move, or an enemy marked WIN to attack.' : 'Tap an enemy in range to strike, or your city to fly there.'}</span>
+        )}
+      </div>
+      {armed ? (
+        <div className="lock-in mx-4 mt-2 rounded-lg border-2 border-hostile bg-hostile/10 px-3 py-2.5" data-testid="armed">
+          <div className="font-display text-[13px] font-extrabold tracking-[0.06em] text-hostile uppercase">
+            Attack {target.length ? target.map((c) => UNITS[c.unitClass].name).join(', ') : hexLabel(view, armed.target)} with {attackers.length}
           </div>
-          {odds || <div className="text-[12px] text-muted">Reading the odds…</div>}
-          <div className="mt-2 flex gap-2">
-            <button type="button" onClick={() => armAttack(null)} className="h-11 flex-1 border border-line bg-ink-900 text-sm font-semibold" data-testid="cancel-attack">
+          {odds && <div className={`font-display text-2xl font-extrabold uppercase ${oddsTone}`} data-testid="preview">{ODDS_TEXT[odds]}</div>}
+          <div className="text-[13px] text-muted">{lossText(view, attackers, armed.target) ?? 'Reading the odds…'}</div>
+          <div className="mt-2.5 flex gap-2">
+            <button type="button" onClick={() => armAttack(null)} className="h-12 flex-1 rounded-lg border border-line bg-ink-900 text-base font-semibold" data-testid="cancel-attack">
               Cancel
             </button>
-            <button type="button" onClick={() => issueOrder(fid, locked.order)} className="font-display h-11 flex-[2] bg-hostile text-base font-black tracking-wide text-white uppercase active:brightness-90" data-testid="confirm-attack">
-              {def.range ? 'Fire' : 'Attack'}
+            <button type="button" onClick={() => issueGroup(armed.orders ?? { [armed.formation]: armed.order })} className="font-display h-12 flex-[2] rounded-lg bg-hostile text-lg font-extrabold tracking-wide text-white uppercase active:brightness-90" data-testid="confirm-attack">
+              {attackers.every((x) => UNITS[x.unitClass].range > 0) ? 'Fire' : 'Attack'}
             </button>
           </div>
         </div>
       ) : (
-        odds && <div className="mx-3 mt-1.5">{odds}</div>
+        <div className="flex gap-2 px-4 pt-2.5 pb-1">
+          <button type="button" className={btn} disabled={resolving || !anyGround} onClick={() => forAll({ type: 'defend' })} data-testid="order-defend">
+            <Icon name="defense" className="h-4 w-4" />
+            Dig in
+          </button>
+          <button type="button" className={btn} disabled={resolving} onClick={() => forAll({ type: 'hold' })} data-testid="order-hold">
+            <Icon name="pause" className="h-4 w-4" />
+            Hold
+          </button>
+          <button type="button" className={btn} disabled={resolving || !members.some((m) => draft.formations[m.id])} onClick={() => members.forEach((m) => setOrder(m.id, null))} data-testid="order-clear">
+            <Icon name="close" className="h-4 w-4" />
+            Undo
+          </button>
+          <button type="button" className={btn} onClick={() => selectFormation(null)} data-testid="deselect">
+            <Icon name="down" className="h-4 w-4" />
+            Close
+          </button>
+        </div>
       )}
-      <div className="flex gap-1.5 px-3 pt-2 pb-1">
-        <button type="button" className={`${btn} ${order?.type === 'defend' ? 'border-friend text-friend' : ''}`} disabled={resolving || !def.ground} onClick={() => issueOrder(fid, { type: 'defend' })} data-testid="order-defend">
-          <Icon name="defense" className="h-4 w-4" />
-          Dig in
-        </button>
-        <button type="button" className={`${btn} ${order?.type === 'hold' ? 'border-friend text-friend' : ''}`} disabled={resolving} onClick={() => issueOrder(fid, { type: 'hold' })} data-testid="order-hold">
-          <Icon name="pause" className="h-4 w-4" />
-          Hold
-        </button>
-        <button type="button" className={btn} disabled={resolving || !order} onClick={() => setOrder(fid, null)} data-testid="order-clear">
-          <Icon name="close" className="h-4 w-4" />
-          Clear
-        </button>
-        <button type="button" className={btn} onClick={() => selectFormation(null)} data-testid="deselect">
-          <Icon name="down" className="h-4 w-4" />
-          Done
-        </button>
-      </div>
     </div>
   );
 }
@@ -527,8 +539,8 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
     (s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id),
   ).length;
   const waiting = role && role !== 'hotseat' && resolving;
-  const chip = 'shrink-0 border border-line bg-ink-950/90 px-2.5 py-1.5 text-[12px] text-muted active:bg-ink-800';
-  const key = 'flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 border border-line bg-ink-900 text-[9px] font-bold tracking-wide uppercase active:bg-ink-700 disabled:opacity-35';
+  const chip = 'shrink-0 rounded-full border border-line bg-ink-900/90 px-3 py-1.5 text-[13px] text-muted active:bg-ink-800';
+  const key = 'font-display flex h-14 w-[3.6rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-line bg-ink-850 text-[11px] font-bold tracking-wide uppercase active:bg-ink-700 disabled:opacity-35';
   return (
     <>
       {!fid && !resolving && (
@@ -553,19 +565,19 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
           )}
         </div>
       )}
-      <div className="pointer-events-auto flex items-stretch gap-1.5 border-t border-line bg-ink-950/95 px-3 pt-2">
+      <div className="pointer-events-auto flex items-stretch gap-2 border-t border-line bg-ink-900/97 px-3 pt-2">
         <button type="button" className={key} onClick={onCommand} data-testid="open-command">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
             <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
           </svg>
-          Command
+          Nation
         </button>
         {role !== 'guest' && (
           <button type="button" className={key} onClick={() => void autoCommand()} disabled={resolving || over || idle === 0} data-testid="auto-command" title="Your staff drafts orders for every unit still waiting">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
               <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
             </svg>
-            Auto
+            Plan
           </button>
         )}
         <button type="button" className={`${key} relative ${idle ? 'text-signal' : 'text-good'}`} onClick={nextIdle} disabled={resolving || idle === 0} data-testid="next-idle">
@@ -578,10 +590,10 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
           onClick={() => void submit()}
           disabled={resolving || over || cooling}
           data-testid="end-turn"
-          className="end-turn relative flex-1 overflow-hidden bg-signal px-3 text-ink-950 active:brightness-90 disabled:opacity-60"
+          className="end-turn relative flex-1 overflow-hidden rounded-xl bg-signal px-3 text-ink-950 active:brightness-90 disabled:opacity-60"
         >
           <div className="font-display text-xl leading-none font-black uppercase">{waiting ? 'Waiting…' : resolving ? 'Resolving…' : over ? 'Game over' : 'End turn'}</div>
-          <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : idle ? `${idle} will hold` : 'all units ordered'}</div>
+          <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : idle ? `${idle} without orders` : 'everyone has orders'}</div>
         </button>
       </div>
     </>
@@ -619,12 +631,18 @@ export function PhoneGame() {
       <div className="map-vignette pointer-events-none absolute inset-0" aria-hidden />
       <CityBanners />
       {resolving && !playback && (
-        <div className="resolving-banner pointer-events-none absolute top-[calc(env(safe-area-inset-top)+86px)] left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2 text-center" role="status">
+        <div className="resolving-banner pointer-events-none absolute top-[calc(env(safe-area-inset-top)+112px)] left-1/2 z-10 -translate-x-1/2 overflow-hidden border border-signal/70 bg-ink-950/90 px-4 py-2 text-center" role="status">
           <div className="font-display text-[10px] font-bold tracking-[0.1em] text-signal uppercase">Orders locked</div>
           <div className="text-sm font-semibold">The world moves…</div>
         </div>
       )}
-      <Hud onMenu={() => setMenu(true)} />
+      <Hud
+        onMenu={() => setMenu(true)}
+        onEconomy={() => {
+          useGame.getState().setTab('economy');
+          setCommand(true);
+        }}
+      />
       <Toasts />
       <div className="safe-bottom safe-x pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col">
         {playback ? (

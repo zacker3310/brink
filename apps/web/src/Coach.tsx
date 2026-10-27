@@ -102,7 +102,7 @@ export function Coach() {
     );
   }
   const place = phone
-    ? 'top-[calc(env(safe-area-inset-top)+88px)] left-2 right-2'
+    ? 'top-[calc(env(safe-area-inset-top)+108px)] left-2 right-2'
     : shifted ? 'bottom-36 left-[calc(50%+180px)] w-[380px] -translate-x-1/2' : 'bottom-3 left-1/2 w-[420px] -translate-x-1/2';
   return (
     <section className={`coach panel-in fixed z-40 ds-panel border-signal/70 shadow-2xl ${phone ? 'px-3 py-2' : 'p-3'} ${place}`} data-testid="coach" data-step={def.id} aria-live="polite" aria-label="Guided first match">
