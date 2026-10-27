@@ -53,6 +53,42 @@ body,
   height: 100%;
 }
 
+/* A game on a phone: no rubber-band scrolling, no tap flashes, no text selection while dragging the
+   map, the full dynamic viewport under the notch and home indicator. */
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+#root {
+  height: 100dvh;
+}
+body {
+  touch-action: manipulation;
+}
+canvas {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 8px);
+}
+.safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 body {
   margin: 0;
   font-feature-settings: 'tnum' 1;
@@ -370,13 +406,16 @@ body {
 
 /* ---------- Brink design system primitives ---------- */
 
-/* A panel: flat instrument glass with a hairline edge. No bevels, no grain. */
-.ds-panel {
-  position: relative;
-  background-color: color-mix(in srgb, var(--color-ink-900) 90%, transparent);
-  border: 1px solid var(--color-line);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
-  backdrop-filter: blur(10px);
+/* A panel: flat instrument glass with a hairline edge. No bevels, no grain. Layered, so a panel's own
+   utilities (fixed, absolute, a border colour) win over these defaults. */
+@layer components {
+  .ds-panel {
+    position: relative;
+    background-color: color-mix(in srgb, var(--color-ink-900) 90%, transparent);
+    border: 1px solid var(--color-line);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+    backdrop-filter: blur(10px);
+  }
 }
 /* Display type: wide heavy caps. Headlines, numbers that matter, buttons. */
 .ds-display {
@@ -412,4 +451,27 @@ body {
 /* The side panel's close button floats over its first section header; keep that header clear. */
 aside[data-testid^='panel-'] section:first-of-type > header {
   padding-right: 28px;
+}
+
+/* Phone */
+.sheet-in {
+  animation: sheet-in 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(40%);
+    opacity: 0;
+  }
+}
+.lock-in {
+  animation: lock-in 420ms ease-out both;
+}
+@keyframes lock-in {
+  0%,
+  40% {
+    box-shadow: 0 0 0 0 rgb(255 60 60 / 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgb(255 60 60 / 0);
+  }
 }

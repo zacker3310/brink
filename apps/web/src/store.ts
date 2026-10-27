@@ -14,13 +14,16 @@ import type {
   TurnReport,
   UnitClass,
 } from '@brink/contracts';
+import { RESOURCES } from '@brink/contracts';
 import { engine } from './engine';
-import { idleFormations } from './insight';
+import { idleFormations, netChange, selfLedger } from './insight';
+import { recruitCostFor } from './rules-view';
 import { useCoach } from './coach';
+import { sfx } from './sfx';
 import { useNet } from './net/room';
 import type { Mode } from './planning';
 import type { Response, SeatState } from './protocol';
-import { listSlots, readPrefs, writePrefs, writeSlot, type SlotInfo } from './saves';
+import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type SlotInfo } from './saves';
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy';
 
@@ -71,10 +74,14 @@ interface State {
   dismissed: string[];
   /** Show where seen enemies could strike next turn. */
   showThreat: boolean;
+  /** A touch attack waiting for its confirming second tap. */
+  armed: { formation: FormationId; target: HexKey; order: FormationOrder } | null;
   /** The last resolved turn, kept so it can be replayed again. */
   lastTurn: { before: NationView; events: GameEvent[] } | null;
 
-  newGame(nation: NationId, seed: number): Promise<void>;
+  newGame(nation: NationId, seed: number, maxTurns?: number): Promise<void>;
+  /** Let the staff draft orders for every unit and city still waiting; the player can change any. */
+  autoCommand(): Promise<void>;
   /** Load a save. A room save reopens its lobby and a hotseat save its curtain; says which. */
   loadGame(text: string): Promise<'single' | 'room' | 'hotseat' | null>;
   toMenu(): void;
@@ -95,6 +102,8 @@ interface State {
   receiveTurn(state: SeatState, before?: NationView): void;
   /** Give an order from the map or unit panel, then move on to the next unit without orders. */
   issueOrder(id: FormationId, order: FormationOrder): void;
+  /** Arm a touch attack: shows the odds; the same tap again confirms. */
+  armAttack(a: { formation: FormationId; target: HexKey; order: FormationOrder } | null): void;
   openCity(id: string | null): void;
   dismissNote(id: string): void;
   toggleThreat(): void;
@@ -109,7 +118,8 @@ interface State {
   setDiplomacy(target: NationId, action: DiplomaticAction | null): void;
   setPriority(id: FormationId, p: SupplyPriority): void;
   submit(): Promise<void>;
-  save(slot: string): Promise<void>;
+  /** Save to a slot; a quiet save (the autosave) says nothing unless it fails. */
+  save(slot: string, quiet?: boolean): Promise<void>;
   /** Download the campaign as a save file. */
   exportSave(): Promise<void>;
   focusOn(key: HexKey): void;
@@ -178,6 +188,8 @@ export const useGame = create<State>((set, get) => {
     // Results arrive as map notifications; the full summary is one click away.
     set({ dismissed: [], selectedFormation: null });
     get().nextIdle();
+    // A phone can drop a backgrounded tab at any time: a solo campaign keeps itself after every turn.
+    if (!useNet.getState().role) void get().save(AUTOSAVE, true);
   };
 
   const editDraft = (fn: (d: NationOrders) => NationOrders) => {
@@ -212,9 +224,10 @@ export const useGame = create<State>((set, get) => {
     dismissed: [],
     showThreat: false,
     lastTurn: null,
+    armed: null,
 
-    async newGame(nation, seed) {
-      if (apply(await engine.call({ type: 'new', seed, nation }))) {
+    async newGame(nation, seed, maxTurns) {
+      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns }))) {
         const capital = Object.values(get().view!.sites).find((s) => s.owner === nation && s.kind === 'capital');
         set({ selectedHex: capital?.key ?? null, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
         get().nextIdle();
@@ -253,7 +266,47 @@ export const useGame = create<State>((set, get) => {
     selectHex: (key) => set({ selectedHex: key }),
     selectFormation: (id) => {
       const f = id ? get().view?.formations[id] : null;
-      set({ selectedFormation: id, selectedHex: f?.key ?? get().selectedHex, mode: 'move', ...(id ? { selectedCity: null } : {}) });
+      if (id && id !== get().selectedFormation) sfx.select();
+      set({ selectedFormation: id, selectedHex: f?.key ?? get().selectedHex, mode: 'move', armed: null, ...(id ? { selectedCity: null } : {}) });
+    },
+    armAttack: (a) => {
+      if (a) sfx.arm();
+      set({ armed: a });
+    },
+    async autoCommand() {
+      const { view, draft, resolving } = get();
+      if (!view || !draft || resolving) return;
+      const r = await engine.call({ type: 'suggest', nation: view.self.id });
+      if (r.type !== 'suggested') return;
+      const cur = get().draft;
+      if (!cur) return;
+      const next = structuredClone(cur);
+      let n = 0;
+      for (const [id, o] of Object.entries(r.orders.formations)) {
+        if (next.formations[id] || !view.formations[id]) continue;
+        next.formations[id] = o;
+        n += 1;
+      }
+      const busy = new Set([...view.self.productionQueue.map((q) => q.siteId), ...next.recruit.map((x) => x.siteId)]);
+      // The staff spends at most half of what is in the bank, and nothing while the treasury is shrinking:
+      // a new unit costs upkeep every turn after.
+      const ledger = selfLedger(view, get().report);
+      const shrinking = ledger ? netChange(ledger).credits < 0 : false;
+      const spent = { credits: 0, energy: 0, materials: 0, food: 0 };
+      for (const x of next.recruit) for (const res of RESOURCES) spent[res] += recruitCostFor(view, x.unitClass)[res];
+      for (const rec of r.orders.recruit) {
+        if (busy.has(rec.siteId) || shrinking) continue;
+        const cost = recruitCostFor(view, rec.unitClass);
+        if (RESOURCES.some((res) => spent[res] + cost[res] > view.self.stockpile[res] / 2)) continue;
+        for (const res of RESOURCES) spent[res] += cost[res];
+        next.recruit.push(rec);
+        busy.add(rec.siteId);
+        n += 1;
+      }
+      if (next.research === undefined && !view.self.research.current && r.orders.research) next.research = r.orders.research;
+      set({ draft: next, armed: null, selectedFormation: null });
+      void recheck();
+      get().notify(n ? `Staff drafted ${n} order${n === 1 ? '' : 's'}. Change any, then end the turn.` : 'Every unit already has orders.');
     },
     setMode: (mode) => set({ mode }),
     setTab: (tab) => set({ tab, panelOpen: true }),
@@ -300,6 +353,7 @@ export const useGame = create<State>((set, get) => {
     async submit() {
       const { draft, resolving } = get();
       if (!draft || resolving) return;
+      sfx.endTurn();
       set({ submitted: structuredClone(draft), resolving: true });
       // In a room the turn resolves when every seat is in; the result comes back via receiveTurn.
       if (useNet.getState().role) {
@@ -344,6 +398,9 @@ export const useGame = create<State>((set, get) => {
       if (apply(result)) afterResolve();
     },
     issueOrder(id, order) {
+      set({ armed: null });
+      if (order.type === 'attack') sfx.boom();
+      else sfx.order();
       get().setOrder(id, order);
       // Civ-style flow: the next unit that needs orders comes up on its own.
       setTimeout(() => {
@@ -368,7 +425,7 @@ export const useGame = create<State>((set, get) => {
       set({ animate: on });
     },
 
-    async save(slot) {
+    async save(slot, quiet = false) {
       const callsigns = roomCallsigns();
       const r = await engine.call({ type: 'save', label: slot, savedAt: new Date().toISOString(), callsigns });
       if (r.type !== 'saved') {
@@ -377,7 +434,7 @@ export const useGame = create<State>((set, get) => {
       }
       const view = get().view!;
       const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}${callsigns ? ' · room' : ''}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString() }, r.text);
-      if (ok) get().notify(`Saved to ${slot}`);
+      if (ok && !quiet) get().notify(`Saved to ${slot}`);
       else get().notify('Could not save: browser storage is unavailable or full', 'error');
       set({ slots: listSlots() });
     },

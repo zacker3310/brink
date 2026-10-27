@@ -15,7 +15,7 @@ import { useGame } from './store';
 
 // Civ-style unit panel (bottom-left) and turn controls (bottom-right), floating over the map.
 
-function usePreview(order: FormationOrder | undefined, fid: string | null) {
+export function usePreview(order: FormationOrder | undefined, fid: string | null) {
   const [preview, setPreview] = useState<{ assault?: AssaultPreview | null; strike?: StrikePreview | null } | null>(null);
   useEffect(() => {
     let live = true;
@@ -87,7 +87,7 @@ function Action({
   );
 }
 
-const OUTCOME: Record<string, { text: string; tone: string }> = {
+export const OUTCOME: Record<string, { text: string; tone: string }> = {
   attacker_victory: { text: 'Breakthrough', tone: 'text-good' },
   inconclusive: { text: 'Stalemate', tone: 'text-signal' },
   defender_held: { text: 'Repulsed', tone: 'text-hostile' },
@@ -249,7 +249,7 @@ export function UnitPanel() {
 }
 
 /** A world event awaiting an answer. The choice rides on the draft; no answer takes option 0. */
-function EventCard() {
+export function EventCard() {
   const event = useGame((s) => s.view?.self.event);
   const choice = useGame((s) => s.draft?.eventChoice);
   const setEventChoice = useGame((s) => s.setEventChoice);

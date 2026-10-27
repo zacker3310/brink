@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Resource } from '@brink/contracts';
 import { GOVERNMENTS, UNITS } from '@brink/game-data';
 import { useCamera } from './camera';
@@ -20,6 +20,7 @@ import { useGame, type Tab } from './store';
 import { TurnControls, UnitPanel } from './UnitPanel';
 import { Meter, signed, Swatch } from './ui';
 import { Icon } from './icons';
+import { sfx } from './sfx';
 
 const RES: [Resource, string][] = [
   ['credits', 'Treasury'],
@@ -298,10 +299,15 @@ function KeyHelp({ onClose }: { onClose: () => void }) {
   );
 }
 
-function VictoryOverlay() {
+export function VictoryOverlay() {
   const view = useGame((s) => s.view)!;
   const toMenu = useGame((s) => s.toMenu);
   const [hidden, setHidden] = useState(false);
+  const outcome = view.victory ? (view.victory.winner === view.self.id ? 'won' : 'lost') : null;
+  useEffect(() => {
+    if (outcome === 'won') sfx.win();
+    if (outcome === 'lost') sfx.lose();
+  }, [outcome]);
   if (!view.victory || hidden) return null;
   const winner = view.nations[view.victory.winner]!;
   const reason = { victory_points: 'by holding the victory-point threshold', last_standing: 'as the last nation standing', turn_limit: 'by leading at the turn limit' }[view.victory.reason];

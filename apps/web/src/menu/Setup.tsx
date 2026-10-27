@@ -9,7 +9,10 @@ import { CLASS_ORDER, DOCTRINE, dossier, operationName, randomSeed, traits, VICT
 import { Emblem, UnitGlyph } from '../glyphs';
 import { MapPreview } from './MapPreview';
 
-export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number) => Promise<void> }) {
+/** The quick campaign: the same war, decided sooner. */
+const QUICK_TURNS = 20;
+
+export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number) => Promise<void> }) {
   const scenario = SCENARIOS[0]!;
   const [nation, setNation] = useState<NationId>(() => {
     const p = readPrefs().nation;
@@ -17,6 +20,12 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   });
   const [seed, setSeed] = useState(randomSeed);
   const [starting, setStarting] = useState(false);
+  const [length, setLength] = useState<'quick' | 'standard'>(() => readPrefs().length ?? 'quick');
+  const turns = length === 'quick' ? Math.min(QUICK_TURNS, scenario.maxTurns) : scenario.maxTurns;
+  const pickLength = (l: 'quick' | 'standard') => {
+    setLength(l);
+    writePrefs({ length: l });
+  };
 
   const world = useMemo(() => createScenario(scenario.id, seed), [scenario.id, seed]);
   const spec = NATIONS.find((n) => n.id === nation)!;
@@ -32,7 +41,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(nation, seed);
+      await onBegin(nation, seed, turns);
     } finally {
       setStarting(false);
     }
@@ -51,11 +60,11 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         if (n >= 1 && n <= NATIONS.length) pick(NATIONS[n - 1]!.id);
       }
     },
-    [nation, seed, starting],
+    [nation, seed, starting, turns],
   );
 
   return (
-    <main className="setup-screen flex min-h-full flex-col" style={{ ['--nation' as string]: spec.color }}>
+    <main className="setup-screen flex min-h-full flex-col max-lg:pb-28" style={{ ['--nation' as string]: spec.color }}>
       <ScreenHeader
         kicker="New campaign"
         title={scenario.name}
@@ -76,7 +85,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
           <Label className="mb-1">
             <span id="roster">Choose your nation</span>
           </Label>
-          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Nation">
+          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-col" role="radiogroup" aria-label="Nation">
             {NATIONS.map((n, i) => {
               const g = GOVERNMENTS[n.government];
               const active = n.id === nation;
@@ -103,9 +112,11 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                         {g.name}
                       </div>
                     </div>
-                    <Kbd>{i + 1}</Kbd>
+                    <span className="max-lg:hidden">
+                      <Kbd>{i + 1}</Kbd>
+                    </span>
                   </div>
-                  <p className="relative mt-2 text-xs leading-snug text-muted">{DOCTRINE[n.government]}</p>
+                  <p className="relative mt-2 text-xs leading-snug text-muted max-sm:hidden">{DOCTRINE[n.government]}</p>
                 </button>
               );
             })}
@@ -122,7 +133,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
             <div className="font-display pointer-events-none absolute top-3 left-4 z-10 text-[10px] tracking-[0.06em] text-faint uppercase">
               Theatre map · seed <span className="font-mono text-muted">{seed}</span>
             </div>
-            <MapPreview world={world} focus={nation} labels forces className="setup-map h-full max-h-[62vh] min-h-[280px] w-full" />
+            <MapPreview world={world} focus={nation} labels forces className="setup-map h-full max-h-[62vh] min-h-[220px] w-full sm:min-h-[280px]" />
             <div className="scanlines opacity-40" aria-hidden />
             <MapLegend />
           </Frame>
@@ -152,13 +163,35 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                 </button>
               </div>
             </div>
-            <Fact label="Turn limit" value={`${scenario.maxTurns} turns`} />
+            <div>
+              <Label>Length</Label>
+              <div className="mt-1 flex" role="radiogroup" aria-label="Campaign length">
+                {(
+                  [
+                    ['quick', 'Quick', Math.min(QUICK_TURNS, scenario.maxTurns)],
+                    ['standard', 'Full', scenario.maxTurns],
+                  ] as const
+                ).map(([id, label, n]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={length === id}
+                    data-testid={`length-${id}`}
+                    onClick={() => pickLength(id)}
+                    className={`border px-3 py-1.5 text-sm ${length === id ? 'border-signal bg-signal/15 text-signal' : 'border-line text-muted hover:text-text'}`}
+                  >
+                    {label} <span className="font-mono text-xs opacity-70">{n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <Fact label="Rivals" value={`${scenario.nations - 1} AI powers`} />
             <div className="min-w-[220px] flex-1">
               <Label>Victory</Label>
               <p className="mt-1 text-xs leading-snug text-muted">
                 Hold <span className="text-text">{VICTORY_SHARE}% of victory points</span>, be the{' '}
-                <span className="text-text">last power standing</span>, or <span className="text-text">lead at turn {scenario.maxTurns}</span>.
+                <span className="text-text">last power standing</span>, or <span className="text-text">lead at turn {turns}</span>.
               </p>
             </div>
           </Frame>
@@ -241,7 +274,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
             onClick={() => void begin()}
             disabled={starting}
             data-testid="start-game"
-            className="begin-btn group relative overflow-hidden border border-signal bg-signal px-5 py-4 text-left text-ink-950 transition-all hover:brightness-110 disabled:opacity-70"
+            className="begin-btn group relative overflow-hidden border border-signal bg-signal px-5 py-4 text-left text-ink-950 shadow-2xl transition-all hover:brightness-110 disabled:opacity-70 max-lg:fixed max-lg:inset-x-3 max-lg:bottom-[max(env(safe-area-inset-bottom),12px)] max-lg:z-30"
           >
             <span className="relative z-10 flex items-center justify-between">
               <span>

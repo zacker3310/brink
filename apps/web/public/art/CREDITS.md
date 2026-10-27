@@ -28,6 +28,9 @@ City districts, the refinery, the fuel farm and the industrial yard are cut from
 Rotterdam pan-sharpened RGB mosaic (WorldView-2, 2019; SpaceNet on AWS, `spacenet-dataset`), licensed
 CC BY-SA 4.0. The cut, graded tiles in `sites/` are shared under the same CC BY-SA 4.0 license.
 
+The home-screen and browser icons (`public/icons/`) are a darkened crop of the capital tile with the
+Brink hex mark over it, so they are a derivative of the same imagery and also CC BY-SA 4.0.
+
 ## Units and props: rendered top-down from these 3D models (`tools/art/render.js`)
 
 | Use | Model | Author | License | Source |

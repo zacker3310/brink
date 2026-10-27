@@ -104,7 +104,9 @@ In React use `<UnitGlyph unitClass color affiliation planned />`; in Pixi use `a
 | City banners, city panel | `Cities.tsx` | Over-map banners, production picker |
 | Combat card, hover card, minimap | `MapOverlays.tsx` | Map overlays |
 | Notifications | `Notifications.tsx` | Right-edge turn results |
-| Coach | `Coach.tsx`, steps in `coach.ts` | Guided first match; bottom centre, a strip beneath the turn summary |
+| Coach | `Coach.tsx`, steps in `coach.ts` | Guided first match; bottom centre, a strip beneath the turn summary; on a phone under the status strip, with touch wording |
+| Phone game screen | `PhoneGame.tsx`, `phone.ts` | Under 760 px wide (or a short touch screen): status strip, thumb dock (44 px minimum targets), sheets for Command and Menu, debrief card, target-lock card |
+| Sound | `sfx.ts` | WebAudio synthesis, no files; unlocked on the first touch |
 
 ## Map overlays
 

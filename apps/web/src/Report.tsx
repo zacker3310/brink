@@ -282,7 +282,7 @@ export function Report() {
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink-950/75 p-4 backdrop-blur-sm sm:p-8" role="dialog" aria-modal="true" aria-labelledby="report-title" data-testid="report">
       <div className="report-in flex max-h-full w-full max-w-5xl flex-col border border-line bg-ink-950 shadow-2xl">
-        <header className="flex items-center gap-4 border-b border-line px-5 py-3" style={{ background: `linear-gradient(90deg, ${view.self.color}22, transparent 60%)` }}>
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-4 py-3 sm:px-5" style={{ background: `linear-gradient(90deg, ${view.self.color}22, transparent 60%)` }}>
           <div>
             <p className="font-display text-[10px] font-bold tracking-[0.1em] text-signal uppercase">
               Situation report · Day {clock.day}, {clock.hour}
@@ -301,7 +301,7 @@ export function Report() {
             </div>
           </div>
           {lastTurn && lastTurn.before.turn === report.turn && (
-            <button type="button" onClick={rewatch} className="ml-auto border border-line px-3 py-2 text-xs text-muted hover:border-faint hover:text-text">
+            <button type="button" onClick={rewatch} className="ml-auto border border-line px-3 py-2 text-xs whitespace-nowrap text-muted hover:border-faint hover:text-text">
               ⟲ Watch it again
             </button>
           )}
@@ -309,9 +309,9 @@ export function Report() {
             type="button"
             onClick={() => setShowReport(false)}
             data-testid="close-report"
-            className="font-display ml-auto border border-signal bg-signal px-4 py-2 text-xs font-black tracking-wide text-ink-950 uppercase hover:brightness-110"
+            className="font-display ml-auto border border-signal bg-signal px-4 py-2 text-xs font-black tracking-wide whitespace-nowrap text-ink-950 uppercase hover:brightness-110"
           >
-            Continue planning <span className="ml-1 font-mono text-[10px] font-normal opacity-70">Esc</span>
+            Continue planning <span className="ml-1 font-mono text-[10px] font-normal opacity-70 max-sm:hidden">Esc</span>
           </button>
         </header>
 

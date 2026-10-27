@@ -23,7 +23,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
 
   await expect(page.getByTestId('top-bar')).toContainText('BRINK');
   await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
-  await expect(page.getByTestId('turn')).toContainText('1 / 30');
+  await expect(page.getByTestId('turn')).toContainText('1 / 20');
   await expect(page.getByTestId('map-canvas')).toBeVisible();
 
   // Select a formation from the Military panel.
@@ -78,14 +78,14 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(report).toContainText('Economy');
   await expect(report).toContainText(`${name} moved`);
   await page.getByTestId('close-report').click();
-  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+  await expect(page.getByTestId('turn')).toContainText('2 / 20');
 
   // Rewatch the turn; leaving it keeps the current turn.
   await page.getByTestId('rewatch').click();
   await expect(page.getByTestId('replay')).toContainText('rewatch');
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('replay')).toHaveCount(0);
-  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+  await expect(page.getByTestId('turn')).toContainText('2 / 20');
 
   // Threat overlay: V toggles it; hovering a seen enemy names the threat.
   await page.keyboard.press('Escape');
@@ -108,7 +108,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('menu-load').click();
   await page.getByTestId('load-slot-2').click();
   await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
-  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+  await expect(page.getByTestId('turn')).toContainText('2 / 20');
   await page.getByTestId('open-report').click();
   await expect(page.getByTestId('report')).toContainText('Turn 1 resolved');
   await page.getByTestId('close-report').click();
@@ -123,11 +123,11 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('menu-load').click();
   await page.getByTestId('load-file').setInputFiles((await file.path())!);
   await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
-  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+  await expect(page.getByTestId('turn')).toContainText('2 / 20');
 
   // Play another turn, then browse back through the report history.
   await page.getByTestId('end-turn').click();
-  await expect(page.getByTestId('turn')).toContainText('3 / 30', { timeout: 15000 });
+  await expect(page.getByTestId('turn')).toContainText('3 / 20', { timeout: 15000 });
   await page.getByTestId('open-report').click();
   await expect(page.getByTestId('report')).toContainText('Turn 2 resolved');
   await page.getByTestId('report-prev').click();

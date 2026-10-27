@@ -41,7 +41,7 @@ export function Menu() {
         <Title
           slots={slots}
           go={setScreen}
-          onTutorial={() => void newGame(TUTORIAL_NATION, TUTORIAL_SEED).then(() => useCoach.getState().begin(1))}
+          onTutorial={() => void newGame(TUTORIAL_NATION, TUTORIAL_SEED, 20).then(() => useCoach.getState().begin(1))}
           onContinue={(s) => {
             const text = readSlot(s.slot);
             if (text) load(text);

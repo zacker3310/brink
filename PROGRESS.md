@@ -106,7 +106,22 @@ Updated 2026-10-25. Milestone 1 (first playable).
   destroyed formations and site captures. Built only from events the player could see. Skip with
   Esc/Space; toggle in the top bar (remembered; off by default under reduced motion).
 
+- iPhone (Add to Home Screen): web app manifest, apple meta tags and icons, standalone full-screen
+  with safe areas, and a service worker that keeps the game playable offline after the first visit.
+  Phones get their own game screen (`PhoneGame.tsx`): edge-to-edge map, a status strip (turn, VP race,
+  resources, threat toggle, menu) and a thumb dock (Command sheet, Auto, Next, End Turn). Tap a unit,
+  tap a blue hex to move; tap an enemy to lock on and read the odds, tap again or Confirm to attack.
+  Pinch to zoom, drag to pan; the camera opens on your capital at a thumb-sized scale. After each turn
+  a debrief card lists the top results. Auto has the staff (the AI planner) draft orders for every
+  unit still waiting, plus research and recruits within half the bank. City production is a bottom
+  sheet; the coach has touch wording. Quick (20 turns, default) or Full (30) campaigns. Synthesised
+  sound (WebAudio: orders, lock-on, end turn, strikes, battles, win/lose), mutable from the menu.
+  Solo campaigns autosave after every turn; Continue picks it up.
+
 ## Outstanding
+
+- iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
+  Safari/WebKit; verify on a device (audio unlock, safe areas, standalone launch).
 
 - Balance: 55 of 100 soak matches end by victory points, 45 at the turn limit (median turn 29).
   Next levers if games should end sooner: stall threshold in `ai`, strike entrenchment, victory share.
@@ -123,4 +138,4 @@ None.
 1. Online reliability: TURN relay, lobby connection diagnostics, guest auto-retry; verify a real
    two-network match.
 2. Async turns on `apps/api` (resolve when all are in or at a deadline; notify on turn).
-3. More maps. 5. Shareable end-of-game recap. Touch input if friends play on phones.
+3. More maps. 5. Shareable end-of-game recap. 6. Haptics and a landscape layout on phones.

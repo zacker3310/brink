@@ -6,6 +6,7 @@ import { HEX_SIZE, useCamera } from './camera';
 import { useKeys } from './chrome';
 import { ModelPortrait, UnitGlyph } from './glyphs';
 import { recruitCostFor } from './rules-view';
+import { usePhone } from './phone';
 import { useGame } from './store';
 import { costText } from './ui';
 import { Icon } from './icons';
@@ -26,6 +27,7 @@ export function CityBanners() {
   const selectedCity = useGame((s) => s.selectedCity);
   const openCity = useGame((s) => s.openCity);
   const cam = useCamera((s) => s.camera);
+  const phone = usePhone();
   const v = playback?.before ?? view;
   if (!v || !draft) return null;
   const queue = v.self.productionQueue;
@@ -37,13 +39,14 @@ export function CityBanners() {
         .map((s) => {
           const p = hexToPixel(parseKey(s.key), HEX_SIZE);
           const x = cam.x + p.x * cam.scale;
-          const y = cam.y + (p.y - HEX_SIZE * 0.78) * cam.scale;
+          // On a phone the banner rides clear of the hex, so the units in a city stay tappable.
+          const y = cam.y + (p.y - HEX_SIZE * (phone ? 1.02 : 0.78)) * cam.scale;
           const owner = s.owner ? v.nations[s.owner] : undefined;
           const mine = s.owner === v.self.id;
           const color = owner?.color ?? '#e0a84a';
           const building = queue.find((q) => q.siteId === s.id);
           const pending = draft.recruit.find((r) => r.siteId === s.id);
-          const clickable = mine && !selectedFormation && !playback;
+          const clickable = mine && (phone || !selectedFormation) && !playback;
           const capital = s.kind === 'capital';
           return (
             <button
@@ -55,7 +58,7 @@ export function CityBanners() {
               className={`city-banner absolute flex -translate-x-1/2 -translate-y-full items-stretch overflow-hidden text-left shadow-lg ${clickable ? 'pointer-events-auto cursor-pointer' : ''} ${
                 selectedCity === s.id ? 'ring-2 ring-white' : ''
               }`}
-              style={{ left: x, top: y, fontSize: Math.max(9, Math.min(13, 11 * cam.scale)) }}
+              style={{ left: x, top: y, fontSize: Math.max(9, Math.min(phone ? 11 : 13, 11 * cam.scale)) }}
               title={mine ? `${s.name}: click to set production` : s.name}
             >
               <span className="flex items-center justify-center px-1.5 font-mono font-black text-ink-950" style={{ background: color }}>
@@ -93,6 +96,7 @@ export function CityPanel() {
   const removeRecruit = useGame((s) => s.removeRecruit);
   const selectFormation = useGame((s) => s.selectFormation);
   useKeys((e) => e.key === 'Escape' && id && openCity(null), [id]);
+  const phone = usePhone();
   const site = id ? view.sites[id] : undefined;
   if (!site) return null;
   const color = view.self.color;
@@ -118,7 +122,7 @@ export function CityPanel() {
   };
   const capacity = view.self.industrialCapacity;
   return (
-    <aside className="panel-in absolute top-3 bottom-3 left-3 z-20 flex w-[340px] flex-col ds-panel backdrop-blur" data-testid="city-panel" aria-label={`${site.name} production`}>
+    <aside className={phone ? 'sheet-in safe-bottom fixed inset-x-0 bottom-0 z-30 flex max-h-[78dvh] flex-col ds-panel backdrop-blur' : 'panel-in absolute top-3 bottom-3 left-3 z-20 flex w-[340px] flex-col ds-panel backdrop-blur'} data-testid="city-panel" aria-label={`${site.name} production`}>
       <header className="flex items-center gap-3 border-b border-line px-4 py-3" style={{ background: `linear-gradient(90deg, ${color}33, transparent)` }}>
         <div className="flex h-11 w-11 items-center justify-center font-mono text-lg font-black text-ink-950" style={{ background: color }}>
           {Math.max(1, Math.round(site.population / 300))}

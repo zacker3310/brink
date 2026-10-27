@@ -10,6 +10,8 @@ export interface SlotInfo {
 }
 
 export const SLOT_NAMES = ['Slot 1', 'Slot 2', 'Slot 3'] as const;
+/** Written after every resolved turn of a solo campaign; "Continue" picks it up. */
+export const AUTOSAVE = 'Autosave';
 
 const INDEX = 'brink.slots.v1';
 const DATA = (slot: string) => `brink.save.v1.${slot}`;
@@ -55,6 +57,9 @@ export interface Prefs {
   name?: string;
   /** The guided first match was finished or skipped. */
   tutorialDone?: boolean;
+  muted?: boolean;
+  /** Campaign length picked on the setup screen. */
+  length?: 'quick' | 'standard';
 }
 
 export function readPrefs(): Prefs {

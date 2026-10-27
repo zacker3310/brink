@@ -13,7 +13,9 @@ export interface SeatState {
 
 export type Request =
   /** `others` are further human seats (multiplayer and hotseat); every other nation is AI. */
-  | { type: 'new'; seed: number; nation: NationId; others?: NationId[] }
+  | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number }
+  /** What the AI would order for this seat now (the Auto button). */
+  | { type: 'suggest'; nation: NationId }
   | { type: 'stateFor'; nation: NationId }
   /** Resolve the turn with every human seat's orders; returns each human seat's new state. */
   | { type: 'resolve'; orders: NationOrders[] }
@@ -34,6 +36,7 @@ export type Response =
   | { type: 'resolved'; states: Record<NationId, SeatState> }
   | { type: 'ok' }
   | { type: 'checked'; rejected: GameEvent[] }
+  | { type: 'suggested'; orders: NationOrders }
   | { type: 'assault'; preview: AssaultPreview | null }
   | { type: 'strike'; preview: StrikePreview | null }
   | { type: 'saved'; text: string; turn: number }

@@ -3,6 +3,7 @@ import { Kbd } from './chrome';
 import { STEPS, useCoach, type CoachSnap } from './coach';
 import { idleFormations } from './insight';
 import { useGame } from './store';
+import { usePhone } from './phone';
 
 /** What the coach reads from the game, as plain numbers and flags. */
 function useSnap(): CoachSnap | null {
@@ -21,6 +22,7 @@ function useSnap(): CoachSnap | null {
   return {
     nation: view.self.name,
     turn: view.turn,
+    maxTurns: view.maxTurns,
     start,
     ordered: orders.filter((o) => o.type !== 'hold').length,
     idle: idleFormations(view, draft.formations).length,
@@ -70,6 +72,8 @@ export function Coach() {
   const snap = useSnap();
   const showReport = useGame((s) => s.showReport);
   const shifted = useGame((s) => s.panelOpen || s.selectedCity !== null);
+  const cityOpen = useGame((s) => s.selectedCity !== null);
+  const phone = usePhone();
   const def = STEPS[step];
   const showMe = useShowMe(def?.id ?? '');
   const complete = active && def?.done && snap ? def.done(snap) : false;
@@ -85,20 +89,23 @@ export function Coach() {
   }, [complete, next]);
 
   if (!active || !def || !snap) return null;
-  // Over the turn summary the coach shrinks to a strip beneath it.
-  if (showReport) {
+  const body = phone && def.touch ? def.touch(snap) : def.body(snap);
+  // Over the turn summary (or, on a phone, a city sheet) the coach shrinks to a strip out of the way.
+  if (showReport || (phone && cityOpen)) {
     return (
-      <section className="coach fixed bottom-3 left-1/2 z-40 w-[min(720px,calc(100%-24px))] -translate-x-1/2 ds-panel border-signal/70 px-3 py-2 shadow-2xl" data-testid="coach" data-step={def.id} aria-live="polite" aria-label="Guided first match">
+      <section className={`coach fixed left-1/2 z-40 w-[min(720px,calc(100%-24px))] -translate-x-1/2 ds-panel border-signal/70 px-3 py-2 shadow-2xl ${phone ? 'top-[calc(env(safe-area-inset-top)+6px)]' : 'bottom-3'}`} data-testid="coach" data-step={def.id} aria-live="polite" aria-label="Guided first match">
         <span className="ds-label mr-2 text-signal">
           {step + 1}/{STEPS.length} · {def.title}
         </span>
-        <span className="text-xs text-muted">{def.body(snap)}</span>
+        <span className="text-xs text-muted">{body}</span>
       </section>
     );
   }
-  const place = shifted ? 'bottom-36 left-[calc(50%+180px)] w-[380px] -translate-x-1/2' : 'bottom-3 left-1/2 w-[420px] -translate-x-1/2';
+  const place = phone
+    ? 'top-[calc(env(safe-area-inset-top)+88px)] left-2 right-2'
+    : shifted ? 'bottom-36 left-[calc(50%+180px)] w-[380px] -translate-x-1/2' : 'bottom-3 left-1/2 w-[420px] -translate-x-1/2';
   return (
-    <section className={`coach panel-in fixed z-40 ds-panel border-signal/70 p-3 shadow-2xl ${place}`} data-testid="coach" data-step={def.id} aria-live="polite" aria-label="Guided first match">
+    <section className={`coach panel-in fixed z-40 ds-panel border-signal/70 shadow-2xl ${phone ? 'px-3 py-2' : 'p-3'} ${place}`} data-testid="coach" data-step={def.id} aria-live="polite" aria-label="Guided first match">
       <div className="flex items-center justify-between gap-2">
         <span className="ds-label text-signal">
           Boot camp · {step + 1}/{STEPS.length}
@@ -113,15 +120,15 @@ export function Coach() {
       <h2 className="font-display mt-2 text-lg leading-tight font-bold tracking-wide uppercase" data-testid="coach-title">
         {def.title}
       </h2>
-      <p className="mt-1 text-xs leading-relaxed text-muted">{def.body(snap)}</p>
-      {def.keys && (
+      <p className={`mt-1 text-xs text-muted ${phone ? 'leading-snug' : 'leading-relaxed'}`}>{body}</p>
+      {def.keys && !phone && (
         <div className="mt-2 flex flex-wrap gap-1">
           {def.keys.map((k) => (
             <Kbd key={k}>{k}</Kbd>
           ))}
         </div>
       )}
-      <div className="mt-3 flex items-center justify-end gap-2">
+      <div className={`flex items-center justify-end gap-2 ${phone ? 'mt-1.5' : 'mt-3'}`}>
         {showMe && !snap.resolving && (
           <button type="button" onClick={showMe.run} className="border border-line px-2.5 py-1 text-[11px] text-muted hover:border-faint hover:text-text" data-testid="coach-show">
             {showMe.label}

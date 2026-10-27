@@ -261,6 +261,8 @@ interface PlayOptions {
   size: number;
   onPhase: (p: Phase) => void;
   onDone: () => void;
+  /** A strike lands, a battle starts or a unit dies: for sound. */
+  onImpact?: (kind: 'strike' | 'battle' | 'destroyed') => void;
 }
 
 /** Play a timeline on `layer`. Returns a stop function that removes everything it drew. */
@@ -291,6 +293,12 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     if (b.theirs) mk(`−${b.theirs}`, 0x6fbf8e, b.ours ? 14 : 0);
   }
   const routes = new Map(tl.actors.map((a) => [a.id, a.route.map(center)]));
+  const heard = new Set<string>();
+  const impact = (id: string, kind: 'strike' | 'battle' | 'destroyed') => {
+    if (heard.has(id)) return;
+    heard.add(id);
+    opts.onImpact?.(kind);
+  };
   // Explosion and smoke frames from the imported art, drawn from a small pool each frame.
   const art = getArt();
   const pool: Sprite[] = [];
@@ -369,6 +377,7 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       sprite.alpha = (a.confirmed ? 1 : 0.55) * fade;
       sprite.setStrength(strength);
       if (a.destroyed) {
+        if (pa > 0 && pa < 0.5) impact(`d${a.id}`, 'destroyed');
         burst(art?.explosion, pos.x, pos.y, pa * 1.4, size * 1.6);
         burst(art?.smoke, pos.x + 4, pos.y - 2, (pa - 0.15) / 0.85, size * 1.5, 0.75, size * 0.6);
       }
@@ -396,6 +405,7 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     for (const s of tl.strikes) {
       const b = center(s.to);
       const land = t - tl.combat[0] - s.delay - 420;
+      if (land > 0 && land < 650) impact(`s${s.to}${s.delay}`, 'strike');
       burst(art?.explosion, b.x, b.y, land / 650, size * 1.3);
       burst(art?.smoke, b.x + 3, b.y - 3, (land - 150) / 1500, size * 1.4, 0.65, size * 0.7);
     }
@@ -404,6 +414,7 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     for (const b of tl.battles) {
       const c0 = center(b.at);
       const since = t - tl.combat[0] - b.delay;
+      if (since > 0 && since < 600) impact(`b${b.at}`, 'battle');
       for (const [dx, dy, d] of [
         [-0.35, 0.1, 0],
         [0.3, -0.25, 160],

@@ -17,7 +17,7 @@ interface Note {
   at?: HexKey;
 }
 
-const ICON: Record<string, string> = {
+export const ICON: Record<string, string> = {
   battle: 'M5 19L19 5 M14 5h5v5 M19 19L5 5 M10 5H5v5',
   strike: 'M12 2v6 M12 16v6 M2 12h6 M16 12h6 M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
   flag: 'M5 21V4 M5 4h11l-2 4 2 4H5',
@@ -28,7 +28,7 @@ const ICON: Record<string, string> = {
   warn: 'M12 3l10 18H2z M12 10v5 M12 18h.01',
 };
 
-const TONE: Record<Tone, string> = {
+export const TONE: Record<Tone, string> = {
   good: 'border-good bg-good/15 text-good',
   bad: 'border-hostile bg-hostile/15 text-hostile',
   info: 'border-friend bg-friend/15 text-friend',

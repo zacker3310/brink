@@ -53,11 +53,13 @@ test('a first-time player is coached through a real turn', async ({ page }) => {
   await at('done');
   await page.getByTestId('coach-next').click();
   await expect(coach).toHaveCount(0);
-  await expect(page.getByTestId('turn')).toContainText('2 / 30');
+  await expect(page.getByTestId('turn')).toContainText('2 / 20');
 
-  // Done once: next time the campaign comes first and the guide sits below it.
+  // Done once: next time the autosaved campaign comes first, a new one next, and the guide sits below.
   await page.reload();
-  await expect(page.locator('[data-testid^="menu-"]').first()).toHaveAttribute('data-testid', 'menu-new');
+  await expect(page.locator('[data-testid^="menu-"]').first()).toHaveAttribute('data-testid', 'menu-continue');
+  await expect(page.getByTestId('menu-continue')).toContainText('turn 2');
+  await expect(page.locator('[data-testid^="menu-"]').nth(1)).toHaveAttribute('data-testid', 'menu-new');
   await expect(page.getByTestId('menu-tutorial')).toBeVisible();
   expect(errors).toEqual([]);
 });

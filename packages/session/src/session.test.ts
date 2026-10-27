@@ -108,4 +108,13 @@ describe('GameSession', () => {
     // Hotseat and single-player saves carry no callsigns.
     expect(parseSave(serializeSave(s.toSave('local', '2026-10-26T12:00:00Z'))).callsigns).toBeUndefined();
   });
+
+  it('can run a shorter campaign and drafts legal orders for a human seat', () => {
+    const s = GameSession.create(MERIDIAN_ID, 3, 'korva', [], { maxTurns: 20 });
+    expect(s.view().maxTurns).toBe(20);
+    const draft = s.suggest('korva');
+    expect(draft.nation).toBe('korva');
+    expect(Object.keys(draft.formations).length).toBeGreaterThan(0);
+    expect(s.check(draft)).toEqual([]);
+  });
 });

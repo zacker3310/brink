@@ -27,8 +27,9 @@ export class GameSession {
   ) {}
 
   /** `playerNation` is the local seat; `others` are further human seats (multiplayer, hotseat). */
-  static create(scenarioId: string, seed: number, playerNation: NationId | null, others: readonly NationId[] = []): GameSession {
+  static create(scenarioId: string, seed: number, playerNation: NationId | null, others: readonly NationId[] = [], opts: { maxTurns?: number } = {}): GameSession {
     const world = createScenario(scenarioId, seed);
+    if (opts.maxTurns) world.maxTurns = Math.max(5, Math.min(world.maxTurns, Math.floor(opts.maxTurns)));
     const humans = playerNation === null ? [] : [playerNation, ...others.filter((n) => n !== playerNation)];
     for (const n of humans) if (!world.nations[n]) throw new Error(`no such nation: ${n}`);
     if (new Set(humans).size !== humans.length) throw new Error('a nation can only have one human');
@@ -104,6 +105,11 @@ export class GameSession {
   /** Validate without resolving: what the engine would reject in these orders. */
   check(orders: NationOrders): GameEvent[] {
     return lockOrders(this.world, [orders]).rejected.filter((e) => e.kind === 'order_rejected' && e.nation === orders.nation);
+  }
+
+  /** What the AI would order for a human seat this turn: the phone's Auto button drafts from it. */
+  suggest(nation: NationId): NationOrders {
+    return planOrders(buildView(this.world, nation), emptyMemory(), this.world.seed);
   }
 
   aiOrders(): NationOrders[] {

@@ -7,6 +7,7 @@ import { readPrefs, writePrefs } from './saves';
 export interface CoachSnap {
   nation: string;
   turn: number;
+  maxTurns: number;
   /** Turn the guided match began on. */
   start: number;
   /** Own formations given a real order (anything but hold). */
@@ -33,6 +34,8 @@ export interface CoachStep {
   skippable?: boolean;
   /** Keys worth showing with the step. */
   keys?: string[];
+  /** The same step said for a touch screen, where there are no keys. */
+  touch?: (s: CoachSnap) => string;
 }
 
 export const STEPS: readonly CoachStep[] = [
@@ -40,7 +43,7 @@ export const STEPS: readonly CoachStep[] = [
     id: 'brief',
     title: 'Your war',
     body: (s) =>
-      `You command the ${s.nation}. Win by holding 40% of all victory points (cities, capitals and the three objectives), or be the last power standing. Thirty turns. Everyone plans in secret; when the turn ends, every order happens at once.`,
+      `You command the ${s.nation}. Win by holding 40% of all victory points (cities, capitals and the three objectives), or be the last power standing. ${s.maxTurns} turns. Everyone plans in secret; when the turn ends, every order happens at once.`,
   },
   {
     id: 'move',
@@ -49,6 +52,7 @@ export const STEPS: readonly CoachStep[] = [
       'A unit is selected: its card is bottom left. Blue hexes are where it can reach this turn. Click one to send it there. To pick a different unit, click it first.',
     done: (s) => s.ordered > 0,
     keys: ['Click', 'M'],
+    touch: () => 'A unit is selected: its card is at the bottom. Blue hexes are where it can reach this turn. Tap one to send it there. Tap any of your units to pick it instead.',
   },
   {
     id: 'all',
@@ -58,10 +62,13 @@ export const STEPS: readonly CoachStep[] = [
     done: (s) => s.idle === 0,
     skippable: true,
     keys: ['N', 'H', 'D'],
+    touch: (s) =>
+      `${s.idle} ${s.idle === 1 ? 'unit still waits' : 'units still wait'} for orders (amber dot). Next jumps to the next one, Dig in fortifies. In a hurry? Auto has your staff draft orders for everyone left.`,
   },
   {
     id: 'build',
     title: 'Build',
+    touch: () => 'Your cities produce. Tap a city banner on the map and pick a unit to build. It costs resources now and musters in a few turns.',
     body: () => 'Your cities produce. Click a city banner on the map and choose a unit to build. It costs resources now and musters in a few turns.',
     done: (s) => s.recruiting,
     skippable: true,
@@ -72,6 +79,7 @@ export const STEPS: readonly CoachStep[] = [
     body: () => 'Press Next Turn, bottom right. Your orders lock, the three AI powers lock theirs, and the world moves.',
     done: (s) => s.resolving || s.turn > s.start,
     keys: ['Ctrl+Enter'],
+    touch: () => 'Tap END TURN. Your orders lock, the three AI powers lock theirs, and the world moves.',
   },
   {
     id: 'watch',
@@ -79,6 +87,7 @@ export const STEPS: readonly CoachStep[] = [
     body: () => 'This is the replay: every move, strike and battle of the turn, as your units saw it. Space pauses, arrows step through phases.',
     done: (s) => !s.playback && !s.resolving && s.turn > s.start,
     keys: ['Space', '← →'],
+    touch: () => 'This is the replay: every move, strike and battle of the turn, as your units saw it. Pause or speed it up up top, or Skip.',
   },
   {
     id: 'report',
@@ -89,6 +98,7 @@ export const STEPS: readonly CoachStep[] = [
         : 'Results also arrive as notifications on the right. For the full story, open the turn summary (bottom right).',
     done: (s) => s.reportSeen && !s.showReport,
     keys: ['Esc'],
+    touch: (s) => (s.showReport ? 'What you gained and lost, and what your scouts saw. Close it to plan the next turn.' : 'For the full story of the turn, tap Report at the bottom.'),
   },
   {
     id: 'threat',
@@ -96,6 +106,7 @@ export const STEPS: readonly CoachStep[] = [
     body: () => 'Press V for the threat overlay. Red hexes are where seen enemies could strike next turn; darker means more of them. Hover an enemy to see its own reach.',
     done: (s) => s.showThreat,
     keys: ['V'],
+    touch: () => 'Tap the radar button up top for the threat overlay. Red hexes are where seen enemies could strike next turn; darker means more of them.',
   },
   {
     id: 'attack',
@@ -105,6 +116,8 @@ export const STEPS: readonly CoachStep[] = [
     done: (s) => s.attackOrdered,
     skippable: true,
     keys: ['Right-click', 'A'],
+    touch: () =>
+      'With a unit selected, enemies it can hit get a red ring. Tap one to lock on: the card shows the odds. Tap it again (or Confirm) to attack. Artillery and air strike from range.',
   },
   {
     id: 'diplomacy',
@@ -114,12 +127,14 @@ export const STEPS: readonly CoachStep[] = [
     done: (s) => s.diplomacyOpen,
     skippable: true,
     keys: ['5'],
+    touch: () => 'Open Command (bottom left), then Diplomacy. Propose peace to a power you are not fighting; it takes effect when they propose back.',
   },
   {
     id: 'done',
     title: 'Over to you, Commander',
     body: () => 'That is the whole loop: order, end the turn, watch, adapt. ? shows every key, and the Field manual in the menu has the rules. Then bring friends: Multiplayer.',
     keys: ['?'],
+    touch: () => 'That is the whole loop: order, end the turn, watch, adapt. The Field manual in the menu has the rules.',
   },
 ];
 

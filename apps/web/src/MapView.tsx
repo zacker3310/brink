@@ -9,6 +9,8 @@ import { AFFILIATION, FONT_UI, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
 import { terrainTexture } from './design/terrain';
 import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
+import { sfx } from './sfx';
+import { isPhone } from './phone';
 import { threatZones } from '@brink/simulation';
 import { hostilesAt, orderForClick, reachFor, type Mode } from './planning';
 import { useGame } from './store';
@@ -185,7 +187,7 @@ export function MapView() {
     let destroyed = false;
     let resize: ResizeObserver | null = null;
     const app = new Application();
-    void app.init({ resizeTo: el, background: SURFACE.ink950, antialias: true, autoDensity: true, resolution: window.devicePixelRatio || 1 }).then(() => {
+    void app.init({ resizeTo: el, background: SURFACE.ink950, antialias: true, autoDensity: true, resolution: Math.min(window.devicePixelRatio || 1, 2) }).then(() => {
       if (destroyed) {
         app.destroy(true);
         return;
@@ -221,7 +223,7 @@ export function MapView() {
           fit: () => {
             userMoved.current = false;
             const cur = useGame.getState().view;
-            if (cur) fitTo(cur);
+            if (cur) fitTo(cur, true);
           },
           centerOn: (x, y) => {
             userMoved.current = true;
@@ -280,9 +282,30 @@ export function MapView() {
     publish();
   }
 
-  function fitTo(v: NationView) {
+  /** The band of the canvas the player can actually see: on a phone the status strip and the dock cover the ends. */
+  function band(h: number): { top: number; bottom: number } {
+    if (!isPhone()) return { top: 0, bottom: h };
+    // The guided match's card sits under the status strip; keep the action below it.
+    const coach = document.querySelector('[data-testid="coach"]')?.getBoundingClientRect().bottom ?? 0;
+    return { top: Math.max(130, coach), bottom: h - (useGame.getState().armed ? 350 : 270) };
+  }
+
+  function fitTo(v: NationView, whole = false) {
     const a = appRef.current;
     if (!a) return;
+    if (!whole && isPhone()) {
+      // A phone opens on your own country at a size a thumb can hit, not the whole theatre in miniature.
+      const home = Object.values(v.sites).find((x) => x.owner === v.self.id && x.kind === 'capital')?.key ?? Object.values(v.formations)[0]?.key;
+      if (home) {
+        const p = center(home);
+        const s = 1.35;
+        const { top, bottom } = band(a.app.screen.height);
+        a.world.scale.set(s);
+        a.world.position.set(a.app.screen.width / 2 - p.x * s, (top + bottom) / 2 - p.y * s);
+        publish();
+        return;
+      }
+    }
     const pts = Object.keys(v.tiles).map(center);
     const minX = Math.min(...pts.map((p) => p.x)) - SIZE;
     const maxX = Math.max(...pts.map((p) => p.x)) + SIZE;
@@ -298,24 +321,58 @@ export function MapView() {
 
   function wireInput(app: Application, world: Container) {
     const canvas = app.canvas;
-    let down: { x: number; y: number; wx: number; wy: number; button: number } | null = null;
+    // Every finger or mouse on the map. One pans (or taps); two pinch-zoom around their midpoint.
+    const pts = new Map<number, { x: number; y: number }>();
+    let down: { x: number; y: number; wx: number; wy: number; button: number; touch: boolean } | null = null;
+    let pinch: { dist: number; scale: number; mx: number; my: number; wx: number; wy: number } | null = null;
     let dragged = false;
+    const rectOf = () => canvas.getBoundingClientRect();
+    const startPan = (x: number, y: number, button: number, touch: boolean) => {
+      down = { x, y, wx: world.x, wy: world.y, button, touch };
+    };
+    const startPinch = () => {
+      const [a, b] = [...pts.values()];
+      const r = rectOf();
+      pinch = { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y) || 1, scale: world.scale.x, mx: (a!.x + b!.x) / 2 - r.left, my: (a!.y + b!.y) / 2 - r.top, wx: world.x, wy: world.y };
+      dragged = true;
+    };
     canvas.addEventListener('pointerdown', (e) => {
-      down = { x: e.clientX, y: e.clientY, wx: world.x, wy: world.y, button: e.button };
-      dragged = false;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       canvas.setPointerCapture(e.pointerId);
+      if (pts.size === 1) {
+        startPan(e.clientX, e.clientY, e.button, e.pointerType !== 'mouse');
+        dragged = false;
+      } else if (pts.size === 2) startPinch();
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (down) {
+      if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pts.size >= 2) {
+        const [a, b] = [...pts.values()];
+        const r = rectOf();
+        const dist = Math.hypot(a!.x - b!.x, a!.y - b!.y) || 1;
+        const s = Math.min(4.5, Math.max(0.4, (pinch.scale * dist) / pinch.dist));
+        const mx = (a!.x + b!.x) / 2 - r.left;
+        const my = (a!.y + b!.y) / 2 - r.top;
+        // Keep the world point that was under the fingers' first midpoint under their midpoint now.
+        const bx = (pinch.mx - pinch.wx) / pinch.scale;
+        const by = (pinch.my - pinch.wy) / pinch.scale;
+        world.scale.set(s);
+        world.position.set(mx - bx * s, my - by * s);
+        userMoved.current = true;
+        publish();
+        return;
+      }
+      if (down && pts.has(e.pointerId)) {
         const dx = e.clientX - down.x;
         const dy = e.clientY - down.y;
-        if (Math.abs(dx) + Math.abs(dy) > 5) dragged = true;
+        if (Math.abs(dx) + Math.abs(dy) > (down.touch ? 10 : 5)) dragged = true;
         if (dragged) {
           userMoved.current = true;
           world.position.set(down.wx + dx, down.wy + dy);
           publish();
         }
       }
+      if (e.pointerType !== 'mouse') return;
       const k = hexAt(e.clientX, e.clientY);
       if (k !== hover.current) {
         hover.current = k;
@@ -323,21 +380,36 @@ export function MapView() {
         useGame.getState().setHover(k);
       }
     });
-    canvas.addEventListener('pointerleave', () => {
+    canvas.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse') return;
       hover.current = null;
       redrawHover();
       useGame.getState().setHover(null);
     });
-    canvas.addEventListener('pointerup', (e) => {
+    const lift = (e: PointerEvent, cancelled: boolean) => {
+      const was = pts.size;
+      pts.delete(e.pointerId);
+      if (was >= 2) {
+        // A pinch ended: carry on panning with the finger still down, without a jump.
+        pinch = null;
+        const rest = [...pts.values()][0];
+        if (rest) startPan(rest.x, rest.y, 0, true);
+        return;
+      }
       const wasDrag = dragged;
-      const button = down?.button ?? e.button;
+      const start = down;
       down = null;
-      if (wasDrag) return;
+      if (wasDrag || cancelled || !start) return;
       const k = hexAt(e.clientX, e.clientY);
       if (!k) return;
-      if (button === 0) onHexClick(k, false);
-      else if (button === 2) onHexClick(k, true);
-    });
+      if (start.touch) onHexClick(k, 'touch');
+      else if (start.button === 0) onHexClick(k, 'left');
+      else if (start.button === 2) onHexClick(k, 'right');
+    };
+    canvas.addEventListener('pointerup', (e) => lift(e, false));
+    canvas.addEventListener('pointercancel', (e) => lift(e, true));
+    // iOS Safari sends its own pinch gestures to the page; the map handles pinches itself.
+    canvas.addEventListener('gesturestart', (e) => e.preventDefault());
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener(
       'wheel',
@@ -370,27 +442,40 @@ export function MapView() {
     };
   }
 
-  /** Left-click selects, or orders in the current mode; right-click always orders by context. */
-  function onHexClick(key: HexKey, right: boolean) {
+  /**
+   * Left-click selects, or orders in the current mode; right-click always orders by context. A tap
+   * selects your own units and otherwise orders by context; an attack takes a second tap, so the
+   * first can show the odds.
+   */
+  function onHexClick(key: HexKey, input: 'left' | 'right' | 'touch') {
     const s = useGame.getState();
     const v = s.view;
     if (!v || s.playback) return;
+    const right = input === 'right';
+    const touch = input === 'touch';
     const r = currentReach();
     const own = Object.values(v.formations)
       .filter((o) => o.key === key)
       .sort((a, b) => (a.id < b.id ? -1 : 1));
     if (r && !s.resolving) {
       const { f, reach } = r;
-      // Left-click on a hex holding our own units (that is not a move target) cycles selection.
-      const selectHere = !right && own.length > 0 && hostilesAt(v, key).length === 0 && (key === f.key || (s.mode === 'move' && !reach[key]));
+      const hostile = hostilesAt(v, key).length > 0;
+      // Clicking or tapping a hex holding our own units (that is not a move target) cycles selection.
+      const selectHere = !right && own.length > 0 && !hostile && (key === f.key || touch || (s.mode === 'move' && !reach[key]));
       if (!selectHere && !(right && key === f.key)) {
-        const result = contextualOrder(v, f, key, s.mode, reach, right);
+        const result = contextualOrder(v, f, key, touch ? 'move' : s.mode, reach, right || touch);
         if ('error' in result) {
-          // A right-click is a command, so say why it failed; a left-click elsewhere just inspects.
-          if (right) {
+          // A command that cannot be carried out says why; an idle click elsewhere just inspects.
+          if (right || (touch && hostile)) {
             s.notify(result.error, 'warn');
             return;
           }
+        } else if (touch && result.order.type === 'attack') {
+          const armed = s.armed;
+          if (armed && armed.formation === f.id && armed.target === key) s.issueOrder(f.id, result.order);
+          else s.armAttack({ formation: f.id, target: key, order: result.order });
+          s.focusOn(key);
+          return;
         } else {
           s.selectHex(key);
           s.issueOrder(f.id, result.order);
@@ -685,6 +770,13 @@ export function MapView() {
       }
     }
     if (s.selectedHex && !replaying) hl.poly(poly(s.selectedHex, 1)).stroke({ width: 2.5, color: 0xffffff, alpha: 0.9 });
+    // A touch attack waiting for its second tap: the target in crosshairs.
+    if (s.armed && !replaying) {
+      const c = center(s.armed.target);
+      hl.poly(poly(s.armed.target, 1)).fill({ color: ATTACK, alpha: 0.18 }).stroke({ width: 3.5, color: ATTACK, alpha: 1 });
+      hl.circle(c.x, c.y, SIZE * 0.55).stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) hl.moveTo(c.x + dx * SIZE * 0.35, c.y + dy * SIZE * 0.35).lineTo(c.x + dx * SIZE * 0.8, c.y + dy * SIZE * 0.8).stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
+    }
     a.layers.highlight!.addChild(hl);
 
     // Planned orders: path, arrowhead and a ghost of the unit where it will end up.
@@ -783,7 +875,7 @@ export function MapView() {
 
   useEffect(() => {
     const unsub = useGame.subscribe((s, prev) => {
-      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat) redraw();
+      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat || s.armed !== prev.armed) redraw();
     });
     return unsub;
   }, []);
@@ -806,6 +898,7 @@ export function MapView() {
         if (cur && cur.phase !== phase) useGame.setState({ playback: { ...cur, phase } });
       },
       onDone: () => useGame.getState().finishPlayback(),
+      onImpact: (kind) => (kind === 'battle' ? sfx.battle() : sfx.boom()),
     });
     return stop;
   }, [result]);
@@ -818,9 +911,10 @@ export function MapView() {
     // Only pan when the target is off-screen or near the edge, so cycling units does not jitter.
     const sx = a.world.x + p.x * s;
     const sy = a.world.y + p.y * s;
-    const m = 90;
-    if (sx < m || sy < m || sx > a.app.screen.width - m || sy > a.app.screen.height - m) {
-      a.world.position.set(a.app.screen.width / 2 - p.x * s, a.app.screen.height / 2 - p.y * s);
+    const m = 70;
+    const { top, bottom } = band(a.app.screen.height);
+    if (sx < m || sy < top + m || sx > a.app.screen.width - m || sy > bottom - m) {
+      a.world.position.set(a.app.screen.width / 2 - p.x * s, (top + bottom) / 2 - p.y * s);
       publish();
     }
   }, [focus]);

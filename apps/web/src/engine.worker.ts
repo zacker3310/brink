@@ -18,7 +18,7 @@ function state(nation?: string): Response {
 function handle(req: Request): Response {
   switch (req.type) {
     case 'new':
-      session = GameSession.create(MERIDIAN_ID, req.seed, req.nation, req.others ?? []);
+      session = GameSession.create(MERIDIAN_ID, req.seed, req.nation, req.others ?? [], { maxTurns: req.maxTurns });
       return state();
     case 'load': {
       const save = parseSave(req.text);
@@ -28,6 +28,8 @@ function handle(req: Request): Response {
   }
   if (!session) return { type: 'error', message: 'no game in progress' };
   switch (req.type) {
+    case 'suggest':
+      return { type: 'suggested', orders: session.suggest(req.nation) };
     case 'check':
       return { type: 'checked', rejected: session.check(req.orders) };
     case 'previewAssault':
