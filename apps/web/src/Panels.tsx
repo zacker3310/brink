@@ -5,7 +5,7 @@ import { GOVERNMENTS, RULES, TECH_IDS, TECHS, UNITS } from '@brink/game-data';
 import { Label } from './chrome';
 import { Emblem, UnitGlyph } from './glyphs';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
-import { checkResearchView, recruitCostFor } from './rules-view';
+import { checkResearchView, recommendedTech, recruitCostFor, researchPerTurn } from './rules-view';
 import { describeOrder } from './planning';
 import { useGame } from './store';
 import { Button, costText, Meter, Stat, Swatch } from './ui';
@@ -358,117 +358,194 @@ export function Economy() {
   );
 }
 
+/** Each technology in plain words: what it is called, and what you get. */
+export const TECH_PLAIN: Record<string, { name: string; gives: string }> = {
+  logistics_doctrine: { name: 'Better supply lines', gives: 'Your units stay supplied further from home.' },
+  signals_intelligence: { name: 'Better scouting', gives: 'Every unit sees one hex further.' },
+  industrial_automation: { name: 'Faster factories', gives: 'Your cities build units 20% faster.' },
+  combined_arms: { name: 'Combined arms', gives: 'Attacks with mixed unit types hit harder.' },
+  precision_munitions: { name: 'Precision strikes', gives: 'Artillery, helicopters and drones hit 20% harder.' },
+  composite_armor: { name: 'Tougher armour', gives: 'Tanks and IFVs take 20% less damage.' },
+};
+
 export function Research() {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
   const setResearch = useGame((s) => s.setResearch);
+  const setBudget = useGame((s) => s.setBudget);
   const current = draft.research !== undefined ? draft.research : view.self.research.current;
-  const output = Math.max(1, view.self.researchOutput);
+  const budget = draft.budget ?? view.self.budget;
+  const output = researchPerTurn(view, budget.research);
+  const others = budget.infrastructure + budget.welfare;
+  const levels: [string, number][] = [
+    ['Low', 10],
+    ['Normal', 25],
+    ['High', 40],
+  ];
+  const done = view.self.research.unlocked;
+  // What you can start now first, cheapest first; what needs an earlier breakthrough after.
+  const open = TECH_IDS.filter((id) => !done.includes(id) && id !== current).sort(
+    (x, y) => Number(!!checkResearchView(view, x)) - Number(!!checkResearchView(view, y)) || TECHS[x]!.cost - TECHS[y]!.cost,
+  );
+  const best = recommendedTech(view);
+  const turnsFor = (id: string, progress = 0) => Math.max(1, Math.ceil((TECHS[id]!.cost - progress) / output));
   return (
-    <Section title="Technology" right={<span className="font-mono text-[10px] text-faint">{view.self.researchOutput}/turn</span>}>
-      <p className="mb-2 text-[11px] text-muted">{view.self.research.progress} points banked toward the current project.</p>
-      <ul className="space-y-1.5">
-        {TECH_IDS.map((id) => {
-          const t = TECHS[id]!;
-          const done = view.self.research.unlocked.includes(id);
+    <Section title="Research">
+      <p className="mb-3 text-[13px] leading-snug text-muted">
+        One breakthrough at a time. Pick one and it finishes by itself. If you never pick, your scientists start the recommended one.
+      </p>
+      {current ? (
+        <div className="mb-3 rounded-lg border-2 border-signal/70 bg-ink-850 p-3" data-testid="research-current">
+          <div className="font-display text-[11px] font-bold tracking-[0.08em] text-signal uppercase">Working on</div>
+          <div className="font-display text-lg font-extrabold">{TECH_PLAIN[current]?.name ?? TECHS[current]?.name}</div>
+          <div className="text-[13px] text-muted">{TECH_PLAIN[current]?.gives}</div>
+          <div className="mt-2">
+            <Meter value={view.self.research.progress} max={TECHS[current]!.cost} />
+          </div>
+          <div className="mt-1 text-[12px] text-faint">Ready in about {turnsFor(current, current === view.self.research.current ? view.self.research.progress : 0)} turns</div>
+        </div>
+      ) : (
+        <p className="mb-3 rounded-lg border border-line bg-ink-850 p-3 text-[13px] text-signal">Nothing in progress. Pick one below.</p>
+      )}
+      <ul className="space-y-2">
+        {open.map((id) => {
           const why = checkResearchView(view, id);
-          const active = current === id;
-          const left = Math.max(0, t.cost - (active ? view.self.research.progress : 0));
+          const plain = TECH_PLAIN[id];
           return (
-            <li
-              key={id}
-              className={`border p-2 text-xs ${done ? 'border-good/40 bg-good/5' : active ? 'border-signal/80 bg-ink-800' : why ? 'border-line/60 bg-ink-900 opacity-60' : 'border-line bg-ink-850'}`}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-semibold">{t.name}</span>
-                <span className="font-mono text-[10px] text-faint">{done ? <Icon name="check" className="h-3 w-3 text-good" /> : `${t.cost} pts`}</span>
-              </div>
-              <p className="text-[11px] text-muted">{t.summary}</p>
-              {t.requires.length > 0 && !done && <p className="text-[10px] text-faint">Requires {t.requires.map((r) => TECHS[r]?.name).join(', ')}</p>}
-              {active && !done && (
-                <div className="mt-1.5">
-                  <Meter value={view.self.research.progress} max={t.cost} />
-                  <div className="mt-0.5 text-[10px] text-faint">~{Math.ceil(left / output)} turns at current output</div>
+            <li key={id}>
+              <button
+                type="button"
+                onClick={() => setResearch(id)}
+                disabled={!!why}
+                data-testid={`research-${id}`}
+                className="w-full rounded-lg border border-line bg-ink-850 p-3 text-left active:bg-ink-700 disabled:opacity-45"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-display text-base font-bold">{plain?.name ?? TECHS[id]!.name}</span>
+                  {id === best && !why && <span className="rounded-full bg-signal px-2 py-0.5 text-[10px] font-bold text-ink-950 uppercase">Recommended</span>}
                 </div>
-              )}
-              <div className="mt-1.5">
-                {done ? (
-                  <span className="text-[11px] font-semibold text-good">Researched</span>
-                ) : active ? (
-                  <Button onClick={() => setResearch(null)}>Stop</Button>
-                ) : (
-                  <Button onClick={() => setResearch(id)} disabled={!!why} title={why ?? undefined}>
-                    Research · ~{Math.ceil(t.cost / output)} turns
-                  </Button>
-                )}
-              </div>
+                <div className="text-[13px] text-muted">{plain?.gives ?? TECHS[id]!.summary}</div>
+                <div className="mt-1 text-[12px] text-faint">{why ? `First: ${TECH_PLAIN[TECHS[id]!.requires[0]!]?.name ?? 'an earlier breakthrough'}` : `About ${turnsFor(id)} turns · tap to research`}</div>
+              </button>
             </li>
           );
         })}
       </ul>
+      <div className="mt-4">
+        <div className="font-display text-[11px] font-bold tracking-[0.08em] text-muted uppercase">Research funding</div>
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Research funding">
+          {levels.map(([label, share]) => {
+            const ok = share + others <= 60;
+            const on = budget.research === share || (label === 'Normal' && !levels.some(([, x]) => x === budget.research));
+            return (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={!ok}
+                onClick={() => setBudget({ ...budget, research: share })}
+                data-testid={`research-funding-${label.toLowerCase()}`}
+                className={`rounded-lg border px-2 py-2 text-center disabled:opacity-40 ${on ? 'border-signal bg-signal/15 text-signal' : 'border-line'}`}
+              >
+                <div className="font-display text-sm font-bold uppercase">{label}</div>
+                <div className="text-[11px] text-muted">{researchPerTurn(view, share)} pts/turn</div>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-[12px] text-faint">More funding spends more of your income each turn and finishes breakthroughs sooner.</p>
+      </div>
+      {done.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {done.map((id) => (
+            <span key={id} className="rounded-full border border-good/50 bg-good/10 px-2.5 py-1 text-[12px] text-good">
+              <Icon name="check" className="mr-1 h-3 w-3 align-[-2px]" />
+              {TECH_PLAIN[id]?.name ?? TECHS[id]?.name}
+            </span>
+          ))}
+        </div>
+      )}
     </Section>
   );
 }
+
+const RELATION_TEXT: Record<string, { label: string; tone: string; means: string }> = {
+  war: { label: 'At war', tone: 'bg-hostile text-white', means: 'You fight: each side can attack the other and take its cities.' },
+  peace: { label: 'At peace', tone: 'bg-good text-ink-950', means: 'Neither side can attack. Breaking it costs stability.' },
+  alliance: { label: 'Allies', tone: 'bg-friend text-ink-950', means: 'Allied: you fight side by side.' },
+};
 
 export function Diplomacy() {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
   const setDiplomacy = useGame((s) => s.setDiplomacy);
-  const others = Object.values(view.nations).filter((n) => n.id !== view.self.id);
+  const others = Object.values(view.nations)
+    .filter((n) => n.id !== view.self.id)
+    .sort((a, b) => b.victoryPoints - a.victoryPoints);
   const planned = (id: string) => draft.diplomacy.find((d) => d.target === id)?.action ?? null;
   const toggle = (id: string, action: DiplomaticAction) => setDiplomacy(id, planned(id) === action ? null : action);
+  const wars = others.filter((n) => !n.eliminated && view.relations[n.id] === 'war').length;
+  const easy = view.difficulty === 'easy';
+  const big = 'mt-2.5 h-11 w-full rounded-lg text-[14px] font-semibold';
   return (
-    <Section title="Relations">
-      <ul className="space-y-2">
+    <Section title="Diplomacy">
+      <p className="mb-3 text-[13px] leading-snug text-muted">
+        {wars === 0 ? 'You are at peace with everyone.' : `You are at war with ${wars} ${wars === 1 ? 'nation' : 'nations'}.`} Fewer wars means you can mass your army against one enemy.
+        {easy ? ' On Easy, anyone accepts your peace offer.' : ' A peace offer is accepted when they are busy fighting someone else.'}
+      </p>
+      <ul className="space-y-2.5">
         {others.map((n) => {
-          const rel = view.relations[n.id];
+          const rel = view.relations[n.id] ?? 'war';
+          const r = RELATION_TEXT[rel]!;
           const incoming = view.proposals.find((p) => p.from === n.id && p.to === view.self.id);
           const outgoing = view.proposals.find((p) => p.from === view.self.id && p.to === n.id);
           const seen = Object.values(view.contacts).filter((c) => c.owner === n.id && c.confirmed).length;
+          const perfidy = RULES.perfidy[rel === 'alliance' ? 'alliance' : 'peace'];
           return (
-            <li key={n.id} className="border border-line bg-ink-850 p-2.5 text-xs" style={{ borderLeft: `3px solid ${n.color}` }}>
-              <div className="flex items-center gap-2">
-                <Emblem color={n.color} government={n.government} className="h-5 w-5" />
-                <div className="leading-tight">
-                  <div className="font-semibold">{n.name}</div>
-                  <div className="text-[10px] text-faint">
-                    {GOVERNMENTS[n.government].name} · {n.victoryPoints} VP · {seen} unit{seen === 1 ? '' : 's'} in sight
+            <li key={n.id} className="rounded-lg border border-line bg-ink-850 p-3" style={{ borderLeft: `4px solid ${n.color}` }} data-testid={`nation-card-${n.id}`}>
+              <div className="flex items-center gap-2.5">
+                <Emblem color={n.color} government={n.government} className="h-8 w-8" />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="font-display truncate text-base font-bold">{n.name}</div>
+                  <div className="text-[12px] text-faint">
+                    {n.victoryPoints} VP{seen ? ` · ${seen} units seen` : ''}
                   </div>
                 </div>
-                <span
-                  className={`ml-auto border px-1.5 py-0.5 text-[10px] font-bold uppercase ${rel === 'war' ? 'border-hostile/60 text-hostile' : rel === 'alliance' ? 'border-good/60 text-good' : 'border-line text-muted'}`}
-                >
-                  {rel}
-                </span>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ${n.eliminated ? 'bg-ink-700 text-faint' : r.tone}`}>{n.eliminated ? 'Defeated' : r.label}</span>
               </div>
-              {n.eliminated ? (
-                <p className="mt-1 text-faint">Eliminated</p>
-              ) : (
+              {!n.eliminated && (
                 <>
-                  {incoming && <p className="mt-1.5 text-signal"><Icon name="flag" className="mr-1 h-3 w-3 align-[-2px]" />They propose {incoming.kind}. Propose it back to accept.</p>}
-                  {outgoing && <p className="mt-1.5 text-faint">Your {outgoing.kind} proposal is pending.</p>}
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {rel === 'war' && (
-                      <Button active={planned(n.id) === 'propose_peace'} onClick={() => toggle(n.id, 'propose_peace')}>
-                        Propose peace
-                      </Button>
-                    )}
-                    {rel === 'peace' && (
-                      <Button active={planned(n.id) === 'propose_alliance'} onClick={() => toggle(n.id, 'propose_alliance')}>
-                        Propose alliance
-                      </Button>
-                    )}
-                    {rel !== 'war' && (
-                      <Button
-                        tone="danger"
-                        active={planned(n.id) === 'declare_war'}
+                  <p className="mt-1.5 text-[13px] text-muted">{r.means}</p>
+                  {incoming && rel === 'war' && <p className="mt-1.5 text-[13px] font-semibold text-signal">They are offering peace.</p>}
+                  {outgoing && !planned(n.id) && <p className="mt-1.5 text-[12px] text-faint">Your {outgoing.kind} offer is waiting for their answer.</p>}
+                  {rel === 'war' && (
+                    <button
+                      type="button"
+                      onClick={() => toggle(n.id, 'propose_peace')}
+                      aria-pressed={planned(n.id) === 'propose_peace'}
+                      className={`${big} ${planned(n.id) === 'propose_peace' ? 'border-2 border-good bg-good/15 text-good' : 'bg-good text-ink-950'}`}
+                    >
+                      {planned(n.id) === 'propose_peace' ? 'Peace offered when the turn ends (tap to cancel)' : incoming ? 'Accept peace' : 'Offer peace'}
+                    </button>
+                  )}
+                  {rel !== 'war' && (
+                    <div className="flex gap-2">
+                      {rel === 'peace' && (
+                        <button type="button" onClick={() => toggle(n.id, 'propose_alliance')} aria-pressed={planned(n.id) === 'propose_alliance'} className={`${big} border border-line ${planned(n.id) === 'propose_alliance' ? 'border-friend text-friend' : 'bg-ink-800'}`}>
+                          {planned(n.id) === 'propose_alliance' ? 'Alliance offered' : incoming ? 'Accept alliance' : 'Offer alliance'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
                         onClick={() => toggle(n.id, 'declare_war')}
-                        title={`Breaking the ${rel} costs ${RULES.perfidy[rel === 'alliance' ? 'alliance' : 'peace']} stability`}
+                        aria-pressed={planned(n.id) === 'declare_war'}
+                        className={`${big} border ${planned(n.id) === 'declare_war' ? 'border-hostile bg-hostile text-white' : 'border-hostile/60 text-hostile'}`}
                       >
-                        Declare war · −{RULES.perfidy[rel === 'alliance' ? 'alliance' : 'peace']} stability
-                      </Button>
-                    )}
-                  </div>
+                        {planned(n.id) === 'declare_war' ? 'War declared at turn end (cancel)' : `Declare war · −${perfidy} stability`}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </li>

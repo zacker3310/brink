@@ -19,6 +19,8 @@ export interface Camera {
 export interface CameraControl {
   zoomBy(factor: number): void;
   fit(): void;
+  /** Back to the opening view: your own country at a playable size (the whole map on a desktop). */
+  home(): void;
   /** Centre on a point in world (hex-pixel) coordinates. */
   centerOn(x: number, y: number): void;
 }

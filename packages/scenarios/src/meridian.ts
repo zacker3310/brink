@@ -259,8 +259,15 @@ export function createMeridianScenario(seed: number): WorldState {
     nations[n.id]!.population = Object.values(sites).filter((s) => s.owner === n.id).reduce((a, s) => a + s.population, 0);
   }
 
+  // Every power owns an atlas: the land and its borders are known from the start (as of turn 0).
+  // Armies are not: enemy units show only once seen.
   for (const id of ids) {
-    world.intel[id] = emptyIntel();
+    const intel = emptyIntel();
+    for (const key of sortedKeys(world.tiles)) {
+      intel.observed[key] = 0;
+      intel.knownOwner[key] = world.tiles[key]!.owner;
+    }
+    world.intel[id] = intel;
     updateIntel(world, id, computeVision(world, id), 0);
   }
   return world;

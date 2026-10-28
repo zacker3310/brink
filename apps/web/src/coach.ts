@@ -127,7 +127,7 @@ export const STEPS: readonly CoachStep[] = [
     done: (s) => s.diplomacyOpen,
     skippable: true,
     keys: ['5'],
-    touch: () => 'Open Command (bottom left), then Diplomacy. Propose peace to a power you are not fighting; it takes effect when they propose back.',
+    touch: () => 'Tap Nation (bottom left), then Diplomacy: one card per country, War or Peace, and one button. Fewer wars, fewer fronts.',
   },
   {
     id: 'done',

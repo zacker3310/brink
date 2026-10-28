@@ -258,9 +258,14 @@ export function updateMemory(memory: AiMemory, view: NationView, events: readonl
 /** Turns without a capture after which a war counts as stalled. */
 const STALL_TURNS = 8;
 
-function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory): NationOrders['diplomacy'] {
+function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory, spare: readonly NationId[]): NationOrders['diplomacy'] {
   const self = view.self.id;
   const out: NationOrders['diplomacy'] = [];
+  // Spared nations (humans on easy) are never attacked by choice, and their peace is always welcome.
+  for (const p of view.proposals) {
+    if (p.to === self && p.kind === 'peace' && spare.includes(p.from) && view.relations[p.from] === 'war') out.push({ target: p.from, action: 'propose_peace' });
+  }
+  const may = (n: NationId) => !spare.includes(n);
   const focus = plan.target?.owner ?? null;
   const alive = sortedKeys(view.nations).filter((n) => n !== self && !view.nations[n]!.eliminated);
   const vp = (n: NationId) => view.nations[n]!.victoryPoints;
@@ -274,19 +279,19 @@ function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory): NationOr
     const stuck = [...enemies].sort((a, b) => (facing.get(b) ?? 0) - (facing.get(a) ?? 0) || vp(b) - vp(a) || (a < b ? -1 : 1))[0]!;
     out.push({ target: stuck, action: 'propose_peace' });
     const prey = alive.filter((n) => n !== stuck).sort((a, b) => vp(a) - vp(b) || (a < b ? -1 : 1))[0];
-    if (prey && view.relations[prey] === 'peace' && vp(prey) <= (view.nations[self]?.victoryPoints ?? 0)) out.push({ target: prey, action: 'declare_war' });
+    if (prey && may(prey) && view.relations[prey] === 'peace' && vp(prey) <= (view.nations[self]?.victoryPoints ?? 0)) out.push({ target: prey, action: 'declare_war' });
     return out;
   }
   if (enemies.length > 1) {
     const settle = enemies.filter((n) => n !== focus).sort((a, b) => vp(b) - vp(a) || (a < b ? -1 : 1))[0];
     if (settle) out.push({ target: settle, action: 'propose_peace' });
     for (const p of view.proposals) {
-      if (p.to === self && p.kind === 'peace' && p.from !== focus && view.relations[p.from] === 'war' && !out.some((d) => d.target === p.from)) {
+      if (p.to === self && p.kind === 'peace' && p.from !== focus && view.relations[p.from] === 'war' && !out.some((d) => d.target === p.from && d.action === 'propose_peace')) {
         out.push({ target: p.from, action: 'propose_peace' });
       }
     }
   }
-  const weakest = [...partners].sort((a, b) => vp(a) - vp(b) || (a < b ? -1 : 1))[0];
+  const weakest = [...partners].filter(may).sort((a, b) => vp(a) - vp(b) || (a < b ? -1 : 1))[0];
   const weakestAlive = [...alive].sort((a, b) => vp(a) - vp(b) || (a < b ? -1 : 1))[0];
   if (weakest && (enemies.length === 0 || (enemies.length === 1 && view.turn >= 10 && weakest === weakestAlive && vp(weakest) + 6 <= (view.nations[self]?.victoryPoints ?? 0)))) {
     out.push({ target: weakest, action: 'declare_war' });
@@ -299,7 +304,7 @@ function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory): NationOr
  * legal against the authoritative world by construction: every path runs over terrain the
  * nation has seen, within the formation's allowance.
  */
-export function planOrders(view: NationView, memory: AiMemory, seed: number): NationOrders {
+export function planOrders(view: NationView, memory: AiMemory, seed: number, opts: { spare?: readonly NationId[] } = {}): NationOrders {
   const self = view.self.id;
   const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
   const contacts = recentContacts(view);
@@ -479,7 +484,8 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number): Na
     endAt(plan, f.key, end);
   }
 
-  const diplomacy = planDiplomacy(view, plan, memory);
+  // One diplomatic order per nation: the engine refuses a second.
+  const diplomacy = planDiplomacy(view, plan, memory, opts.spare ?? []).filter((d, i, all) => all.findIndex((x) => x.target === d.target) === i);
 
   const research = chooseResearch(view);
   const budget = planBudget(view);

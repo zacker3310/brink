@@ -227,6 +227,13 @@ export interface VictoryState {
   turn: number;
 }
 
+/**
+ * How hard the campaign is for its human seats. Easy: a single-player campaign opens at war with
+ * the nearest rival only, the AI never declares war on a human and accepts any peace a human
+ * offers, and the human starts with half again the stockpile. Hard: the AI starts with that bonus.
+ */
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
 export interface WorldState {
   schema: 1;
   rulesetVersion: string;
@@ -246,6 +253,8 @@ export interface WorldState {
   proposals: Proposal[];
   intel: Record<NationId, NationIntel>;
   victory: VictoryState | null;
+  /** Absent in campaigns made before difficulty existed: they play as normal. */
+  difficulty?: Difficulty;
 }
 
 // ---------------------------------------------------------------------------
@@ -406,6 +415,7 @@ export interface NationView {
   victoryThreshold: number;
   totalVictoryPoints: number;
   victory: VictoryState | null;
+  difficulty: Difficulty;
 }
 
 export interface TurnResult {

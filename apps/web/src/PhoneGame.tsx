@@ -4,6 +4,7 @@ import { TERRAIN, UNITS } from '@brink/game-data';
 import { useCamera } from './camera';
 import { CityBanners, CityPanel } from './Cities';
 import { Coach } from './Coach';
+import { useCoach } from './coach';
 import { steps } from './counters';
 import { VictoryOverlay } from './Game';
 import { UnitGlyph } from './glyphs';
@@ -31,7 +32,7 @@ import { signed } from './ui';
 
 const RES_NAME: Record<Resource, string> = { credits: 'funds', energy: 'energy', materials: 'materials', food: 'food' };
 
-function Hud({ onMenu, onEconomy }: { onMenu: () => void; onEconomy: () => void }) {
+function Hud({ onMenu, onEconomy, onWorld }: { onMenu: () => void; onEconomy: () => void; onWorld: () => void }) {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report);
   const showThreat = useGame((s) => s.showThreat);
@@ -75,6 +76,12 @@ function Hud({ onMenu, onEconomy }: { onMenu: () => void; onEconomy: () => void 
             {mine >= rival.victoryPoints ? 'You lead' : `${rival.name} leads with ${rival.victoryPoints}`}
           </div>
         </div>
+        <button type="button" onClick={onWorld} aria-label="World map" data-testid="world" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-ink-900/80 text-muted">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18" />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={toggleThreat}
@@ -128,7 +135,9 @@ function Hud({ onMenu, onEconomy }: { onMenu: () => void; onEconomy: () => void 
   );
 }
 
-function MenuSheet({ onClose }: { onClose: () => void }) {
+function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => void }) {
+  const mapStyle = useGame((s) => s.mapStyle);
+  const setMapStyle = useGame((s) => s.setMapStyle);
   const save = useGame((s) => s.save);
   const exportSave = useGame((s) => s.exportSave);
   const animate = useGame((s) => s.animate);
@@ -137,7 +146,6 @@ function MenuSheet({ onClose }: { onClose: () => void }) {
   const resolving = useGame((s) => s.resolving);
   const role = useNet((n) => n.role);
   const leave = useNet((n) => n.leave);
-  const fit = useCamera((s) => s.control);
   const [muted, setM] = useState(isMuted());
   const row = 'flex w-full items-center justify-between border-b border-line/60 px-4 py-3.5 text-left text-sm active:bg-ink-800 disabled:opacity-40';
   return (
@@ -185,15 +193,18 @@ function MenuSheet({ onClose }: { onClose: () => void }) {
       >
         Sound <span className={muted ? 'text-faint' : 'text-signal'}>{muted ? 'Off' : 'On'}</span>
       </button>
+      <button type="button" className={row} onClick={() => setMapStyle(mapStyle === 'atlas' ? 'satellite' : 'atlas')} data-testid="toggle-map-style">
+        Map style <span className="text-signal">{mapStyle === 'atlas' ? 'Clean' : 'Satellite'}</span>
+      </button>
       <button
         type="button"
         className={row}
         onClick={() => {
           onClose();
-          fit?.fit();
+          onHowTo();
         }}
       >
-        Show the whole map
+        How to win
       </button>
       <button
         type="button"
@@ -600,6 +611,78 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
   );
 }
 
+/** The whole theatre: every nation ranked, with where you stand with it. */
+function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy: () => void }) {
+  const view = useGame((s) => s.view)!;
+  const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints);
+  const cities = (id: string) => Object.values(view.sites).filter((s) => s.owner === id && (s.kind === 'city' || s.kind === 'capital')).length;
+  const tag = (id: string) => (id === view.self.id ? ['You', 'bg-friend text-ink-950'] : view.relations[id] === 'war' ? ['War', 'bg-hostile text-white'] : view.relations[id] === 'alliance' ? ['Ally', 'bg-friend text-ink-950'] : ['Peace', 'bg-good text-ink-950']);
+  return (
+    <div className="sheet-in pointer-events-auto rounded-t-2xl border-t border-line bg-ink-900/97 px-4 pt-3" data-testid="world-card">
+      <div className="flex items-baseline justify-between">
+        <span className="font-display text-lg font-extrabold uppercase">The theatre</span>
+        <span className="text-[12px] text-faint">{view.victoryThreshold} VP wins</span>
+      </div>
+      <ul className="mt-2 space-y-1.5">
+        {ranked.map((n, i) => {
+          const [label, tone] = tag(n.id);
+          return (
+            <li key={n.id} className="flex items-center gap-2.5">
+              <span className="w-4 text-[13px] text-faint">{i + 1}</span>
+              <span className="h-4 w-4 shrink-0 rounded" style={{ background: n.color }} />
+              <span className={`min-w-0 flex-1 truncate text-[14px] ${n.id === view.self.id ? 'font-bold' : ''} ${n.eliminated ? 'text-faint line-through' : ''}`}>{n.name}</span>
+              <span className="text-[12px] text-faint">{cities(n.id)} cities</span>
+              <span className="w-12 text-right text-[14px] font-semibold tabular-nums">{n.victoryPoints}</span>
+              <span className={`w-14 rounded-full py-0.5 text-center text-[10px] font-bold uppercase ${n.eliminated ? 'bg-ink-700 text-faint' : tone}`}>{n.eliminated ? 'Out' : label}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-3 flex gap-2 pb-1">
+        <button type="button" onClick={onDiplomacy} className="h-11 flex-1 rounded-lg border border-line bg-ink-850 text-[14px] font-semibold">
+          Diplomacy
+        </button>
+        <button type="button" onClick={onClose} className="font-display h-11 flex-[1.4] rounded-lg bg-signal text-[15px] font-extrabold text-ink-950 uppercase" data-testid="world-close">
+          Back to my army
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The whole game in three steps, at the start of a campaign and from the menu. */
+function HowToWin({ onClose }: { onClose: () => void }) {
+  const view = useGame((s) => s.view)!;
+  const goal = nextObjective(view);
+  const steps: [string, string][] = [
+    ['Take places', `Cities, capitals and the gold objectives are worth victory points. Reach ${view.victoryThreshold}, or lead after turn ${view.maxTurns}, and you win.${goal ? ` Start with ${goal.site.name}: the amber ring.` : ''}`],
+    ['Move and attack', 'Tap your tile, then a blue hex to move there. Enemies you can hit are tagged WIN, EVEN or RISKY: attack the WINs.'],
+    ['End the turn', 'Everyone moves at once. Watch what happens, read the debrief, go again. Stuck? Tap Plan and your generals give every unit orders.'],
+  ];
+  return (
+    <div className="fixed inset-0 z-40 flex items-end bg-ink-950/70" data-testid="how-to-win">
+      <div className="sheet-in safe-bottom w-full rounded-t-2xl border-t border-line bg-ink-900 px-5 pt-5">
+        <div className="font-display text-2xl font-extrabold uppercase">How to win</div>
+        {view.difficulty === 'easy' && <p className="mt-1 text-[13px] text-good">Easy: you face one enemy. The others stay at peace with you.</p>}
+        <ol className="mt-3 space-y-3">
+          {steps.map(([title, text], i) => (
+            <li key={title} className="flex gap-3">
+              <span className="font-display flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal text-lg font-extrabold text-ink-950">{i + 1}</span>
+              <div>
+                <div className="font-display text-base font-bold uppercase">{title}</div>
+                <p className="text-[14px] leading-snug text-muted">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <button type="button" onClick={onClose} className="font-display mt-4 mb-1 h-12 w-full rounded-xl bg-signal text-lg font-extrabold text-ink-950 uppercase" data-testid="how-to-close">
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PhoneGame() {
   const showReport = useGame((s) => s.showReport);
   const playback = useGame((s) => s.playback);
@@ -611,6 +694,10 @@ export function PhoneGame() {
   const [menu, setMenu] = useState(false);
   const [command, setCommand] = useState(false);
   const [chat, setChat] = useState(false);
+  const [world, setWorld] = useState(false);
+  const firstTurn = useGame((s) => s.view?.turn === 1 && !s.view.victory);
+  const [howTo, setHowTo] = useState(firstTurn && !useCoach.getState().active);
+  const control = useCamera((s) => s.control);
   const reportTurn = useGame((s) => s.report?.turn ?? 0);
   const [briefed, setBriefed] = useState(reportTurn);
   const debrief = reportTurn > briefed && !resolving;
@@ -642,11 +729,27 @@ export function PhoneGame() {
           useGame.getState().setTab('economy');
           setCommand(true);
         }}
+        onWorld={() => {
+          useGame.getState().selectFormation(null);
+          control?.fit();
+          setWorld(true);
+        }}
       />
       <Toasts />
       <div className="safe-bottom safe-x pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col">
         {playback ? (
           <ReplayDock />
+        ) : world ? (
+          <WorldCard
+            onClose={() => {
+              control?.home();
+              setWorld(false);
+            }}
+            onDiplomacy={() => {
+              useGame.getState().setTab('diplomacy');
+              setCommand(true);
+            }}
+          />
         ) : (
           <>
             {event && !fid && (
@@ -661,7 +764,8 @@ export function PhoneGame() {
       </div>
       <CityPanel />
       {command && <CommandSheet onClose={() => setCommand(false)} />}
-      {menu && <MenuSheet onClose={() => setMenu(false)} />}
+      {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
+      {howTo && <HowToWin onClose={() => setHowTo(false)} />}
       <ChatOverlay open={chat} onClose={() => setChat(false)} />
       <VictoryOverlay />
       {showReport && <Report />}

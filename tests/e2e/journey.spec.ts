@@ -19,6 +19,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('nation-korva').click();
   await expect(page.getByTestId('dossier-name')).toHaveText('Korva Directorate');
   await page.getByTestId('seed').fill('1234');
+  // Normal: every rival at war from turn 1, so the first turn has fighting to replay.
+  await page.getByTestId('difficulty-normal').click();
   await page.getByTestId('start-game').click();
 
   await expect(page.getByTestId('top-bar')).toContainText('BRINK');
@@ -69,7 +71,10 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.keyboard.press(' ');
   await expect(page.getByTestId('replay-pause')).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press(' ');
-  await expect(page.getByTestId('replay-pause')).toHaveAttribute('aria-pressed', 'false');
+  // Unpaused: it plays on (or, on a quiet turn, has already finished).
+  await expect
+    .poll(async () => (await page.getByTestId('replay-pause').count()) === 0 || (await page.getByTestId('replay-pause').getAttribute('aria-pressed')) === 'false')
+    .toBe(true);
   await expect(page.getByTestId('notifications')).toBeVisible();
   await page.getByTestId('open-report').click();
   const report = page.getByTestId('report');

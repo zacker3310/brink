@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { NationId } from '@brink/contracts';
+import type { Difficulty, NationId } from '@brink/contracts';
 import { GOVERNMENTS, UNITS } from '@brink/game-data';
 import { NATIONS, SCENARIOS, createScenario } from '@brink/scenarios';
 import { readPrefs, writePrefs } from '../saves';
@@ -9,10 +9,16 @@ import { CLASS_ORDER, DOCTRINE, dossier, operationName, randomSeed, traits, VICT
 import { Emblem, UnitGlyph } from '../glyphs';
 import { MapPreview } from './MapPreview';
 
+const DIFFICULTIES: [Difficulty, string, string][] = [
+  ['easy', 'Easy', 'One enemy. The others stay at peace with you. Extra funds.'],
+  ['normal', 'Normal', 'All three rivals at war with you from turn 1.'],
+  ['hard', 'Hard', 'Everyone at war, and the AI starts richer.'],
+];
+
 /** The quick campaign: the same war, decided sooner. */
 const QUICK_TURNS = 20;
 
-export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number) => Promise<void> }) {
+export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty) => Promise<void> }) {
   const scenario = SCENARIOS[0]!;
   const [nation, setNation] = useState<NationId>(() => {
     const p = readPrefs().nation;
@@ -22,6 +28,11 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<'quick' | 'standard'>(() => readPrefs().length ?? 'quick');
   const turns = length === 'quick' ? Math.min(QUICK_TURNS, scenario.maxTurns) : scenario.maxTurns;
+  const [difficulty, setDifficulty] = useState<Difficulty>(() => readPrefs().difficulty ?? 'easy');
+  const pickDifficulty = (d: Difficulty) => {
+    setDifficulty(d);
+    writePrefs({ difficulty: d });
+  };
   const pickLength = (l: 'quick' | 'standard') => {
     setLength(l);
     writePrefs({ length: l });
@@ -41,7 +52,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(nation, seed, turns);
+      await onBegin(nation, seed, turns, difficulty);
     } finally {
       setStarting(false);
     }
@@ -60,7 +71,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         if (n >= 1 && n <= NATIONS.length) pick(NATIONS[n - 1]!.id);
       }
     },
-    [nation, seed, starting, turns],
+    [nation, seed, starting, turns, difficulty],
   );
 
   return (
@@ -186,7 +197,25 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                 ))}
               </div>
             </div>
-            <Fact label="Rivals" value={`${scenario.nations - 1} AI powers`} />
+            <div className="w-full">
+              <Label>Difficulty</Label>
+              <div className="mt-1 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Difficulty">
+                {DIFFICULTIES.map(([id, label, text]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={difficulty === id}
+                    data-testid={`difficulty-${id}`}
+                    onClick={() => pickDifficulty(id)}
+                    className={`rounded-lg border px-2.5 py-2 text-left ${difficulty === id ? 'border-signal bg-signal/15' : 'border-line hover:border-faint'}`}
+                  >
+                    <div className={`font-display text-sm font-bold uppercase ${difficulty === id ? 'text-signal' : ''}`}>{label}</div>
+                    <div className="text-[11px] leading-snug text-muted">{text}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="min-w-[220px] flex-1">
               <Label>Victory</Label>
               <p className="mt-1 text-xs leading-snug text-muted">
@@ -289,15 +318,6 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         </section>
       </div>
     </main>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <Label>{label}</Label>
-      <div className="mt-1 text-sm font-semibold">{value}</div>
-    </div>
   );
 }
 

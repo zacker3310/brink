@@ -1,9 +1,10 @@
-import type { AiMemory, GameEvent, NationId, NationOrders, NationView, SaveFile, TurnReport, WorldState } from '@brink/contracts';
+import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationView, SaveFile, TurnReport, WorldState } from '@brink/contracts';
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { emptyMemory, planOrders, updateMemory } from '@brink/ai';
 import { RULESET_VERSION } from '@brink/game-data';
 import { createScenario } from '@brink/scenarios';
-import { buildView, clone, hashState, lockOrders, resolveTurn, sortedKeys } from '@brink/simulation';
+import { keyDistance } from '@brink/map';
+import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys } from '@brink/simulation';
 
 export interface AdvanceResult {
   /** The player's report, or every nation's when there is no player. */
@@ -27,12 +28,19 @@ export class GameSession {
   ) {}
 
   /** `playerNation` is the local seat; `others` are further human seats (multiplayer, hotseat). */
-  static create(scenarioId: string, seed: number, playerNation: NationId | null, others: readonly NationId[] = [], opts: { maxTurns?: number } = {}): GameSession {
+  static create(
+    scenarioId: string,
+    seed: number,
+    playerNation: NationId | null,
+    others: readonly NationId[] = [],
+    opts: { maxTurns?: number; difficulty?: Difficulty } = {},
+  ): GameSession {
     const world = createScenario(scenarioId, seed);
     if (opts.maxTurns) world.maxTurns = Math.max(5, Math.min(world.maxTurns, Math.floor(opts.maxTurns)));
     const humans = playerNation === null ? [] : [playerNation, ...others.filter((n) => n !== playerNation)];
     for (const n of humans) if (!world.nations[n]) throw new Error(`no such nation: ${n}`);
     if (new Set(humans).size !== humans.length) throw new Error('a nation can only have one human');
+    if (opts.difficulty && opts.difficulty !== 'normal') applyDifficulty(world, humans, opts.difficulty);
     const memory: Record<NationId, AiMemory> = {};
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
     return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});
@@ -107,6 +115,10 @@ export class GameSession {
     return lockOrders(this.world, [orders]).rejected.filter((e) => e.kind === 'order_rejected' && e.nation === orders.nation);
   }
 
+  get difficulty(): Difficulty {
+    return this.world.difficulty ?? 'normal';
+  }
+
   /** What the AI would order for a human seat this turn: the phone's Auto button drafts from it. */
   suggest(nation: NationId): NationOrders {
     return planOrders(buildView(this.world, nation), emptyMemory(), this.world.seed);
@@ -116,7 +128,7 @@ export class GameSession {
     const out: NationOrders[] = [];
     for (const n of sortedKeys(this.memory)) {
       if (this.world.nations[n]!.eliminated) continue;
-      out.push(planOrders(buildView(this.world, n), this.memory[n]!, this.world.seed));
+      out.push(planOrders(buildView(this.world, n), this.memory[n]!, this.world.seed, { spare: this.world.difficulty === 'easy' ? this.seats : [] }));
     }
     return out;
   }
@@ -171,5 +183,33 @@ export class GameSession {
         : {}),
       ...(callsigns ? { callsigns: { ...callsigns } } : {}),
     };
+  }
+}
+
+/**
+ * Set up a campaign's difficulty (see `Difficulty`). Easy, single-player: one front, at war with
+ * the rival whose capital is nearest and at peace with the rest, and half again the stockpile.
+ */
+function applyDifficulty(world: WorldState, humans: readonly NationId[], difficulty: Difficulty): void {
+  world.difficulty = difficulty;
+  const boost = (n: NationId) => {
+    const s = world.nations[n]!.stockpile;
+    for (const r of sortedKeys(s)) s[r as keyof typeof s] = Math.floor((s[r as keyof typeof s] * 3) / 2);
+  };
+  const capital = (n: NationId) => Object.values(world.sites).find((s) => s.kind === 'capital' && s.owner === n)?.key;
+  if (difficulty === 'easy') {
+    for (const h of humans) boost(h);
+    const me = humans[0];
+    const home = me ? capital(me) : undefined;
+    if (humans.length !== 1 || !me || !home) return;
+    const rivals = sortedKeys(world.nations).filter((n) => n !== me);
+    const far = (n: NationId) => {
+      const k = capital(n);
+      return k ? keyDistance(home, k) : Infinity;
+    };
+    const nearest = [...rivals].sort((a, b) => far(a) - far(b) || (a < b ? -1 : 1))[0];
+    for (const n of rivals) if (n !== nearest) world.relations[pairKey(me, n)] = 'peace';
+  } else {
+    for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) boost(n);
   }
 }

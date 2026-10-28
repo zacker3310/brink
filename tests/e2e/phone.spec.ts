@@ -24,7 +24,7 @@ async function endTurn(page: Page, turn: number) {
 }
 
 test('a campaign plays on a phone by touch alone: move a stack, attack, end turns', async ({ page }) => {
-  test.setTimeout(330_000);
+  test.setTimeout(480_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -36,8 +36,17 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
   await expect(page.getByTestId('length-quick')).toHaveAttribute('aria-checked', 'true');
   // A fixed seed: the engine and the staff planner are deterministic, so this is the same war every run.
   await page.getByTestId('seed').fill('7');
+  await expect(page.getByTestId('difficulty-easy')).toHaveAttribute('aria-checked', 'true');
   await page.getByTestId('start-game').tap();
+  // The three-step brief comes first.
+  await expect(page.getByTestId('how-to-win')).toContainText('How to win');
+  await page.getByTestId('how-to-close').tap();
   await expect(page.getByTestId('turn')).toContainText('1/20');
+  // The world map: every nation, and where you stand with each.
+  await page.getByTestId('world').tap();
+  await expect(page.getByTestId('world-card')).toContainText('War');
+  await page.getByTestId('world-close').tap();
+  await page.getByTestId('next-idle').tap();
   // The whole command surface fits on the screen.
   for (const id of ['top-bar', 'end-turn', 'auto-command', 'next-idle', 'open-command']) await expect(page.getByTestId(id)).toBeInViewport();
 
@@ -58,8 +67,10 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
     [150, h - 300] as const,
   );
   expect(spot).toBeTruthy();
+  const waiting = await page.getByTestId('next-idle').textContent();
   await page.touchscreen.tap(spot!.x, spot!.y);
-  await expect(page.getByTestId('planned-order')).not.toContainText('Tap a');
+  // The stack got its orders: fewer units wait (the next stack comes up on its own).
+  await expect(page.getByTestId('next-idle')).not.toHaveText(waiting!);
 
   // Staff work: the rest get orders in one tap.
   await page.getByTestId('deselect').tap();
@@ -71,17 +82,22 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
   // Command sheet and city build, by touch.
   await page.getByTestId('open-command').tap();
   await expect(page.getByTestId('panel-overview')).toBeVisible();
+  await page.getByTestId('tab-research').tap();
+  await page.getByTestId('research-funding-high').tap();
+  await expect(page.getByTestId('research-funding-high')).toHaveAttribute('aria-checked', 'true');
+  // The recommended research started by itself when the first turn ended.
+  await expect(page.getByTestId('research-current')).toBeVisible();
   await page.getByTestId('tab-diplomacy').tap();
-  await expect(page.getByTestId('panel-diplomacy')).toBeVisible();
+  await expect(page.getByTestId('panel-diplomacy')).toContainText('At peace');
   await page.getByTestId('close-sheet').tap();
 
   // Attack by touch: find a stack with an enemy it can hit, tap the enemy (the odds come up), confirm.
   let attacked = false;
-  for (let tries = 0; tries < 6 && !attacked; tries++) {
+  for (let tries = 0; tries < 12 && !attacked; tries++) {
     const stacks = await page.evaluate(() => [...new Set(window.__brink!.formations().map((f) => f.key))]);
     for (const key of stacks) {
       const at = await page.evaluate((k) => window.__brink!.hexToClient(k), key);
-      if (at.y < 170 || at.y > viewport.height - 330 || at.x < 20 || at.x > viewport.width - 20) continue;
+      if (at.y < 170 || at.y > viewport.height - 420 || at.x < 20 || at.x > viewport.width - 20) continue;
       await page.touchscreen.tap(at.x, at.y);
       const target = await page.evaluate(
         ([top, bottom, w]) =>

@@ -1,4 +1,4 @@
-import type { GameEvent, NationId, NationOrders, NationView, TurnReport } from '@brink/contracts';
+import type { Difficulty, GameEvent, NationId, NationOrders, NationView, TurnReport } from '@brink/contracts';
 import type { AssaultPreview, StrikePreview } from '@brink/simulation';
 
 // Messages between the UI and the engine worker. The worker holds the authoritative world;
@@ -13,7 +13,7 @@ export interface SeatState {
 
 export type Request =
   /** `others` are further human seats (multiplayer and hotseat); every other nation is AI. */
-  | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number }
+  | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number; difficulty?: Difficulty }
   /** What the AI would order for this seat now (the Auto button). */
   | { type: 'suggest'; nation: NationId }
   | { type: 'stateFor'; nation: NationId }

@@ -117,4 +117,34 @@ describe('GameSession', () => {
     expect(Object.keys(draft.formations).length).toBeGreaterThan(0);
     expect(s.check(draft)).toEqual([]);
   });
+
+  it('easy opens one front, keeps the peace it promises and survives a save', () => {
+    const normal = GameSession.create(MERIDIAN_ID, 5, 'aster');
+    const s = GameSession.create(MERIDIAN_ID, 5, 'aster', [], { difficulty: 'easy' });
+    const v = s.view();
+    expect(Object.values(v.relations).filter((r) => r === 'war')).toHaveLength(1);
+    expect(v.self.stockpile.credits).toBe(Math.floor((normal.view().self.stockpile.credits * 3) / 2));
+    const friends = Object.keys(v.relations).filter((n) => v.relations[n] === 'peace');
+    for (let i = 0; i < 20 && !s.view().victory; i++) s.advance();
+    // No AI ever declares war on the human; the human never declared any.
+    for (const n of friends) expect(s.view().relations[n]).toBe('peace');
+    const loaded = GameSession.fromSave(parseSave(serializeSave(s.toSave('x', '2026-10-28T12:00:00Z'))));
+    expect(loaded.difficulty).toBe('easy');
+  });
+
+  it('accepts a human peace offer on easy', () => {
+    const s = GameSession.create(MERIDIAN_ID, 5, 'aster', [], { difficulty: 'easy' });
+    const v = s.view();
+    const enemy = Object.keys(v.relations).find((n) => v.relations[n] === 'war')!;
+    s.advance({ nation: 'aster', turn: v.turn, formations: {}, recruit: [], diplomacy: [{ target: enemy, action: 'propose_peace' }] });
+    s.advance();
+    expect(s.view().relations[enemy]).toBe('peace');
+  });
+
+  it('hard gives every AI half again its stockpile', () => {
+    const normal = GameSession.create(MERIDIAN_ID, 5, 'aster');
+    const hard = GameSession.create(MERIDIAN_ID, 5, null, [], { difficulty: 'hard' });
+    expect(hard.difficulty).toBe('hard');
+    expect(normal.difficulty).toBe('normal');
+  });
 });

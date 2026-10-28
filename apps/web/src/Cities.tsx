@@ -29,7 +29,8 @@ export function CityBanners() {
   const cam = useCamera((s) => s.camera);
   const phone = usePhone();
   const v = playback?.before ?? view;
-  if (!v || !draft) return null;
+  // Zoomed out on a phone the map is political: nation names, no city banners.
+  if (!v || !draft || (phone && cam.scale < 0.95)) return null;
   const queue = v.self.productionQueue;
   return (
     <div className="pointer-events-none absolute inset-0 z-[5] overflow-hidden" aria-label="Cities">

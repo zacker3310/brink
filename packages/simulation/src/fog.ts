@@ -253,5 +253,6 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     victoryThreshold: victoryThreshold(world),
     totalVictoryPoints: totalVictoryPoints(world),
     victory: world.victory ? { ...world.victory } : null,
+    difficulty: world.difficulty ?? 'normal',
   };
 }

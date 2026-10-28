@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
   Budget,
+  Difficulty,
   DiplomaticAction,
   FormationId,
   FormationOrder,
@@ -17,7 +18,7 @@ import type {
 import { RESOURCES } from '@brink/contracts';
 import { engine } from './engine';
 import { idleFormations, netChange, selfLedger } from './insight';
-import { recruitCostFor } from './rules-view';
+import { recommendedTech, recruitCostFor } from './rules-view';
 import { movementAllowance } from '@brink/simulation';
 import { UNITS } from '@brink/game-data';
 import { useCoach } from './coach';
@@ -86,12 +87,15 @@ interface State {
   dismissed: string[];
   /** Show where seen enemies could strike next turn. */
   showThreat: boolean;
+  /** The map's ground: a clean board-game map, or satellite imagery. */
+  mapStyle: 'atlas' | 'satellite';
+  setMapStyle(style: 'atlas' | 'satellite'): void;
   /** A touch attack waiting for its confirming second tap. */
   armed: Armed | null;
   /** The last resolved turn, kept so it can be replayed again. */
   lastTurn: { before: NationView; events: GameEvent[] } | null;
 
-  newGame(nation: NationId, seed: number, maxTurns?: number): Promise<void>;
+  newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty): Promise<void>;
   /** Let the staff draft orders for every unit and city still waiting; the player can change any. */
   autoCommand(): Promise<void>;
   /** Load a save. A room save reopens its lobby and a hotseat save its curtain; says which. */
@@ -242,11 +246,16 @@ export const useGame = create<State>((set, get) => {
     selectedCity: null,
     dismissed: [],
     showThreat: false,
+    mapStyle: readPrefs().mapStyle ?? 'atlas',
+    setMapStyle(style) {
+      writePrefs({ mapStyle: style });
+      set({ mapStyle: style });
+    },
     lastTurn: null,
     armed: null,
 
-    async newGame(nation, seed, maxTurns) {
-      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns }))) {
+    async newGame(nation, seed, maxTurns, difficulty) {
+      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty }))) {
         const capital = Object.values(get().view!.sites).find((s) => s.owner === nation && s.kind === 'capital');
         set({ selectedHex: capital?.key ?? null, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
         get().nextIdle();
@@ -407,8 +416,17 @@ export const useGame = create<State>((set, get) => {
     setPriority: (id, p) => editDraft((d) => ({ ...d, supplyPriority: { ...(d.supplyPriority ?? {}), [id]: p } })),
 
     async submit() {
-      const { draft, resolving } = get();
-      if (!draft || resolving) return;
+      const { draft: planned, resolving, view } = get();
+      if (!planned || resolving) return;
+      // Research never sits idle: with nothing chosen, the scientists start the recommended project.
+      let draft = planned;
+      if (view && draft.research === undefined && !view.self.research.current) {
+        const pick = recommendedTech(view);
+        if (pick) {
+          draft = { ...draft, research: pick };
+          set({ draft });
+        }
+      }
       sfx.endTurn();
       set({ submitted: structuredClone(draft), resolving: true });
       // In a room the turn resolves when every seat is in; the result comes back via receiveTurn.

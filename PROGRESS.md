@@ -135,6 +135,23 @@ Updated 2026-10-25. Milestone 1 (first playable).
     imagery is graded down and borders are bolder.
   - Fixed: the silent autosave reported "Could not save" after every turn.
 
+- Easier to play, easier to look at:
+  - Difficulty (Easy default): one front, at war with the nearest rival only, the AI never declares
+    war on you and accepts any peace you offer, half again the starting stockpile. Normal is all at
+    war; Hard gives the AI the bonus. Stored on the world, so saves keep it; tested in `session`.
+  - Clean map (default): flat board-game terrain with a small mark per terrain (trees, hills, peaks,
+    blocks, waves); satellite imagery is a menu option.
+  - Every power starts with the political map: land and borders known from turn 0 (scenario intel);
+    enemy units still need to be seen. World button: the whole theatre with nation names across
+    their land, a ranked list with war/peace for each, and a jump to Diplomacy.
+  - Research in plain words ("Faster factories: your cities build units 20% faster"), a
+    Recommended pick that starts by itself if you never choose, honest turn estimates from turn 1,
+    and a Low / Normal / High funding choice instead of a budget slider.
+  - Diplomacy: one card per nation, WAR or PEACE in a pill, what it means, one big button (Offer
+    peace, Accept peace, Declare war with its stability cost).
+  - "How to win" in three steps at the start of every campaign and from the menu.
+  - Fixed: the AI could send the same diplomatic order twice and have all of them refused.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real

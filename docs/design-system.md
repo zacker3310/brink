@@ -83,7 +83,11 @@ panel.
 
 ## Map
 
-- Ground: Sentinel-2 imagery (credits in `public/art/CREDITS.md`), graded down by a dark wash.
+- Ground, clean style (default): flat terrain colours (`ATLAS` in `MapView.tsx`) with one small mark
+  per terrain: three trees, two hill arcs, a snow-capped peak, city blocks, waves. Plains are bare.
+- Ground, satellite style (menu): Sentinel-2 imagery (credits in `public/art/CREDITS.md`), graded down by a dark wash.
+- Zoomed out (below 0.95), the map turns political: nation names in their colour across their land,
+  city banners hidden on a phone.
 - Territory: nation colour at 20 % (12 % where only remembered), 3.5 px borders on a dark keyline.
 - Reach: blue fill with a bright outer edge. Targets: red ring, plus an odds tag under the hex
   (green WIN, amber EVEN, red RISKY) for the selected stack's attackers (`odds.ts`).
@@ -106,6 +110,8 @@ hover combat card) and gets the same map.
 | Phone game screen | `PhoneGame.tsx`, `phone.ts` | Status strip (turn, victory bar, funds, goal), unit card with stack row and attack card, dock (Nation, Plan, Next, End Turn), debrief, sheets |
 | Counters, pictograms | `counters.ts`, `design/pictograms.ts`, `glyphs.tsx` | The only way to draw a unit |
 | Odds, goal | `odds.ts`, `objective.ts` | Shared by map and cards |
+| World card, How to win | `PhoneGame.tsx` | The whole theatre with war/peace per nation; the three-step brief |
+| Research, Diplomacy | `Panels.tsx` | Plain-word cards, one decision each; research funding Low / Normal / High |
 | Desktop HUD | `Game.tsx`, `UnitPanel.tsx`, `MapOverlays.tsx` | Mouse and keyboard |
 | City banners, production | `Cities.tsx` | Production is a bottom sheet on a phone |
 | Coach | `Coach.tsx`, `coach.ts` | Guided first match, touch wording on phones |

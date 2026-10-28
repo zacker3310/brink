@@ -115,6 +115,68 @@ function drawPath(g: Graphics, from: HexKey, order: FormationOrder, color: numbe
   }
 }
 
+/** Board-game ground: flat, calm terrain colours, each with a small mark saying what it is. */
+const ATLAS: Record<Terrain, { fill: number; ink: number }> = {
+  plains: { fill: 0x8e9a64, ink: 0x6d7a48 },
+  forest: { fill: 0x4f6e47, ink: 0x2f4a2b },
+  hills: { fill: 0xa48e60, ink: 0x7a6640 },
+  mountains: { fill: 0x8d8b86, ink: 0xe9e7e1 },
+  urban: { fill: 0x7a8490, ink: 0x4c5560 },
+  water: { fill: 0x3e6c8c, ink: 0x6f9bb8 },
+};
+
+function atlasGround(v: NationView, keys: HexKey[]): Container {
+  const g = new Graphics();
+  const marks = new Graphics();
+  for (const key of keys) {
+    const t = v.tiles[key]!;
+    if (t.visibility === 'unknown' || !t.terrain) {
+      g.poly(poly(key)).fill({ color: 0x1a2126 });
+      g.poly(poly(key)).stroke({ width: 0.8, color: 0x2b353c, alpha: 0.8 });
+      continue;
+    }
+    const look = ATLAS[t.terrain];
+    // A touch of variation hex to hex, so the land does not look like a spreadsheet.
+    const shade = jitter(key, 3) * 0.08;
+    g.poly(poly(key)).fill({ color: look.fill });
+    g.poly(poly(key)).fill({ color: shade > 0 ? 0xffffff : 0x000000, alpha: Math.abs(shade) });
+    g.poly(poly(key)).stroke({ width: 1, color: 0x000000, alpha: 0.18 });
+    const c = center(key);
+    const x = c.x + jitter(key, 5) * 6;
+    const y = c.y - 9 + jitter(key, 6) * 3;
+    if (t.siteId) continue;
+    if (t.terrain === 'forest') {
+      for (const [dx, dy] of [[-7, 2], [0, -2], [7, 2]] as const) marks.poly([x + dx, y + dy - 6, x + dx + 4, y + dy + 2, x + dx - 4, y + dy + 2]).fill({ color: look.ink, alpha: 0.9 });
+    } else if (t.terrain === 'hills') {
+      marks.moveTo(x - 10, y + 3).quadraticCurveTo(x - 5, y - 4, x, y + 3).moveTo(x - 1, y + 3).quadraticCurveTo(x + 5, y - 5, x + 11, y + 3).stroke({ width: 1.8, color: look.ink, alpha: 0.9, cap: 'round' });
+    } else if (t.terrain === 'mountains') {
+      marks.poly([x - 10, y + 4, x - 2, y - 7, x + 3, y, x + 6, y - 4, x + 11, y + 4]).fill({ color: 0x5f5d59 });
+      marks.poly([x - 4.5, y - 3.5, x - 2, y - 7, x + 0.5, y - 3.5]).fill({ color: look.ink });
+    } else if (t.terrain === 'urban') {
+      for (const [dx, h] of [[-7, 6], [-1, 9], [5, 5]] as const) marks.rect(x + dx, y + 4 - h, 5, h).fill({ color: look.ink, alpha: 0.9 });
+    } else if (t.terrain === 'water') {
+      for (const dy of [-2, 3]) marks.moveTo(x - 9, y + dy).quadraticCurveTo(x - 4.5, y + dy - 3, x, y + dy).quadraticCurveTo(x + 4.5, y + dy + 3, x + 9, y + dy).stroke({ width: 1.5, color: look.ink, alpha: 0.9, cap: 'round' });
+    }
+  }
+  const water = new Graphics();
+  for (const key of keys) {
+    const t = v.tiles[key]!;
+    if (!t.river || !t.terrain) continue;
+    const c = center(key);
+    for (const n of neighborKeys(key)) {
+      const u = v.tiles[n];
+      if (!u?.river || !u.terrain || n < key) continue;
+      const d = center(n);
+      const mx = (c.x + d.x) / 2 + jitter(key + n, 1) * 8;
+      const my = (c.y + d.y) / 2 + jitter(key + n, 2) * 8;
+      water.moveTo(c.x, c.y).quadraticCurveTo(mx, my, d.x, d.y).stroke({ width: 5, color: 0x3e6c8c, cap: 'round' });
+    }
+  }
+  const out = new Container();
+  out.addChild(g, marks, water);
+  return out;
+}
+
 const ODDS_COLOR: Record<Odds, number> = { good: 0x4fd18b, even: 0xffc23d, bad: 0xff5a4e };
 
 /** A pill under an enemy hex: how an attack there would likely go. Holds its size on screen. */
@@ -204,7 +266,7 @@ export function MapView() {
       const world = new Container();
       app.stage.addChild(world);
       const layers: Record<string, Container> = {};
-      for (const name of ['terrain', 'overlay', 'threat', 'sites', 'highlight', 'paths', 'units', 'anim', 'hover']) {
+      for (const name of ['terrain', 'overlay', 'threat', 'sites', 'highlight', 'paths', 'units', 'labels', 'anim', 'hover']) {
         layers[name] = new Container();
         world.addChild(layers[name]);
       }
@@ -227,9 +289,14 @@ export function MapView() {
             zoomAt(app.screen.width / 2, app.screen.height / 2, f);
           },
           fit: () => {
-            userMoved.current = false;
+            userMoved.current = true;
             const cur = useGame.getState().view;
             if (cur) fitTo(cur, true);
+          },
+          home: () => {
+            userMoved.current = false;
+            const cur = useGame.getState().view;
+            if (cur) fitTo(cur);
           },
           centerOn: (x, y) => {
             userMoved.current = true;
@@ -274,6 +341,8 @@ export function MapView() {
     if (!a) return;
     useCamera.setState({ camera: { x: a.world.x, y: a.world.y, scale: a.world.scale.x, width: a.app.screen.width, height: a.app.screen.height } });
     setModelZoom(a.world.scale.x);
+    // Zoomed out, the map becomes a political map: nation names across their land.
+    a.layers.labels!.visible = a.world.scale.x < 0.95;
   }
 
   function zoomAt(px: number, py: number, factor: number) {
@@ -293,7 +362,9 @@ export function MapView() {
     if (!isPhone()) return { top: 0, bottom: h };
     // The guided match's card sits under the status strip; keep the action below it.
     const coach = document.querySelector('[data-testid="coach"]')?.getBoundingClientRect().bottom ?? 0;
-    return { top: Math.max(150, coach), bottom: h - (useGame.getState().armed ? 400 : 300) };
+    // The unit card stands about 400 px tall over the bottom of the map while a stack is selected.
+    const g = useGame.getState();
+    return { top: Math.max(150, coach), bottom: h - (g.armed ? 470 : g.selectedFormation ? 410 : 300) };
   }
 
   function fitTo(v: NationView, whole = false) {
@@ -318,10 +389,12 @@ export function MapView() {
     const minY = Math.min(...pts.map((p) => p.y)) - SIZE;
     const maxY = Math.max(...pts.map((p) => p.y)) + SIZE;
     const w = a.app.screen.width;
-    const h = a.app.screen.height;
-    const s = Math.min(w / (maxX - minX), h / (maxY - minY), 1.6);
+    // On a phone the whole theatre fits between the status strip and the world card below it.
+    const top = isPhone() ? 130 : 0;
+    const h = a.app.screen.height - top - (isPhone() ? 330 : 0);
+    const s = Math.min((w - 8) / (maxX - minX), h / (maxY - minY), 1.6);
     a.world.scale.set(s);
-    a.world.position.set((w - (maxX - minX) * s) / 2 - minX * s, (h - (maxY - minY) * s) / 2 - minY * s);
+    a.world.position.set((w - (maxX - minX) * s) / 2 - minX * s, top + (h - (maxY - minY) * s) / 2 - minY * s);
     publish();
   }
 
@@ -534,6 +607,8 @@ export function MapView() {
     const hostile = hostilesAt(v, key).length > 0;
     if (ownHere && !hostile) {
       s.selectStack(key);
+      // Bring it up out from under the unit card, so its reach and targets are on screen.
+      s.focusOn(key);
       return;
     }
     const group = s.group.filter((id) => v.formations[id]);
@@ -611,8 +686,9 @@ export function MapView() {
 
   /** The ground: rebuilt only when what the viewer knows of the land changes, not on every click. */
   function drawGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: string[]) {
-    const art = getArt();
-    const sig = `${art ? 1 : 0}|${keys.map((k) => `${k}${v.tiles[k]!.visibility[0]}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
+    const atlas = useGame.getState().mapStyle === 'atlas';
+    const art = atlas ? null : getArt();
+    const sig = `${atlas ? 'atlas' : art ? 1 : 0}|${keys.map((k) => `${k}${v.tiles[k]!.visibility[0]}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
     if (groundSig.current === sig) return;
     groundSig.current = sig;
     const layer = a.layers.terrain!;
@@ -620,6 +696,10 @@ export function MapView() {
     for (const t of groundTextures.current) t.destroy(true);
     const made: Texture[] = [];
     groundTextures.current = made;
+    if (atlas) {
+      layer.addChild(atlasGround(v, keys));
+      return;
+    }
     // Terrain: satellite-style ground mapped in world space, so the landscape runs on across hexes.
     const terrain = new Graphics();
     const crisp = new Graphics();
@@ -715,7 +795,7 @@ export function MapView() {
     const v = s.playback?.before ?? s.view;
     const replaying = s.playback !== null;
     if (!a || !v) return;
-    for (const name of ['overlay', 'threat', 'sites', 'highlight', 'paths', 'units']) {
+    for (const name of ['overlay', 'threat', 'sites', 'highlight', 'paths', 'units', 'labels']) {
       a.layers[name]!.removeChildren().forEach((c) => c.destroy());
     }
     const keys = Object.keys(v.tiles).sort();
@@ -729,7 +809,7 @@ export function MapView() {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown') continue;
       // The imagery is graded down so units, borders and highlights carry the picture.
-      if (art && !t.siteId) overlay.poly(poly(key)).fill({ color: 0x0d1418, alpha: 0.32 });
+      if (art && s.mapStyle !== 'atlas' && !t.siteId) overlay.poly(poly(key)).fill({ color: 0x0d1418, alpha: 0.32 });
       if (t.owner) {
         const color = hex(v.nations[t.owner]?.color ?? '#888888');
         overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.2 : 0.12 });
@@ -743,6 +823,29 @@ export function MapView() {
       if (t.visibility === 'observed') overlay.poly(poly(key)).fill({ color: 0x0a0c0b, alpha: 0.5 });
     }
     a.layers.overlay!.addChild(overlay);
+
+    // Nation names across their territory, for the zoomed-out political map.
+    const lands = new Map<string, Point[]>();
+    for (const key of keys) {
+      const t = v.tiles[key]!;
+      if (t.owner && t.visibility !== 'unknown') lands.set(t.owner, [...(lands.get(t.owner) ?? []), center(key)]);
+    }
+    for (const [owner, pts] of [...lands].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
+      const n = v.nations[owner];
+      if (!n || pts.length < 3) continue;
+      const cx = pts.reduce((s2, p) => s2 + p.x, 0) / pts.length;
+      const cy = pts.reduce((s2, p) => s2 + p.y, 0) / pts.length;
+      const label = new Text({
+        text: n.name.toUpperCase(),
+        resolution: 2,
+        style: { fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: '800', fill: 0xffffff, letterSpacing: 2, stroke: { color: hex(n.color), width: 7, join: 'round' }, align: 'center', wordWrap: true, wordWrapWidth: 260 },
+      });
+      label.anchor.set(0.5);
+      label.position.set(cx, cy);
+      label.alpha = 0.92;
+      a.layers.labels!.addChild(label);
+    }
+    a.layers.labels!.visible = a.world.scale.x < 0.95;
 
     // Threat: where seen enemies could hit next turn, darker where more of them could.
     if (s.showThreat && !replaying) {
@@ -943,7 +1046,7 @@ export function MapView() {
 
   useEffect(() => {
     const unsub = useGame.subscribe((s, prev) => {
-      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat || s.armed !== prev.armed) redraw();
+      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat || s.armed !== prev.armed || s.mapStyle !== prev.mapStyle || s.group !== prev.group) redraw();
     });
     return unsub;
   }, []);

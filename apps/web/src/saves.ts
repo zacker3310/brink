@@ -60,6 +60,9 @@ export interface Prefs {
   muted?: boolean;
   /** Campaign length picked on the setup screen. */
   length?: 'quick' | 'standard';
+  difficulty?: 'easy' | 'normal' | 'hard';
+  /** Clean board-game map (default) or satellite imagery. */
+  mapStyle?: 'atlas' | 'satellite';
 }
 
 export function readPrefs(): Prefs {
