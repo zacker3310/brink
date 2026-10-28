@@ -11,6 +11,7 @@ import '@fontsource/barlow-condensed/latin-800.css';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import '@fontsource/cinzel/latin-700.css';
+import '@fontsource/cinzel/latin-900.css';
 import './index.css';
 
 // Offline play once installed to the Home Screen. Production builds only.

@@ -2,6 +2,14 @@
 
 Newest first. Each entry: what changed, where, how it was tested, what is left.
 
+## 2026-10-28: Home screen as a game title screen
+
+- The landing-page title is gone. The home screen is the painted theatre at war (burning fronts,
+  smoke, clouds, a drifting camera) behind an engraved gold BRINK and a big command menu, with your
+  record and a sound toggle in the corners. `menu/TitleScene.tsx`, `.home*` in `index.css`.
+- `MapLife.addFront` and `addFire` stage fronts without a campaign behind them.
+- e2e: the journey reads the new Continue line ("Korva Directorate · turn 2").
+
 ## 2026-10-28: Visual pass: painted map, live battles, Console screens
 
 - Painted map (`apps/web/src/paint/ground.ts`), the new default map style: a hand-painted fantasy

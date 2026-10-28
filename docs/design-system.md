@@ -161,7 +161,8 @@ clean style, which draws thousands of vector shapes instead of one texture.
 
 ## Console (v3): text screens
 
-Every text screen wears `.vercel` on its root: the title, setup, archive, manual, skirmish, the
+The home screen is the exception: it is a game title screen, not a console page (see "Home" below).
+Every other text screen wears `.vercel` on its root: setup, archive, manual, skirmish, the
 command sheet and side panels, the report, the order review, the city panel, the battle brief and
 verdict. The class re-points the tokens, so every utility inside follows, and resets display type to
 Geist in sentence case. Menus also wear `.vercel-mono`, where the accent is white; in-game sheets
@@ -186,3 +187,19 @@ Components (`index.css`, `chrome.tsx`):
 
 The CSS is deliberately outside Tailwind's layers so it wins over utilities on the same element. The
 same is true of the `safe-*` padding classes: never put `safe-x` and `px-*` on one element.
+
+## Home (v3)
+
+The home screen is a game title screen (`menu/Title.tsx`, `menu/TitleScene.tsx`, `.home*` in
+`index.css`):
+
+- **Backdrop**: the painted Meridian theatre, full screen, at war. Fronts burn along the realm
+  borders and the no-man's land between them (`MapLife.addFront`, `addFire`), clouds pass, and the
+  camera drifts and breathes over it. In portrait the war is framed in the top third, above the menu.
+- **Title**: BRINK in Cinzel 900 with a gold-on-bronze gradient and a dark keyline, the scenario name
+  in tracked gold caps above it.
+- **Menu**: big condensed caps, the first item larger in gold; the selected item gets a glowing gold
+  bar and a gold wash. Arrow keys, number keys, Enter; 52 px touch rows.
+- **Corners**: your record (stars, battles won, wars won) and the version and a sound toggle.
+- A shade keeps the menu legible over the map: from the left on wide screens, from the bottom on
+  phones.

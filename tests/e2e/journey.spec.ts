@@ -120,7 +120,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('save-slot-2').click();
   await expect(page.getByText('Saved to Slot 2')).toBeVisible();
   await page.reload();
-  await expect(page.getByTestId('menu-continue')).toContainText('Korva Directorate, turn 2');
+  await expect(page.getByTestId('menu-continue')).toContainText('Korva Directorate · turn 2');
   await page.getByTestId('menu-load').click();
   await page.getByTestId('load-slot-2').click();
   await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');

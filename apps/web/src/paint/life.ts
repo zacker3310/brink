@@ -152,17 +152,7 @@ export class MapLife {
       for (const k of [...ownAt].sort()) {
         for (const n of neighborKeys(k)) {
           if (!enemyAt.has(n)) continue;
-          const from = center(k);
-          const to = center(n);
-          const glow = new Sprite(tex);
-          glow.anchor.set(0.5);
-          glow.tint = 0xff5a2c;
-          glow.blendMode = 'add';
-          glow.position.set((from.x + to.x) / 2, (from.y + to.y) / 2);
-          glow.scale.set((size * 1.3) / 128, (size * 0.9) / 128);
-          glow.rotation = Math.atan2(to.y - from.y, to.x - from.x) + Math.PI / 2;
-          this.fireLayer.addChild(glow);
-          this.fronts.push({ from, to, next: [hash(k + n) * 1.2, hash(n + k) * 1.2 + 0.3], glow, phase: hash(n) * 6 });
+          this.addFront(center(k), center(n), hash(k + n));
           if (this.fronts.length >= 16) break;
         }
         if (this.fronts.length >= 16) break;
@@ -177,18 +167,36 @@ export class MapLife {
         const at = e.kind === 'engagement' ? e.location : e.kind === 'strike' ? e.target : null;
         if (!at || seen.has(at) || v.tiles[at]?.visibility === 'unknown') continue;
         seen.add(at);
-        const p = center(at);
-        const glow = new Sprite(tex);
-        glow.anchor.set(0.5);
-        glow.tint = 0xff7a2a;
-        glow.blendMode = 'add';
-        glow.alpha = 0.5;
-        glow.scale.set((size * 0.9) / 128);
-        glow.position.set(p.x + size * 0.25, p.y + size * 0.3);
-        this.fireLayer.addChild(glow);
-        this.fires.push({ p: { x: p.x + size * 0.25, y: p.y + size * 0.3 }, next: hash(at) });
+        this.addFire(center(at), hash(at));
       }
     }
+  }
+
+  /** A front between two hex centres: both sides fire, the edge between them glows. */
+  addFront(from: Point, to: Point, seed: number): void {
+    const glow = new Sprite(softTexture());
+    glow.anchor.set(0.5);
+    glow.tint = 0xff5a2c;
+    glow.blendMode = 'add';
+    glow.position.set((from.x + to.x) / 2, (from.y + to.y) / 2);
+    glow.scale.set((this.ctx.size * 1.3) / 128, (this.ctx.size * 0.9) / 128);
+    glow.rotation = Math.atan2(to.y - from.y, to.x - from.x) + Math.PI / 2;
+    this.fireLayer.addChild(glow);
+    this.fronts.push({ from, to, next: [seed * 1.2, ((seed * 7) % 1) * 1.2 + 0.3], glow, phase: seed * 6 });
+  }
+
+  /** A burning battlefield: a glow on the ground and smoke rising from it. */
+  addFire(p: Point, seed: number): void {
+    const { size } = this.ctx;
+    const glow = new Sprite(softTexture());
+    glow.anchor.set(0.5);
+    glow.tint = 0xff7a2a;
+    glow.blendMode = 'add';
+    glow.alpha = 0.5;
+    glow.scale.set((size * 0.9) / 128);
+    glow.position.set(p.x + size * 0.25, p.y + size * 0.3);
+    this.fireLayer.addChild(glow);
+    this.fires.push({ p: { x: p.x + size * 0.25, y: p.y + size * 0.3 }, next: seed });
   }
 
   private add(obj: Container, life: number, step: Fx['step']): void {
