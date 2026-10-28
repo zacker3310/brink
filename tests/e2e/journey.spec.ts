@@ -13,7 +13,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
 
   await page.goto('./');
   await expect(page).toHaveTitle('Brink');
-  await expect(page.getByTestId('wordmark')).toHaveText('BRINK');
+  await expect(page.getByTestId('wordmark')).toHaveText('Brink');
   await expect(page.getByTestId('menu-continue')).toHaveCount(0);
   await page.getByTestId('menu-new').click();
   await page.getByTestId('nation-korva').click();

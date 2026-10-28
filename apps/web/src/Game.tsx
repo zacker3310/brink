@@ -233,7 +233,7 @@ function SidePanel() {
   const togglePanel = useGame((s) => s.togglePanel);
   if (!open) return null;
   return (
-    <aside className="panel-in absolute top-0 bottom-0 left-0 z-20 w-[320px] overflow-y-auto border-r border-line bg-ink-900/97 shadow-2xl backdrop-blur" data-testid={`panel-${tab}`}>
+    <aside className="vercel panel-in absolute top-0 bottom-0 left-0 z-20 w-[320px] overflow-y-auto border-r border-line bg-ink-900/97 shadow-2xl backdrop-blur" data-testid={`panel-${tab}`}>
       <div className="sticky top-0 z-10 flex h-0 justify-end">
         <button type="button" onClick={() => togglePanel(false)} className="mt-1.5 mr-1.5 h-6 w-6 bg-ink-900 text-faint hover:text-text" aria-label="Close panel">
           <Icon name="close" />

@@ -40,7 +40,7 @@ function Brief({ req, onFight, onQuick, onBack }: { req: BattleRequest; onFight:
   const mode = s.site === 'capital' || s.site === 'city' || s.site === 'objective' ? 'capture' : 'destroy';
   const [title, text] = MODE_TEXT[mode];
   return (
-    <div className="safe-top safe-bottom safe-x absolute inset-0 overflow-y-auto bg-ink-950/96" data-testid="arena-brief">
+    <div className="vercel safe-top safe-bottom safe-x absolute inset-0 overflow-y-auto bg-black" data-testid="arena-brief">
       <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-5">
         <div className="mt-6 font-display text-[12px] font-bold tracking-[0.12em] text-signal uppercase">Battle · {s.terrain}{s.river ? ' · river' : ''}</div>
         <h1 className="font-display text-3xl leading-tight font-extrabold uppercase">{req.title}</h1>
@@ -98,7 +98,7 @@ function Verdict({ result, req, onDone }: { result: ArenaResult; req: BattleRequ
   const lost = req.setup.attackers.filter((u) => (result.kept[u.id] ?? 0) === 0).length;
   const killed = req.setup.defenders.filter((u) => (result.kept[u.id] ?? 0) === 0).length;
   return (
-    <div className="screen-in safe-top safe-bottom absolute inset-0 z-20 bg-ink-950/80 backdrop-blur-sm" data-testid="arena-verdict">
+    <div className="vercel screen-in safe-top safe-bottom absolute inset-0 z-20 bg-black/80 backdrop-blur-sm" data-testid="arena-verdict">
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <div className={`font-display text-5xl font-extrabold uppercase ${result.won ? 'text-good' : 'text-hostile'}`}>{result.won ? 'Victory' : 'Repulsed'}</div>
         <div className="mt-3 flex gap-2" aria-label={`${result.stars} of 3 stars`} data-testid="arena-stars">

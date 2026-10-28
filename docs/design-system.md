@@ -1,4 +1,8 @@
-# Brink design system: Command Table (v2)
+# Brink design system: Command Table (v2) and Console (v3)
+
+v3 adds two things to the Command Table below: a **painted map** that reads like a fantasy world
+map (a MOBA or MMO overworld) with battles that play out live along every front, and **Console**,
+a developer-console look for every text screen. Both are described in their own sections at the end.
 
 Brink is a war game you should be able to play in a waiting room. v1 ("ISR picture") looked like a
 real drone feed and played like one: three tiny vehicles and a NATO chip per hex, four resources in
@@ -49,12 +53,14 @@ says who; it never replaces friend/foe.
 
 | Role | Face | Use |
 |---|---|---|
-| Display | Barlow Condensed 700–800, uppercase for labels | Headings, names, numbers that matter, buttons, counters |
-| UI | Barlow 400–600 | Everything else |
+| Display (map HUD) | Barlow Condensed 700–800, uppercase for labels | The tactical HUD over the map: counters, banners, the dock, the turn button |
+| UI | Geist (variable) | Everything else; Console screens use it for headings too |
+| Mono | Geist Mono (variable) | Small uppercase labels, data, keyboard hints |
+| Region names | Cinzel 700 | Nation names across their land on the painted map, only |
 
-One family, tabular figures everywhere (set on `body`); `font-mono` maps to Barlow so numbers line
-up without a code font. Minimum size on a phone: 11 px for labels, 13 px for sentences.
-Self-hosted from npm (`@fontsource/barlow`, `@fontsource/barlow-condensed`), latin subset.
+Tabular figures everywhere (set on `body`). Minimum size on a phone: 11 px for labels, 13 px for
+sentences. Self-hosted from npm (`@fontsource-variable/geist`, `@fontsource-variable/geist-mono`,
+`@fontsource/barlow-condensed`, `@fontsource/cinzel`), latin subset.
 
 ### Shape and motion
 
@@ -83,7 +89,8 @@ panel.
 
 ## Map
 
-- Ground, clean style (default): flat terrain colours (`ATLAS` in `MapView.tsx`) with one small mark
+- Ground, painted style (default): see "Painted map" below.
+- Ground, clean style (menu): flat terrain colours (`ATLAS` in `MapView.tsx`) with one small mark
   per terrain: three trees, two hill arcs, a snow-capped peak, city blocks, waves. Plains are bare.
 - Ground, satellite style (menu): Sentinel-2 imagery (credits in `public/art/CREDITS.md`), graded down by a dark wash.
 - Zoomed out (below 0.95), the map turns political: nation names in their colour across their land,
@@ -116,3 +123,66 @@ hover combat card) and gets the same map.
 | City banners, production | `Cities.tsx` | Production is a bottom sheet on a phone |
 | Coach | `Coach.tsx`, `coach.ts` | Guided first match, touch wording on phones |
 | Sound | `sfx.ts` | WebAudio, no files |
+
+## Painted map (v3)
+
+`apps/web/src/paint/ground.ts` paints the whole theatre procedurally into one canvas, baked into a
+single texture (about 90 ms; repainted only when land is explored). No canvas blur filters, which
+Safari lacks: soft edges come from stamped radial gradients, and every stroke is seeded per hex so
+the land never changes between paints. In order:
+
+1. **Sea** all round the land, deep at the margins, with shallows and surf along the coast.
+2. **Ground**: a base colour per hex, a soft disc of it spilling past each edge so neighbours blend,
+   jittered blobs for variation, then light and shade across many hexes (sunlit downs, dark valleys).
+3. **Brushwork**: grass tufts, rock flecks, cobbles, ripples.
+4. **Coasts, roads, rivers**: sand and surf where land meets water; dirt roads between developed
+   hexes; rivers in four strokes (bank, deep, shallow, glint).
+5. **Props**, back to front: round-canopied trees, rock peaks with snow, rounded hills, houses, walled
+   towns and castles, depot yards, standing stones on objectives. They keep to the rim of each hex:
+   the middle is a clearing for the army counter.
+6. **Light**: warm from the top left, a vignette, unexplored land kept dark.
+
+Over it, in Pixi: each nation's land under a 10 % wash of its colour (one path per nation, so no
+seams), and borders that glow (11 px at 18 %, 5.5 px at 45 %, a 2.2 px core lifted toward white).
+Zoomed out, nation names in Cinzel, cream with a dark keyline and a glow in the nation's colour.
+
+`apps/web/src/paint/life.ts` keeps it alive (decoration only, never game state):
+
+| Layer | What |
+|---|---|
+| Fog | Banks of cloud over unexplored hexes, gently heaving |
+| Cloud shadows | Six soft shadows drifting west to east |
+| Water | Glints that twinkle on the sea and rivers |
+| Fronts | Wherever your stack stands next to an enemy at war: an ember glow on the contested edge, and both sides firing (muzzle flash, tracer, shell burst, smoke), up to 16 fronts |
+| Fires | Smoke rising where last turn's battles and strikes landed |
+
+With reduced motion only the fog stays (still). Measured in Chromium: no frame-rate cost against the
+clean style, which draws thousands of vector shapes instead of one texture.
+
+## Console (v3): text screens
+
+Every text screen wears `.vercel` on its root: the title, setup, archive, manual, skirmish, the
+command sheet and side panels, the report, the order review, the city panel, the battle brief and
+verdict. The class re-points the tokens, so every utility inside follows, and resets display type to
+Geist in sentence case. Menus also wear `.vercel-mono`, where the accent is white; in-game sheets
+keep command amber as the colour of the next action.
+
+| Token (inside `.vercel`) | Value |
+|---|---|
+| ink-950 / 900 / 850 / 800 / 700 | #000 / #0a0a0a / #111 / #1a1a1a / #2e2e2e |
+| line | #262626 |
+| text / muted / faint | #ededed / #a1a1a1 / #737373 |
+| friend / good / hostile | #3b9eff / #3ecf8e / #ff5f56 |
+
+Components (`index.css`, `chrome.tsx`):
+
+- **Top bar** (`ScreenHeader`): the Brink mark, a breadcrumb (Brink / section / screen), Esc.
+- **Buttons**: `v-btn v-btn-primary` (white on black, the one main action) and `v-btn-secondary`
+  (black with a hairline). 40 px tall, 6 px radius, Geist 500.
+- **Cards**: `v-card` (#0a0a0a, 1 px #262626, 12 px radius), `v-card-link` brightens the border on hover.
+- **Labels**: `ds-label` and `v-kicker` are the only capitals: Geist Mono 12 px, muted.
+- **Backdrop**: `v-backdrop`, a 64 px engineering grid fading down from a soft top glow.
+- **Headlines**: `v-gradient-text`, white to grey, tight tracking (-0.045em).
+
+The CSS is deliberately outside Tailwind's layers so it wins over utilities on the same element. The
+same is true of the `safe-*` padding classes: never put `safe-x` and `px-*` on one element.

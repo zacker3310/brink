@@ -23,9 +23,10 @@
   --color-friend: #4fb3ff;
   --color-neutral: #9ad69c;
   --color-unknown: #ffe14d;
-  --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
-  /* Numbers use Barlow too, with tabular figures (set on body): one family, no code-font look. */
-  --font-mono: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  /* Geist for reading, Geist Mono for labels and data; the condensed face stays for the tight
+     tactical HUD over the map. */
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', monospace;
   --font-display: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
 }
 
@@ -469,4 +470,130 @@ aside[data-testid^='panel-'] section:first-of-type > header {
     transform: scale(0.2) rotate(-40deg);
     opacity: 0;
   }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Console: the design system for every text screen (menus, setup, archive, manual, skirmish, the
+   command sheet, reports, the order review, the city panel). Black, hairline borders, a grey
+   scale, Geist in sentence case, white primary buttons: a developer console, not a war room.
+   Scoped by `.vercel` on a screen's root; it re-points the tokens, so every utility inside follows.
+   Unlayered on purpose: it must win over Tailwind's layered utilities on the same element. */
+.vercel {
+  --color-ink-950: #000000;
+  --color-ink-900: #0a0a0a;
+  --color-ink-850: #111111;
+  --color-ink-800: #1a1a1a;
+  --color-ink-700: #2e2e2e;
+  --color-ink-600: #3d3d3d;
+  --color-line: #262626;
+  --color-text: #ededed;
+  --color-muted: #a1a1a1;
+  --color-faint: #737373;
+  --color-friend: #3b9eff;
+  --color-good: #3ecf8e;
+  --color-hostile: #ff5f56;
+  --font-display: var(--font-sans);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  font-feature-settings: 'tnum' 1, 'ss01' 1;
+}
+.vercel .font-display {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+.vercel .uppercase {
+  text-transform: none;
+  letter-spacing: normal;
+}
+/* Small labels are the one place for capitals: mono, quiet, lightly tracked. */
+.vercel .ds-label,
+.vercel .v-kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.vercel .ds-panel {
+  background: var(--color-ink-900);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.vercel kbd {
+  font-family: var(--font-mono);
+  border-radius: 4px;
+}
+/* Buttons: white primary, hairline secondary. */
+.v-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms;
+}
+.v-btn-primary {
+  background: #ededed;
+  color: #0a0a0a;
+}
+.v-btn-primary:hover {
+  background: #ffffff;
+}
+.v-btn-secondary {
+  background: #0a0a0a;
+  color: #ededed;
+  border: 1px solid #2e2e2e;
+}
+.v-btn-secondary:hover {
+  background: #1a1a1a;
+  border-color: #3d3d3d;
+}
+.v-card {
+  background: #0a0a0a;
+  border: 1px solid #262626;
+  border-radius: 12px;
+  transition:
+    border-color 150ms,
+    background-color 150ms;
+}
+.v-card-link:hover {
+  border-color: #3d3d3d;
+  background: #111111;
+}
+/* The faint engineering grid behind landing screens, fading out from a soft top glow. */
+.v-backdrop {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgb(255 255 255 / 0.09), transparent 70%),
+    linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px) 0 0 / 64px 64px,
+    #000;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
+}
+.v-gradient-text {
+  background: linear-gradient(180deg, #ffffff 0%, #a1a1a1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.v-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+}
+/* Menus are monochrome, as on a console: the accent is white. In-game sheets keep command amber. */
+.vercel-mono {
+  --color-signal: #ededed;
 }

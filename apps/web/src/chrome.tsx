@@ -22,21 +22,38 @@ export function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="rounded-[3px] border border-line bg-ink-800 px-1.5 py-px font-mono text-[10px] text-muted">{children}</kbd>;
 }
 
+/** The Brink mark: a hexagon with the frontline cut through it. */
+export function Mark({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden>
+      <path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z" fill="currentColor" />
+      <path d="M5.5 14.5l4-3 3 2.2 6-5.2" stroke="#000" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** A console top bar: the mark, a breadcrumb back to the title, and room on the right. */
 export function ScreenHeader({ title, kicker, onBack, right }: { title: string; kicker: string; onBack: () => void; right?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-center gap-4 border-b border-line bg-ink-950/80 px-4 py-3 backdrop-blur sm:px-6">
-      <button type="button" onClick={onBack} className="group flex items-center gap-2 text-xs text-muted hover:text-text" data-testid="menu-back">
-        <span className="transition-transform group-hover:-translate-x-0.5" aria-hidden>
-          ←
+    <header className="safe-x sticky top-0 z-20 border-b border-line bg-black/80 backdrop-blur-md">
+      <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:px-6">
+        <button type="button" onClick={onBack} className="group flex h-10 items-center gap-2 rounded-md text-sm text-text" data-testid="menu-back" aria-label="Back to the title">
+          <Mark />
+          <span className="font-semibold tracking-tight">Brink</span>
+        </button>
+        <span className="text-ink-600" aria-hidden>
+          /
         </span>
-        Command <Kbd>Esc</Kbd>
-      </button>
-      <div className="h-6 w-px bg-line" aria-hidden />
-      <div className="leading-tight">
-        <div className="font-display text-[10px] font-semibold tracking-[0.1em] text-signal uppercase">{kicker}</div>
-        <h1 className="text-lg font-bold tracking-tight">{title}</h1>
+        <span className="text-sm text-muted">{kicker}</span>
+        <span className="text-ink-600" aria-hidden>
+          /
+        </span>
+        <h1 className="text-sm font-medium text-text">{title}</h1>
+        <span className="ml-1 hidden sm:inline">
+          <Kbd>Esc</Kbd>
+        </span>
+        <div className="ml-auto">{right}</div>
       </div>
-      <div className="ml-auto">{right}</div>
     </header>
   );
 }

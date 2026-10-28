@@ -293,7 +293,7 @@ export function Report() {
   const exchange = totals.dealt - totals.lost;
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink-950/75 p-4 backdrop-blur-sm sm:p-8" role="dialog" aria-modal="true" aria-labelledby="report-title" data-testid="report">
+    <div className="vercel fixed inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm sm:p-8" role="dialog" aria-modal="true" aria-labelledby="report-title" data-testid="report">
       <div className="report-in flex max-h-full w-full max-w-5xl flex-col border border-line bg-ink-950 shadow-2xl">
         <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-4 py-3 sm:px-5" style={{ background: `linear-gradient(90deg, ${view.self.color}22, transparent 60%)` }}>
           <div>

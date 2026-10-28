@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, type Texture } from 'pixi.js';
+import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
@@ -16,6 +16,11 @@ import { contextualOrder, hostilesAt, orderForClick, reachFor } from './planning
 import { nextObjective } from './objective';
 import { groupOrders, oddsFor, ODDS_TAG, type Odds } from './odds';
 import { useGame } from './store';
+import { paintTheatre } from './paint/ground';
+import { MapLife } from './paint/life';
+
+/** Region names on the painted map: an engraved serif, like a printed atlas of a fantasy world. */
+const FONT_REGION = "'Cinzel', Georgia, serif";
 
 const SIZE = HEX_SIZE;
 
@@ -24,6 +29,12 @@ const MOVE = AFFILIATION.friend;
 const ATTACK = AFFILIATION.hostile;
 
 const hex = (n: string) => Number.parseInt(n.replace('#', ''), 16);
+
+/** A nation colour lifted toward white: the bright core of a glowing border. */
+function lighten(c: number): number {
+  const ch = (sh: number) => Math.min(255, (((c >> sh) & 0xff) * 0.55 + 255 * 0.45) | 0);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
 
 function center(key: HexKey) {
   return hexToPixel(parseKey(key), SIZE);
@@ -224,7 +235,7 @@ declare global {
 
 export function MapView() {
   const host = useRef<HTMLDivElement>(null);
-  const appRef = useRef<{ app: Application; world: Container; layers: Record<string, Container> } | null>(null);
+  const appRef = useRef<{ app: Application; world: Container; layers: Record<string, Container>; life: MapLife } | null>(null);
   const hover = useRef<HexKey | null>(null);
   /** Set once the player pans or zooms; until then the map refits to its container. */
   const userMoved = useRef(false);
@@ -270,17 +281,23 @@ export function MapView() {
       const world = new Container();
       app.stage.addChild(world);
       const layers: Record<string, Container> = {};
-      for (const name of ['terrain', 'overlay', 'threat', 'sites', 'highlight', 'paths', 'units', 'labels', 'anim', 'hover']) {
+      for (const name of ['terrain', 'overlay', 'threat', 'sites', 'highlight', 'paths', 'units', 'life', 'labels', 'anim', 'hover']) {
         layers[name] = new Container();
         world.addChild(layers[name]);
       }
-      appRef.current = { app, world, layers };
+      // The map, alive: fog, cloud shadows, water, and fighting along every front.
+      const life = new MapLife(app, layers.life!, { center, size: SIZE });
+      appRef.current = { app, world, layers, life };
       // Rotors turn and drone teams circle whether or not anything else changes.
       app.ticker.add(() => tickModels(performance.now()));
       wireInput(app, world);
       // Imported art arrives after the first frame; redraw with it as soon as it lands.
       void loadArt().then((loaded) => {
         if (loaded && !destroyed) redraw();
+      });
+      // Pixi draws text at once: redraw the region names when their typeface has arrived.
+      void document.fonts?.load(`700 30px ${FONT_REGION}`).then(() => {
+        if (!destroyed) redraw();
       });
       redraw();
       redrawHover();
@@ -322,6 +339,7 @@ export function MapView() {
       resize?.disconnect();
       useCamera.setState({ control: null });
       if (appRef.current) {
+        appRef.current.life.destroy();
         appRef.current.app.destroy(true);
         appRef.current = null;
       }
@@ -690,9 +708,14 @@ export function MapView() {
 
   /** The ground: rebuilt only when what the viewer knows of the land changes, not on every click. */
   function drawGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: string[]) {
-    const atlas = useGame.getState().mapStyle === 'atlas';
-    const art = atlas ? null : getArt();
-    const sig = `${atlas ? 'atlas' : art ? 1 : 0}|${keys.map((k) => `${k}${v.tiles[k]!.visibility[0]}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
+    const style = useGame.getState().mapStyle;
+    const atlas = style === 'atlas';
+    const painted = style === 'painted';
+    const art = atlas || painted ? null : getArt();
+    // The painted canvas only changes when land is explored; seen-versus-visible shading is drawn
+    // over it, so a new turn does not repaint the theatre.
+    const vis = (k: HexKey) => (painted ? (v.tiles[k]!.visibility === 'unknown' ? 'u' : 'k') : v.tiles[k]!.visibility[0]);
+    const sig = `${style}${art ? 1 : 0}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
     if (groundSig.current === sig) return;
     groundSig.current = sig;
     const layer = a.layers.terrain!;
@@ -702,6 +725,22 @@ export function MapView() {
     groundTextures.current = made;
     if (atlas) {
       layer.addChild(atlasGround(v, keys));
+      return;
+    }
+    // Beyond the painted canvas the open sea runs on.
+    a.app.renderer.background.color = painted ? 0x0a2433 : SURFACE.ink950;
+    if (painted) {
+      // One hand-painted canvas for the whole theatre, baked into a single texture.
+      // Instrumented: `brink:paint` in the browser's performance timeline.
+      performance.mark('brink:paint-start');
+      const p = paintTheatre(v, keys, SIZE);
+      performance.measure('brink:paint', 'brink:paint-start');
+      const tex = Texture.from(p.canvas);
+      made.push(tex);
+      const ground = new Sprite(tex);
+      ground.position.set(p.x, p.y);
+      ground.scale.set(p.unit);
+      layer.addChild(ground);
       return;
     }
     // Terrain: satellite-style ground mapped in world space, so the landscape runs on across hexes.
@@ -804,27 +843,57 @@ export function MapView() {
     }
     const keys = Object.keys(v.tiles).sort();
     const art = getArt();
+    const paintedMap = s.mapStyle === 'painted';
     drawGround(a, v, keys);
+    a.life.update(v, s.report, !replaying);
 
 
     // Ownership: tint and Civ-style thick borders, fog on stale ground.
     const overlay = new Graphics();
+    const washes = new Map<string, HexKey[]>();
+    const stale: HexKey[] = [];
     for (const key of keys) {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown') continue;
       // The imagery is graded down so units, borders and highlights carry the picture.
-      if (art && s.mapStyle !== 'atlas' && !t.siteId) overlay.poly(poly(key)).fill({ color: 0x0d1418, alpha: 0.32 });
+      if (art && s.mapStyle === 'satellite' && !t.siteId) overlay.poly(poly(key)).fill({ color: 0x0d1418, alpha: 0.32 });
       if (t.owner) {
         const color = hex(v.nations[t.owner]?.color ?? '#888888');
-        overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.2 : 0.12 });
-        for (const n of neighborKeys(key)) {
-          if (v.tiles[n]?.owner === t.owner) continue;
-          const [p, q] = edge(key, n, 2.5);
-          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 6, color: 0x000000, alpha: 0.4, cap: 'round' });
-          overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 3.5, color, alpha: 1, cap: 'round' });
+        if (paintedMap) {
+          // A light wash of the nation's colour (one path per nation, below, so no seams), and a
+          // border that glows like a realm's edge.
+          washes.set(t.owner, [...(washes.get(t.owner) ?? []), key]);
+          for (const n of neighborKeys(key)) {
+            if (v.tiles[n]?.owner === t.owner) continue;
+            const [p, q] = edge(key, n, 3);
+            overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 11, color, alpha: 0.18, cap: 'round' });
+            overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 5.5, color, alpha: 0.45, cap: 'round' });
+            overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.2, color: lighten(color), alpha: 1, cap: 'round' });
+          }
+        } else {
+          overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.2 : 0.12 });
+          for (const n of neighborKeys(key)) {
+            if (v.tiles[n]?.owner === t.owner) continue;
+            const [p, q] = edge(key, n, 2.5);
+            overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 6, color: 0x000000, alpha: 0.4, cap: 'round' });
+            overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 3.5, color, alpha: 1, cap: 'round' });
+          }
         }
       }
-      if (t.visibility === 'observed') overlay.poly(poly(key)).fill({ color: 0x0a0c0b, alpha: 0.5 });
+      if (t.visibility === 'observed') {
+        if (paintedMap) stale.push(key);
+        else overlay.poly(poly(key)).fill({ color: 0x0a0c0b, alpha: 0.5 });
+      }
+    }
+    if (paintedMap) {
+      const wash = new Graphics();
+      for (const [owner, list] of [...washes].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
+        for (const k of list) wash.poly(poly(k, -0.6));
+        wash.fill({ color: hex(v.nations[owner]?.color ?? '#888888'), alpha: 0.1 });
+      }
+      for (const k of stale) wash.poly(poly(k, -0.6));
+      if (stale.length) wash.fill({ color: 0x0a0c0b, alpha: 0.36 });
+      a.layers.overlay!.addChild(wash);
     }
     a.layers.overlay!.addChild(overlay);
 
@@ -839,11 +908,28 @@ export function MapView() {
       if (!n || pts.length < 3) continue;
       const cx = pts.reduce((s2, p) => s2 + p.x, 0) / pts.length;
       const cy = pts.reduce((s2, p) => s2 + p.y, 0) / pts.length;
-      const label = new Text({
-        text: n.name.toUpperCase(),
-        resolution: 2,
-        style: { fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: '800', fill: 0xffffff, letterSpacing: 2, stroke: { color: hex(n.color), width: 7, join: 'round' }, align: 'center', wordWrap: true, wordWrapWidth: 260 },
-      });
+      const label = paintedMap
+        ? new Text({
+            text: n.name.toUpperCase(),
+            resolution: 2,
+            style: {
+              fontFamily: FONT_REGION,
+              fontSize: 30,
+              fontWeight: '700',
+              fill: 0xf6ecd0,
+              letterSpacing: 6,
+              stroke: { color: 0x1a1208, width: 6, join: 'round' },
+              dropShadow: { color: hex(n.color), blur: 12, distance: 0, alpha: 0.9 },
+              align: 'center',
+              wordWrap: true,
+              wordWrapWidth: 300,
+            },
+          })
+        : new Text({
+            text: n.name.toUpperCase(),
+            resolution: 2,
+            style: { fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: '800', fill: 0xffffff, letterSpacing: 2, stroke: { color: hex(n.color), width: 7, join: 'round' }, align: 'center', wordWrap: true, wordWrapWidth: 260 },
+          });
       label.anchor.set(0.5);
       label.position.set(cx, cy);
       label.alpha = 0.92;

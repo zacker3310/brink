@@ -29,7 +29,7 @@ import type { BattleOutcome } from './arena/ArenaScreen';
 import { recordStars, recordWarWon } from './arena/career';
 import type { Mode } from './planning';
 import type { Response } from './protocol';
-import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type SlotInfo } from './saves';
+import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type MapStyle, type SlotInfo } from './saves';
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy';
 
@@ -91,8 +91,8 @@ interface State {
   /** Show where seen enemies could strike next turn. */
   showThreat: boolean;
   /** The map's ground: a clean board-game map, or satellite imagery. */
-  mapStyle: 'atlas' | 'satellite';
-  setMapStyle(style: 'atlas' | 'satellite'): void;
+  mapStyle: MapStyle;
+  setMapStyle(style: MapStyle): void;
   /** A touch attack waiting for its confirming second tap. */
   armed: Armed | null;
   /** The last resolved turn, kept so it can be replayed again. */
@@ -262,7 +262,7 @@ export const useGame = create<State>((set, get) => {
     selectedCity: null,
     dismissed: [],
     showThreat: false,
-    mapStyle: readPrefs().mapStyle ?? 'atlas',
+    mapStyle: readPrefs().mapStyle ?? 'painted',
     setMapStyle(style) {
       writePrefs({ mapStyle: style });
       set({ mapStyle: style });

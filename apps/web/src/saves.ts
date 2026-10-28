@@ -1,6 +1,9 @@
 // Save slots in localStorage. Every access is guarded: storage can be missing (private
 // windows, blocked site data) or full, and the game must still run without it.
 
+/** How the map is drawn: painted (default), a clean board, or satellite imagery. */
+export type MapStyle = 'painted' | 'atlas' | 'satellite';
+
 export interface SlotInfo {
   slot: string;
   label: string;
@@ -62,8 +65,8 @@ export interface Prefs {
   length?: 'quick' | 'standard' | 'epic';
   difficulty?: 'easy' | 'normal' | 'hard';
   theatre?: string;
-  /** Clean board-game map (default) or satellite imagery. */
-  mapStyle?: 'atlas' | 'satellite';
+  /** Painted fantasy map (default), clean board-game map, or satellite imagery. */
+  mapStyle?: MapStyle;
 }
 
 export function readPrefs(): Prefs {

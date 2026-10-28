@@ -187,8 +187,8 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
       >
         Sound <span className={muted ? 'text-faint' : 'text-signal'}>{muted ? 'Off' : 'On'}</span>
       </button>
-      <button type="button" className={row} onClick={() => setMapStyle(mapStyle === 'atlas' ? 'satellite' : 'atlas')} data-testid="toggle-map-style">
-        Map style <span className="text-signal">{mapStyle === 'atlas' ? 'Clean' : 'Satellite'}</span>
+      <button type="button" className={row} onClick={() => setMapStyle(mapStyle === 'painted' ? 'atlas' : mapStyle === 'atlas' ? 'satellite' : 'painted')} data-testid="toggle-map-style">
+        Map style <span className="text-signal">{mapStyle === 'painted' ? 'Painted' : mapStyle === 'atlas' ? 'Clean' : 'Satellite'}</span>
       </button>
       <button
         type="button"
@@ -216,7 +216,7 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
 function Sheet({ title, onClose, children, testId, tabs }: { title: string; onClose: () => void; children: React.ReactNode; testId: string; tabs?: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-30 flex flex-col justify-end bg-ink-950/60" onClick={onClose} data-testid={testId}>
-      <div className="sheet-in safe-bottom safe-x flex max-h-[88dvh] flex-col border-t border-line bg-ink-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="vercel sheet-in safe-bottom safe-x flex max-h-[88dvh] flex-col rounded-t-2xl border-t border-line bg-ink-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
           <span className="font-display text-sm font-black tracking-[0.08em] uppercase">{title}</span>
           <button type="button" onClick={onClose} aria-label="Close" data-testid="close-sheet" className="-mr-2 flex h-9 w-9 items-center justify-center text-faint">

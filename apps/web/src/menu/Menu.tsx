@@ -24,7 +24,7 @@ export function Menu() {
   const load = (text: string) => void loadGame(text);
 
   return (
-    <div key={screen} className="screen-in h-full overflow-y-auto">
+    <div key={screen} className="vercel vercel-mono screen-in h-full overflow-y-auto bg-black">
       {screen === 'title' && (
         <Title
           slots={slots}

@@ -77,7 +77,7 @@ export function OrderReview() {
   const nation = (id: string) => view.nations[id]?.name ?? id;
   const row = 'flex items-baseline justify-between gap-3 py-1 text-[13px]';
   return (
-    <div className={`fixed inset-0 z-40 flex ${phone ? 'items-end' : 'items-center justify-center'} bg-ink-950/70`} data-testid="order-review" role="dialog" aria-label="Review orders">
+    <div className={`vercel fixed inset-0 z-40 flex ${phone ? 'items-end' : 'items-center justify-center'} bg-ink-950/70`} data-testid="order-review" role="dialog" aria-label="Review orders">
       <div className={`${phone ? 'sheet-in safe-bottom w-full rounded-t-2xl border-t' : 'w-full max-w-lg rounded-2xl border'} flex max-h-[88dvh] flex-col border-line bg-ink-900`}>
         <header className="px-5 pt-4">
           <div className="font-display text-[11px] font-bold tracking-[0.1em] text-signal uppercase">
@@ -168,10 +168,10 @@ export function OrderReview() {
           </section>
         </div>
         <footer className="flex gap-2 border-t border-line px-5 py-3">
-          <button type="button" onClick={close} className="h-12 flex-1 rounded-xl border border-line bg-ink-850 text-[14px] font-semibold" data-testid="review-back">
+          <button type="button" onClick={close} className="v-btn v-btn-secondary h-12 flex-1" data-testid="review-back">
             Back to orders
           </button>
-          <button type="button" onClick={() => void submit()} className="font-display h-12 flex-[1.4] rounded-xl bg-signal text-lg font-extrabold text-ink-950 uppercase active:brightness-90" data-testid="commit-turn">
+          <button type="button" onClick={() => void submit()} className="v-btn v-btn-primary h-12 flex-[1.4] text-[15px] font-semibold" data-testid="commit-turn">
             Commit orders
           </button>
         </footer>

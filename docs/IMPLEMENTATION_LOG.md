@@ -2,6 +2,25 @@
 
 Newest first. Each entry: what changed, where, how it was tested, what is left.
 
+## 2026-10-28: Visual pass: painted map, live battles, Console screens
+
+- Painted map (`apps/web/src/paint/ground.ts`), the new default map style: a hand-painted fantasy
+  world map in one baked texture (sea and coasts, blended ground, relief, brushwork, roads, rivers,
+  trees, peaks, hills, towns and castles), glowing realm borders, Cinzel region names. Clean and
+  satellite styles stay in the menu.
+- Living map (`apps/web/src/paint/life.ts`): fog clouds over unexplored land, drifting cloud shadows,
+  water glints, and live fighting along every front where your stack faces an enemy at war (ember
+  glow on the contested edge, muzzle flashes, tracers, shell bursts, smoke), smoke over last turn's
+  battles. Reduced motion stops it.
+- Console design system for text screens (`.vercel` in `index.css`): Geist and Geist Mono, black,
+  hairlines, grey scale, white primary buttons, breadcrumb top bar; the title is a console landing
+  page with the live theatre in a window and the menu as cards.
+- Performance: paint about 90 ms (316 ms at 4x CPU throttling), only when land is explored; no
+  frame-rate cost from the living layer (Chromium, software rendering).
+- Tests: `pnpm check` and 4 e2e green; the journey test reads the new wordmark.
+- Outstanding: the HUD over the map keeps its condensed tactical type; the setup and title previews
+  still draw the satellite theatre; real-device GPU and frame rate unmeasured.
+
 ## 2026-10-28: Overhaul pass 1 (plan phases A to F)
 
 Audit and plan: `docs/OVERHAUL_PLAN.md`. Rules: `docs/GAME_DESIGN.md`. Ruleset `1.4.0` to `1.5.0`,

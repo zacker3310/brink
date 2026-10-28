@@ -143,7 +143,7 @@ export function CityPanel() {
   const boost = (key: 'credits' | 'energy' | 'materials' | 'food' | 'industry' | 'research') => site.facilities.reduce((a, f) => a + (FACILITIES[f].yields[key] ?? 0), 0);
   const capacity = view.self.industrialCapacity;
   return (
-    <aside className={phone ? 'sheet-in safe-bottom fixed inset-x-0 bottom-0 z-30 flex max-h-[78dvh] flex-col ds-panel backdrop-blur' : 'panel-in absolute top-3 bottom-3 left-3 z-20 flex w-[340px] flex-col ds-panel backdrop-blur'} data-testid="city-panel" aria-label={`${site.name} production`}>
+    <aside className={'vercel ' + (phone ? 'sheet-in safe-bottom fixed inset-x-0 bottom-0 z-30 flex max-h-[78dvh] flex-col ds-panel backdrop-blur' : 'panel-in absolute top-3 bottom-3 left-3 z-20 flex w-[340px] flex-col ds-panel backdrop-blur')} data-testid="city-panel" aria-label={`${site.name} production`}>
       <header className="flex items-center gap-3 border-b border-line px-4 py-3" style={{ background: `linear-gradient(90deg, ${color}33, transparent)` }}>
         <div className="flex h-11 w-11 items-center justify-center font-mono text-lg font-black text-ink-950" style={{ background: color }}>
           {Math.max(1, Math.round(site.population / 300))}
