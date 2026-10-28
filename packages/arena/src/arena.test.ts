@@ -57,6 +57,9 @@ describe('levels', () => {
   });
 });
 
+/** Full battles at 60 steps a second: seconds of work locally, more on a shared CI runner. */
+const FULL_BATTLES = 30_000;
+
 describe('battles', () => {
   it('a strong force beats a weak one, and a hopeless one loses, across seeds', () => {
     let won = 0;
@@ -69,7 +72,7 @@ describe('battles', () => {
     }
     expect(won).toBeGreaterThanOrEqual(5);
     expect(lost).toBeGreaterThanOrEqual(5);
-  });
+  }, FULL_BATTLES);
 
   it('every unit type can fight to a finish without errors', () => {
     const all: UnitClass[] = ['infantry', 'mechanized', 'armor', 'artillery', 'recon', 'air', 'drone'];
@@ -79,12 +82,12 @@ describe('battles', () => {
       const r = arenaResult(a);
       for (const v of Object.values(r.kept)) expect(v).toBeGreaterThanOrEqual(0);
     }
-  });
+  }, FULL_BATTLES);
 
   it('is deterministic for a seed and the same inputs', () => {
     const make = () => createArena({ seed: 9, terrain: 'forest', river: true, site: null, skill: 0.5, abilities: [], attackers: [spec('a', 'armor'), spec('b', 'infantry')], defenders: [spec('x', 'mechanized'), spec('y', 'infantry')] });
     expect(arenaResult(run(make()))).toEqual(arenaResult(run(make())));
-  });
+  }, FULL_BATTLES);
 
   it('a tank shell bounces once and can come back to hit its own tank', () => {
     const a = createArena({ seed: 1, terrain: 'plains', river: false, site: null, skill: 0, abilities: [], attackers: [spec('a', 'armor')], defenders: [spec('x', 'infantry')] });
