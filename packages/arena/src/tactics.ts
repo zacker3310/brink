@@ -1,6 +1,6 @@
 import type { UnitClass } from '@brink/contracts';
 import { buildLevel, CRATE, idx, inside, OPEN, TREE, walkable, WALL, type Level, type LevelSetup, type Point } from './level';
-import { mulberry32 } from './rng';
+import { draw, mulberry32 } from './rng';
 import { ABILITIES, ARENA_H, ARENA_W, CAPTURE_ROUNDS, CLASSES, COVER, damageFactor, OVERWATCH_AIM, RANKS, ROUND_LIMIT, type AbilityId, type WeaponKind } from './rules';
 
 // A tactical battle on one hex, fought in turns. On your turn each unit may move, then act: fire
@@ -101,7 +101,8 @@ export interface Arena {
   /** Append-only: the renderer plays it from where it last read. */
   events: ArenaEvent[];
   stats: { shots: number; hits: number; kills: number; lost: number };
-  rng: () => number;
+  /** The seeded stream's state: the whole arena is plain JSON, so it saves and resumes exactly. */
+  stream: number;
 }
 
 export interface ArenaResult {
@@ -192,7 +193,7 @@ export function createArena(setup: ArenaSetup): Arena {
     capture: 0,
     events: [{ type: 'turn', side: 'blue', round: 1 }],
     stats: { shots: 0, hits: 0, kills: 0, lost: 0 },
-    rng: mulberry32(setup.seed),
+    stream: setup.seed >>> 0,
   };
 }
 
@@ -403,7 +404,7 @@ function damage(a: Arena, t: Unit, amount: number, by: Side | null): void {
   if (t.side === 'blue') a.stats.lost++;
 }
 
-const roll = (a: Arena, base: number) => Math.round((base * (85 + Math.floor(a.rng() * 31))) / 100);
+const roll = (a: Arena, base: number) => Math.round((base * (85 + Math.floor(draw(a) * 31))) / 100);
 
 /** Area damage around a cell: full in it, half next to it; crates and trees there break. */
 function blast(a: Arena, at: Point, dmg: number, kind: WeaponKind, radius: number, by: Side | null): void {
@@ -431,7 +432,7 @@ function blast(a: Arena, at: Point, dmg: number, kind: WeaponKind, radius: numbe
 function shoot(a: Arena, u: Unit, t: Unit, info: FireInfo, overwatch: boolean): void {
   const kind = CLASSES[u.cls].weapon.kind;
   u.aim = Math.atan2(t.y - u.y, t.x - u.x);
-  const hit = a.rng() * 100 < info.chance;
+  const hit = draw(a) * 100 < info.chance;
   if (u.side === 'blue') {
     a.stats.shots++;
     if (hit) a.stats.hits++;
@@ -546,10 +547,10 @@ export function act(a: Arena, action: Action, side: Side = a.turn): boolean {
     u.acted = true;
   } else if (action.type === 'strike') {
     const chance = strikeChance(a, u, action.at)!;
-    const hit = a.rng() * 100 < chance;
+    const hit = draw(a) * 100 < chance;
     let at = action.at;
     if (!hit) {
-      const [dx, dy] = DIRS[Math.floor(a.rng() * 8)]!;
+      const [dx, dy] = DIRS[Math.floor(draw(a) * 8)]!;
       at = { x: Math.max(0, Math.min(ARENA_W - 1, at.x + dx)), y: Math.max(0, Math.min(ARENA_H - 1, at.y + dy)) };
     }
     u.aim = Math.atan2(action.at.y - u.y, action.at.x - u.x);
@@ -751,7 +752,7 @@ function planUnit(a: Arena, u: Unit, skill: number, noise: () => number): Plan {
 /** Play one whole side's turn with the AI (the enemy, or your own side on autopilot). */
 export function playSide(a: Arena, side: Side): void {
   const skill = side === 'red' ? a.skill : 0.75;
-  const noise = mulberry32(Math.floor(a.rng() * 4294967296));
+  const noise = mulberry32(Math.floor(draw(a) * 4294967296));
   // Guns first (they soften what the others then finish), then the rest in a fixed order.
   const order = a.units
     .filter((u) => u.side === side)

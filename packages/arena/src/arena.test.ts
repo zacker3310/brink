@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Terrain, UnitClass } from '@brink/contracts';
 import { BRIDGE, buildLevel, CRATE, idx, OPEN, walkable, WALL, WATER } from './level';
 import { ARENA_H, ARENA_W, CAPTURE_ROUNDS, CLASSES, COVER, ROUND_LIMIT } from './rules';
-import { act, arenaResult, autoBattle, canAct, createArena, endTurn, fireInfo, reachable, retreat, strikeChance, targetsOf, type Arena, type ArenaSetup, type UnitSpec } from './tactics';
+import { act, arenaResult, autoBattle, autoTurn, canAct, createArena, endTurn, fireInfo, reachable, retreat, strikeChance, targetsOf, type Arena, type ArenaSetup, type UnitSpec } from './tactics';
 
 const TERRAINS: Terrain[] = ['plains', 'forest', 'hills', 'mountains', 'urban'];
 
@@ -316,6 +316,22 @@ describe('battles', () => {
     const q = make();
     expect(arenaResult(p)).toEqual(arenaResult(q));
     expect(p.events).toEqual(q.events);
+  }, FULL_BATTLES);
+
+  it('is plain JSON: a battle saved mid-fight resumes and plays out exactly as one that never stopped', () => {
+    const make = () => createArena(setup({ seed: 21, terrain: 'hills', skill: 0.5, attackers: [spec('a', 'armor'), spec('b', 'artillery'), spec('c', 'infantry')], defenders: [spec('x', 'mechanized'), spec('y', 'infantry')] }));
+    const straight = make();
+    const paused = make();
+    for (let i = 0; i < 3; i++) {
+      autoTurn(straight);
+      autoTurn(paused);
+    }
+    const resumed = JSON.parse(JSON.stringify(paused)) as Arena;
+    expect(resumed).toEqual(paused);
+    autoBattle(straight);
+    autoBattle(resumed);
+    expect(resumed.events).toEqual(straight.events);
+    expect(arenaResult(resumed)).toEqual(arenaResult(straight));
   }, FULL_BATTLES);
 
   it('an even fight on autopilot goes either way, and a sharp enemy wins more of them', () => {
