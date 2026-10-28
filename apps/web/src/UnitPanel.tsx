@@ -313,7 +313,7 @@ export function EventCard() {
 export function TurnControls() {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
-  const submit = useGame((s) => s.submit);
+  const openReview = useGame((s) => s.openReview);
   const nextIdle = useGame((s) => s.nextIdle);
   const resolving = useGame((s) => s.resolving);
   const report = useGame((s) => s.report);
@@ -358,7 +358,7 @@ export function TurnControls() {
       </button>
       <button
         type="button"
-        onClick={() => void submit()}
+        onClick={openReview}
         disabled={resolving || over}
         data-testid="end-turn"
         className="end-turn relative overflow-hidden bg-signal px-4 py-3 text-ink-950 transition-all hover:brightness-110 disabled:opacity-60"

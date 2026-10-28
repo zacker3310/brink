@@ -7,7 +7,7 @@ import { pairKey } from './rules';
 /** A small axial-rectangle world: q in [0, cols), r in [0, rows). Everything plains, unowned. */
 export function makeWorld(cols = 8, rows = 6, nations: NationId[] = ['a', 'b']): WorldState {
   const world: WorldState = {
-    schema: 1,
+    schema: 2,
     rulesetVersion: RULESET_VERSION,
     scenarioId: 'fixture',
     turn: 1,
@@ -20,6 +20,7 @@ export function makeWorld(cols = 8, rows = 6, nations: NationId[] = ['a', 'b']):
     formations: {},
     relations: {},
     proposals: [],
+    treaties: [],
     intel: {},
     victory: null,
   };
@@ -43,6 +44,7 @@ export function makeWorld(cols = 8, rows = 6, nations: NationId[] = ['a', 'b']):
       budget: { research: 0, infrastructure: 0, welfare: 0 },
       research: { current: null, progress: 0, unlocked: [] },
       productionQueue: [],
+      construction: [],
       objectives: [],
       warLosses: 0,
       eliminated: false,
@@ -81,6 +83,7 @@ export function site(world: WorldState, id: string, key: string, owner: NationId
     population: 500,
     victoryPoints: vp,
     yields: { credits: 10, energy: 5, materials: 5, food: 5, industry: 10, research: 2 },
+    facilities: [],
   };
   world.sites[id] = s;
   world.tiles[key]!.siteId = id;

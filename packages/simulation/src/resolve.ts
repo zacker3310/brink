@@ -16,13 +16,14 @@ import { settleEconomy } from './economy';
 import { resolveDiplomacy } from './diplomacy';
 import { resolveWorldEvents } from './events';
 import { resolveEngagements, resolveRetreats, resolveStrikes } from './engagements';
-import { buildView, canDetect, computeVision, detectedFormations, updateIntel, victoryPoints, victoryThreshold, type Vision } from './fog';
+import { buildView, canDetect, computeVision, detectedFormations, updateIntel, victoryPoints, type Vision } from './fog';
 import { hashState } from './hash';
 import { resolveMovement } from './movement';
 import { resolveProduction } from './production';
 import { clone, relationOf, sortedKeys } from './rules';
 import { allocateLogistics } from './supply';
 import { resolveTerritory } from './territory';
+import { evaluateVictory } from './victory';
 import { lockOrders } from './validate';
 
 export const PHASES = [
@@ -88,22 +89,6 @@ function resolveEliminations(world: WorldState, events: GameEvent[]): void {
   }
 }
 
-/** Phase 11b. Victory points, last nation standing, or the turn limit, in that order. */
-export function evaluateVictory(world: WorldState): WorldState['victory'] {
-  const alive = living(world);
-  if (alive.length === 1) return { winner: alive[0]!, reason: 'last_standing', turn: world.turn };
-  const vp = victoryPoints(world);
-  const threshold = victoryThreshold(world);
-  const leaders = alive.filter((n) => vp[n]! >= threshold);
-  if (leaders.length === 1) return { winner: leaders[0]!, reason: 'victory_points', turn: world.turn };
-  if (world.turn >= world.maxTurns) {
-    const strength = (n: NationId) => Object.values(world.formations).filter((f) => f.owner === n).reduce((a, f) => a + f.strength, 0);
-    const ranked = [...alive].sort((a, b) => vp[b]! - vp[a]! || strength(b) - strength(a) || (a < b ? -1 : 1));
-    return { winner: ranked[0]!, reason: 'turn_limit', turn: world.turn };
-  }
-  return null;
-}
-
 /** Events a nation is entitled to see, redacted where they would reveal what it cannot. */
 function reportFor(world: WorldState, nation: NationId, vision: Vision, events: readonly GameEvent[]): GameEvent[] {
   const friendly = (owner: NationId) => relationOf(world.relations, nation, owner) === 'alliance';
@@ -150,12 +135,18 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
       case 'research':
       case 'order_rejected':
       case 'world_event':
+      case 'construction_queued':
+      case 'construction_cancelled':
+      case 'facility_built':
         if (e.nation === nation) out.push(e);
         break;
       case 'proposal':
         if (e.from === nation || e.to === nation) out.push(e);
         break;
+      // Treaties are public, like declarations of war.
       case 'diplomacy':
+      case 'treaty':
+      case 'treaty_ended':
       case 'elimination':
       case 'victory':
         out.push(e);
@@ -226,7 +217,7 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   // 11. Victory.
   resolveEliminations(world, events);
   world.victory = evaluateVictory(world);
-  if (world.victory) events.push({ kind: 'victory', winner: world.victory.winner, reason: world.victory.reason });
+  if (world.victory) events.push({ kind: 'victory', winner: world.victory.winner, reason: world.victory.reason, ...(world.victory.coalition ? { coalition: world.victory.coalition } : {}) });
 
   // 12. Observation and reports. Intel is recorded against the turn just resolved.
   const resolved = world.turn;

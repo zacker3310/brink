@@ -76,10 +76,10 @@ export const STEPS: readonly CoachStep[] = [
   {
     id: 'end',
     title: 'End the turn',
-    body: () => 'Press Next Turn, bottom right. Your orders lock, the three AI powers lock theirs, and the world moves.',
+    body: () => 'Press Next Turn, bottom right, check the order review, then Commit. Your orders lock, the three AI powers lock theirs, and the world moves.',
     done: (s) => s.resolving || s.turn > s.start,
     keys: ['Ctrl+Enter'],
-    touch: () => 'Tap END TURN. Your orders lock, the three AI powers lock theirs, and the world moves.',
+    touch: () => 'Tap END TURN, check the review, then COMMIT. Your orders lock, the three AI powers lock theirs, and the world moves.',
   },
   {
     id: 'watch',

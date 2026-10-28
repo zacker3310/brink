@@ -23,7 +23,7 @@ function handle(req: Request): Response {
     case 'load': {
       const save = parseSave(req.text);
       session = GameSession.fromSave(save);
-      return { type: 'loaded', state: { type: 'state', ...seat() }, humans: [...session.humans], callsigns: save.callsigns ?? null };
+      return { type: 'loaded', state: { type: 'state', ...seat() }, humans: [...session.humans], callsigns: save.callsigns ?? null, migratedFrom: save.migratedFrom ?? null };
     }
   }
   if (!session) return { type: 'error', message: 'no game in progress' };

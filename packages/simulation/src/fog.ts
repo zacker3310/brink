@@ -11,9 +11,10 @@ import type {
   TileView,
   WorldState,
 } from '@brink/contracts';
-import { RULES, TERRAIN } from '@brink/game-data';
+import { TERRAIN, VICTORY } from '@brink/game-data';
 import { rangeKeys } from '@brink/map';
 import { clone, nationModifiers, relationOf, sortedKeys, visionRadius } from './rules';
+import { supremacyStanding } from './victory';
 
 export interface Vision {
   /** Hexes whose terrain, ownership and open-ground formations are seen. */
@@ -130,7 +131,7 @@ export function totalVictoryPoints(world: WorldState): number {
 }
 
 export function victoryThreshold(world: WorldState): number {
-  return Math.ceil((totalVictoryPoints(world) * RULES.victoryShare) / 100);
+  return Math.ceil((totalVictoryPoints(world) * VICTORY.dominationShare) / 100);
 }
 
 /**
@@ -190,6 +191,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
       victoryPoints: s.victoryPoints,
       population: s.population,
       yields: { ...s.yields },
+      facilities: s.owner === nation || visible ? [...s.facilities] : [],
     };
     tiles[s.key]!.siteId = id;
   }
@@ -246,6 +248,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     nations,
     relations,
     proposals: world.proposals.filter((p) => p.from === nation || p.to === nation).map((p) => ({ ...p })),
+    treaties: world.treaties.map((t) => ({ ...t })),
     tiles,
     sites,
     formations,
@@ -254,5 +257,6 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     totalVictoryPoints: totalVictoryPoints(world),
     victory: world.victory ? { ...world.victory } : null,
     difficulty: world.difficulty ?? 'normal',
+    supremacy: supremacyStanding(world),
   };
 }

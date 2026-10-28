@@ -6,7 +6,7 @@ import { Kbd, Label, useKeys } from './chrome';
 import { CityBanners, CityPanel } from './Cities';
 import { Coach } from './Coach';
 import { Emblem } from './glyphs';
-import { netChange, selfLedger, turnClock } from './insight';
+import { netChange, selfLedger, turnClock, VICTORY_HOW, wonCampaign } from './insight';
 import { HoverCard, ModeBanner, Toasts, ZoomControls } from './MapOverlays';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
@@ -294,15 +294,16 @@ export function VictoryOverlay() {
   const view = useGame((s) => s.view)!;
   const toMenu = useGame((s) => s.toMenu);
   const [hidden, setHidden] = useState(false);
-  const outcome = view.victory ? (view.victory.winner === view.self.id ? 'won' : 'lost') : null;
+  const outcome = view.victory ? (wonCampaign(view) ? 'won' : 'lost') : null;
   useEffect(() => {
     if (outcome === 'won') sfx.win();
     if (outcome === 'lost') sfx.lose();
   }, [outcome]);
   if (!view.victory || hidden) return null;
   const winner = view.nations[view.victory.winner]!;
-  const reason = { victory_points: 'by holding the victory-point threshold', last_standing: 'as the last nation standing', turn_limit: 'by leading at the turn limit' }[view.victory.reason];
-  const won = winner.id === view.self.id;
+  const reason = VICTORY_HOW[view.victory.reason];
+  const won = wonCampaign(view);
+  const allies = (view.victory.coalition ?? []).filter((n) => n !== winner.id).map((n) => view.nations[n]!.name);
   const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints);
   return (
     <div className="screen-in absolute inset-0 z-20 flex items-center justify-center bg-ink-950/75 backdrop-blur-sm" data-testid="victory" role="status">
@@ -310,7 +311,8 @@ export function VictoryOverlay() {
         <div className="font-display text-[10px] font-bold tracking-[0.1em] text-faint uppercase">Campaign concluded · turn {view.victory.turn}</div>
         <div className={`font-display mt-2 text-5xl font-black tracking-tight ${won ? 'text-good' : 'text-hostile'}`}>{won ? 'VICTORY' : 'DEFEAT'}</div>
         <div className="mt-2 text-sm text-muted">
-          <span style={{ color: winner.color }}>{winner.name}</span> wins {reason}.
+          <span style={{ color: winner.color }}>{winner.name}</span>
+          {allies.length ? ` and ${allies.join(', ')}` : ''} win{allies.length ? '' : 's'} {reason}.
         </div>
         <ul className="mt-4 space-y-1 text-left text-xs">
           {ranked.map((n, i) => (
@@ -357,9 +359,11 @@ function useShortcuts(toggleHelp: () => void) {
       if (e.key === 'Escape' || e.key === 'Enter') g.setShowReport(false);
       return;
     }
+    // The review handles its own keys: Enter commits, Escape goes back.
+    if (g.review) return;
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
-      void g.submit();
+      g.openReview();
       return;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;

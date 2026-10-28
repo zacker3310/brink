@@ -1,7 +1,7 @@
 import type { FormationId, GameEvent, Ledger, NationId, NationOrders, Resource, Stockpile, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { RULES, TECHS, UNITS } from '@brink/game-data';
-import { clamp, nationModifiers, pct, sortedKeys, zeroStockpile } from './rules';
+import { FACILITIES, RULES, TECHS, TREATIES, UNITS } from '@brink/game-data';
+import { clamp, fortressFloor, nationModifiers, pct, sortedKeys, zeroStockpile } from './rules';
 
 export interface Settlement {
   income: Stockpile;
@@ -24,6 +24,17 @@ export function grossYields(world: WorldState, nation: NationId): { income: Stoc
     for (const r of RESOURCES) income[r] += s.yields[r];
     industry += s.yields.industry;
     research += s.yields.research;
+    for (const fac of s.facilities) {
+      const y = FACILITIES[fac].yields;
+      for (const r of RESOURCES) income[r] += y[r] ?? 0;
+      industry += y.industry ?? 0;
+      research += y.research ?? 0;
+    }
+  }
+  // Trade agreements: a fixed income for each partner, before unrest.
+  for (const t of world.treaties) {
+    if (t.kind !== 'trade' || (t.a !== nation && t.b !== nation) || t.from > world.turn || t.until < world.turn) continue;
+    for (const r of RESOURCES) income[r] += TREATIES.tradeIncome[r];
   }
   const hexes = Object.values(world.tiles).filter((t) => t.owner === nation).length;
   income.credits += Math.floor(hexes / RULES.hexesPerCredit);
@@ -61,6 +72,10 @@ export function settleEconomy(
 
   const upkeepDue = zeroStockpile();
   for (const f of own) for (const r of RESOURCES) upkeepDue[r] += UNITS[f.unitClass].upkeep[r];
+  for (const id of sortedKeys(world.sites)) {
+    const s = world.sites[id]!;
+    if (s.owner === nation) for (const fac of s.facilities) for (const r of RESOURCES) upkeepDue[r] += FACILITIES[fac].upkeep[r];
+  }
   upkeepDue.food += Math.floor(population / RULES.popPerFood);
   upkeepDue.energy += Math.floor(gross.industry / RULES.industryPerEnergy);
 
@@ -124,6 +139,7 @@ export function settleEconomy(
     if (!moved.has(f.id) && UNITS[f.unitClass].ground) {
       f.entrenchment = clamp(f.entrenchment + (f.lastOrder === 'defend' ? 20 : 10), 0, 100);
     }
+    f.entrenchment = Math.max(f.entrenchment, fortressFloor(world, f));
     if (engaged.has(f.id)) continue;
     f.organization = clamp(f.organization + 5 + Math.floor(f.supply / 10), 0, 100);
     f.morale = clamp(f.morale + Math.sign(70 - f.morale) * Math.min(3, Math.abs(70 - f.morale)), 0, 100);

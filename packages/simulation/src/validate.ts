@@ -1,6 +1,9 @@
 import type {
   ArenaBattle,
+  BuildOrder,
   Budget,
+  DiplomaticAction,
+  FacilityId,
   FormationOrder,
   GameEvent,
   NationId,
@@ -12,9 +15,10 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { AIR_REBASE_RANGE, TECHS, UNITS } from '@brink/game-data';
+import { AIR_REBASE_RANGE, FACILITIES, FACILITY_SLOTS, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
-import { enterCost, movementAllowance, pathCost, recruitCost, relationOf, sortedKeys } from './rules';
+import { canPropose } from './diplomacy';
+import { enterCost, movementAllowance, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
 export interface LockedOrders {
   /** One entry per living nation, sorted by nation id. Every own formation has an order. */
@@ -107,6 +111,7 @@ function lockRecruits(
   nation: NationId,
   recruits: RecruitOrder[],
   reject: (reason: string) => void,
+  reserved: Stockpile,
 ): RecruitOrder[] {
   const n = world.nations[nation]!;
   const bySite = new Map<string, RecruitOrder[]>();
@@ -117,7 +122,6 @@ function lockRecruits(
     }
     bySite.set(r.siteId, [...(bySite.get(r.siteId) ?? []), r]);
   }
-  const reserved: Stockpile = { credits: 0, energy: 0, materials: 0, food: 0 };
   const out: RecruitOrder[] = [];
   for (const siteId of [...bySite.keys()].sort()) {
     const list = bySite.get(siteId)!;
@@ -140,6 +144,85 @@ function lockRecruits(
       for (const res of RESOURCES) reserved[res] += cost[res];
       out.push({ siteId, unitClass: r.unitClass });
     }
+  }
+  return out;
+}
+
+/** Why `nation` may not take `action` toward `target` this turn, or null. */
+export function checkDiplomacy(
+  world: Pick<WorldState, 'relations' | 'treaties' | 'turn'> & { nations: Record<NationId, { name: string }> },
+  nation: NationId,
+  target: NationId,
+  action: DiplomaticAction,
+): string | null {
+  const t = world.nations[target]!;
+  const rel = relationOf(world.relations, nation, target);
+  switch (action) {
+    case 'declare_war': {
+      if (rel === 'war') return `already at war with ${t.name}`;
+      const pact = treatyIn(world.treaties, 'nonaggression', nation, target, world.turn);
+      if (pact) return `bound by a non-aggression pact with ${t.name} through turn ${pact.until}`;
+      return null;
+    }
+    case 'propose_peace':
+      return rel === 'war' ? null : `not at war with ${t.name}`;
+    case 'propose_alliance':
+      return rel === 'peace' ? null : `must be at peace with ${t.name} to ally`;
+    case 'propose_nonaggression':
+      if (rel !== 'peace') return `a non-aggression pact needs peace with ${t.name}`;
+      return canPropose(world, nation, target, 'nonaggression') ? null : `a pact with ${t.name} is already in force`;
+    case 'propose_trade':
+      if (rel === 'war') return `no trade with ${t.name} while at war`;
+      if (treatyIn(world.treaties, 'embargo', nation, target, world.turn)) return `an embargo bars trade with ${t.name}`;
+      return canPropose(world, nation, target, 'trade') ? null : `trade with ${t.name} is already running`;
+    case 'embargo': {
+      const e = treatyIn(world.treaties, 'embargo', nation, target, world.turn);
+      return e && e.until > world.turn ? `an embargo on ${t.name} is already in force` : null;
+    }
+    default:
+      return 'unknown diplomatic action';
+  }
+}
+
+/** Why `nation` cannot start `facility` at `siteId` now, ignoring cost, or null. */
+export function checkBuild(world: WorldState, nation: NationId, siteId: string, facility: FacilityId): string | null {
+  const site = world.sites[siteId];
+  const def = FACILITIES[facility];
+  if (!site) return 'no such site';
+  if (!def) return 'unknown facility';
+  if (site.owner !== nation) return `${site.name} is not under your control`;
+  const building = world.nations[nation]!.construction.filter((c) => c.siteId === siteId);
+  if (site.facilities.includes(facility) || building.some((c) => c.facility === facility)) return `${site.name} already has a ${def.name.toLowerCase()}`;
+  if (site.facilities.length + building.length >= FACILITY_SLOTS[site.kind]) return `${site.name} has no room for another facility`;
+  if (def.requires && !world.nations[nation]!.research.unlocked.includes(def.requires)) return `${def.name} needs ${TECHS[def.requires]?.name ?? def.requires}`;
+  return null;
+}
+
+/** Builds accepted in site order, one per site, while they fit what recruits left of the stockpile. */
+function lockBuilds(world: WorldState, nation: NationId, builds: BuildOrder[], reject: (reason: string) => void, reserved: Stockpile): BuildOrder[] {
+  const n = world.nations[nation]!;
+  const out: BuildOrder[] = [];
+  const seen = new Set<string>();
+  const valid = builds.filter((b) => b && typeof b.siteId === 'string' && typeof b.facility === 'string');
+  if (valid.length !== builds.length) reject('malformed build order');
+  for (const b of [...valid].sort((x, y) => (x.siteId < y.siteId ? -1 : x.siteId > y.siteId ? 1 : 0))) {
+    if (seen.has(b.siteId)) {
+      reject(`more than one build at ${b.siteId}`);
+      continue;
+    }
+    seen.add(b.siteId);
+    const why = checkBuild(world, nation, b.siteId, b.facility);
+    if (why) {
+      reject(why);
+      continue;
+    }
+    const cost = FACILITIES[b.facility].cost;
+    if (RESOURCES.some((r) => reserved[r] + cost[r] > n.stockpile[r])) {
+      reject(`insufficient resources for a ${FACILITIES[b.facility].name.toLowerCase()} at ${world.sites[b.siteId]!.name}`);
+      continue;
+    }
+    for (const r of RESOURCES) reserved[r] += cost[r];
+    out.push({ siteId: b.siteId, facility: b.facility });
   }
   return out;
 }
@@ -206,7 +289,10 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
       else locked.formations[id] = order;
     }
 
-    locked.recruit = lockRecruits(world, nation, Array.isArray(sub.recruit) ? sub.recruit : [], reject);
+    // Recruits reserve first, then buildings, from one shared reservation: nothing is overspent.
+    const reserved: Stockpile = { credits: 0, energy: 0, materials: 0, food: 0 };
+    locked.recruit = lockRecruits(world, nation, Array.isArray(sub.recruit) ? sub.recruit : [], reject, reserved);
+    if (sub.build !== undefined) locked.build = lockBuilds(world, nation, Array.isArray(sub.build) ? sub.build : [], reject, reserved);
 
     if (sub.budget) {
       const why = checkBudget(sub.budget);
@@ -242,15 +328,14 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
     for (const d of dip) perTarget.set(d.target, (perTarget.get(d.target) ?? 0) + 1);
     for (const d of [...dip].sort((a, b) => (a.target < b.target ? -1 : a.target > b.target ? 1 : 0))) {
       const t = world.nations[d.target];
-      const rel = t ? relationOf(world.relations, nation, d.target) : null;
       if (!t || d.target === nation) reject('no such nation');
       else if (perTarget.get(d.target)! > 1) reject(`more than one diplomatic action toward ${t.name}`);
       else if (t.eliminated) reject(`${t.name} has been eliminated`);
-      else if (d.action === 'declare_war' && rel === 'war') reject(`already at war with ${t.name}`);
-      else if (d.action === 'propose_peace' && rel !== 'war') reject(`not at war with ${t.name}`);
-      else if (d.action === 'propose_alliance' && rel !== 'peace') reject(`must be at peace with ${t.name} to ally`);
-      else if (!['declare_war', 'propose_peace', 'propose_alliance'].includes(d.action)) reject('unknown diplomatic action');
-      else locked.diplomacy.push({ target: d.target, action: d.action });
+      else {
+        const why = checkDiplomacy(world, nation, d.target, d.action);
+        if (why) reject(why);
+        else locked.diplomacy.push({ target: d.target, action: d.action });
+      }
     }
 
     if (sub.battles !== undefined) {

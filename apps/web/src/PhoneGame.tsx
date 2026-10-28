@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Formation, FormationOrder, Resource } from '@brink/contracts';
-import { TERRAIN, UNITS } from '@brink/game-data';
+import { TERRAIN, UNITS, VICTORY } from '@brink/game-data';
 import { useCamera } from './camera';
 import { CityBanners, CityPanel } from './Cities';
 import { Coach } from './Coach';
@@ -530,7 +530,7 @@ function Debrief({ onDone }: { onDone: () => void }) {
 function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean }) {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
-  const submit = useGame((s) => s.submit);
+  const openReview = useGame((s) => s.openReview);
   const nextIdle = useGame((s) => s.nextIdle);
   const autoCommand = useGame((s) => s.autoCommand);
   const resolving = useGame((s) => s.resolving);
@@ -590,7 +590,7 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
         </button>
         <button
           type="button"
-          onClick={() => void submit()}
+          onClick={openReview}
           disabled={resolving || over || cooling}
           data-testid="end-turn"
           className="end-turn relative flex-1 overflow-hidden rounded-xl bg-signal px-3 text-ink-950 active:brightness-90 disabled:opacity-60"
@@ -613,7 +613,13 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
     <div className="sheet-in pointer-events-auto rounded-t-2xl border-t border-line bg-ink-900/97 px-4 pt-3" data-testid="world-card">
       <div className="flex items-baseline justify-between">
         <span className="font-display text-lg font-extrabold uppercase">The theatre</span>
-        <span className="text-[12px] text-faint">{view.victoryThreshold} VP wins</span>
+        <span className="text-[12px] text-faint">
+          {view.victoryThreshold} VP or {VICTORY.supremacyShare}% standing wins
+        </span>
+      </div>
+      <div className="mt-1 flex justify-end gap-2 pr-[3.75rem] text-[10px] text-faint uppercase">
+        <span className="w-14 text-right">Standing</span>
+        <span className="w-12 text-right">VP</span>
       </div>
       <ul className="mt-2 space-y-1.5">
         {ranked.map((n, i) => {
@@ -624,6 +630,9 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
               <span className="h-4 w-4 shrink-0 rounded" style={{ background: n.color }} />
               <span className={`min-w-0 flex-1 truncate text-[14px] ${n.id === view.self.id ? 'font-bold' : ''} ${n.eliminated ? 'text-faint line-through' : ''}`}>{n.name}</span>
               <span className="text-[12px] text-faint">{cities(n.id)} cities</span>
+              <span className="w-14 text-right text-[13px] tabular-nums text-muted" data-testid={`standing-${n.id}`} title="Average share of land, army and output: Supremacy and the score at the turn limit">
+                {view.supremacy[n.id] ?? 0}%
+              </span>
               <span className="w-12 text-right text-[14px] font-semibold tabular-nums">{n.victoryPoints}</span>
               <span className={`w-14 rounded-full py-0.5 text-center text-[10px] font-bold uppercase ${n.eliminated ? 'bg-ink-700 text-faint' : tone}`}>{n.eliminated ? 'Out' : label}</span>
             </li>
@@ -647,7 +656,7 @@ function HowToWin({ onClose }: { onClose: () => void }) {
   const view = useGame((s) => s.view)!;
   const goal = nextObjective(view);
   const steps: [string, string][] = [
-    ['Take places', `Cities, capitals and the gold objectives are worth victory points. Reach ${view.victoryThreshold}, or lead after turn ${view.maxTurns}, and you win.${goal ? ` Start with ${goal.site.name}: the amber ring.` : ''}`],
+    ['Take places', `Cities, capitals and the gold objectives are worth victory points. Reach ${view.victoryThreshold} and you win; allies can win together, and a power far ahead in land, army and output wins by supremacy. Otherwise the best standing after turn ${view.maxTurns} wins.${goal ? ` Start with ${goal.site.name}: the amber ring.` : ''}`],
     ['Move and attack', 'Tap your tile, then a blue hex to move there. Enemies you can hit are tagged WIN, EVEN or RISKY: attack the WINs.'],
     ['End the turn', 'Everyone moves at once. Watch what happens, read the debrief, go again. Stuck? Tap Plan and your generals give every unit orders.'],
   ];

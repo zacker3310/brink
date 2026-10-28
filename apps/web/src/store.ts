@@ -3,6 +3,7 @@ import type {
   Budget,
   Difficulty,
   DiplomaticAction,
+  FacilityId,
   FormationId,
   FormationOrder,
   GameEvent,
@@ -17,7 +18,7 @@ import type {
 } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { engine } from './engine';
-import { idleFormations, netChange, selfLedger } from './insight';
+import { idleFormations, netChange, selfLedger, wonCampaign } from './insight';
 import { recommendedTech, recruitCostFor } from './rules-view';
 import { movementAllowance } from '@brink/simulation';
 import { UNITS } from '@brink/game-data';
@@ -140,12 +141,18 @@ interface State {
   setOrder(id: FormationId, order: FormationOrder | null): void;
   addRecruit(siteId: string, unitClass: UnitClass): void;
   removeRecruit(index: number): void;
+  /** Start (or, with null, cancel) this turn's building at a site. */
+  setBuild(siteId: string, facility: FacilityId | null): void;
   setBudget(budget: Budget): void;
   setResearch(tech: TechId | null): void;
   setEventChoice(choice: 0 | 1): void;
   setDiplomacy(target: NationId, action: DiplomaticAction | null): void;
   setPriority(id: FormationId, p: SupplyPriority): void;
   submit(): Promise<void>;
+  /** The order review is open: End Turn shows it, Commit submits. */
+  review: boolean;
+  openReview(): void;
+  closeReview(): void;
   /** Save to a slot; a quiet save (the autosave) says nothing unless it fails. */
   save(slot: string, quiet?: boolean): Promise<void>;
   /** Download the campaign as a save file. */
@@ -191,7 +198,7 @@ export const useGame = create<State>((set, get) => {
     if (r.type === 'state') {
       set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), submitted: null, rejected: [], screen: 'game' });
       // A war won opens the next theatre.
-      if (r.view.victory?.winner === r.view.self.id) recordWarWon(r.view.scenarioId);
+      if (wonCampaign(r.view)) recordWarWon(r.view.scenarioId);
     }
     return true;
   };
@@ -237,6 +244,14 @@ export const useGame = create<State>((set, get) => {
     mode: 'move',
     tab: 'overview',
     showReport: false,
+    review: false,
+    openReview: () => {
+      const { draft, resolving, view } = get();
+      if (!draft || resolving || !view || view.victory) return;
+      set({ review: true, armed: null });
+      void recheck();
+    },
+    closeReview: () => set({ review: false }),
     focus: null,
     notices: [],
     slots: listSlots(),
@@ -272,7 +287,7 @@ export const useGame = create<State>((set, get) => {
       // Multiplayer is gone: anyone else who sat at the table hands their nation to the AI.
       for (const n of r.humans.slice(1)) await engine.call({ type: 'seat', nation: n, to: 'ai' });
       apply(r.state);
-      get().notify(`Loaded turn ${get().view!.turn}`);
+      get().notify(r.migratedFrom ? `Loaded turn ${get().view!.turn}, upgraded from rules ${r.migratedFrom} to the current rules` : `Loaded turn ${get().view!.turn}`);
       get().nextIdle();
       return true;
     },
@@ -427,6 +442,12 @@ export const useGame = create<State>((set, get) => {
         d.recruit = [...d.recruit.filter((r) => r.siteId !== siteId), { siteId, unitClass }];
         return d;
       }),
+    setBuild: (siteId, facility) =>
+      editDraft((d) => {
+        const rest = (d.build ?? []).filter((b) => b.siteId !== siteId);
+        d.build = facility ? [...rest, { siteId, facility }] : rest;
+        return d;
+      }),
     removeRecruit: (i) =>
       editDraft((d) => {
         d.recruit.splice(i, 1);
@@ -456,7 +477,7 @@ export const useGame = create<State>((set, get) => {
         }
       }
       sfx.endTurn();
-      set({ submitted: structuredClone(draft), resolving: true });
+      set({ submitted: structuredClone(draft), resolving: true, review: false });
       const r = await engine.call({ type: 'submit', orders: draft });
       const before = get().view;
       if (r.type === 'state' && before && r.report) set({ lastTurn: { before, events: r.report.events } });

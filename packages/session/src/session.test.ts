@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { SAVE_VERSION } from '@brink/contracts';
+import { RULESET_VERSION } from '@brink/game-data';
 import { MERIDIAN_ID } from '@brink/scenarios';
 import { hashState } from '@brink/simulation';
 import { parseSave, SaveError, serializeSave } from './save';
@@ -29,12 +31,46 @@ describe('GameSession', () => {
     const s = GameSession.create(MERIDIAN_ID, 4, 'aster');
     const save = s.toSave('x', '2026-10-25T12:00:00Z');
     expect(() => parseSave('nope')).toThrow(SaveError);
-    expect(() => parseSave(serializeSave({ ...save, rulesetVersion: '0.9.0' }))).toThrow(/ruleset/);
+    expect(() => parseSave(serializeSave({ ...save, rulesetVersion: '9.0.0' }))).toThrow(/newer than this build/);
+    expect(() => parseSave(serializeSave({ ...save, rulesetVersion: '0.9.0' }))).toThrow(/does not match its header/);
     expect(() => parseSave(serializeSave({ ...save, saveVersion: 99 }))).toThrow(/newer/);
     const tampered = JSON.parse(serializeSave(save));
     tampered.world.nations.aster.stockpile.credits = 99999;
     expect(() => parseSave(JSON.stringify(tampered))).toThrow(/corrupted/);
     expect(hashState(save.world)).toBe(save.hash);
+  });
+
+  it('migrates a save from the previous build and plays on', () => {
+    const s = GameSession.create(MERIDIAN_ID, 6, 'korva');
+    for (let i = 0; i < 2; i++) s.advance();
+    // What ruleset 1.4.0 wrote: save version 1, world schema 1, no treaties, facilities or construction.
+    const old = JSON.parse(serializeSave(s.toSave('old', '2026-10-27T12:00:00Z')));
+    old.saveVersion = 1;
+    old.rulesetVersion = '1.4.0';
+    old.world.rulesetVersion = '1.4.0';
+    old.world.schema = 1;
+    delete old.world.treaties;
+    for (const site of Object.values(old.world.sites) as Record<string, unknown>[]) delete site.facilities;
+    for (const n of Object.values(old.world.nations) as Record<string, unknown>[]) delete n.construction;
+    old.hash = hashState(old.world);
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.migratedFrom).toBe('1.4.0');
+    expect(loaded.saveVersion).toBe(SAVE_VERSION);
+    expect(loaded.world).toMatchObject({ schema: 2, rulesetVersion: RULESET_VERSION, treaties: [] });
+    expect(loaded.hash).toBe(hashState(loaded.world));
+    const resumed = GameSession.fromSave(loaded);
+    expect(resumed.turn).toBe(3);
+    resumed.advance();
+    expect(resumed.turn).toBe(4);
+    // Tampering is still caught: the hash is checked against the save as written.
+    old.world.nations.korva.stockpile.credits = 99999;
+    expect(() => parseSave(JSON.stringify(old))).toThrow(/corrupted/);
+  });
+
+  it('runs any campaign length from 5 to 60 turns', () => {
+    expect(GameSession.create(MERIDIAN_ID, 1, 'aster', [], { maxTurns: 45 }).snapshot().maxTurns).toBe(45);
+    expect(GameSession.create(MERIDIAN_ID, 1, 'aster', [], { maxTurns: 99 }).snapshot().maxTurns).toBe(60);
+    expect(GameSession.create(MERIDIAN_ID, 1, 'aster', [], { maxTurns: 2 }).snapshot().maxTurns).toBe(5);
   });
 
   it('seats several humans: AIs play only the empty seats, every human gets a report', () => {

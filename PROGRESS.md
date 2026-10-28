@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-10-28. Milestone 1 (first playable).
+Updated 2026-10-28 (overhaul pass 1). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -170,13 +170,21 @@ Updated 2026-10-28. Milestone 1 (first playable).
   - Fixed: the arena canvas had no CSS size, so 2x screens showed a quarter of the field; the safe-area
     classes beat Tailwind padding (they sit outside its layers).
 
+- Overhaul pass 1 (`docs/OVERHAUL_PLAN.md`, `docs/GAME_DESIGN.md`, `docs/IMPLEMENTATION_LOG.md`):
+  - Saves migrate forward across rulesets and save versions instead of being refused.
+  - Treaties: binding non-aggression pacts, trade agreements, embargoes, all timed and public.
+  - Victory: Coalition and Supremacy join Domination; the turn limit is a Score victory on standing.
+    Quick, Standard and Epic campaigns (20, 30, 45 turns).
+  - Facilities: farm, mine, power plant, factory, research lab, fortress; three unlocked by research.
+  - Order review before every commit, phone and desktop.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
   Safari/WebKit; verify on a device (audio unlock, safe areas, standalone launch).
 
-- Balance: 55 of 100 soak matches end by victory points, 45 at the turn limit (median turn 29).
-  Next levers if games should end sooner: stall threshold in `ai`, strike entrenchment, victory share.
+- Balance: of 100 soak matches, 38 end by domination, 19 by supremacy, 43 on score at the turn
+  limit (median turn 28). Next lever: AI deadlock-breaking (concentration, artillery before assaults).
 - Arena: tested in Chromium (iPhone 14 Pro emulation with SwiftShader WebGL and desktop), not yet on a
   real iPhone GPU; frame rate on older phones unmeasured. New nations per theatre not done (same four
   powers on new ground).

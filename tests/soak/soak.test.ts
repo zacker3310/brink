@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { STACK_LIMIT } from '@brink/game-data';
+import { FACILITY_SLOTS, STACK_LIMIT } from '@brink/game-data';
 import { MERIDIAN_ID } from '@brink/scenarios';
 import { GameSession } from '@brink/session';
 
@@ -33,6 +33,13 @@ function invariants(w: WorldState): string[] {
     if (owners.length > STACK_LIMIT) bad.push(`${owners.length} formations in ${key}`);
   }
   for (const s of Object.values(w.sites)) if (w.tiles[s.key]!.owner !== s.owner) bad.push(`site ${s.id} owner differs from its hex`);
+  for (const s of Object.values(w.sites)) {
+    if (s.facilities.length > FACILITY_SLOTS[s.kind] || new Set(s.facilities).size !== s.facilities.length) bad.push(`site ${s.id} facilities ${s.facilities.join(',')}`);
+  }
+  for (const t of w.treaties) {
+    if (!(t.a < t.b) || t.until < t.from) bad.push(`malformed treaty ${JSON.stringify(t)}`);
+    if (t.kind !== 'embargo' && t.until >= w.turn && w.relations[`${t.a}|${t.b}`] === 'war') bad.push(`${t.kind} between ${t.a} and ${t.b} at war`);
+  }
   return bad;
 }
 
@@ -41,12 +48,15 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
     const endings: Record<string, number> = {};
     const turns: number[] = [];
     let rejected = 0;
+    const usage = { facilities: 0, treaties: 0 };
     for (let seed = 1; seed <= MATCHES; seed++) {
       const s = GameSession.create(MERIDIAN_ID, seed, null);
       let guard = 0;
       while (!s.over) {
         const r = s.advance();
         rejected += r.events.filter((e) => e.kind === 'order_rejected').length;
+        usage.facilities += r.events.filter((e) => e.kind === 'facility_built').length;
+        usage.treaties += r.events.filter((e) => e.kind === 'treaty').length;
         const bad = invariants(s.snapshot());
         expect(bad, `seed ${seed} turn ${s.turn}`).toEqual([]);
         if (++guard > 40) throw new Error(`seed ${seed} did not end`);
@@ -57,7 +67,10 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
       turns.push(v.turn);
     }
     turns.sort((a, b) => a - b);
-    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected);
+    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties);
+    // The AI uses the economy and diplomacy it is given.
+    expect(usage.facilities).toBeGreaterThan(MATCHES);
+    expect(usage.treaties).toBeGreaterThan(MATCHES);
     expect(rejected).toBe(0);
   });
 });

@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import type { DiplomaticAction, UnitClass } from '@brink/contracts';
+import type { DiplomaticAction, NationView, ProposalKind, UnitClass } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { GOVERNMENTS, RULES, TECH_IDS, TECHS, UNITS } from '@brink/game-data';
+import { GOVERNMENTS, RULES, TECH_IDS, TECHS, TREATIES, UNITS } from '@brink/game-data';
 import { Label } from './chrome';
 import { Emblem, UnitGlyph } from './glyphs';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
-import { checkResearchView, recommendedTech, recruitCostFor, researchPerTurn } from './rules-view';
+import { checkResearchView, diplomacyBlocked, recommendedTech, recruitCostFor, researchPerTurn } from './rules-view';
 import { describeOrder } from './planning';
 import { useGame } from './store';
 import { Button, costText, Meter, Stat, Swatch } from './ui';
@@ -477,9 +477,37 @@ export function Research() {
 
 const RELATION_TEXT: Record<string, { label: string; tone: string; means: string }> = {
   war: { label: 'At war', tone: 'bg-hostile text-white', means: 'You fight: each side can attack the other and take its cities.' },
-  peace: { label: 'At peace', tone: 'bg-good text-ink-950', means: 'Neither side can attack. Breaking it costs stability.' },
+  peace: { label: 'At peace', tone: 'bg-good text-ink-950', means: 'Neither side can attack. Breaking it costs stability. A pact makes it binding; trade pays you both.' },
   alliance: { label: 'Allies', tone: 'bg-friend text-ink-950', means: 'Allied: you fight side by side.' },
 };
+
+const OFFER_TEXT: Record<ProposalKind, string> = {
+  peace: 'peace',
+  alliance: 'an alliance',
+  nonaggression: `a non-aggression pact (${TREATIES.nonaggressionTurns} turns, no war either way)`,
+  trade: `trade (+${TREATIES.tradeIncome.credits} credits and +${TREATIES.tradeIncome.materials} materials a turn each, ${TREATIES.tradeTurns} turns)`,
+};
+
+/** The agreements in force between you and `other`, with their last turn. */
+function TreatyChips({ view, other }: { view: NationView; other: string }) {
+  const mine = view.treaties.filter((t) => (t.a === view.self.id && t.b === other) || (t.b === view.self.id && t.a === other));
+  if (mine.length === 0) return null;
+  const text = (t: (typeof mine)[number]) =>
+    t.kind === 'nonaggression'
+      ? `Non-aggression pact · no war until after turn ${t.until}`
+      : t.kind === 'trade'
+        ? `Trading · +${TREATIES.tradeIncome.credits} cr +${TREATIES.tradeIncome.materials} mat a turn · to turn ${t.until}`
+        : `Embargo by ${t.by === view.self.id ? 'you' : 'them'} · no trade until after turn ${t.until}`;
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid={`treaties-${other}`}>
+      {mine.map((t) => (
+        <span key={t.kind} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${t.kind === 'embargo' ? 'border-hostile/50 text-hostile' : 'border-good/50 text-good'}`}>
+          {text(t)}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function Diplomacy() {
   const view = useGame((s) => s.view)!;
@@ -522,8 +550,9 @@ export function Diplomacy() {
               {!n.eliminated && (
                 <>
                   <p className="mt-1.5 text-[13px] text-muted">{r.means}</p>
-                  {incoming && rel === 'war' && <p className="mt-1.5 text-[13px] font-semibold text-signal">They are offering peace.</p>}
-                  {outgoing && !planned(n.id) && <p className="mt-1.5 text-[12px] text-faint">Your {outgoing.kind} offer is waiting for their answer.</p>}
+                  <TreatyChips view={view} other={n.id} />
+                  {incoming && <p className="mt-1.5 text-[13px] font-semibold text-signal">They are offering {OFFER_TEXT[incoming.kind]}. Offer it back to accept.</p>}
+                  {outgoing && !planned(n.id) && <p className="mt-1.5 text-[12px] text-faint">Your offer of {OFFER_TEXT[outgoing.kind]} is waiting for their answer.</p>}
                   {rel === 'war' && (
                     <button
                       type="button"
@@ -535,20 +564,43 @@ export function Diplomacy() {
                     </button>
                   )}
                   {rel !== 'war' && (
-                    <div className="flex gap-2">
-                      {rel === 'peace' && (
-                        <button type="button" onClick={() => toggle(n.id, 'propose_alliance')} aria-pressed={planned(n.id) === 'propose_alliance'} className={`${big} border border-line ${planned(n.id) === 'propose_alliance' ? 'border-friend text-friend' : 'bg-ink-800'}`}>
-                          {planned(n.id) === 'propose_alliance' ? 'Alliance offered' : incoming ? 'Accept alliance' : 'Offer alliance'}
+                    <div className="mt-1 grid grid-cols-2 gap-x-2">
+                      {(
+                        [
+                          ['propose_alliance', 'alliance', 'Offer alliance'],
+                          ['propose_nonaggression', 'nonaggression', 'Offer pact'],
+                          ['propose_trade', 'trade', 'Offer trade'],
+                        ] as const
+                      )
+                        .filter(([a]) => !diplomacyBlocked(view, n.id, a) || planned(n.id) === a)
+                        .map(([action, kind, label]) => {
+                          const on = planned(n.id) === action;
+                          const accepting = incoming?.kind === kind;
+                          return (
+                            <button key={action} type="button" onClick={() => toggle(n.id, action)} aria-pressed={on} data-testid={`${action}-${n.id}`} className={`${big} border ${on ? 'border-friend bg-friend/15 text-friend' : accepting ? 'border-signal bg-signal text-ink-950' : 'border-line bg-ink-800'}`}>
+                              {on ? `${label.charAt(6).toUpperCase()}${label.slice(7)} offered (cancel)` : accepting ? label.replace('Offer', 'Accept') : label}
+                            </button>
+                          );
+                        })}
+                      {!diplomacyBlocked(view, n.id, 'embargo') && (
+                        <button type="button" onClick={() => toggle(n.id, 'embargo')} aria-pressed={planned(n.id) === 'embargo'} data-testid={`embargo-${n.id}`} className={`${big} border ${planned(n.id) === 'embargo' ? 'border-signal text-signal' : 'border-line bg-ink-800 text-muted'}`}>
+                          {planned(n.id) === 'embargo' ? 'Embargo at turn end (cancel)' : 'Embargo'}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => toggle(n.id, 'declare_war')}
-                        aria-pressed={planned(n.id) === 'declare_war'}
-                        className={`${big} border ${planned(n.id) === 'declare_war' ? 'border-hostile bg-hostile text-white' : 'border-hostile/60 text-hostile'}`}
-                      >
-                        {planned(n.id) === 'declare_war' ? 'War declared at turn end (cancel)' : `Declare war · −${perfidy} stability`}
-                      </button>
+                      {(() => {
+                        const why = diplomacyBlocked(view, n.id, 'declare_war');
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => toggle(n.id, 'declare_war')}
+                            disabled={!!why}
+                            aria-pressed={planned(n.id) === 'declare_war'}
+                            className={`${big} col-span-2 border disabled:opacity-60 ${planned(n.id) === 'declare_war' ? 'border-hostile bg-hostile text-white' : 'border-hostile/60 text-hostile'}`}
+                          >
+                            {why ? `No war: pact holds` : planned(n.id) === 'declare_war' ? 'War declared at turn end (cancel)' : `Declare war · −${perfidy} stability`}
+                          </button>
+                        );
+                      })()}
                     </div>
                   )}
                 </>

@@ -7,6 +7,7 @@ test.use({ viewport, deviceScaleFactor, isMobile, hasTouch, userAgent });
 
 async function endTurn(page: Page, turn: number) {
   await page.getByTestId('end-turn').tap();
+  await page.getByTestId('commit-turn').tap();
   await expect(page.getByTestId('replay')).toBeVisible({ timeout: 15000 });
   // A short replay may finish on its own before the tap lands.
   await page
@@ -129,6 +130,7 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
       // Close in on the enemy a few hexes at a time.
       await page.getByTestId('auto-command').tap();
       await page.getByTestId('end-turn').tap();
+      await page.getByTestId('commit-turn').tap();
       await expect(page.getByTestId('replay')).toBeVisible({ timeout: 15000 });
       await page.getByTestId('skip-replay').tap({ timeout: 3000 }).catch(() => undefined);
       await page.getByTestId('debrief-close').tap();
@@ -138,6 +140,7 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
 
   await page.getByTestId('auto-command').tap();
   await page.getByTestId('end-turn').tap();
+  await page.getByTestId('commit-turn').tap();
   await expect(page.getByTestId('replay')).toBeVisible({ timeout: 15000 });
   await page.getByTestId('skip-replay').tap({ timeout: 3000 }).catch(() => undefined);
   await page.getByTestId('debrief-close').tap();

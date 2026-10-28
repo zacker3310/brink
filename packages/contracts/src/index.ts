@@ -65,17 +65,44 @@ export interface Site {
   population: number;
   victoryPoints: number;
   yields: Yields;
+  /** Facilities built here, sorted. They pass to whoever takes the site. */
+  facilities: FacilityId[];
 }
+
+/** Buildings a nation can put up at its sites. Effects and costs live in game-data `FACILITIES`. */
+export type FacilityId = 'factory' | 'power_plant' | 'farm' | 'mine' | 'research_lab' | 'fortress';
+
+export const FACILITY_IDS: readonly FacilityId[] = ['factory', 'power_plant', 'farm', 'mine', 'research_lab', 'fortress'];
 
 export type Relation = 'war' | 'peace' | 'alliance';
 
-export type DiplomaticAction = 'declare_war' | 'propose_peace' | 'propose_alliance';
+export type DiplomaticAction = 'declare_war' | 'propose_peace' | 'propose_alliance' | 'propose_nonaggression' | 'propose_trade' | 'embargo';
+
+export type ProposalKind = 'peace' | 'alliance' | 'nonaggression' | 'trade';
 
 export interface Proposal {
   from: NationId;
   to: NationId;
-  kind: 'peace' | 'alliance';
+  kind: ProposalKind;
   turn: number;
+}
+
+/**
+ * A timed agreement between two nations, in force from `from` through `until` (turns, inclusive).
+ * Non-aggression: neither may declare war on the other while it lasts. Trade: both gain income;
+ * war ends it. Embargo: declared by `by`; ends any trade and bars a new one while it lasts.
+ */
+export type TreatyKind = 'nonaggression' | 'trade' | 'embargo';
+
+export interface Treaty {
+  kind: TreatyKind;
+  /** The two parties, `a < b`. */
+  a: NationId;
+  b: NationId;
+  from: number;
+  until: number;
+  /** Embargoes only: who imposed it. */
+  by?: NationId;
 }
 
 export interface Budget {
@@ -94,6 +121,15 @@ export interface ProductionItem {
   /** Industrial capacity applied so far. */
   progress: number;
   /** Industrial capacity required. */
+  required: number;
+}
+
+/** A facility under construction: industrial capacity is applied each turn until `required`. */
+export interface ConstructionItem {
+  id: string;
+  siteId: SiteId;
+  facility: FacilityId;
+  progress: number;
   required: number;
 }
 
@@ -121,6 +157,8 @@ export interface Nation {
   budget: Budget;
   research: ResearchState;
   productionQueue: ProductionItem[];
+  /** Facilities being built; industry goes here before the unit queue. */
+  construction: ConstructionItem[];
   objectives: SiteId[];
   /** Cumulative strength lost; drives war weariness. */
   warLosses: number;
@@ -184,6 +222,11 @@ export interface RecruitOrder {
   unitClass: UnitClass;
 }
 
+export interface BuildOrder {
+  siteId: SiteId;
+  facility: FacilityId;
+}
+
 export interface DiplomacyOrder {
   target: NationId;
   action: DiplomaticAction;
@@ -210,6 +253,8 @@ export interface NationOrders {
   turn: number;
   formations: Record<FormationId, FormationOrder>;
   recruit: RecruitOrder[];
+  /** Facilities to start; costs are reserved at validation like recruits. */
+  build?: BuildOrder[];
   budget?: Budget;
   research?: TechId | null;
   supplyPriority?: Record<FormationId, SupplyPriority>;
@@ -237,13 +282,18 @@ export interface NationIntel {
   lastKnown: Record<FormationId, LastKnownContact>;
 }
 
-export type VictoryReason = 'victory_points' | 'last_standing' | 'turn_limit';
+export type VictoryReason = 'victory_points' | 'supremacy' | 'coalition' | 'last_standing' | 'turn_limit';
 
 export interface VictoryState {
   winner: NationId;
   reason: VictoryReason;
   turn: number;
+  /** Coalition victories: every member of the winning bloc, sorted. The winner leads it. */
+  coalition?: NationId[];
 }
+
+/** Campaign lengths offered at setup. */
+export type CampaignLength = 'quick' | 'standard' | 'epic';
 
 /**
  * How hard the campaign is for its human seats. Easy: a single-player campaign opens at war with
@@ -253,7 +303,7 @@ export interface VictoryState {
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
 export interface WorldState {
-  schema: 1;
+  schema: 2;
   rulesetVersion: string;
   scenarioId: string;
   /** Number of the next turn to be resolved. Starts at 1. */
@@ -269,6 +319,7 @@ export interface WorldState {
   /** Keyed by `pairKey(a, b)`. */
   relations: Record<string, Relation>;
   proposals: Proposal[];
+  treaties: Treaty[];
   intel: Record<NationId, NationIntel>;
   victory: VictoryState | null;
   /** Absent in campaigns made before difficulty existed: they play as normal. */
@@ -354,10 +405,15 @@ export type GameEvent =
   | { kind: 'research'; nation: NationId; tech: TechId }
   /** `broke` is the treaty a declaration of war tore up, if any. */
   | { kind: 'diplomacy'; a: NationId; b: NationId; relation: Relation; proposedBy: NationId; broke?: 'peace' | 'alliance' }
-  | { kind: 'proposal'; from: NationId; to: NationId; proposal: 'peace' | 'alliance' }
+  | { kind: 'proposal'; from: NationId; to: NationId; proposal: ProposalKind }
+  | { kind: 'treaty'; treaty: TreatyKind; a: NationId; b: NationId; until: number; by?: NationId }
+  | { kind: 'treaty_ended'; treaty: TreatyKind; a: NationId; b: NationId; reason: 'expired' | 'war' | 'embargo' }
+  | { kind: 'construction_queued'; nation: NationId; item: string; site: SiteId; facility: FacilityId }
+  | { kind: 'construction_cancelled'; nation: NationId; item: string; site: SiteId; facility: FacilityId; reason: string }
+  | { kind: 'facility_built'; nation: NationId; site: SiteId; facility: FacilityId }
   | { kind: 'world_event'; nation: NationId; event: WorldEventId; choice: 0 | 1 | null }
   | { kind: 'elimination'; nation: NationId }
-  | { kind: 'victory'; winner: NationId; reason: VictoryReason }
+  | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
   | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string };
 
 export interface TurnReport {
@@ -396,6 +452,8 @@ export interface SiteView {
   victoryPoints: number;
   population: number;
   yields: Yields;
+  /** Known only for your own sites and ones you can see now; otherwise empty. */
+  facilities: FacilityId[];
 }
 
 export interface Contact {
@@ -428,6 +486,8 @@ export interface NationView {
   nations: Record<NationId, PublicNation>;
   relations: Record<NationId, Relation>;
   proposals: Proposal[];
+  /** Treaties are public: every agreement in force between any two powers. */
+  treaties: Treaty[];
   tiles: Record<HexKey, TileView>;
   sites: Record<SiteId, SiteView>;
   formations: Record<FormationId, Formation>;
@@ -436,6 +496,8 @@ export interface NationView {
   totalVictoryPoints: number;
   victory: VictoryState | null;
   difficulty: Difficulty;
+  /** Each nation's standing toward Supremacy, percent: average share of VP, army and income. */
+  supremacy: Record<NationId, number>;
 }
 
 export interface TurnResult {
@@ -450,7 +512,8 @@ export interface TurnResult {
 // Saves
 
 export const SAVE_FORMAT = 'brink-save';
-export const SAVE_VERSION = 1;
+/** 2: treaties, facilities and construction (world schema 2). Older saves are migrated on load. */
+export const SAVE_VERSION = 2;
 
 export interface SaveFile {
   format: typeof SAVE_FORMAT;
@@ -474,6 +537,8 @@ export interface SaveFile {
   histories?: Record<NationId, TurnReport[]>;
   /** A room save: each seat's player callsign, so the room can resume with seats reserved. */
   callsigns?: Record<NationId, string>;
+  /** Set on load when the save was upgraded: the ruleset it was written under. Never written. */
+  migratedFrom?: string;
 }
 
 /** What an AI nation remembers between turns. Built only from its own views and reports. */

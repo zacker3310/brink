@@ -24,7 +24,7 @@ import {
 } from './combat';
 import { canDetect, type Vision } from './fog';
 import { rollRange } from './rng';
-import { clamp, enterCost, nationModifiers, relationOf, sortedKeys } from './rules';
+import { clamp, enterCost, fortressFloor, nationModifiers, relationOf, sortedKeys } from './rules';
 
 /** Per-formation effects computed from a snapshot, then committed together. */
 interface Effects {
@@ -61,7 +61,7 @@ class EffectBook {
       f.morale = clamp(f.morale + e.morale, 0, 100);
       f.ammunition = clamp(f.ammunition - e.ammunition, 0, 100);
       f.experience = clamp(f.experience + e.experience, 0, 100);
-      f.entrenchment = clamp(f.entrenchment - e.entrenchment, 0, 100);
+      f.entrenchment = Math.max(fortressFloor(world, f), clamp(f.entrenchment - e.entrenchment, 0, 100));
       lost.set(f.owner, (lost.get(f.owner) ?? 0) + loss);
     }
     for (const [n, l] of lost) world.nations[n]!.warLosses += l;

@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { GameEvent, HexKey, NationView, TurnReport, UnitClass } from '@brink/contracts';
-import { EVENTS, TECHS, UNITS } from '@brink/game-data';
+import { EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { Label, useKeys } from './chrome';
 import { UnitGlyph } from './glyphs';
-import { arenaNote, atPlace, describeEffect, hexLabel, netChange, toPlace, turnClock } from './insight';
+import { arenaNote, atPlace, describeEffect, hexLabel, netChange, toPlace, treatyText, turnClock, VICTORY_HOW } from './insight';
 import { useGame } from './store';
 import { Swatch } from './ui';
 
@@ -162,13 +162,26 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
         out.Diplomacy!.push({ tone: e.relation === 'war' && (e.a === me || e.b === me) ? 'bad' : undefined, text: `${nation(view, e.a)} and ${nation(view, e.b)} are now at ${e.relation}.` });
         break;
       case 'proposal':
-        out.Diplomacy!.push({ text: `${nation(view, e.from)} proposes ${e.proposal} to ${nation(view, e.to)}.` });
+        out.Diplomacy!.push({ text: `${nation(view, e.from)} proposes ${e.proposal === 'nonaggression' ? 'a non-aggression pact' : e.proposal} to ${nation(view, e.to)}.` });
+        break;
+      case 'treaty':
+      case 'treaty_ended':
+        out.Diplomacy!.push({ tone: e.a === me || e.b === me ? (e.kind === 'treaty' && e.treaty !== 'embargo' ? 'good' : 'bad') : undefined, text: treatyText(view, e) });
+        break;
+      case 'construction_queued':
+        out.Production!.push({ text: `Construction started: ${FACILITIES[e.facility].name.toLowerCase()} at ${view.sites[e.site]?.name ?? e.site}.` });
+        break;
+      case 'facility_built':
+        out.Production!.push({ tone: 'good', text: `${FACILITIES[e.facility].name} completed at ${view.sites[e.site]?.name ?? e.site}: ${FACILITIES[e.facility].summary.toLowerCase()}` });
+        break;
+      case 'construction_cancelled':
+        out.Production!.push({ tone: 'bad', text: `${FACILITIES[e.facility].name} at ${view.sites[e.site]?.name ?? e.site} lost: ${e.reason}.` });
         break;
       case 'elimination':
         out.Diplomacy!.push({ tone: e.nation === me ? 'bad' : undefined, text: `${nation(view, e.nation)} has been eliminated.` });
         break;
       case 'victory':
-        out.Diplomacy!.push({ tone: e.winner === me ? 'good' : 'bad', text: `${nation(view, e.winner)} wins (${e.reason.replace('_', ' ')}).` });
+        out.Diplomacy!.push({ tone: e.winner === me || e.coalition?.includes(me) ? 'good' : 'bad', text: `${nation(view, e.winner)} wins ${VICTORY_HOW[e.reason]}.` });
         break;
       case 'order_rejected':
         out.Orders!.push({ tone: 'bad', text: `Rejected${e.formation ? ` (${name(view, e.formation, me)})` : ''}: ${e.reason}.` });

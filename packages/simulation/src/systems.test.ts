@@ -155,7 +155,7 @@ describe('victory and diplomacy', () => {
     expect(r.world.victory).toMatchObject({ winner: 'a', reason: 'last_standing' });
   });
 
-  it('the turn limit decides on victory points', () => {
+  it('the turn limit decides on the strategic score, then victory points', () => {
     const w = makeWorld();
     w.turn = 30;
     w.sites['a-home']!.victoryPoints = 4;

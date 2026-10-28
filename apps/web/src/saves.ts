@@ -59,7 +59,7 @@ export interface Prefs {
   tutorialDone?: boolean;
   muted?: boolean;
   /** Campaign length picked on the setup screen. */
-  length?: 'quick' | 'standard';
+  length?: 'quick' | 'standard' | 'epic';
   difficulty?: 'easy' | 'normal' | 'hard';
   theatre?: string;
   /** Clean board-game map (default) or satellite imagery. */

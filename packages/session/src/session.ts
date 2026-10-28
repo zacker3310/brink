@@ -18,6 +18,9 @@ export interface AdvanceResult {
  * none for AI-only), and what each AI remembers. The UI holds a session inside a worker and only
  * ever receives views; in multiplayer the host's worker holds it and sends each seat its own.
  */
+/** The longest campaign a session will run. */
+export const MAX_CAMPAIGN_TURNS = 60;
+
 export class GameSession {
   private constructor(
     private world: WorldState,
@@ -36,7 +39,8 @@ export class GameSession {
     opts: { maxTurns?: number; difficulty?: Difficulty } = {},
   ): GameSession {
     const world = createScenario(scenarioId, seed);
-    if (opts.maxTurns) world.maxTurns = Math.max(5, Math.min(world.maxTurns, Math.floor(opts.maxTurns)));
+    // Any length from 5 turns to an epic 60; the scenario's own limit is only the default.
+    if (opts.maxTurns) world.maxTurns = Math.max(5, Math.min(MAX_CAMPAIGN_TURNS, Math.floor(opts.maxTurns)));
     const humans = playerNation === null ? [] : [playerNation, ...others.filter((n) => n !== playerNation)];
     for (const n of humans) if (!world.nations[n]) throw new Error(`no such nation: ${n}`);
     if (new Set(humans).size !== humans.length) throw new Error('a nation can only have one human');

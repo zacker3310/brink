@@ -1,6 +1,6 @@
 import type { Formation, GameEvent, NationId, NationOrders, Stockpile, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { RULES, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { FACILITIES, RULES, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { recruitCost, relationOf, zeroStockpile } from './rules';
 
 export function newFormation(world: WorldState, owner: NationId, unitClass: Formation['unitClass'], key: string, name: string): Formation {
@@ -41,10 +41,11 @@ function ordinal(n: number): string {
 }
 
 /**
- * Phase 3. Resources for new recruits were reserved at validation and are consumed here, when
- * the item enters the queue. Industrial capacity (last settlement's throughput) is then spent
- * down the queue in order. Finished formations appear at their site if it is still held and
- * has room; otherwise they wait.
+ * Phase 3. Resources for new recruits and buildings were reserved at validation and are consumed
+ * here, when the item enters its queue. Work at a site that changed hands is cancelled without a
+ * refund. Industrial capacity (last settlement's throughput) goes first to construction, in queue
+ * order, then down the unit queue. A finished facility stands at once; a finished formation
+ * appears at its site if it is still held and has room, otherwise it waits.
  */
 export function resolveProduction(world: WorldState, nation: NationId, orders: NationOrders, events: GameEvent[]): Stockpile {
   const n = world.nations[nation]!;
@@ -55,6 +56,23 @@ export function resolveProduction(world: WorldState, nation: NationId, orders: N
     events.push({ kind: 'production_cancelled', nation, item: item.id, site: item.siteId, reason: 'site lost' });
     return false;
   });
+
+  n.construction = n.construction.filter((item) => {
+    if (world.sites[item.siteId]?.owner === nation) return true;
+    events.push({ kind: 'construction_cancelled', nation, item: item.id, site: item.siteId, facility: item.facility, reason: 'site lost' });
+    return false;
+  });
+  for (const b of orders.build ?? []) {
+    const cost = FACILITIES[b.facility].cost;
+    if (RESOURCES.some((res) => cost[res] > n.stockpile[res])) throw new Error(`a build for ${nation} passed validation without the resources to pay for it`);
+    for (const res of RESOURCES) {
+      n.stockpile[res] -= cost[res];
+      spent[res] += cost[res];
+    }
+    const id = `c${world.nextId++}`;
+    n.construction.push({ id, siteId: b.siteId, facility: b.facility, progress: 0, required: FACILITIES[b.facility].industry });
+    events.push({ kind: 'construction_queued', nation, item: id, site: b.siteId, facility: b.facility });
+  }
 
   for (const r of orders.recruit) {
     const cost = recruitCost(n, r.unitClass);
@@ -71,6 +89,19 @@ export function resolveProduction(world: WorldState, nation: NationId, orders: N
   }
 
   let capacity = n.industrialCapacity;
+  const built: string[] = [];
+  for (const item of n.construction) {
+    const take = Math.min(capacity, item.required - item.progress);
+    item.progress += take;
+    capacity -= take;
+    if (item.progress < item.required) continue;
+    const site = world.sites[item.siteId]!;
+    site.facilities = [...site.facilities, item.facility].sort();
+    events.push({ kind: 'facility_built', nation, site: site.id, facility: item.facility });
+    built.push(item.id);
+  }
+  n.construction = n.construction.filter((i) => !built.includes(i.id));
+
   const done: string[] = [];
   for (const item of n.productionQueue) {
     if (item.progress < item.required) {

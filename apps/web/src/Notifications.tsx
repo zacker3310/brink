@@ -1,6 +1,6 @@
 import type { HexKey, NationView, TurnReport } from '@brink/contracts';
-import { EVENTS, TECHS, UNITS } from '@brink/game-data';
-import { arenaNote, atPlace, describeEffect, hexLabel } from './insight';
+import { EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
+import { arenaNote, atPlace, describeEffect, hexLabel, treatyText } from './insight';
 import { useGame } from './store';
 
 // Civ-style turn notifications: a column of icons on the right edge of the map. Hover to read,
@@ -33,6 +33,8 @@ export const TONE: Record<Tone, string> = {
   bad: 'border-hostile bg-hostile/15 text-hostile',
   info: 'border-friend bg-friend/15 text-friend',
 };
+
+const PROPOSAL_NAME: Record<string, string> = { peace: 'peace', alliance: 'an alliance', nonaggression: 'a non-aggression pact', trade: 'trade' };
 
 export function notesFor(view: NationView, report: TurnReport): Note[] {
   const me = view.self.id;
@@ -126,7 +128,24 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
         }
         break;
       case 'proposal':
-        if (e.to === me) out.push({ id, icon: 'scroll', tone: 'info', title: `${nation(e.from)} proposes ${e.proposal}`, text: 'Answer in Diplomacy: propose it back to accept.' });
+        if (e.to === me) out.push({ id, icon: 'scroll', tone: 'info', title: `${nation(e.from)} offers ${PROPOSAL_NAME[e.proposal]}`, text: 'Answer in Diplomacy: offer it back to accept.' });
+        break;
+      case 'treaty':
+      case 'treaty_ended':
+        if (e.a === me || e.b === me) {
+          const bad = (e.kind === 'treaty' && e.treaty === 'embargo') || (e.kind === 'treaty_ended' && e.treaty !== 'embargo');
+          const title = e.kind === 'treaty_ended' ? 'Treaty ended' : e.treaty === 'embargo' ? 'Embargo' : e.treaty === 'trade' ? 'Trade agreement signed' : 'Non-aggression pact signed';
+          out.push({ id, icon: 'scroll', tone: bad ? 'bad' : 'good', title, text: treatyText(view, e) });
+        }
+        break;
+      case 'facility_built':
+        if (e.nation === me) {
+          const site = view.sites[e.site];
+          out.push({ id, icon: 'gear', tone: 'good', title: `${FACILITIES[e.facility].name} built`, text: `${site?.name ?? e.site}: ${FACILITIES[e.facility].summary}`, at: site?.key });
+        }
+        break;
+      case 'construction_cancelled':
+        if (e.nation === me) out.push({ id, icon: 'gear', tone: 'bad', title: 'Construction lost', text: `${FACILITIES[e.facility].name} at ${view.sites[e.site]?.name}: ${e.reason}.` });
         break;
       case 'elimination':
         out.push({ id, icon: 'skull', tone: e.nation === me ? 'bad' : 'info', title: `${nation(e.nation)} eliminated`, text: 'A power has fallen.' });

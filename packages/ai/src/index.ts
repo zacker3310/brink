@@ -1,7 +1,9 @@
 import type {
   AiMemory,
+  BuildOrder,
   Budget,
   Contact,
+  FacilityId,
   Formation,
   FormationId,
   FormationOrder,
@@ -12,13 +14,14 @@ import type {
   NationView,
   RecruitOrder,
   SiteView,
+  Stockpile,
   TechId,
   UnitClass,
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { AIR_REBASE_RANGE, EVENTS, STACK_LIMIT, TECHS, UNITS, type EventEffect } from '@brink/game-data';
+import { AIR_REBASE_RANGE, EVENTS, FACILITIES, FACILITY_SLOTS, STACK_LIMIT, TECHS, UNITS, type EventEffect } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
-import { enterCost, movementAllowance, previewAssault, recruitCost, roll, sortedKeys } from '@brink/simulation';
+import { enterCost, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
 // order it writes goes through the same validator as a human's. Two layers:
@@ -184,9 +187,10 @@ function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[]): U
   return best;
 }
 
-function planRecruitment(view: NationView, memory: AiMemory, own: Formation[]): RecruitOrder[] {
+function planRecruitment(view: NationView, memory: AiMemory, own: Formation[], committed?: Stockpile): RecruitOrder[] {
   const out: RecruitOrder[] = [];
   const left = { ...view.self.stockpile };
+  if (committed) for (const r of RESOURCES) left[r] -= committed[r];
   // Keep a reserve for upkeep and logistics.
   const reserve = { credits: 40, energy: 25, materials: 30, food: 25 };
   const queued = view.self.productionQueue.map((p) => p.unitClass);
@@ -207,6 +211,82 @@ function planRecruitment(view: NationView, memory: AiMemory, own: Formation[]): 
   }
   return out;
 }
+
+/**
+ * Agreements: trade with anyone it is not fighting (money for nothing), and a non-aggression pact
+ * with stronger peace partners it has no plan to attack, to keep a second front shut. It answers
+ * offers on the same terms. Its war target and anyone it is about to fight are left alone.
+ */
+function planTreaties(view: NationView, plan: Plan, war: NationOrders['diplomacy'], spare: readonly NationId[]): NationOrders['diplomacy'] {
+  const self = view.self.id;
+  const out: NationOrders['diplomacy'] = [];
+  const vp = (n: NationId) => view.nations[n]!.victoryPoints;
+  const busy = new Set(war.map((d) => d.target));
+  const focus = plan.target?.owner ?? null;
+  const running = (kind: 'trade' | 'nonaggression', n: NationId) => {
+    const t = treatyIn(view.treaties, kind, self, n, view.turn);
+    return !!t && t.until > view.turn;
+  };
+  const offered = (kind: string, n: NationId) => view.proposals.some((p) => p.from === self && p.to === n && p.kind === kind);
+  const asked = (kind: string, n: NationId) => view.proposals.some((p) => p.from === n && p.to === self && p.kind === kind);
+  for (const n of sortedKeys(view.nations)) {
+    if (n === self || view.nations[n]!.eliminated || busy.has(n)) continue;
+    const rel = view.relations[n];
+    if (rel === 'war') continue;
+    const embargoed = !!treatyIn(view.treaties, 'embargo', self, n, view.turn);
+    if (!embargoed && !running('trade', n) && (asked('trade', n) || !offered('trade', n))) {
+      out.push({ target: n, action: 'propose_trade' });
+      continue;
+    }
+    const wantPact = spare.includes(n) || (n !== focus && vp(n) >= vp(self));
+    if (rel === 'peace' && wantPact && !running('nonaggression', n) && (asked('nonaggression', n) || !offered('nonaggression', n))) {
+      out.push({ target: n, action: 'propose_nonaggression' });
+    }
+  }
+  return out;
+}
+
+/** Which facility fixes the scarcest resource; then growth (factory, lab); a fortress where it is pressed. */
+function wantedFacility(view: NationView, memory: AiMemory, site: SiteView): FacilityId | null {
+  const s = view.self.stockpile;
+  const unlocked = view.self.research.unlocked;
+  const building = view.self.construction.filter((c) => c.siteId === site.id).map((c) => c.facility);
+  const can = (f: FacilityId) => !site.facilities.includes(f) && !building.includes(f) && (!FACILITIES[f].requires || unlocked.includes(FACILITIES[f].requires!));
+  const pressed = view.turn - (memory.pressure[site.id] ?? -99) <= 2;
+  const wants: FacilityId[] = [];
+  if (pressed && site.kind === 'capital') wants.push('fortress');
+  const scarce = (['food', 'materials', 'energy'] as const).filter((r) => s[r] < 120).sort((a, b) => s[a] - s[b]);
+  const fix: Record<string, FacilityId> = { food: 'farm', materials: 'mine', energy: 'power_plant' };
+  for (const r of scarce) wants.push(fix[r]!);
+  wants.push('factory', 'research_lab', 'mine', 'power_plant', 'farm');
+  return wants.find(can) ?? null;
+}
+
+/** One building at a time, keeping a reserve for upkeep and the next recruit. */
+function planBuilds(view: NationView, memory: AiMemory): BuildOrder[] {
+  if (view.self.construction.length > 0) return [];
+  // Paced: two to start, one more every four turns. A war is won by armies; buildings pay off slowly.
+  const standing = sortedKeys(view.sites).reduce((a, id) => a + (view.sites[id]!.owner === view.self.id ? view.sites[id]!.facilities.length : 0), 0);
+  if (standing >= 2 + Math.floor(view.turn / 4)) return [];
+  const left = { ...view.self.stockpile };
+  const reserve = { credits: 60, energy: 25, materials: 30, food: 25 };
+  const sites = sortedKeys(view.sites)
+    .map((id) => view.sites[id]!)
+    .filter((s) => s.owner === view.self.id)
+    .sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind] || (a.id < b.id ? -1 : 1));
+  for (const site of sites) {
+    const building = view.self.construction.filter((c) => c.siteId === site.id).length;
+    if (site.facilities.length + building >= FACILITY_SLOTS[site.kind]) continue;
+    const f = wantedFacility(view, memory, site);
+    if (!f) continue;
+    const cost = FACILITIES[f].cost;
+    if (RESOURCES.some((r) => left[r] - cost[r] < reserve[r])) return [];
+    return [{ siteId: site.id, facility: f }];
+  }
+  return [];
+}
+
+const KIND_RANK: Record<SiteView['kind'], number> = { capital: 0, city: 1, depot: 2, objective: 3 };
 
 function planBudget(view: NationView): Budget | undefined {
   const b = view.self.budget;
@@ -484,8 +564,13 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     endAt(plan, f.key, end);
   }
 
-  // One diplomatic order per nation: the engine refuses a second.
-  const diplomacy = planDiplomacy(view, plan, memory, opts.spare ?? []).filter((d, i, all) => all.findIndex((x) => x.target === d.target) === i);
+  // One diplomatic order per target: the engine refuses a second. War on a pact partner is
+  // refused too, so the pact is honoured here rather than bounced by the validator.
+  const war = planDiplomacy(view, plan, memory, opts.spare ?? []).filter((d) => d.action !== 'declare_war' || !treatyIn(view.treaties, 'nonaggression', self, d.target, view.turn));
+  const diplomacy = [...war, ...planTreaties(view, plan, war, opts.spare ?? [])].filter((d, i, all) => all.findIndex((x) => x.target === d.target) === i);
+  // Build first (one project at a time), then recruit from what is left.
+  const build = planBuilds(view, memory);
+  const recruit = planRecruitment(view, memory, own, build.length ? FACILITIES[build[0]!.facility].cost : undefined);
 
   const research = chooseResearch(view);
   const budget = planBudget(view);
@@ -493,9 +578,10 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     nation: self,
     turn: view.turn,
     formations: orders,
-    recruit: planRecruitment(view, memory, own),
+    recruit,
     diplomacy,
   };
+  if (build.length) out.build = build;
   if (research !== undefined) out.research = research;
   if (budget) out.budget = budget;
   const eventChoice = chooseEvent(view);

@@ -32,7 +32,8 @@ export type Request =
 export type Response =
   | ({ type: 'state' } & SeatState)
   /** A loaded save: the local seat's state and who else sat at the table. */
-  | { type: 'loaded'; state: { type: 'state' } & SeatState; humans: NationId[]; callsigns: Record<NationId, string> | null }
+  /** `migratedFrom`: the older ruleset the save was upgraded from, if it was. */
+  | { type: 'loaded'; state: { type: 'state' } & SeatState; humans: NationId[]; callsigns: Record<NationId, string> | null; migratedFrom: string | null }
   | { type: 'resolved'; states: Record<NationId, SeatState> }
   | { type: 'ok' }
   | { type: 'checked'; rejected: GameEvent[] }

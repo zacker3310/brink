@@ -1,4 +1,4 @@
-import type { Formation, HexKey, Ledger, NationView, Stockpile, TurnReport } from '@brink/contracts';
+import type { Formation, GameEvent, HexKey, Ledger, NationView, Stockpile, TreatyKind, TurnReport, VictoryReason } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { HOURS_PER_TURN, type EventEffect } from '@brink/game-data';
 import { keyDistance } from '@brink/map';
@@ -75,4 +75,41 @@ export function arenaNote(arena: true | 'voided' | undefined, attacking: boolean
   if (arena === true) return attacking ? ' You fought it by hand.' : ' They fought it out in the field.';
   if (arena === 'voided' && attacking) return ' Your battle did not count: the enemy at the hex changed before the turn ended, so the odds decided.';
   return '';
+}
+
+/** Whether this nation won: the winner, or any member of a winning coalition. */
+export function wonCampaign(view: Pick<NationView, 'victory' | 'self'>): boolean {
+  const v = view.victory;
+  return !!v && (v.winner === view.self.id || (v.coalition?.includes(view.self.id) ?? false));
+}
+
+/** How the campaign was decided, in a phrase: "wins by ...". */
+export const VICTORY_HOW: Record<VictoryReason, string> = {
+  victory_points: 'by holding the victory-point threshold (domination)',
+  coalition: 'with its coalition, holding the map between them',
+  supremacy: 'by supremacy: ahead in land, army and output together',
+  last_standing: 'as the last nation standing',
+  turn_limit: 'on strategic score at the turn limit',
+};
+
+const TREATY_NAME: Record<TreatyKind, string> = { nonaggression: 'non-aggression pact', trade: 'trade agreement', embargo: 'embargo' };
+
+/** A treaty event as one sentence, from `me`'s side where it involves `me`. */
+export function treatyText(view: Pick<NationView, 'nations' | 'self'>, e: Extract<GameEvent, { kind: 'treaty' | 'treaty_ended' }>): string {
+  const me = view.self.id;
+  const name = (id: string) => (id === me ? 'We' : (view.nations[id]?.name ?? id));
+  const other = e.a === me ? e.b : e.b === me ? e.a : null;
+  const pair = `${name(e.a)} and ${name(e.b)}`;
+  if (e.kind === 'treaty') {
+    if (e.treaty === 'embargo') {
+      const by = e.by ?? e.a;
+      const on = by === e.a ? e.b : e.a;
+      return `${name(by)} embargoed ${on === me ? 'us' : (view.nations[on]?.name ?? on)}: no trade through turn ${e.until}.`;
+    }
+    if (other) return `We signed a ${TREATY_NAME[e.treaty]} with ${view.nations[other]?.name ?? other}, in force through turn ${e.until}.`;
+    return `${pair} signed a ${TREATY_NAME[e.treaty]}, in force through turn ${e.until}.`;
+  }
+  const why = { expired: 'ran out', war: 'ended with the war', embargo: 'ended under an embargo' }[e.reason];
+  const between = other ? `us and ${view.nations[other]?.name ?? other}` : pair;
+  return `The ${TREATY_NAME[e.treaty]} between ${between} ${why}.`;
 }

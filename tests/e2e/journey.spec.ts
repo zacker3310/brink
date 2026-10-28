@@ -64,8 +64,19 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(page.getByTestId('build-infantry')).toHaveAttribute('class', /border-signal/);
   await page.getByTestId('close-city').click();
 
-  // End the turn: it replays on the map, results arrive as notifications, the summary is a click away.
+  // End the turn: the review lists what commits, then it replays on the map, results arrive as
+  // notifications, and the summary is a click away.
   await page.getByTestId('end-turn').click();
+  await expect(page.getByTestId('order-review')).toBeVisible();
+  await expect(page.getByTestId('review-orders')).toBeVisible();
+  // The infantry chosen in the capital is listed with its cost, and the treasury shows what is left.
+  await expect(page.getByTestId('order-review')).toContainText('Infantry at Korvagrad');
+  await expect(page.getByTestId('review-treasury')).toBeVisible();
+  // Back keeps the orders; End Turn again and Commit sends them.
+  await page.getByTestId('review-back').click();
+  await expect(page.getByTestId('order-review')).toHaveCount(0);
+  await page.getByTestId('end-turn').click();
+  await page.getByTestId('commit-turn').click();
   await expect(page.getByTestId('replay')).toBeVisible();
   // The replay can be paused and resumed.
   await page.keyboard.press(' ');
@@ -132,6 +143,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
 
   // Play another turn, then browse back through the report history.
   await page.getByTestId('end-turn').click();
+  await page.getByTestId('commit-turn').click();
   await expect(page.getByTestId('turn')).toContainText('3 / 20', { timeout: 15000 });
   await page.getByTestId('open-report').click();
   await expect(page.getByTestId('report')).toContainText('Turn 2 resolved');

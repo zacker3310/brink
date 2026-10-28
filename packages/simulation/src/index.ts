@@ -11,3 +11,4 @@ export * from './rng';
 export * from './rules';
 export * from './supply';
 export * from './validate';
+export * from './victory';

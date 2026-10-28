@@ -5,9 +5,9 @@
 // 0..1000; organization, morale, readiness, fuel, ammunition, experience, entrenchment and
 // supply are 0..100. One turn is six simulated hours.
 
-import type { GovernmentId, Resource, Stockpile, TechId, Terrain, UnitClass, WorldEventId } from '@brink/contracts';
+import type { CampaignLength, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
 
-export const RULESET_VERSION = '1.4.0';
+export const RULESET_VERSION = '1.5.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -321,6 +321,125 @@ export const TECHS: Record<TechId, TechDef> = {
 /** Sorted, so iteration never depends on object insertion order. */
 export const TECH_IDS: readonly TechId[] = Object.keys(TECHS).sort();
 
+// ---------------------------------------------------------------------------
+// Facilities: what a nation can build at its sites. One of each per site, up to the site's slots.
+
+export interface FacilityDef {
+  name: string;
+  summary: string;
+  /** Paid in full when the build is ordered (reserved at validation). */
+  cost: Stockpile;
+  /** Industrial capacity to finish; construction takes industry before the unit queue. */
+  industry: number;
+  /** Added to the site's yields while it stands. */
+  yields: Partial<Yields>;
+  upkeep: Stockpile;
+  /** Research that must be finished before it can be built. */
+  requires: TechId | null;
+}
+
+export const FACILITIES: Record<FacilityId, FacilityDef> = {
+  farm: {
+    name: 'Farm complex',
+    summary: '+12 food a turn.',
+    cost: stock(70, 0, 30, 0),
+    industry: 30,
+    yields: { food: 12 },
+    upkeep: stock(0, 0, 0, 0),
+    requires: null,
+  },
+  mine: {
+    name: 'Mine',
+    summary: '+12 materials a turn.',
+    cost: stock(90, 0, 20, 0),
+    industry: 40,
+    yields: { materials: 12 },
+    upkeep: stock(0, 1, 0, 0),
+    requires: null,
+  },
+  power_plant: {
+    name: 'Power plant',
+    summary: '+14 energy a turn.',
+    cost: stock(100, 0, 60, 0),
+    industry: 45,
+    yields: { energy: 14 },
+    upkeep: stock(2, 0, 0, 0),
+    requires: null,
+  },
+  factory: {
+    name: 'Factory',
+    summary: '+12 industrial capacity: units and buildings finish sooner.',
+    cost: stock(120, 0, 80, 0),
+    industry: 60,
+    yields: { industry: 12 },
+    upkeep: stock(0, 2, 0, 0),
+    requires: 'industrial_automation',
+  },
+  research_lab: {
+    name: 'Research lab',
+    summary: '+8 research a turn.',
+    cost: stock(140, 0, 40, 0),
+    industry: 50,
+    yields: { research: 8 },
+    upkeep: stock(3, 1, 0, 0),
+    requires: 'signals_intelligence',
+  },
+  fortress: {
+    name: 'Fortress',
+    summary: 'Your units here are always dug in to at least 60, even after a bombardment.',
+    cost: stock(100, 0, 100, 0),
+    industry: 60,
+    yields: {},
+    upkeep: stock(2, 0, 2, 0),
+    requires: 'logistics_doctrine',
+  },
+};
+
+/** Sorted, so iteration never depends on object insertion order. */
+export const FACILITY_ORDER: readonly FacilityId[] = (Object.keys(FACILITIES) as FacilityId[]).sort();
+
+/** How many facilities each kind of site can hold. */
+export const FACILITY_SLOTS: Record<SiteKind, number> = { capital: 4, city: 3, depot: 2, objective: 2 };
+
+/** Entrenchment a fortress guarantees its owner's formations. */
+export const FORTRESS_ENTRENCHMENT = 60;
+
+// ---------------------------------------------------------------------------
+// Treaties and victory paths.
+
+export const TREATIES = {
+  /** Turns a non-aggression pact binds both sides (no declaration of war either way). */
+  nonaggressionTurns: 6,
+  /** Turns a trade agreement runs; renew it by proposing again. */
+  tradeTurns: 8,
+  /** Income each party gains per turn of trade. */
+  tradeIncome: stock(14, 0, 6, 0),
+  /** Turns an embargo bars trade between the two. */
+  embargoTurns: 5,
+} as const;
+
+export const VICTORY = {
+  /** Domination: percent of all victory points held by one nation. */
+  dominationShare: 40,
+  /**
+   * Coalition: an all-allied bloc of two or more holds `coalitionBase + coalitionPerMember x members`
+   * percent of all victory points (two: 60, three: 80). It scales so allies cannot win by signing:
+   * three of four powers start with about two thirds of the map between them.
+   */
+  coalitionBase: 20,
+  coalitionPerMember: 20,
+  /**
+   * Supremacy: average of a nation's percent shares of victory points, army strength and gross
+   * income, with stability at least `supremacyStability`, from `supremacyFromTurn` on.
+   */
+  supremacyShare: 38,
+  supremacyStability: 45,
+  supremacyFromTurn: 8,
+} as const;
+
+/** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */
+export const CAMPAIGN_TURNS: Record<CampaignLength, number> = { quick: 20, standard: 30, epic: 45 };
+
 export const SITE_SUPPLY: Record<'capital' | 'city' | 'depot' | 'objective', number> = {
   capital: 60,
   city: 30,
@@ -353,6 +472,7 @@ export const RULES = {
   defenderLethality: 5,
   /** Random swing on combat losses, percent either way. */
   combatSwing: 15,
+  /** Kept for the view and older callers; equal to `VICTORY.dominationShare`. */
   victoryShare: 40,
   baseStability: 60,
   /** Credits per this many owned hexes. */

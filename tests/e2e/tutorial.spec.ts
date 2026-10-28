@@ -38,6 +38,7 @@ test('a first-time player is coached through a real turn', async ({ page }) => {
 
   await at('end');
   await page.getByTestId('end-turn').click();
+  await page.getByTestId('commit-turn').click();
   await at('watch');
   await at('report');
   await page.getByTestId('coach-show').click();

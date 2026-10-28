@@ -7,10 +7,13 @@ import type {
   Resource,
   Stockpile,
   Terrain,
+  Treaty,
+  TreatyKind,
   UnitClass,
+  WorldState,
 } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { GOVERNMENTS, RIVER_MOVE_COST, TECHS, TERRAIN, UNITS, type Modifiers } from '@brink/game-data';
+import { FORTRESS_ENTRENCHMENT, GOVERNMENTS, RIVER_MOVE_COST, TECHS, TERRAIN, UNITS, type Modifiers } from '@brink/game-data';
 import { areAdjacent } from '@brink/map';
 
 export function sortedKeys<T extends object>(obj: T): (keyof T & string)[] {
@@ -146,4 +149,17 @@ export function visionRadius(unitClass: UnitClass, mods: FullModifiers, onRecon:
 
 export function isRanged(unitClass: UnitClass): boolean {
   return UNITS[unitClass].range > 0;
+}
+
+/** The treaty of `kind` between `a` and `b` in force on `turn`, if any. Works on a world or a view. */
+export function treatyIn(treaties: readonly Treaty[], kind: TreatyKind, a: NationId, b: NationId, turn: number): Treaty | undefined {
+  const [x, y] = a < b ? [a, b] : [b, a];
+  return treaties.find((t) => t.kind === kind && t.a === x && t.b === y && t.from <= turn && turn <= t.until);
+}
+
+/** Entrenchment a formation cannot fall below: a ground unit in its own nation's fortress. */
+export function fortressFloor(world: WorldState, f: Formation): number {
+  const id = world.tiles[f.key]?.siteId;
+  const site = id ? world.sites[id] : undefined;
+  return site && site.owner === f.owner && site.facilities.includes('fortress') && UNITS[f.unitClass].ground ? FORTRESS_ENTRENCHMENT : 0;
 }

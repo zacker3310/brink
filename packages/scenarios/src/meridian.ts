@@ -185,7 +185,7 @@ export function createMeridianScenario(seed: number, theatreId: string = MERIDIA
 
   const sites: Record<string, Site> = {};
   const placeSite = (id: string, name: string, kind: SiteKind, key: HexKey, owner: NationId | null, profile: { vp: number; pop: number; yields: Yields }) => {
-    sites[id] = { id, name, kind, key, owner, originalOwner: owner, population: profile.pop, victoryPoints: profile.vp, yields: { ...profile.yields } };
+    sites[id] = { id, name, kind, key, owner, originalOwner: owner, population: profile.pop, victoryPoints: profile.vp, yields: { ...profile.yields }, facilities: [] };
     const t = tiles[key]!;
     t.siteId = id;
     t.terrain = kind === 'depot' ? 'plains' : 'urban';
@@ -244,6 +244,7 @@ export function createMeridianScenario(seed: number, theatreId: string = MERIDIA
       budget: { research: 10, infrastructure: 10, welfare: 5 },
       research: { current: null, progress: 0, unlocked: [] },
       productionQueue: [],
+      construction: [],
       objectives: OBJECTIVES.map((_, i) => `objective${i}`),
       warLosses: 0,
       eliminated: false,
@@ -255,7 +256,7 @@ export function createMeridianScenario(seed: number, theatreId: string = MERIDIA
   for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) relations[pairKey(ids[i]!, ids[j]!)] = 'war';
 
   const world: WorldState = {
-    schema: 1,
+    schema: 2,
     rulesetVersion: RULESET_VERSION,
     scenarioId: theatre.id,
     turn: 1,
@@ -268,6 +269,7 @@ export function createMeridianScenario(seed: number, theatreId: string = MERIDIA
     formations: {},
     relations,
     proposals: [],
+    treaties: [],
     intel: {},
     victory: null,
   };

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import type { Difficulty, NationId } from '@brink/contracts';
-import { GOVERNMENTS, UNITS } from '@brink/game-data';
-import { NATIONS, SCENARIOS, THEATRES, createScenario } from '@brink/scenarios';
+import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
+import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY } from '@brink/game-data';
+import { NATIONS, THEATRES, createScenario } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Swatch } from '../ui';
@@ -16,11 +16,8 @@ const DIFFICULTIES: [Difficulty, string, string][] = [
   ['hard', 'Hard', 'Everyone at war, and the AI starts richer.'],
 ];
 
-/** The quick campaign: the same war, decided sooner. */
-const QUICK_TURNS = 20;
 
 export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string) => Promise<void> }) {
-  const scenario = SCENARIOS[0]!;
   const wars = readCareer().warsWon.length;
   const [theatreId, setTheatreId] = useState(() => {
     const t = THEATRES.find((x) => x.id === readPrefs().theatre);
@@ -37,14 +34,14 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   });
   const [seed, setSeed] = useState(randomSeed);
   const [starting, setStarting] = useState(false);
-  const [length, setLength] = useState<'quick' | 'standard'>(() => readPrefs().length ?? 'quick');
-  const turns = length === 'quick' ? Math.min(QUICK_TURNS, scenario.maxTurns) : scenario.maxTurns;
+  const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
+  const turns = CAMPAIGN_TURNS[length];
   const [difficulty, setDifficulty] = useState<Difficulty>(() => readPrefs().difficulty ?? 'easy');
   const pickDifficulty = (d: Difficulty) => {
     setDifficulty(d);
     writePrefs({ difficulty: d });
   };
-  const pickLength = (l: 'quick' | 'standard') => {
+  const pickLength = (l: CampaignLength) => {
     setLength(l);
     writePrefs({ length: l });
   };
@@ -190,10 +187,11 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               <div className="mt-1 flex" role="radiogroup" aria-label="Campaign length">
                 {(
                   [
-                    ['quick', 'Quick', Math.min(QUICK_TURNS, scenario.maxTurns)],
-                    ['standard', 'Full', scenario.maxTurns],
+                    ['quick', 'Quick'],
+                    ['standard', 'Standard'],
+                    ['epic', 'Epic'],
                   ] as const
-                ).map(([id, label, n]) => (
+                ).map(([id, label]) => (
                   <button
                     key={id}
                     type="button"
@@ -203,7 +201,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                     onClick={() => pickLength(id)}
                     className={`border px-3 py-1.5 text-sm ${length === id ? 'border-signal bg-signal/15 text-signal' : 'border-line text-muted hover:text-text'}`}
                   >
-                    {label} <span className="font-mono text-xs opacity-70">{n}</span>
+                    {label} <span className="font-mono text-xs opacity-70">{CAMPAIGN_TURNS[id]}</span>
                   </button>
                 ))}
               </div>
@@ -253,8 +251,10 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
             <div className="min-w-[220px] flex-1">
               <Label>Victory</Label>
               <p className="mt-1 text-xs leading-snug text-muted">
-                Hold <span className="text-text">{VICTORY_SHARE}% of victory points</span>, be the{' '}
-                <span className="text-text">last power standing</span>, or <span className="text-text">lead at turn {turns}</span>.
+                <span className="text-text">Domination</span>: hold {VICTORY_SHARE}% of victory points. <span className="text-text">Coalition</span>: with your allies hold{' '}
+                {VICTORY.coalitionBase + VICTORY.coalitionPerMember * 2}% (two) or {VICTORY.coalitionBase + VICTORY.coalitionPerMember * 3}% (three).{' '}
+                <span className="text-text">Supremacy</span>: average {VICTORY.supremacyShare}% of land, army and output from turn {VICTORY.supremacyFromTurn}.{' '}
+                <span className="text-text">Score</span>: the best standing at turn {turns}. Or be the last power standing.
               </p>
             </div>
           </Frame>
