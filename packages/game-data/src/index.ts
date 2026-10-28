@@ -5,9 +5,9 @@
 // 0..1000; organization, morale, readiness, fuel, ammunition, experience, entrenchment and
 // supply are 0..100. One turn is six simulated hours.
 
-import type { CampaignLength, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
+import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
 
-export const RULESET_VERSION = '1.5.0';
+export const RULESET_VERSION = '1.6.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -241,6 +241,17 @@ export interface GovernmentDef {
   summary: string;
   modifiers: Modifiers;
 }
+
+/**
+ * A human seat's command edge by campaign difficulty, applied like a government's modifiers. The AI
+ * plays at full strength on every level, so this is what makes Easy easy and Normal fair to a
+ * commander still learning the war. Hard has none (the AI gets the stockpile bonus instead).
+ */
+export const DIFFICULTY_EDGE: Record<Difficulty, Modifiers> = {
+  easy: { income: { credits: 70, energy: 70, materials: 70, food: 70 }, industry: 60, research: 40, stability: 15, attack: 40, homeDefense: 50, recruitDiscount: 30, supplyCapacity: 30, ranged: 20 },
+  normal: { income: { credits: 30, energy: 30, materials: 30, food: 30 }, industry: 30, research: 20, stability: 5, attack: 20, homeDefense: 25, recruitDiscount: 15, supplyCapacity: 10 },
+  hard: {},
+};
 
 export const GOVERNMENTS: Record<GovernmentId, GovernmentDef> = {
   commonwealth: {

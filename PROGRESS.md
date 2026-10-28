@@ -178,6 +178,20 @@ Updated 2026-10-28 (overhaul pass 1). Milestone 1 (first playable).
   - Facilities: farm, mine, power plant, factory, research lab, fortress; three unlocked by research.
   - Order review before every commit, phone and desktop.
 
+- Easier campaigns and turn-based battles (ruleset `1.6.0`):
+  - Difficulty measured with the AI's own planner in the human seat (32 campaigns a level): Easy
+    won 34%, barely above Normal. Human seats now get a command edge per level (`DIFFICULTY_EDGE`):
+    Easy wins 88% (66% playing only defensively), Normal 56%, Hard 25%.
+  - The real-time arena is replaced by a turn-based tactical battle (`packages/arena/src/tactics.ts`):
+    move then act, hit chances with their reasons shown before you fire, cover and flanking,
+    overwatch, dig in, mines, air strikes; the enemy AI scores every reachable cell. Deterministic,
+    an event log played back by the renderer.
+  - Realistic rendering: real GLB models (T-72, AH-64, drone, Mixamo riflemen, Hesco, containers), a
+    Poly Haven sky for image-based light, soft shadows, a generated battlefield with grass, scrub,
+    trees, boulders, buildings and water, and a film of muzzle flashes, tracers, rockets, explosions,
+    debris and burning wrecks. Pan, pinch and follow camera. The battle is its own lazy chunk.
+  - Fixed: the first frame after building a battle stepped time backwards (a stalled scene glowed).
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
@@ -186,7 +200,8 @@ Updated 2026-10-28 (overhaul pass 1). Milestone 1 (first playable).
 - Balance: of 100 soak matches, 38 end by domination, 19 by supremacy, 43 on score at the turn
   limit (median turn 28). Next lever: AI deadlock-breaking (concentration, artillery before assaults).
 - Arena: tested in Chromium (iPhone 14 Pro emulation with SwiftShader WebGL and desktop), not yet on a
-  real iPhone GPU; frame rate on older phones unmeasured. New nations per theatre not done (same four
+  real iPhone GPU; frame rate on older phones unmeasured (2048 px shadows and about 2,500 grass
+  instances are the levers if it drops). The infantry slide between cells (no walk cycle yet). New nations per theatre not done (same four
   powers on new ground).
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
@@ -196,6 +211,6 @@ None.
 
 ## Next recommended tasks
 
-1. Play the arena on a real iPhone: frame rate, touch feel, audio unlock; tune skill and par times.
+1. Play the turn-based battles on a real iPhone: frame rate, touch feel, audio unlock; tune skill.
 2. New nations for the later theatres.
 3. More skirmishes and arena props per terrain. 5. Shareable end-of-game recap. 6. Haptics and a landscape layout on phones.

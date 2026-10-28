@@ -139,6 +139,15 @@ export const arenaSfx = {
   hurt: () => throttle('hurt', 120) && tone(140, 0.12, { type: 'square', gain: 0.05, slide: -60 }),
   capture: () => throttle('capture', 900) && tone(660, 0.12, { type: 'triangle', gain: 0.05 }),
   ability: () => [523, 784, 1046].forEach((f, i) => tone(f, 0.14, { type: 'triangle', gain: 0.05, at: i * 0.06 })),
+  /** A vehicle moving off: a low engine growl. */
+  engine: () => {
+    if (!throttle('engine', 250)) return;
+    noise(0.7, { gain: 0.08, cutoff: 260, sweep: 140 });
+    tone(48, 0.7, { type: 'sawtooth', gain: 0.03, slide: 20 });
+  },
+  /** Picking a unit or a cell on the battlefield. */
+  tick: () => throttle('tick', 40) && tone(1320, 0.04, { type: 'triangle', gain: 0.04 }),
+  miss: () => throttle('miss', 80) && noise(0.18, { gain: 0.12, cutoff: 1800, sweep: 300 }),
 };
 
 /** Battle music: drums, a driving bass line and a dark pad, scheduled on the audio clock. */

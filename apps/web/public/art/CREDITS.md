@@ -1,7 +1,8 @@
 # Art credits
 
-Every image in `public/art` comes from an open source, or is rendered here from one. Nothing
-here is fetched at runtime. Tools that produced it are in `tools/art/`.
+Every image and model in `public/art` comes from an open source, or is rendered here from one.
+Everything is served from this site; nothing is fetched from a third party at runtime. Tools that
+produced it are in `tools/art/`.
 
 ## Ground: Copernicus Sentinel-2 imagery
 
@@ -48,6 +49,21 @@ Brink hex mark over it, so they are a derivative of the same imagery and also CC
 
 The renders modify the models (scaled, posed, repainted, lit and viewed from above). No endorsement
 by any author is implied.
+
+## Battle models and sky (`models/`, `env/`)
+
+The tactical battles load these 3D models directly: the same T-72, AH-64D, quadcopter drone, Mixamo
+soldiers with the rifle-aiming animation, Hesco barrier, shipping container (rust) and watch tower as
+above, under the same licenses. Each was re-encoded with gltf-transform (meshopt geometry, WebP
+textures at 512 to 1024 px; `tools/art/README.md`), and in the game they are scaled, tinted, posed,
+partly rebuilt (the IFV and the self-propelled howitzer on the T-72 chassis) and lit; no endorsement
+by any author is implied.
+
+| Use | Asset | Author | License |
+|---|---|---|---|
+| Sky light and reflections (`env/park.exr`) | Rooitou Park HDRI, 512 px EXR | Greg Zaal, Poly Haven, packaged in `@pmndrs/assets` | CC0 1.0 |
+
+The battlefield itself (ground, grass, trees, rocks, buildings, water) is generated in code.
 
 ## Effects
 

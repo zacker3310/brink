@@ -44,7 +44,7 @@ export class GameSession {
     const humans = playerNation === null ? [] : [playerNation, ...others.filter((n) => n !== playerNation)];
     for (const n of humans) if (!world.nations[n]) throw new Error(`no such nation: ${n}`);
     if (new Set(humans).size !== humans.length) throw new Error('a nation can only have one human');
-    if (opts.difficulty && opts.difficulty !== 'normal') applyDifficulty(world, humans, opts.difficulty);
+    if (opts.difficulty) applyDifficulty(world, humans, opts.difficulty);
     const memory: Record<NationId, AiMemory> = {};
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
     return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});
@@ -196,6 +196,9 @@ export class GameSession {
  */
 function applyDifficulty(world: WorldState, humans: readonly NationId[], difficulty: Difficulty): void {
   world.difficulty = difficulty;
+  // Every human seat plays with the level's command edge (none on Hard).
+  if (difficulty !== 'hard') for (const h of humans) world.nations[h]!.edge = difficulty;
+  if (difficulty === 'normal') return;
   const boost = (n: NationId) => {
     const s = world.nations[n]!.stockpile;
     for (const r of sortedKeys(s)) s[r as keyof typeof s] = Math.floor((s[r as keyof typeof s] * 3) / 2);

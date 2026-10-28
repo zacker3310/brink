@@ -16,7 +16,7 @@ to build and orders the work by impact.
 | Scenarios | `packages/scenarios` | The Meridian map generator: four powers, 3 theatres. |
 | AI | `packages/ai` | `planOrders(view, memory, seed)`: sees only the `NationView`. Threats, target choice, recruitment by observed enemy mix, odds-checked assaults, diplomacy. |
 | Session | `packages/session` | `GameSession`: seats, AI turns, history, saves (`parseSave`, hash-checked). |
-| Arena | `packages/arena` | Real-time hand-fought battles; results ride the orders. |
+| Arena | `packages/arena` | Turn-based hand-fought battles (`tactics.ts`); results ride the orders. |
 | Web | `apps/web` | React 19, zustand, PixiJS 8 map, three.js arena, Tailwind v4, Vite. Engine in a Web Worker. Phone layout (`PhoneGame.tsx`) and desktop (`Game.tsx`). |
 | API | `apps/api` | Optional Fastify headless simulation. |
 | Tests | per package + `tests/` | ~110 unit tests, 100-match AI soak, 4 Playwright e2e (desktop, phone, tutorial, skirmish). |

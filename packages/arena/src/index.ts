@@ -1,4 +1,4 @@
 export * from './rules';
 export * from './level';
-export * from './sim';
+export * from './tactics';
 export { mulberry32 } from './rng';

@@ -10,11 +10,15 @@ interface Window {
   // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.
   __arena?: {
     arena(): {
-      units: { id: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean }[];
-      shots: unknown[];
+      units: { id: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean; moved: boolean; acted: boolean }[];
+      round: number;
+      turn: 'blue' | 'red';
       stats: { shots: number };
     } | null;
+    /** A cell's centre on screen. */
     toScreen(x: number, y: number): { x: number; y: number };
+    /** Nothing animating, and it is the player's turn. */
+    ready(): boolean;
     win(): void;
     lose(): void;
   };

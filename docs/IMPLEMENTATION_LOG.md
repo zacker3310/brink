@@ -2,6 +2,33 @@
 
 Newest first. Each entry: what changed, where, how it was tested, what is left.
 
+## 2026-10-28: Easier campaigns; turn-based, realistic battles
+
+- **Difficulty, measured first.** A probe played every nation on every level with the AI's planner in
+  the human seat (and a defensive variant), 8 seeds each. Easy won 34% and Normal 31%: the old Easy
+  only removed enemies and added a starting stockpile, so the other AIs out-grew you. Now each human
+  seat carries a command edge (`Nation.edge`, `DIFFICULTY_EDGE` in game-data, applied like a
+  government in `nationModifiers`): Easy +70% income, +60% industry, +40% attack, +50% home defence,
+  units 30% cheaper; Normal +30% income and industry, +20% attack, +25% home defence, 15% cheaper.
+  Result: Easy 88% (66% defensive), Normal 56% (13% defensive), Hard 25%. Ruleset `1.6.0`; older
+  saves migrate with no edge. Setup states the edge. Test: `session.test.ts` (who gets it, it pays).
+- **Turn-based battles.** `packages/arena/src/sim.ts` (real time) is gone; `tactics.ts` replaces it:
+  grid movement with diagonal costs, line of fire with cover by side, flanking, trees, dug in, the
+  shown hit chance is the rolled one, overwatch interrupts mid-move, mines, artillery splash with
+  scatter, drone dives, abilities once a battle, capture over two rounds, a 12-round limit. The AI
+  scores every reachable cell (expected damage, exposure, objective, noise by skill). Balance tuned
+  on autopilot across the eight skirmishes (tanks 140 HP, infantry 45, rockets +15% on armour, enemy
+  aim (skill - .5) x 30; early skirmishes got a second vehicle). 19 tests in `arena.test.ts`.
+- **Realistic rendering.** `apps/web/src/arena/assets.ts`, `terrain.ts`, `scene.ts`: GLB models
+  re-encoded with gltf-transform (3 MB), a Poly Haven HDRI for light, 2048 px soft shadows, a
+  generated battlefield (ground in about 60 ms), instanced grass, scrub, trees, rocks, Hesco and
+  containers, buildings, water; the event log is played as a film with effects; pan, pinch, wheel and
+  a follow camera; odds labels over targets. The battle screen is lazy-loaded (main bundle back to
+  333 KB from 1 MB).
+- e2e: the skirmish test selects a unit, moves it, ends a turn, waits for round two and wins; the
+  phone test opens a battle from the war map and selects a unit.
+- Outstanding: real iPhone frame rate; a walk cycle for infantry; more prop variety per terrain.
+
 ## 2026-10-28: Home screen as a game title screen
 
 - The landing-page title is gone. The home screen is the painted theatre at war (burning fronts,

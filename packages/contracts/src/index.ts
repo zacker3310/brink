@@ -165,6 +165,8 @@ export interface Nation {
   eliminated: boolean;
   /** A world event awaiting this nation's answer, drawn at the end of `turn`. */
   event?: PendingEvent | null;
+  /** A human seat's command edge from the campaign difficulty (`DIFFICULTY_EDGE`). Absent: none. */
+  edge?: Difficulty;
 }
 
 export type WorldEventId =
@@ -298,7 +300,9 @@ export type CampaignLength = 'quick' | 'standard' | 'epic';
 /**
  * How hard the campaign is for its human seats. Easy: a single-player campaign opens at war with
  * the nearest rival only, the AI never declares war on a human and accepts any peace a human
- * offers, and the human starts with half again the stockpile. Hard: the AI starts with that bonus.
+ * offers, and the human starts with half again the stockpile. Easy and Normal give human seats a
+ * command edge (income, industry, combat; `DIFFICULTY_EDGE`). Hard: no edge, and the AI starts with
+ * the stockpile bonus.
  */
 export type Difficulty = 'easy' | 'normal' | 'hard';
 

@@ -18,3 +18,10 @@ are not committed; fetch them from the repositories named in the credits.
 4. `package.py` trims the renders, bakes a soft halo under each unit, and writes `units/manifest.json`
    (sprite size in world px, rotor hub).
 5. Effect frames are Kenney's explosion and black smoke sequences, downscaled to 160 px.
+6. **Battle models** (`public/art/models`): the GLBs above re-encoded for loading in the browser with
+   `npx @gltf-transform/cli optimize <in> <out> --compress meshopt --texture-compress webp
+   --texture-size 1024 --simplify false --join false --flatten false` (512 for the Apache, the
+   drone, the soldiers and the props; 256 for the animation). Keep `--join false --flatten false`:
+   the game finds the T-72's `turret` and `hull` and the Apache's `heli_rotor` and `heli_tail` by name.
+7. **Sky** (`public/art/env/park.exr`): the base64 EXR in `@pmndrs/assets/hdri/park.exr.js`, decoded
+   to a file.

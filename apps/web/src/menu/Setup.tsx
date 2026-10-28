@@ -11,9 +11,9 @@ import { Emblem, UnitGlyph } from '../glyphs';
 import { MapPreview } from './MapPreview';
 
 const DIFFICULTIES: [Difficulty, string, string][] = [
-  ['easy', 'Easy', 'One enemy. The others stay at peace with you. Extra funds.'],
-  ['normal', 'Normal', 'All three rivals at war with you from turn 1.'],
-  ['hard', 'Hard', 'Everyone at war, and the AI starts richer.'],
+  ['easy', 'Easy', 'One enemy, the rest at peace. Big command edge: +70% income, +40% attack, cheaper units.'],
+  ['normal', 'Normal', 'All three rivals at war with you. A fair edge: +30% income, +20% attack.'],
+  ['hard', 'Hard', 'Everyone at war, no edge, and the AI starts richer.'],
 ];
 
 

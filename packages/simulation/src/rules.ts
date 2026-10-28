@@ -13,7 +13,7 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { FORTRESS_ENTRENCHMENT, GOVERNMENTS, RIVER_MOVE_COST, TECHS, TERRAIN, UNITS, type Modifiers } from '@brink/game-data';
+import { DIFFICULTY_EDGE, FORTRESS_ENTRENCHMENT, GOVERNMENTS, RIVER_MOVE_COST, TECHS, TERRAIN, UNITS, type Modifiers } from '@brink/game-data';
 import { areAdjacent } from '@brink/map';
 
 export function sortedKeys<T extends object>(obj: T): (keyof T & string)[] {
@@ -50,7 +50,7 @@ export function zeroStockpile(): Stockpile {
 export type FullModifiers = Required<Omit<Modifiers, 'income'>> & { income: Record<Resource, number> };
 
 /** Government plus unlocked technologies, summed. */
-export function nationModifiers(nation: Pick<Nation, 'government' | 'research'>): FullModifiers {
+export function nationModifiers(nation: Pick<Nation, 'government' | 'research'> & { edge?: Nation['edge'] }): FullModifiers {
   const out: FullModifiers = {
     income: { credits: 0, energy: 0, materials: 0, food: 0 },
     industry: 0,
@@ -67,6 +67,7 @@ export function nationModifiers(nation: Pick<Nation, 'government' | 'research'>)
     armorDefense: 0,
   };
   const sources: Modifiers[] = [GOVERNMENTS[nation.government].modifiers];
+  if (nation.edge) sources.push(DIFFICULTY_EDGE[nation.edge]);
   for (const t of [...nation.research.unlocked].sort()) {
     const def = TECHS[t];
     if (def) sources.push(def.modifiers);

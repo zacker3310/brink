@@ -1,6 +1,6 @@
 # Brink: game design
 
-The rules as implemented, ruleset `1.5.0`. Numbers come from `packages/game-data`; when this
+The rules as implemented, ruleset `1.6.0`. Numbers come from `packages/game-data`; when this
 document and the code disagree, the code is right and this file is stale.
 
 ## Premise
@@ -177,7 +177,13 @@ The standing is public, shown in the World card. Every campaign ends at its turn
 | Epic | 45 | |
 
 Difficulty: Easy (one front; the AI never declares war on you and accepts your peace; half again your
-starting stockpile), Normal (everyone at war from turn 1), Hard (the AI starts with the bonus).
+starting stockpile), Normal (everyone at war from turn 1), Hard (the AI starts with the bonus). The
+AI plays at full strength on every level; Easy and Normal give the human seats a command edge
+(`DIFFICULTY_EDGE`): Easy +70% income, +60% industry, +40% attack, +50% home defence, units 30%
+cheaper; Normal +30% income and industry, +20% attack, +25% home defence, units 15% cheaper.
+Measured with the AI's own planner in the human seat (32 campaigns each, Meridian, 30 turns): Easy
+wins 88% (66% playing only defensively), Normal 56% (13%), Hard 25%. In tactical battles the enemy
+also reads less well on Easy (lower skill).
 Theatres: the Meridian, the Highland Front (one war won), the Varn Delta (two wars won). The seed
 fixes the map texture and every roll.
 

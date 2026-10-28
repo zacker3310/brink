@@ -113,11 +113,22 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
       await expect(page.getByTestId('armed')).toBeVisible();
       await page.getByTestId('confirm-attack').tap();
       await expect(page.getByTestId('armed')).toHaveCount(0);
-      // An attack on a hex with enemies in it becomes a battle: fight it, tap to fire, win, go back.
-      if (await page.getByTestId('arena-brief').isVisible()) {
+      // An attack on a hex with enemies in it becomes a battle: fight it, tap a unit, win, go back.
+      const battle = await page
+        .getByTestId('arena-brief')
+        .waitFor({ timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
+      if (battle) {
         await page.getByTestId('arena-fight').tap();
-        await expect(page.getByTestId('arena-canvas')).toBeVisible();
-        await page.touchscreen.tap(viewport.width / 2, viewport.height / 3);
+        await expect(page.getByTestId('arena-canvas')).toBeVisible({ timeout: 20000 });
+        await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 45000 });
+        const unit = await page.evaluate(() => {
+          const u = window.__arena!.arena()!.units.find((x) => x.side === 'blue' && x.alive)!;
+          return window.__arena!.toScreen(u.x, u.y);
+        });
+        await page.touchscreen.tap(unit.x, unit.y);
+        await expect(page.getByTestId('arena-unit')).toBeVisible();
         await page.evaluate(() => window.__arena!.win());
         await expect(page.getByTestId('arena-stars')).toBeVisible({ timeout: 10000 });
         await page.getByTestId('arena-continue').tap();

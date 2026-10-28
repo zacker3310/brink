@@ -183,4 +183,19 @@ describe('GameSession', () => {
     expect(hard.difficulty).toBe('hard');
     expect(normal.difficulty).toBe('normal');
   });
+
+  it('gives human seats the command edge of their level, and the AI none', () => {
+    const edge = (d: 'easy' | 'normal' | 'hard') => GameSession.create(MERIDIAN_ID, 5, 'aster', [], { difficulty: d }).snapshot().nations;
+    expect(edge('easy').aster!.edge).toBe('easy');
+    expect(edge('normal').aster!.edge).toBe('normal');
+    expect(edge('hard').aster!.edge).toBeUndefined();
+    for (const n of ['korva', 'selmar', 'drevan']) expect(edge('normal')[n]!.edge).toBeUndefined();
+    // The edge is income: same world, same orders, more credits for the human with it.
+    const plain = GameSession.create(MERIDIAN_ID, 5, 'aster');
+    const easy = GameSession.create(MERIDIAN_ID, 5, 'aster', [], { difficulty: 'normal' });
+    const start = [plain.view().self.stockpile.credits, easy.view().self.stockpile.credits];
+    plain.advance();
+    easy.advance();
+    expect(easy.view().self.stockpile.credits - start[1]!).toBeGreaterThan(plain.view().self.stockpile.credits - start[0]!);
+  });
 });
