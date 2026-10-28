@@ -112,6 +112,16 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
       await expect(page.getByTestId('armed')).toBeVisible();
       await page.getByTestId('confirm-attack').tap();
       await expect(page.getByTestId('armed')).toHaveCount(0);
+      // An attack on a hex with enemies in it becomes a battle: fight it, tap to fire, win, go back.
+      if (await page.getByTestId('arena-brief').isVisible()) {
+        await page.getByTestId('arena-fight').tap();
+        await expect(page.getByTestId('arena-canvas')).toBeVisible();
+        await page.touchscreen.tap(viewport.width / 2, viewport.height / 3);
+        await page.evaluate(() => window.__arena!.win());
+        await expect(page.getByTestId('arena-stars')).toBeVisible({ timeout: 10000 });
+        await page.getByTestId('arena-continue').tap();
+        await expect(page.getByTestId('arena')).toHaveCount(0);
+      }
       attacked = true;
       break;
     }

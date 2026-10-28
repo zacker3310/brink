@@ -1,5 +1,5 @@
 import type { WorldState } from '@brink/contracts';
-import { createMeridianScenario, MERIDIAN_ID } from './meridian';
+import { createMeridianScenario, MERIDIAN_ID, THEATRES } from './meridian';
 
 export * from './meridian';
 
@@ -21,7 +21,8 @@ export const SCENARIOS: readonly ScenarioInfo[] = [
   },
 ];
 
+/** Every theatre is the Meridian generator on different ground. */
 export function createScenario(id: string, seed: number): WorldState {
-  if (id === MERIDIAN_ID) return createMeridianScenario(seed);
+  if (THEATRES.some((t) => t.id === id)) return createMeridianScenario(seed, id);
   throw new Error(`unknown scenario: ${id}`);
 }

@@ -7,4 +7,15 @@ interface Window {
     formations(): { id: string; cls: string; key: string }[];
     targets(): string[];
   };
+  // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.
+  __arena?: {
+    arena(): {
+      units: { id: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean }[];
+      shots: unknown[];
+      stats: { shots: number };
+    } | null;
+    toScreen(x: number, y: number): { x: number; y: number };
+    win(): void;
+    lose(): void;
+  };
 }

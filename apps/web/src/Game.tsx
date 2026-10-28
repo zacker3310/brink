@@ -10,10 +10,8 @@ import { netChange, selfLedger, turnClock } from './insight';
 import { HoverCard, ModeBanner, Toasts, ZoomControls } from './MapOverlays';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
-import { useNet } from './net/room';
 import { Notifications } from './Notifications';
 import { useReplay } from './replay';
-import { ChatOverlay, Curtain, RoomChip } from './RoomUi';
 import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
 import { useGame, type Tab } from './store';
@@ -29,7 +27,7 @@ const RES: [Resource, string][] = [
   ['food', 'Food'],
 ];
 
-function TopBar({ onChat }: { onChat: () => void }) {
+function TopBar() {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report);
   const toMenu = useGame((s) => s.toMenu);
@@ -39,13 +37,7 @@ function TopBar({ onChat }: { onChat: () => void }) {
   const animate = useGame((s) => s.animate);
   const setAnimate = useGame((s) => s.setAnimate);
   const [saving, setSaving] = useState(false);
-  const role = useNet((n) => n.role);
-  const leave = useNet((n) => n.leave);
-  const exit = () => {
-    if (role && role !== 'hotseat' && !window.confirm('Leave the war room? Your friends will see you go offline.')) return;
-    if (role) leave();
-    toMenu();
-  };
+  const exit = toMenu;
   const s = view.self;
   const ledger = selfLedger(view, report);
   const net = ledger ? netChange(ledger) : null;
@@ -119,8 +111,7 @@ function TopBar({ onChat }: { onChat: () => void }) {
         >
           Replay {animate ? 'on' : 'off'}
         </button>
-        <RoomChip onChat={onChat} />
-        <div className={`relative ${role === 'guest' ? 'hidden' : ''}`}>
+        <div className="relative">
           <button type="button" onClick={() => setSaving(!saving)} disabled={resolving} data-testid="save-menu" className="border border-line px-2.5 py-1.5 text-xs hover:border-faint disabled:opacity-40">
             Save
           </button>
@@ -344,7 +335,7 @@ export function VictoryOverlay() {
   );
 }
 
-function useShortcuts(toggleHelp: () => void, openChat: () => void) {
+function useShortcuts(toggleHelp: () => void) {
   const s = useGame;
   useKeys((e) => {
     const g = s.getState();
@@ -377,10 +368,6 @@ function useShortcuts(toggleHelp: () => void, openChat: () => void) {
     const k = e.key.toLowerCase();
     const tab = Number(e.key);
     if (e.key === '?') toggleHelp();
-    else if (e.key === 't' && useNet.getState().role && useNet.getState().role !== 'hotseat') {
-      e.preventDefault();
-      openChat();
-    }
     else if (tab >= 1 && tab <= TABS.length) g.setTab(TABS[tab - 1]![0]);
     else if (e.key === 'Tab') {
       e.preventDefault();
@@ -410,14 +397,10 @@ function useShortcuts(toggleHelp: () => void, openChat: () => void) {
 export function Game() {
   const showReport = useGame((s) => s.showReport);
   const [help, setHelp] = useState(false);
-  const [chat, setChat] = useState(false);
-  useShortcuts(
-    () => setHelp((h) => !h),
-    () => setChat(true),
-  );
+  useShortcuts(() => setHelp((h) => !h));
   return (
     <div className="grid h-full grid-rows-[auto_1fr] bg-ink-950">
-      <TopBar onChat={() => setChat(!chat)} />
+      <TopBar />
       <div className="flex min-h-0">
         <LeftRail />
         <div className="map-stage relative min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="map">
@@ -434,13 +417,11 @@ export function Game() {
           <CityPanel />
           <Toasts />
           {help && <KeyHelp onClose={() => setHelp(false)} />}
-          <ChatOverlay open={chat} onClose={() => setChat(false)} />
           <VictoryOverlay />
         </div>
       </div>
       {showReport && <Report />}
       <Coach />
-      <Curtain />
     </div>
   );
 }

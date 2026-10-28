@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { Difficulty, NationId } from '@brink/contracts';
 import { GOVERNMENTS, UNITS } from '@brink/game-data';
-import { NATIONS, SCENARIOS, createScenario } from '@brink/scenarios';
+import { NATIONS, SCENARIOS, THEATRES, createScenario } from '@brink/scenarios';
+import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Swatch } from '../ui';
 import { Frame, Kbd, Label, ScreenHeader, useKeys } from '../chrome';
@@ -18,8 +19,18 @@ const DIFFICULTIES: [Difficulty, string, string][] = [
 /** The quick campaign: the same war, decided sooner. */
 const QUICK_TURNS = 20;
 
-export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty) => Promise<void> }) {
+export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string) => Promise<void> }) {
   const scenario = SCENARIOS[0]!;
+  const wars = readCareer().warsWon.length;
+  const [theatreId, setTheatreId] = useState(() => {
+    const t = THEATRES.find((x) => x.id === readPrefs().theatre);
+    return t && t.unlock <= wars ? t.id : THEATRES[0]!.id;
+  });
+  const theatre = THEATRES.find((t) => t.id === theatreId)!;
+  const pickTheatre = (id: string) => {
+    setTheatreId(id);
+    writePrefs({ theatre: id });
+  };
   const [nation, setNation] = useState<NationId>(() => {
     const p = readPrefs().nation;
     return NATIONS.some((n) => n.id === p) ? p! : NATIONS[0]!.id;
@@ -38,7 +49,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     writePrefs({ length: l });
   };
 
-  const world = useMemo(() => createScenario(scenario.id, seed), [scenario.id, seed]);
+  const world = useMemo(() => createScenario(theatreId, seed), [theatreId, seed]);
   const spec = NATIONS.find((n) => n.id === nation)!;
   const gov = GOVERNMENTS[spec.government];
   const info = useMemo(() => dossier(world, nation), [world, nation]);
@@ -52,7 +63,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(nation, seed, turns, difficulty);
+      await onBegin(nation, seed, turns, difficulty, theatreId);
     } finally {
       setStarting(false);
     }
@@ -71,14 +82,14 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         if (n >= 1 && n <= NATIONS.length) pick(NATIONS[n - 1]!.id);
       }
     },
-    [nation, seed, starting, turns, difficulty],
+    [nation, seed, starting, turns, difficulty, theatreId],
   );
 
   return (
     <main className="setup-screen flex min-h-full flex-col max-lg:pb-28" style={{ ['--nation' as string]: spec.color }}>
       <ScreenHeader
         kicker="New campaign"
-        title={scenario.name}
+        title={theatre.name}
         onBack={onBack}
         right={
           <div className="text-right leading-tight">
@@ -195,6 +206,29 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                     {label} <span className="font-mono text-xs opacity-70">{n}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+            <div className="w-full">
+              <Label>Theatre</Label>
+              <div className="mt-1 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Theatre">
+                {THEATRES.map((t) => {
+                  const locked = t.unlock > wars;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={theatreId === t.id}
+                      disabled={locked}
+                      data-testid={`theatre-${t.id}`}
+                      onClick={() => pickTheatre(t.id)}
+                      className={`rounded-lg border px-2.5 py-2 text-left disabled:opacity-45 ${theatreId === t.id ? 'border-signal bg-signal/15' : 'border-line hover:border-faint'}`}
+                    >
+                      <div className={`font-display text-sm font-bold uppercase ${theatreId === t.id ? 'text-signal' : ''}`}>{t.name.replace(/^The /, '')}</div>
+                      <div className="text-[11px] leading-snug text-muted">{locked ? `Win ${t.unlock} war${t.unlock === 1 ? '' : 's'} to unlock (${wars}/${t.unlock})` : t.summary}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="w-full">

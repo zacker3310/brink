@@ -10,6 +10,7 @@ import { describeOrder } from './planning';
 import { useGame } from './store';
 import { Button, costText, Meter, Stat, Swatch } from './ui';
 import { Icon } from './icons';
+import { ABILITIES, type AbilityId } from '@brink/arena';
 
 function Section({ title, children, right }: { title: ReactNode; children: ReactNode; right?: ReactNode }) {
   return (
@@ -359,6 +360,9 @@ export function Economy() {
 }
 
 /** Each technology in plain words: what it is called, and what you get. */
+/** The arena weapon each breakthrough hands your crews. */
+const BATTLE_UNLOCK: Record<string, string> = Object.fromEntries((Object.keys(ABILITIES) as AbilityId[]).map((a) => [ABILITIES[a].tech, `${ABILITIES[a].name}. ${ABILITIES[a].text}`]));
+
 export const TECH_PLAIN: Record<string, { name: string; gives: string }> = {
   logistics_doctrine: { name: 'Better supply lines', gives: 'Your units stay supplied further from home.' },
   signals_intelligence: { name: 'Better scouting', gives: 'Every unit sees one hex further.' },
@@ -425,6 +429,7 @@ export function Research() {
                   {id === best && !why && <span className="rounded-full bg-signal px-2 py-0.5 text-[10px] font-bold text-ink-950 uppercase">Recommended</span>}
                 </div>
                 <div className="text-[13px] text-muted">{plain?.gives ?? TECHS[id]!.summary}</div>
+                {BATTLE_UNLOCK[id] && <div className="mt-1 text-[12px] font-semibold text-signal">In battle: {BATTLE_UNLOCK[id]}</div>}
                 <div className="mt-1 text-[12px] text-faint">{why ? `First: ${TECH_PLAIN[TECHS[id]!.requires[0]!]?.name ?? 'an earlier breakthrough'}` : `About ${turnsFor(id)} turns · tap to research`}</div>
               </button>
             </li>

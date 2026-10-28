@@ -11,20 +11,19 @@ import { UnitGlyph } from './glyphs';
 import { Icon } from './icons';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
-import { useNet } from './net/room';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
 import { describeOrder, hostilesAt } from './planning';
 import { useReplay } from './replay';
 import { ICON, notesFor, TONE } from './Notifications';
 import { nextObjective } from './objective';
 import { Report } from './Report';
-import { ChatOverlay, Curtain } from './RoomUi';
 import { SLOT_NAMES } from './saves';
 import { isMuted, setMuted } from './sfx';
 import { useGame, type Tab } from './store';
 import { EventCard } from './UnitPanel';
 import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
 import { signed } from './ui';
+import { RANKS, rankOf } from '@brink/arena';
 
 // The game on a phone: the map edge to edge, a slim status strip under the notch, and everything
 // you do within reach of a thumb. Tap your units, tap where they go; enemies you can hit already say
@@ -144,14 +143,11 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
   const setAnimate = useGame((s) => s.setAnimate);
   const toMenu = useGame((s) => s.toMenu);
   const resolving = useGame((s) => s.resolving);
-  const role = useNet((n) => n.role);
-  const leave = useNet((n) => n.leave);
   const [muted, setM] = useState(isMuted());
   const row = 'flex w-full items-center justify-between border-b border-line/60 px-4 py-3.5 text-left text-sm active:bg-ink-800 disabled:opacity-40';
   return (
     <Sheet title="Menu" onClose={onClose} testId="menu-sheet">
-      {role !== 'guest' &&
-        SLOT_NAMES.map((slot) => (
+      {SLOT_NAMES.map((slot) => (
           <button
             key={slot}
             type="button"
@@ -166,18 +162,16 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
             Save to {slot}
           </button>
         ))}
-      {role !== 'guest' && (
-        <button
-          type="button"
-          className={row}
-          onClick={() => {
-            onClose();
-            void exportSave();
-          }}
-        >
-          Export save file
-        </button>
-      )}
+      <button
+        type="button"
+        className={row}
+        onClick={() => {
+          onClose();
+          void exportSave();
+        }}
+      >
+        Export save file
+      </button>
       <button type="button" className={row} onClick={() => setAnimate(!animate)} aria-pressed={animate} data-testid="toggle-replay">
         Turn replay <span className={animate ? 'text-signal' : 'text-faint'}>{animate ? 'On' : 'Off'}</span>
       </button>
@@ -210,8 +204,6 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
         type="button"
         className={`${row} text-hostile`}
         onClick={() => {
-          if (role && role !== 'hotseat' && !window.confirm('Leave the war room? Your friends will see you go offline.')) return;
-          if (role) leave();
           toMenu();
         }}
       >
@@ -361,6 +353,7 @@ function UnitCard() {
   const armed = useGame((s) => s.armed);
   const armAttack = useGame((s) => s.armAttack);
   const issueGroup = useGame((s) => s.issueGroup);
+  const attack = useGame((s) => s.attack);
   const setOrder = useGame((s) => s.setOrder);
   const toggleGroup = useGame((s) => s.toggleGroup);
   const selectFormation = useGame((s) => s.selectFormation);
@@ -399,7 +392,10 @@ function UnitCard() {
         <Chip cls={f.unitClass} color={color} strength={f.strength} size="h-12 w-12" />
         <div className="min-w-0 flex-1">
           <div className="font-display truncate text-lg leading-tight font-extrabold">{members.length > 1 ? `${def.name} + ${members.length - 1} more` : f.name}</div>
-          <div className="truncate text-[13px] text-muted">{ROLE[f.unitClass]}</div>
+          <div className="truncate text-[13px] text-muted">
+            {rankOf(f.experience) > 0 && <span className="font-semibold text-signal" data-testid="unit-rank">{RANKS[rankOf(f.experience)]!.name} · </span>}
+            {ROLE[f.unitClass]}
+          </div>
         </div>
       </div>
       <div className={`mx-4 mt-2 rounded-lg bg-ink-850 px-3 py-1.5 text-[13px] leading-snug ${armed ? 'hidden' : ''}`} data-testid="planned-order">
@@ -420,7 +416,7 @@ function UnitCard() {
             <button type="button" onClick={() => armAttack(null)} className="h-12 flex-1 rounded-lg border border-line bg-ink-900 text-base font-semibold" data-testid="cancel-attack">
               Cancel
             </button>
-            <button type="button" onClick={() => issueGroup(armed.orders ?? { [armed.formation]: armed.order })} className="font-display h-12 flex-[2] rounded-lg bg-hostile text-lg font-extrabold tracking-wide text-white uppercase active:brightness-90" data-testid="confirm-attack">
+            <button type="button" onClick={() => attack(armed.target, armed.orders ?? { [armed.formation]: armed.order })} className="font-display h-12 flex-[2] rounded-lg bg-hostile text-lg font-extrabold tracking-wide text-white uppercase active:brightness-90" data-testid="confirm-attack">
               {attackers.every((x) => UNITS[x.unitClass].range > 0) ? 'Fire' : 'Attack'}
             </button>
           </div>
@@ -543,13 +539,11 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
   const lastTurn = useGame((s) => s.lastTurn);
   const rewatch = useGame((s) => s.rewatch);
   const fid = useGame((s) => s.selectedFormation);
-  const role = useNet((s) => s.role);
   const idle = idleFormations(view, draft.formations).length;
   const over = view.victory !== null;
   const idleCities = Object.values(view.sites).filter(
     (s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id),
   ).length;
-  const waiting = role && role !== 'hotseat' && resolving;
   const chip = 'shrink-0 rounded-full border border-line bg-ink-900/90 px-3 py-1.5 text-[13px] text-muted active:bg-ink-800';
   const key = 'font-display flex h-14 w-[3.6rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-line bg-ink-850 text-[11px] font-bold tracking-wide uppercase active:bg-ink-700 disabled:opacity-35';
   return (
@@ -583,14 +577,12 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
           </svg>
           Nation
         </button>
-        {role !== 'guest' && (
-          <button type="button" className={key} onClick={() => void autoCommand()} disabled={resolving || over || idle === 0} data-testid="auto-command" title="Your staff drafts orders for every unit still waiting">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
-              <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
-            </svg>
-            Plan
-          </button>
-        )}
+        <button type="button" className={key} onClick={() => void autoCommand()} disabled={resolving || over || idle === 0} data-testid="auto-command" title="Your staff drafts orders for every unit still waiting">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+            <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
+          </svg>
+          Plan
+        </button>
         <button type="button" className={`${key} relative ${idle ? 'text-signal' : 'text-good'}`} onClick={nextIdle} disabled={resolving || idle === 0} data-testid="next-idle">
           <Icon name={idle ? 'next' : 'check'} className="h-5 w-5" />
           {idle ? 'Next' : 'Ready'}
@@ -603,7 +595,7 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
           data-testid="end-turn"
           className="end-turn relative flex-1 overflow-hidden rounded-xl bg-signal px-3 text-ink-950 active:brightness-90 disabled:opacity-60"
         >
-          <div className="font-display text-xl leading-none font-black uppercase">{waiting ? 'Waiting…' : resolving ? 'Resolving…' : over ? 'Game over' : 'End turn'}</div>
+          <div className="font-display text-xl leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : 'End turn'}</div>
           <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : idle ? `${idle} without orders` : 'everyone has orders'}</div>
         </button>
       </div>
@@ -693,7 +685,6 @@ export function PhoneGame() {
   const resolving = useGame((s) => s.resolving);
   const [menu, setMenu] = useState(false);
   const [command, setCommand] = useState(false);
-  const [chat, setChat] = useState(false);
   const [world, setWorld] = useState(false);
   const firstTurn = useGame((s) => s.view?.turn === 1 && !s.view.victory);
   const [howTo, setHowTo] = useState(firstTurn && !useCoach.getState().active);
@@ -766,11 +757,9 @@ export function PhoneGame() {
       {command && <CommandSheet onClose={() => setCommand(false)} />}
       {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
       {howTo && <HowToWin onClose={() => setHowTo(false)} />}
-      <ChatOverlay open={chat} onClose={() => setChat(false)} />
       <VictoryOverlay />
       {showReport && <Report />}
       <Coach />
-      <Curtain />
     </div>
   );
 }

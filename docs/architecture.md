@@ -65,8 +65,8 @@ from inside the hex. Last-known positions persist, marked unconfirmed, until the
 Reports are filtered the same way: an unseen strike victim is not named to the striker. The victory-point
 scoreboard is public by design.
 
-Single-player saves contain the full world (they must, to resume). Competitive saves and multiplayer
-replays would need per-nation views; the event filter in `resolve.ts` is the place to build them.
+Saves contain the full world (they must, to resume). Per-nation replays would need per-nation views;
+the event filter in `resolve.ts` is the place to build them.
 
 ## Client
 
@@ -75,32 +75,23 @@ the planner reuses the engine's own `enterCost`, `movementAllowance` and `reacha
 map is a plan the validator accepts. Planned orders are amber, submitted orders white, last turn's fighting
 red. Saves are JSON strings in three localStorage slots or a file.
 
-## Multiplayer
+## Battles
 
-The host's browser is the server. `GameSession` takes several human seats (`create(scenario, seed,
-local, others)`); AIs play the empty ones. `apps/web/src/net/room.ts` runs the room:
+An attack order on a hex with enemies in it can be fought by hand. `@brink/arena` is a headless,
+deterministic real-time sim (levels built from the hex's terrain, river and site; seven unit classes;
+bouncing shells; an AI whose skill ramps with difficulty and turn); `apps/web/src/arena` draws it in
+three.js. The result travels with the turn's orders as an `ArenaBattle` (who fought, strength kept per
+unit in permille, won or not). At resolution it replaces the dice for that hex only if every hostile
+there at the time was among those fought; otherwise the engagement is fought on the odds and reported
+as `arena: 'voided'`. The engine stays pure: it validates and applies a claimed result, it never runs
+the arena. Detail: `docs/arena.md`.
 
-- **Online**: WebRTC data channels brokered by PeerJS's public signalling server; a five-letter room
-  code maps to the host's peer id. Guests connect straight to the host (no relay server; strict NATs
-  without TURN can fail to connect).
-- **Local** (`?net=local`): BroadcastChannel between tabs on one machine. Used by the e2e tests.
-- **Hotseat**: the same seats on one device, with an opaque curtain between players and each seat's
-  replay starting from the board that seat planned against.
-
-The host collects every human seat's `NationOrders`, resolves when all connected seats have locked (the
-host can force it; missing seats hold), and sends each guest only its own `SeatState` (view, report,
-history). Guests never hold the world, so they cannot see through fog. A guest that drops can rejoin
-with the same name and gets its seat back; meanwhile the host can hand the seat to the AI
-(`GameSession.releaseSeat`, reversed by `reclaimSeat` on rejoin). An optional planning timer (1, 2 or
-5 minutes) counts down on every client; at zero each client locks its current draft and the host
-resolves two seconds later. Remaining time travels as a duration, so clock skew does not matter. Saves record every human seat (`SaveFile.humans`). A host's save also records each seat's callsign (`SaveFile.callsigns`): loading it opens a host lobby with those seats reserved, only the saved callsigns may join (each into its own seat, reclaiming one the AI held), and Resume carries on from the saved world. A multi-human save without callsigns is hotseat and resumes behind the curtain.
-
-A dedicated server (Fastify plus WebSocket, persistence, planning deadlines) would reuse the same
-`GameSession` and message shapes; nothing in the engine changes.
+Multiplayer (PeerJS rooms, hotseat) was removed in favour of hand-fought battles. `GameSession` still
+takes several human seats, and loading an old multi-human save hands the other seats to the AI.
 
 ## Rejected alternatives
 
 - A tick per movement point: forces every unit onto one speed grid. The event clock handles mixed speeds.
 - A sequential seeded PRNG: results would depend on draw order.
 - Server-authoritative single-player: adds a required service for no gain. The API exists for headless
-  simulation and as the seam for multiplayer.
+  simulation.

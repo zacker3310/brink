@@ -3,7 +3,7 @@ import type { GameEvent, HexKey, NationView, TurnReport, UnitClass } from '@brin
 import { EVENTS, TECHS, UNITS } from '@brink/game-data';
 import { Label, useKeys } from './chrome';
 import { UnitGlyph } from './glyphs';
-import { atPlace, describeEffect, hexLabel, netChange, toPlace, turnClock } from './insight';
+import { arenaNote, atPlace, describeEffect, hexLabel, netChange, toPlace, turnClock } from './insight';
 import { useGame } from './store';
 import { Swatch } from './ui';
 
@@ -73,7 +73,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
               <span className="font-semibold">{e.type === 'meeting' ? 'Meeting engagement' : attacking ? 'Our assault' : mine.length ? 'Enemy assault on us' : 'Battle observed'}</span> {atPlace(view, e.location)}: {result}.{' '}
               {mine.length > 0 && (
                 <span className="text-muted">
-                  We lost {lost}, they lost {dealt}.
+                  We lost {lost}, they lost {dealt}.{arenaNote(e.arena, attacking)}
                 </span>
               )}
             </>

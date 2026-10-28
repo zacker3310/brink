@@ -1,6 +1,6 @@
 import type { HexKey, NationView, TurnReport } from '@brink/contracts';
 import { EVENTS, TECHS, UNITS } from '@brink/game-data';
-import { atPlace, describeEffect, hexLabel } from './insight';
+import { arenaNote, atPlace, describeEffect, hexLabel } from './insight';
 import { useGame } from './store';
 
 // Civ-style turn notifications: a column of icons on the right edge of the map. Hover to read,
@@ -52,8 +52,8 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
           id,
           icon: 'battle',
           tone: e.outcome === 'inconclusive' ? 'info' : good ? 'good' : 'bad',
-          title: `${attacking ? 'Assault' : 'Attacked'} ${atPlace(view, e.location)}`,
-          text: `${{ attacker_victory: 'The attackers broke through', defender_held: 'The defenders held', inconclusive: 'Neither side gave way' }[e.outcome]}. We lost ${lost}, they lost ${dealt}.`,
+          title: `${e.arena === true && attacking ? 'Battle' : attacking ? 'Assault' : 'Attacked'} ${atPlace(view, e.location)}`,
+          text: `${{ attacker_victory: 'The attackers broke through', defender_held: 'The defenders held', inconclusive: 'Neither side gave way' }[e.outcome]}. We lost ${lost}, they lost ${dealt}.${arenaNote(e.arena, attacking)}`,
           at: e.location,
         });
         break;

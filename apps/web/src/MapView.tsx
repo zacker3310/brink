@@ -181,11 +181,15 @@ const ODDS_COLOR: Record<Odds, number> = { good: 0x4fd18b, even: 0xffc23d, bad: 
 
 /** A pill under an enemy hex: how an attack there would likely go. Holds its size on screen. */
 function oddsBadge(c: Point, odds: Odds): Container {
+  return tagBadge(c, ODDS_TAG[odds], ODDS_COLOR[odds]);
+}
+
+function tagBadge(c: Point, text: string, color: number): Container {
   const box = new Container();
-  const t = new Text({ text: ODDS_TAG[odds], resolution: 4, style: { fontFamily: FONT_DISPLAY, fontSize: 11, fontWeight: '800', fill: 0x0d1114, letterSpacing: 0.4 } });
+  const t = new Text({ text, resolution: 4, style: { fontFamily: FONT_DISPLAY, fontSize: 11, fontWeight: '800', fill: 0x0d1114, letterSpacing: 0.4 } });
   t.anchor.set(0.5);
   const w = t.width + 10;
-  box.addChild(new Graphics().roundRect(-w / 2, -7.5, w, 15, 7.5).fill({ color: ODDS_COLOR[odds] }).stroke({ width: 1.5, color: 0x0d1114 }), t);
+  box.addChild(new Graphics().roundRect(-w / 2, -7.5, w, 15, 7.5).fill({ color }).stroke({ width: 1.5, color: 0x0d1114 }), t);
   box.position.set(c.x, c.y + SIZE * 0.72);
   keepScreenSize(box);
   return box;
@@ -618,7 +622,7 @@ export function MapView() {
       if (ids.length > 0) {
         if (ids.some((id) => orders[id]!.type === 'attack')) {
           const armed = s.armed;
-          if (armed && armed.target === key) s.issueGroup(armed.orders ?? { [armed.formation]: armed.order });
+          if (armed && armed.target === key) s.attack(key, armed.orders ?? { [armed.formation]: armed.order });
           else {
             const lead = s.selectedFormation && orders[s.selectedFormation] ? s.selectedFormation : ids[0]!;
             s.armAttack({ formation: lead, target: key, order: orders[lead]!, orders });
@@ -943,6 +947,12 @@ export function MapView() {
       }
     }
     if (s.selectedHex && !replaying) hl.poly(poly(s.selectedHex, 1)).stroke({ width: 2.5, color: 0xffffff, alpha: 0.9 });
+    // Battles you have fought this turn: how they went.
+    for (const b of s.draft?.battles ?? []) {
+      if (replaying) break;
+      hl.poly(poly(b.target, 3)).stroke({ width: 3, color: b.won ? 0x4fd18b : ATTACK, alpha: 0.95 });
+      badges.push(tagBadge(center(b.target), b.won ? 'WON' : 'REPULSED', b.won ? 0x4fd18b : 0xff5a4e));
+    }
     // The suggested next objective: a ring in command amber.
     const goal = replaying ? null : nextObjective(v);
     if (goal) {

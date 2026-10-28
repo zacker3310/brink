@@ -1,4 +1,5 @@
 import type {
+  ArenaBattle,
   EngagementParticipant,
   Formation,
   FormationId,
@@ -92,6 +93,23 @@ export interface Support {
 
 const supportKey = (nation: NationId, key: HexKey) => `${nation}|${key}`;
 
+/** The arena battle `nation` fought on `target` this turn, if any. */
+function arenaFor(orders: Record<NationId, NationOrders>, nation: NationId, target: HexKey): ArenaBattle | undefined {
+  return orders[nation]?.battles?.find((b) => b.target === target);
+}
+
+/** An arena result stands while every enemy in the hex is one that was fought. */
+function arenaHolds(world: WorldState, nation: NationId, b: ArenaBattle): boolean {
+  const here = hostilesAt(world, nation, b.target);
+  return here.length > 0 && here.every((h) => b.defenders.includes(h.id));
+}
+
+/** Strength lost by a formation that kept `kept` permille of it in the arena. */
+function arenaLoss(f: Formation, b: ArenaBattle): number {
+  const kept = Math.max(0, Math.min(1000, b.kept[f.id] ?? 1000));
+  return f.strength - Math.floor((f.strength * kept) / 1000);
+}
+
 /**
  * Phase 6. Every artillery and air strike is computed from the same pre-strike snapshot and
  * committed together, so two batteries shelling each other both fire.
@@ -111,6 +129,9 @@ export function resolveStrikes(
       const order = orders[nation]!.formations[id]!;
       const f = world.formations[id];
       if (!f || order.type !== 'attack' || UNITS[f.unitClass].range === 0) continue;
+      // Guns and aircraft that fought in the arena did their shooting there.
+      const fought = arenaFor(orders, nation, order.target);
+      if (fought?.attackers.includes(id) && arenaHolds(world, nation, fought)) continue;
       const def = UNITS[f.unitClass];
       if (keyDistance(f.key, order.target) > def.range) continue;
       const victims = hostilesAt(world, nation, order.target);
@@ -209,8 +230,22 @@ export function resolveEngagements(
   for (const nation of sortedKeys(orders))
     for (const id of sortedKeys(orders[nation]!.formations)) if (orders[nation]!.formations[id]!.type === 'defend') defendingIds.add(id);
 
+  // Arena battles whose guns and aircraft fought without a ground assault on the hex.
+  for (const nation of sortedKeys(orders)) {
+    for (const b of orders[nation]!.battles ?? []) {
+      if (assaults.some((a) => a.nation === nation && a.target === b.target)) continue;
+      assaults.push({ nation, target: b.target, attackers: [] });
+    }
+  }
+
   for (const a of assaults) {
     const defenders = hostilesAt(world, a.nation, a.target);
+    const arena = arenaFor(orders, a.nation, a.target);
+    if (arena && defenders.length > 0 && arenaHolds(world, a.nation, arena)) {
+      fightInArena(world, a, arena, defenders, book, mustRetreat, claim, events, engaged);
+      continue;
+    }
+    if (a.attackers.length === 0) continue;
     const tile = world.tiles[a.target]!;
     if (defenders.length === 0) {
       // Nobody home: walk in, unless the hex belongs to a nation we are at peace with.
@@ -258,7 +293,7 @@ export function resolveEngagements(
       if (won) mustRetreat.set(d.id, [...(mustRetreat.get(d.id) ?? []), ...a.attackers.map((f) => f.key)]);
     }
     if (won) claim(a.target, a.nation, a.attackers);
-    events.push({ kind: 'engagement', id, location: a.target, type: 'assault', participants, outcome, retreated: [], destroyed: [], advanced: null });
+    events.push({ kind: 'engagement', id, location: a.target, type: 'assault', participants, outcome, retreated: [], destroyed: [], advanced: null, ...(arena ? { arena: 'voided' as const } : {}) });
   }
 
   for (const [x, y] of meetings) {
@@ -320,6 +355,50 @@ export function resolveEngagements(
     if (alive[0]) advances.set(key, alive[0].id);
   }
   return { mustRetreat, advances };
+}
+
+/** An assault settled by the player's arena battle instead of the dice. */
+function fightInArena(
+  world: WorldState,
+  a: Assault,
+  b: ArenaBattle,
+  defenders: Formation[],
+  book: EffectBook,
+  mustRetreat: Map<FormationId, HexKey[]>,
+  claim: (key: HexKey, nation: NationId, candidates: Formation[]) => void,
+  events: GameEvent[],
+  engaged: Set<FormationId>,
+): void {
+  const id = `e${world.turn}-${a.nation}-${a.target}`;
+  const attackers = [...new Map([...a.attackers, ...b.attackers.map((x) => world.formations[x]).filter((f): f is Formation => !!f && f.owner === a.nation)].map((f) => [f.id, f])).values()].sort(
+    (x, y) => (x.id < y.id ? -1 : 1),
+  );
+  const won = b.won;
+  const outcome: AssaultOutcome = won ? 'attacker_victory' : 'defender_held';
+  const participants: EngagementParticipant[] = [];
+  for (const f of attackers) {
+    const loss = arenaLoss(f, b);
+    const org = Math.floor(loss / 4) + 5;
+    const morale = won ? 6 : -6;
+    const ammo = UNITS[f.unitClass].ammoPerAttack;
+    // Fighting it yourself teaches more than a die roll.
+    book.add(f.id, { strength: loss, organization: org, morale, ammunition: ammo, experience: 4 });
+    participants.push(participant(f, 'attacker', loss, org, morale, ammo));
+    engaged.add(f.id);
+  }
+  const ground = attackers.filter((f) => UNITS[f.unitClass].ground && areAdjacent(f.key, a.target));
+  for (const d of defenders) {
+    const loss = arenaLoss(d, b);
+    const org = Math.floor(loss / 4) + (won ? 15 : 5);
+    const morale = won ? -8 : 4;
+    const ammo = Math.floor(UNITS[d.unitClass].ammoPerAttack / 2);
+    book.add(d.id, { strength: loss, organization: org, morale, ammunition: ammo, experience: 2 });
+    participants.push(participant(d, 'defender', loss, org, morale, ammo));
+    engaged.add(d.id);
+    if (won) mustRetreat.set(d.id, [...(mustRetreat.get(d.id) ?? []), ...(ground.length ? ground : attackers).map((f) => f.key)]);
+  }
+  if (won && ground.length > 0) claim(a.target, a.nation, ground);
+  events.push({ kind: 'engagement', id, location: a.target, type: 'assault', participants, outcome, retreated: [], destroyed: [], advanced: null, arena: true });
 }
 
 /**

@@ -1,14 +1,19 @@
 import { useMemo, useState } from 'react';
 import { RULESET_VERSION } from '@brink/game-data';
 import { NATIONS, SCENARIOS, createScenario } from '@brink/scenarios';
+import { readCareer } from '../arena/career';
 import { tutorialDone } from '../coach';
 import { latestSlot, type SlotInfo } from '../saves';
 import { Kbd, relativeTime, useKeys } from '../chrome';
 import { Icon } from '../icons';
 import { MapPreview } from './MapPreview';
 
-export type MenuScreen = 'title' | 'setup' | 'archive' | 'manual' | 'multiplayer';
+export type MenuScreen = 'title' | 'setup' | 'archive' | 'manual' | 'skirmish';
 
+function skirmishSub(): string {
+  const c = readCareer();
+  return c.battles ? `${c.stars}★ earned · ${c.wins} of ${c.battles} battles won` : 'Practice battles: drive, shoot, earn stars';
+}
 
 interface Item {
   id: string;
@@ -41,8 +46,8 @@ export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]
         ]
       : []),
     { id: 'new', label: 'New campaign', sub: `${scenario.name} · you against three AI powers`, go: () => go('setup') },
+    { id: 'skirmish', label: 'Skirmish', sub: skirmishSub(), go: () => go('skirmish') },
     ...(fresh ? [] : [guided]),
-    { id: 'multiplayer', label: 'Multiplayer', sub: 'Host friends online, join by code, or hotseat', go: () => go('multiplayer') },
     { id: 'load', label: 'Load campaign', sub: slots.length ? `${slots.length} saved operation${slots.length === 1 ? '' : 's'} on file` : 'Save slots and files', go: () => go('archive') },
     { id: 'manual', label: 'Field manual', sub: 'Turns, victory, units and terrain', go: () => go('manual') },
   ];

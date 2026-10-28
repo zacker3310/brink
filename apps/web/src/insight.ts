@@ -69,3 +69,10 @@ export function describeEffect(e: EventEffect): string {
   if (e.research) parts.push(`${sign(e.research)} research`);
   return parts.length ? parts.join(' · ') : 'No effect';
 }
+
+/** What the arena had to do with an engagement, as a trailing sentence for the debrief and report. */
+export function arenaNote(arena: true | 'voided' | undefined, attacking: boolean): string {
+  if (arena === true) return attacking ? ' You fought it by hand.' : ' They fought it out in the field.';
+  if (arena === 'voided' && attacking) return ' Your battle did not count: the enemy at the hex changed before the turn ended, so the odds decided.';
+  return '';
+}

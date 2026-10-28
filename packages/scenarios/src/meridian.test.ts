@@ -2,7 +2,8 @@ import { UNIT_CLASSES } from '@brink/contracts';
 import { describe, expect, it } from 'vitest';
 import { findPath } from '@brink/map';
 import { enterCost, hashState } from '@brink/simulation';
-import { createMeridianScenario } from './meridian';
+import { createScenario } from './index';
+import { createMeridianScenario, MERIDIAN_ID, THEATRES } from './meridian';
 
 describe('the Meridian Crisis', () => {
   const w = createMeridianScenario(1);
@@ -37,5 +38,23 @@ describe('the Meridian Crisis', () => {
   it('is deterministic in the seed and varies with it', () => {
     expect(hashState(createMeridianScenario(1))).toBe(hashState(w));
     expect(hashState(createMeridianScenario(2))).not.toBe(hashState(w));
+  });
+});
+
+describe('theatres', () => {
+  it('give every theatre its own ground, rivers and id', () => {
+    const terrain = (id: string) => {
+      const w = createScenario(id, 3);
+      expect(w.scenarioId).toBe(id);
+      const tiles = Object.values(w.tiles);
+      return { rough: tiles.filter((t) => t.terrain === 'hills' || t.terrain === 'mountains' || t.terrain === 'forest').length, rivers: tiles.filter((t) => t.river).length };
+    };
+    const base = terrain(MERIDIAN_ID);
+    const high = terrain('highland-front');
+    const delta = terrain('varn-delta');
+    expect(high.rough).toBeGreaterThan(base.rough);
+    expect(delta.rough).toBeLessThan(base.rough);
+    expect(delta.rivers).toBeGreaterThan(base.rivers);
+    for (const t of THEATRES) expect(Object.keys(createScenario(t.id, 3).sites)).toHaveLength(Object.keys(createScenario(MERIDIAN_ID, 3).sites).length);
   });
 });

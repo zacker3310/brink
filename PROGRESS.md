@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-10-25. Milestone 1 (first playable).
+Updated 2026-10-28. Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -152,6 +152,24 @@ Updated 2026-10-25. Milestone 1 (first playable).
   - "How to win" in three steps at the start of every campaign and from the menu.
   - Fixed: the AI could send the same diplomatic order twice and have all of them refused.
 
+- Battles you fight (the arena), replacing multiplayer:
+  - Every attack on a hex with enemies opens a brief: fight it by hand, quick-resolve on the odds,
+    or back out. Top-down 3D in three.js, Tank Hero style: drag to drive, tap to fire; WASD and mouse
+    on desktop. Seven classes play differently (bouncing tank shells, IFV bursts, infantry rockets that
+    hide in trees, artillery lobs, helicopter rocket pairs, one-shot dive drones).
+  - Arena maps are built from the hex: streets for cities, woods, ridges, sandbags, a river with two
+    bridges; capture battles for cities and objectives, destroy battles elsewhere.
+  - The result replaces the dice at end of turn when the hex still holds what you fought; otherwise
+    the dice decide and the debrief says why. `docs/arena.md`.
+  - Progression: veteran ranks from experience (shown on unit cards), research unlocks battle
+    abilities (shown in Research), stars per battle, a Skirmish menu of eight battles unlocked by
+    stars, and two new theatres (Highland Front, Varn Delta) unlocked by winning wars.
+  - Enemy skill ramps with difficulty, war progress and numbers. Synth SFX and a battle music loop.
+  - Multiplayer (PeerJS rooms, hotseat, chat) removed; old multi-human saves load with the AI in the
+    other seats.
+  - Fixed: the arena canvas had no CSS size, so 2x screens showed a quarter of the field; the safe-area
+    classes beat Tailwind padding (they sit outside its layers).
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
@@ -159,8 +177,9 @@ Updated 2026-10-25. Milestone 1 (first playable).
 
 - Balance: 55 of 100 soak matches end by victory points, 45 at the turn limit (median turn 29).
   Next levers if games should end sooner: stall threshold in `ai`, strike entrenchment, victory share.
-- Multiplayer: no TURN relay for strict NATs, a loaded multi-human save resumes single-player (other
-  seats hold), guests cannot save.
+- Arena: tested in Chromium (iPhone 14 Pro emulation with SwiftShader WebGL and desktop), not yet on a
+  real iPhone GPU; frame rate on older phones unmeasured. New nations per theatre not done (same four
+  powers on new ground).
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
 ## Blockers
@@ -169,7 +188,6 @@ None.
 
 ## Next recommended tasks
 
-1. Online reliability: TURN relay, lobby connection diagnostics, guest auto-retry; verify a real
-   two-network match.
-2. Async turns on `apps/api` (resolve when all are in or at a deadline; notify on turn).
-3. More maps. 5. Shareable end-of-game recap. 6. Haptics and a landscape layout on phones.
+1. Play the arena on a real iPhone: frame rate, touch feel, audio unlock; tune skill and par times.
+2. New nations for the later theatres.
+3. More skirmishes and arena props per terrain. 5. Shareable end-of-game recap. 6. Haptics and a landscape layout on phones.

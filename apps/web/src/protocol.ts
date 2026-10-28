@@ -12,8 +12,8 @@ export interface SeatState {
 }
 
 export type Request =
-  /** `others` are further human seats (multiplayer and hotseat); every other nation is AI. */
-  | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number; difficulty?: Difficulty }
+  /** `others` are further human seats; every other nation is AI. `theatre` picks the map. */
+  | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number; difficulty?: Difficulty; theatre?: string }
   /** What the AI would order for this seat now (the Auto button). */
   | { type: 'suggest'; nation: NationId }
   | { type: 'stateFor'; nation: NationId }

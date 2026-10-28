@@ -1,4 +1,5 @@
 import type {
+  ArenaBattle,
   Budget,
   FormationOrder,
   GameEvent,
@@ -149,6 +150,23 @@ function lockRecruits(
  * event; a formation without a legal order holds. Nothing here depends on the order in
  * which submissions arrived.
  */
+/** An arena result must name a hex, attackers holding attack orders on it, and kept strengths 0..1000. */
+function checkBattle(world: WorldState, locked: NationOrders, b: ArenaBattle, seen: Set<string>): string | null {
+  if (!b || typeof b.target !== 'string' || !world.tiles[b.target]) return 'battle on an unknown hex';
+  if (seen.has(b.target)) return 'more than one battle on one hex';
+  if (!Array.isArray(b.attackers) || !Array.isArray(b.defenders) || b.attackers.length === 0) return 'battle without attackers';
+  for (const id of b.attackers) {
+    const o = locked.formations[id];
+    if (!o || o.type !== 'attack' || o.target !== b.target) return 'battle attacker without an attack order on that hex';
+  }
+  if (typeof b.won !== 'boolean' || !b.kept || typeof b.kept !== 'object') return 'malformed battle result';
+  for (const [id, k] of Object.entries(b.kept)) {
+    if (!b.attackers.includes(id) && !b.defenders.includes(id)) return 'battle result for a formation that did not fight';
+    if (!Number.isInteger(k) || k < 0 || k > 1000) return 'battle result out of range';
+  }
+  return null;
+}
+
 export function lockOrders(world: WorldState, submissions: readonly NationOrders[]): LockedOrders {
   const rejected: GameEvent[] = [];
   const byNation = new Map<NationId, NationOrders[]>();
@@ -233,6 +251,19 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
       else if (d.action === 'propose_alliance' && rel !== 'peace') reject(`must be at peace with ${t.name} to ally`);
       else if (!['declare_war', 'propose_peace', 'propose_alliance'].includes(d.action)) reject('unknown diplomatic action');
       else locked.diplomacy.push({ target: d.target, action: d.action });
+    }
+
+    if (sub.battles !== undefined) {
+      const battles = Array.isArray(sub.battles) ? sub.battles : [];
+      const seen = new Set<string>();
+      for (const b of battles) {
+        const why = checkBattle(world, locked, b, seen);
+        if (why) reject(why);
+        else {
+          seen.add(b.target);
+          (locked.battles ??= []).push({ target: b.target, attackers: [...b.attackers].sort(), defenders: [...b.defenders].sort(), kept: { ...b.kept }, won: b.won });
+        }
+      }
     }
   }
   return { orders, rejected };

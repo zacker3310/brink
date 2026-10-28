@@ -61,6 +61,7 @@ export interface Prefs {
   /** Campaign length picked on the setup screen. */
   length?: 'quick' | 'standard';
   difficulty?: 'easy' | 'normal' | 'hard';
+  theatre?: string;
   /** Clean board-game map (default) or satellite imagery. */
   mapStyle?: 'atlas' | 'satellite';
 }

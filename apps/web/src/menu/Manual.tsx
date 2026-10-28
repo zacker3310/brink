@@ -1,4 +1,5 @@
 import { HOURS_PER_TURN, RIVER_MOVE_COST, STACK_LIMIT, TERRAIN, UNITS } from '@brink/game-data';
+import { CAPTURE_TIME } from '@brink/arena';
 import { SCENARIOS } from '@brink/scenarios';
 import { costText } from '../ui';
 import { Frame, Label, ScreenHeader, useKeys } from '../chrome';
@@ -34,6 +35,19 @@ export function Manual({ onBack }: { onBack: () => void }) {
               </li>
             ))}
           </ol>
+        </Frame>
+
+        <Frame className="enter-2 p-4 lg:col-span-2">
+          <Label>Battles</Label>
+          <p className="mt-3 text-sm text-muted">
+            Attack a hex with enemies in it and you can fight the battle yourself: drag to drive, tap to fire (WASD and the mouse on a computer). Tank shells bounce once off walls.
+            Cities, capitals and objectives are taken by holding the amber circle for {CAPTURE_TIME} seconds; anywhere else you destroy them. Win and the hex falls when the turn ends,
+            unless the enemy there changes first, in which case the odds decide. Quick resolve skips the fight and uses the odds.
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            Units rank up with experience (Veteran, Elite, Ace: more armour, faster reload). Research unlocks battle abilities. Stars earned in battle open Skirmishes, and each war won opens
+            a new theatre.
+          </p>
         </Frame>
 
         <Frame className="enter-2 p-4">

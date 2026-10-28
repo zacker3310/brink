@@ -23,9 +23,11 @@ import { movementAllowance } from '@brink/simulation';
 import { UNITS } from '@brink/game-data';
 import { useCoach } from './coach';
 import { sfx } from './sfx';
-import { useNet } from './net/room';
+import { battleFor, battleRecord, type BattleRequest } from './arena/battle';
+import type { BattleOutcome } from './arena/ArenaScreen';
+import { recordStars, recordWarWon } from './arena/career';
 import type { Mode } from './planning';
-import type { Response, SeatState } from './protocol';
+import type { Response } from './protocol';
 import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type SlotInfo } from './saves';
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy';
@@ -95,11 +97,11 @@ interface State {
   /** The last resolved turn, kept so it can be replayed again. */
   lastTurn: { before: NationView; events: GameEvent[] } | null;
 
-  newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty): Promise<void>;
+  newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty, theatre?: string): Promise<void>;
   /** Let the staff draft orders for every unit and city still waiting; the player can change any. */
   autoCommand(): Promise<void>;
-  /** Load a save. A room save reopens its lobby and a hotseat save its curtain; says which. */
-  loadGame(text: string): Promise<'single' | 'room' | 'hotseat' | null>;
+  /** Load a save. Seats other players held in an old multiplayer save go to the AI. */
+  loadGame(text: string): Promise<boolean>;
   toMenu(): void;
   selectHex(key: HexKey | null): void;
   selectFormation(id: FormationId | null): void;
@@ -109,6 +111,14 @@ interface State {
   toggleGroup(id: FormationId): void;
   /** Give several units their orders at once (a stack moving or attacking together). */
   issueGroup(orders: Record<FormationId, FormationOrder>): void;
+  /** A battle waiting to be fought in the arena (an attack you ordered, or a skirmish). */
+  battle: BattleRequest | null;
+  /** Order an attack: it goes to the arena when there are enemies to fight, straight to the map when not. */
+  attack(target: HexKey, orders: Record<FormationId, FormationOrder>): void;
+  /** Open the arena for a battle. */
+  fight(req: BattleRequest): void;
+  /** The arena closed: fought (its result rides on the turn's orders), resolved by the odds, or backed out of. */
+  endBattle(outcome: BattleOutcome): void;
   setMode(mode: Mode): void;
   setTab(tab: Tab): void;
   setHover(key: HexKey | null): void;
@@ -118,10 +128,6 @@ interface State {
   /** Apply the turn being replayed and open its report. Also used to skip the replay. */
   finishPlayback(): void;
   setAnimate(on: boolean): void;
-  /** Show a seat's state as the start of planning (new game, joined room, hotseat seat). */
-  enterGame(state: SeatState): void;
-  /** A resolved turn arrived for this seat: replay it from `before` (default: the current view). */
-  receiveTurn(state: SeatState, before?: NationView): void;
   /** Give an order from the map or unit panel, then move on to the next unit without orders. */
   issueOrder(id: FormationId, order: FormationOrder): void;
   /** Arm a touch attack: shows the odds; the same tap again confirms. */
@@ -172,13 +178,6 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-/** A hosted room's seats by callsign, so its save resumes as the same room. */
-function roomCallsigns(): Record<NationId, string> | undefined {
-  const net = useNet.getState();
-  if (net.role !== 'host' || !net.started) return undefined;
-  return Object.fromEntries(net.seats.filter((s) => s.player !== null).map((s) => [s.nation, s.player!]));
-}
-
 function freshDraft(view: NationView): NationOrders {
   return { nation: view.self.id, turn: view.turn, formations: {}, recruit: [], diplomacy: [] };
 }
@@ -191,6 +190,8 @@ export const useGame = create<State>((set, get) => {
     }
     if (r.type === 'state') {
       set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), submitted: null, rejected: [], screen: 'game' });
+      // A war won opens the next theatre.
+      if (r.view.victory?.winner === r.view.self.id) recordWarWon(r.view.scenarioId);
     }
     return true;
   };
@@ -198,8 +199,7 @@ export const useGame = create<State>((set, get) => {
   /** Ask the engine what it would reject in the current draft. */
   const recheck = async () => {
     const d = get().draft;
-    // A guest has no world to check against; the host validates when the turn resolves.
-    if (!d || useNet.getState().role === 'guest') return;
+    if (!d) return;
     const r = await engine.call({ type: 'check', orders: d });
     if (r.type === 'checked') set({ rejected: r.rejected });
   };
@@ -211,7 +211,7 @@ export const useGame = create<State>((set, get) => {
     set({ dismissed: [], selectedFormation: null });
     get().nextIdle();
     // A phone can drop a backgrounded tab at any time: a solo campaign keeps itself after every turn.
-    if (!useNet.getState().role) void get().save(AUTOSAVE, true);
+    void get().save(AUTOSAVE, true);
   };
 
   const editDraft = (fn: (d: NationOrders) => NationOrders) => {
@@ -233,6 +233,7 @@ export const useGame = create<State>((set, get) => {
     selectedHex: null,
     selectedFormation: null,
     group: [],
+    battle: null,
     mode: 'move',
     tab: 'overview',
     showReport: false,
@@ -254,8 +255,8 @@ export const useGame = create<State>((set, get) => {
     lastTurn: null,
     armed: null,
 
-    async newGame(nation, seed, maxTurns, difficulty) {
-      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty }))) {
+    async newGame(nation, seed, maxTurns, difficulty, theatre) {
+      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre }))) {
         const capital = Object.values(get().view!.sites).find((s) => s.owner === nation && s.kind === 'capital');
         set({ selectedHex: capital?.key ?? null, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
         get().nextIdle();
@@ -265,21 +266,15 @@ export const useGame = create<State>((set, get) => {
       const r = await engine.call({ type: 'load', text });
       if (r.type !== 'loaded') {
         apply(r);
-        return null;
+        return false;
       }
       set({ selectedHex: null, selectedFormation: null, showReport: false, dismissed: [] });
-      if (r.callsigns) {
-        await useNet.getState().resumeRoom(r.humans, r.callsigns, r.state);
-        return 'room';
-      }
-      if (r.humans.length > 1) {
-        useNet.getState().resumeHotseat(r.humans, r.state);
-        return 'hotseat';
-      }
+      // Multiplayer is gone: anyone else who sat at the table hands their nation to the AI.
+      for (const n of r.humans.slice(1)) await engine.call({ type: 'seat', nation: n, to: 'ai' });
       apply(r.state);
       get().notify(`Loaded turn ${get().view!.turn}`);
       get().nextIdle();
-      return 'single';
+      return true;
     },
     toMenu: () => {
       useCoach.getState().stop();
@@ -392,8 +387,41 @@ export const useGame = create<State>((set, get) => {
       editDraft((d) => {
         if (order) d.formations[id] = order;
         else delete d.formations[id];
+        // A unit that no longer attacks there takes its battle's result with it: that fight falls to the odds.
+        if (d.battles?.some((b) => b.attackers.includes(id) && !(order?.type === 'attack' && order.target === b.target))) {
+          d.battles = d.battles.filter((b) => !b.attackers.includes(id) || (order?.type === 'attack' && order.target === b.target));
+          get().notify('Orders changed: that battle will be settled by the odds instead', 'warn');
+        }
         return d;
       }),
+    attack(target, orders) {
+      const view = get().view;
+      const req = view ? battleFor(view, target, orders) : null;
+      if (req && !useGame.getState().submitted) {
+        set({ armed: null });
+        get().fight(req);
+      } else get().issueGroup(orders);
+    },
+    fight(req) {
+      set({ battle: req, armed: null });
+    },
+    endBattle(outcome) {
+      const req = get().battle;
+      set({ battle: null });
+      if (!req || req.skirmish || outcome.kind === 'back') {
+        if (req?.skirmish && outcome.kind === 'fought') recordStars(req, outcome.result);
+        return;
+      }
+      get().issueGroup(req.orders);
+      if (outcome.kind === 'fought') {
+        recordStars(req, outcome.result);
+        const record = battleRecord(req, outcome.result);
+        editDraft((d) => {
+          d.battles = [...(d.battles ?? []).filter((b) => b.target !== record.target), record];
+          return d;
+        });
+      }
+    },
     addRecruit: (siteId, unitClass) =>
       editDraft((d) => {
         d.recruit = [...d.recruit.filter((r) => r.siteId !== siteId), { siteId, unitClass }];
@@ -429,11 +457,6 @@ export const useGame = create<State>((set, get) => {
       }
       sfx.endTurn();
       set({ submitted: structuredClone(draft), resolving: true });
-      // In a room the turn resolves when every seat is in; the result comes back via receiveTurn.
-      if (useNet.getState().role) {
-        useNet.getState().lockLocal(structuredClone(draft));
-        return;
-      }
       const r = await engine.call({ type: 'submit', orders: draft });
       const before = get().view;
       if (r.type === 'state' && before && r.report) set({ lastTurn: { before, events: r.report.events } });
@@ -453,23 +476,6 @@ export const useGame = create<State>((set, get) => {
       if (pb.rewatch) return;
       apply(pb.result);
       afterResolve();
-    },
-    enterGame(state) {
-      set({ playback: null, resolving: false, showReport: false, selectedFormation: null, selectedCity: null, dismissed: [], panelOpen: false, lastTurn: null });
-      apply({ type: 'state', ...state });
-      get().nextIdle();
-    },
-    receiveTurn(state, before) {
-      const from = before ?? get().view;
-      const result = { type: 'state' as const, ...state };
-      if (from && state.report) set({ lastTurn: { before: from, events: state.report.events } });
-      if (from && get().animate && state.report && state.report.events.some(isVisual)) {
-        // Show the seat's own pre-turn board (hotseat may be coming from another player's).
-        set({ view: from, draft: freshDraft(from), submitted: null, selectedFormation: null, selectedCity: null, playback: { before: from, events: state.report.events, result, phase: 'movement' }, resolving: true });
-        return;
-      }
-      set({ resolving: false, playback: null });
-      if (apply(result)) afterResolve();
     },
     issueOrder(id, order) {
       set({ armed: null });
@@ -500,21 +506,20 @@ export const useGame = create<State>((set, get) => {
     },
 
     async save(slot, quiet = false) {
-      const callsigns = roomCallsigns();
-      const r = await engine.call({ type: 'save', label: slot, savedAt: new Date().toISOString(), callsigns });
+      const r = await engine.call({ type: 'save', label: slot, savedAt: new Date().toISOString() });
       if (r.type !== 'saved') {
         apply(r);
         return;
       }
       const view = get().view!;
-      const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}${callsigns ? ' · room' : ''}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString() }, r.text);
+      const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString() }, r.text);
       if (!ok) get().notify('Could not save: browser storage is unavailable or full', 'error');
       else if (!quiet) get().notify(`Saved to ${slot}`);
       set({ slots: listSlots() });
     },
 
     async exportSave() {
-      const r = await engine.call({ type: 'save', label: 'Exported', savedAt: new Date().toISOString(), callsigns: roomCallsigns() });
+      const r = await engine.call({ type: 'save', label: 'Exported', savedAt: new Date().toISOString(), });
       if (r.type !== 'saved') {
         apply(r);
         return;

@@ -139,19 +139,47 @@ function terrainFor(col: number, row: number, rough: number): Terrain {
   return 'plains';
 }
 
-/** The Varn river runs east-west across the middle, so north and south must cross it. */
-function hasRiver(col: number, row: number): boolean {
-  return row === 6 && col >= 2 && col <= 15;
+/**
+ * Theatres: the same four powers and cities on different ground. The Meridian is the classic map;
+ * the others unlock as you win wars.
+ */
+export interface Theatre {
+  id: string;
+  name: string;
+  summary: string;
+  /** Added to every hex's roughness: more ridges and woods above zero, open ground below. */
+  rough: number;
+  /** Rows the rivers run along. */
+  rivers: readonly number[];
+  /** Wars you must have won to play it. */
+  unlock: number;
 }
 
-export function createMeridianScenario(seed: number): WorldState {
+export const THEATRES: readonly Theatre[] = [
+  { id: MERIDIAN_ID, name: 'The Meridian Crisis', summary: 'The classic basin: one river, one ridge, two passes.', rough: 0, rivers: [6], unlock: 0 },
+  { id: 'highland-front', name: 'The Highland Front', summary: 'Ridges and pine forest: slow going, deadly for armour, a gift to infantry.', rough: 38, rivers: [6], unlock: 1 },
+  { id: 'varn-delta', name: 'The Varn Delta', summary: 'Flat, open, cut by three rivers: every advance is a crossing.', rough: -28, rivers: [3, 6, 9], unlock: 2 },
+];
+
+export function theatreOf(id: string): Theatre | undefined {
+  return THEATRES.find((t) => t.id === id);
+}
+
+/** The rivers run east-west, so north and south must cross them. */
+function hasRiver(t: Theatre, col: number, row: number): boolean {
+  return t.rivers.includes(row) && col >= 2 && col <= 15;
+}
+
+export function createMeridianScenario(seed: number, theatreId: string = MERIDIAN_ID): WorldState {
+  const theatre = theatreOf(theatreId);
+  if (!theatre) throw new Error(`unknown theatre: ${theatreId}`);
   const rough = texture(seed);
   const tiles: Record<HexKey, Tile> = {};
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
       const a = offsetToAxial(col, row);
       const key = hexKey(a.q, a.r);
-      tiles[key] = { key, q: a.q, r: a.r, terrain: terrainFor(col, row, rough(key)), river: hasRiver(col, row), infrastructure: 0, owner: null, siteId: null };
+      tiles[key] = { key, q: a.q, r: a.r, terrain: terrainFor(col, row, rough(key) + theatre.rough), river: hasRiver(theatre, col, row), infrastructure: 0, owner: null, siteId: null };
     }
   }
 
@@ -229,7 +257,7 @@ export function createMeridianScenario(seed: number): WorldState {
   const world: WorldState = {
     schema: 1,
     rulesetVersion: RULESET_VERSION,
-    scenarioId: MERIDIAN_ID,
+    scenarioId: theatre.id,
     turn: 1,
     maxTurns: MAX_TURNS,
     seed: seed >>> 0,

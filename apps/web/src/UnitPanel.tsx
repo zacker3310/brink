@@ -7,11 +7,11 @@ import { ModelPortrait, UnitGlyph } from './glyphs';
 import { Icon } from './icons';
 import { describeEffect, hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
-import { useNet } from './net/room';
 import { describeOrder, type Mode } from './planning';
-import { SeatBoard } from './RoomUi';
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
+import { battleFor } from './arena/battle';
+import { RANKS, rankOf } from '@brink/arena';
 
 // Civ-style unit panel (bottom-left) and turn controls (bottom-right), floating over the map.
 
@@ -87,6 +87,27 @@ function Action({
   );
 }
 
+/** On a computer, an attack order can be fought by hand: every unit attacking that hex goes in together. */
+function FightButton({ target }: { target: string }) {
+  const view = useGame((s) => s.view)!;
+  const draft = useGame((s) => s.draft)!;
+  const fight = useGame((s) => s.fight);
+  const fought = draft.battles?.find((b) => b.target === target);
+  const orders = Object.fromEntries(Object.entries(draft.formations).filter(([, o]) => o.type === 'attack' && o.target === target));
+  const req = battleFor(view, target, orders);
+  if (!req && !fought) return null;
+  return (
+    <div className="flex items-center gap-2 border-t border-line px-3 py-2 text-[11px]">
+      {fought ? <span className={fought.won ? 'font-semibold text-good' : 'font-semibold text-hostile'}>Fought: {fought.won ? 'won' : 'repulsed'}</span> : <span className="text-muted">Fight this battle yourself, or leave it to the odds.</span>}
+      {req && !fought && (
+        <button type="button" onClick={() => fight(req)} className="ml-auto rounded bg-hostile px-2.5 py-1 font-bold text-white uppercase" data-testid="fight-it">
+          Fight it
+        </button>
+      )}
+    </div>
+  );
+}
+
 export const OUTCOME: Record<string, { text: string; tone: string }> = {
   attacker_victory: { text: 'Breakthrough', tone: 'text-good' },
   inconclusive: { text: 'Stalemate', tone: 'text-signal' },
@@ -148,6 +169,7 @@ export function UnitPanel() {
           <div className="min-w-0 flex-1">
             <div className="font-display truncate text-base leading-tight font-black">{f.name}</div>
             <div className="text-[10px] font-semibold tracking-wide uppercase" style={{ color }}>
+              {rankOf(f.experience) > 0 && <span className="text-signal">{RANKS[rankOf(f.experience)]!.name} </span>}
               {def.name} · {hexLabel(view, f.key)}
             </div>
             <div className="mt-1.5 flex gap-3 font-mono text-xs">
@@ -164,6 +186,9 @@ export function UnitPanel() {
           </div>
         </div>
 
+        {order?.type === 'attack' && !resolving && (
+          <FightButton target={order.target} />
+        )}
         {preview && order?.type === 'attack' && (
           <div className="border-t border-line px-3 py-2 text-[11px]" data-testid="preview">
             {preview.assault &&
@@ -293,20 +318,16 @@ export function TurnControls() {
   const resolving = useGame((s) => s.resolving);
   const report = useGame((s) => s.report);
   const setShowReport = useGame((s) => s.setShowReport);
-  const playback = useGame((s) => s.playback);
   const lastTurn = useGame((s) => s.lastTurn);
   const rewatch = useGame((s) => s.rewatch);
-  const role = useNet((s) => s.role);
   const total = Object.keys(view.formations).length;
   const idle = idleFormations(view, draft.formations).length;
   const over = view.victory !== null;
   const idleCities = Object.values(view.sites).filter(
     (s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id),
   ).length;
-  const waitingOthers = role && role !== 'hotseat' && resolving && !playback;
   return (
     <div className="pointer-events-auto absolute right-3 bottom-3 z-10 flex w-56 flex-col items-stretch gap-1.5">
-      <SeatBoard />
       <EventCard />
       {lastTurn && !resolving && (
         <button type="button" onClick={rewatch} data-testid="rewatch" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
@@ -342,7 +363,7 @@ export function TurnControls() {
         data-testid="end-turn"
         className="end-turn relative overflow-hidden bg-signal px-4 py-3 text-ink-950 transition-all hover:brightness-110 disabled:opacity-60"
       >
-        <div className="font-display text-lg leading-none font-black uppercase">{waitingOthers ? 'Waiting…' : resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
+        <div className="font-display text-lg leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
         <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
       </button>
       <Minimap />

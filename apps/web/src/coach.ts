@@ -132,9 +132,9 @@ export const STEPS: readonly CoachStep[] = [
   {
     id: 'done',
     title: 'Over to you, Commander',
-    body: () => 'That is the whole loop: order, end the turn, watch, adapt. ? shows every key, and the Field manual in the menu has the rules. Then bring friends: Multiplayer.',
+    body: () => 'That is the whole loop: order, end the turn, watch, adapt. ? shows every key, and the Field manual in the menu has the rules. Attacks on enemy units become battles you fight by hand.',
     keys: ['?'],
-    touch: () => 'That is the whole loop: order, end the turn, watch, adapt. The Field manual in the menu has the rules.',
+    touch: () => 'That is the whole loop: order, end the turn, watch, adapt. Attacks on enemy units become battles you fight by hand, or quick-resolve on the odds.',
   },
 ];
 

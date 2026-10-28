@@ -189,6 +189,22 @@ export interface DiplomacyOrder {
   action: DiplomaticAction;
 }
 
+/**
+ * A battle the player fought in the arena. It replaces the dice for that attack when the turn
+ * resolves, as long as the defenders in the hex are the ones that were fought.
+ */
+export interface ArenaBattle {
+  target: HexKey;
+  /** Own formations that fought: each must hold an attack order on `target`. */
+  attackers: FormationId[];
+  /** Enemy formations fought. */
+  defenders: FormationId[];
+  /** Strength each participant kept, permille of what it had when the battle began (0 = destroyed). */
+  kept: Record<FormationId, number>;
+  /** The attackers took (or cleared) the hex. */
+  won: boolean;
+}
+
 export interface NationOrders {
   nation: NationId;
   turn: number;
@@ -200,6 +216,8 @@ export interface NationOrders {
   diplomacy: DiplomacyOrder[];
   /** Answer to the pending world event; unanswered events take option 0. */
   eventChoice?: 0 | 1;
+  /** Battles fought in the arena this turn, one per target. */
+  battles?: ArenaBattle[];
 }
 
 export interface LastKnownContact {
@@ -304,6 +322,8 @@ export type GameEvent =
       retreated: FormationId[];
       destroyed: FormationId[];
       advanced: FormationId | null;
+      /** Fought in the arena (true), or an arena result that no longer applied (`'voided'`). */
+      arena?: true | 'voided';
     }
   | {
       kind: 'strike';
