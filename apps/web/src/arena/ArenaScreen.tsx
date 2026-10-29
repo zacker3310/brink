@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ABILITIES,
   BREAK_AT,
+  DIFFICULTY,
   act,
+  advise,
   arenaResult,
   autoTurn,
   bestFire,
@@ -21,6 +23,7 @@ import {
   suppLevel,
   supportChance,
   typeOf,
+  undoable,
   unitAt,
   usableWeapons,
   unitValue,
@@ -32,6 +35,7 @@ import {
   type Action,
   type ArenaResult,
   type Battle,
+  type Difficulty,
   type FireInfo,
   type Point,
   type Role,
@@ -127,6 +131,42 @@ function kinds(roles: Role[]): string {
   return s[0]!.toUpperCase() + s.slice(1);
 }
 
+const PLACE: Partial<Record<number, string>> = { 1: 'the road', 2: 'the trees', 4: 'the bridge', 5: 'the building', 6: 'the rubble', 8: 'the rocks' };
+
+/** The advised plan in words: "Move 4 cells into the trees, then fire at the T-72B3 (64%)." */
+function adviceText(b: Battle, me: Unit, plan: Action[], known: Set<string>): string {
+  const bits: string[] = [];
+  let from: Point = me;
+  const t = typeOf(me.type);
+  for (const a of plan) {
+    if (a.type === 'move') {
+      const steps = Math.max(Math.abs(a.to.x - from.x), Math.abs(a.to.y - from.y));
+      const place = PLACE[b.map.cells[a.to.y * b.map.w + a.to.x] ?? 0];
+      bits.push(`${a.dash ? 'dash' : 'move'} ${steps} ${steps === 1 ? 'cell' : 'cells'}${place ? ` into ${place}` : ''}`);
+      from = a.to;
+    } else if (a.type === 'fire') {
+      const target = b.units.find((u) => u.id === a.target);
+      const w = t.weapons.find((x) => x.id === a.weapon);
+      const info = target && w ? fireInfo(b, me, target, w, from, false, known) : null;
+      bits.push(`fire at the ${target ? typeOf(target.type).short : 'enemy'}${info ? ` (${info.chance}%)` : ''}`);
+    } else if (a.type === 'strike') bits.push(a.smoke ? 'lay smoke' : 'call fire on their position');
+    else if (a.type === 'overwatch') bits.push('go on overwatch');
+    else if (a.type === 'hunker') bits.push('hunker down');
+    else if (a.type === 'smoke') bits.push('pop smoke');
+    else if (a.type === 'face') bits.push('turn to face them');
+    else if (a.type === 'dismount') bits.push('dismount the squad');
+    else if (a.type === 'embark') bits.push('board the carrier');
+    else if (a.type === 'treat') bits.push('treat the wounded');
+    else if (a.type === 'repair') bits.push('repair the damaged vehicle');
+    else if (a.type === 'breach') bits.push('breach the wall');
+    else if (a.type === 'mine') bits.push('lay mines');
+    else if (a.type === 'split') bits.push('split into fireteams');
+    else if (a.type === 'merge') bits.push('join up');
+  }
+  const s = bits.length > 1 ? `${bits.slice(0, -1).join(', ')}, then ${bits.at(-1)}` : (bits[0] ?? 'hold');
+  return `${s[0]!.toUpperCase()}${s.slice(1)}.`;
+}
+
 function Tile({ u, active, onClick }: { u: Unit; active: boolean; onClick: () => void }) {
   const t = typeOf(u.type);
   const h = health(u);
@@ -198,7 +238,19 @@ function CamButton({ label, testid, onClick, pressed, children }: { label: strin
   );
 }
 
-function Brief({ req, onFight, onQuick, onBack }: { req: BattleRequest; onFight: () => void; onQuick: () => void; onBack: () => void }) {
+/** What a difficulty does, in a line. */
+function difficultyText(d: Difficulty): string {
+  const def = DIFFICULTY[d];
+  const pts = (v: number) => `${v > 0 ? '+' : '−'}${Math.abs(v)}`;
+  const bits = [`Your crews ${pts(def.aim)} to hit, theirs ${pts(def.enemyAim)}`];
+  if (def.enemyUnits < 1) bits.push(`about ${Math.round((1 - def.enemyUnits) * 100)}% fewer of them`);
+  if (def.skill > 0) bits.push('and they play sharper');
+  else if (def.skill < 0) bits.push('and they play loose');
+  return `${bits.join(', ')}.`;
+}
+
+function Brief({ req, onDifficulty, onFight, onQuick, onBack }: { req: BattleRequest; onDifficulty?: (d: Difficulty) => void; onFight: () => void; onQuick: () => void; onBack: () => void }) {
+  const difficulty = req.setup.difficulty ?? 'normal';
   const s = req.setup;
   const cond = useMemo(() => pickConditions(s), [s]);
   const mine = useMemo(() => buildForce(s, 'blue'), [s]);
@@ -218,6 +270,21 @@ function Brief({ req, onFight, onQuick, onBack }: { req: BattleRequest; onFight:
           <div className="text-[17px] font-semibold">{title}</div>
           <p className="mt-0.5 text-[15px] text-muted">{text}</p>
         </div>
+        <div className="mt-5 text-[13px] font-semibold text-muted">Difficulty</div>
+        {onDifficulty ? (
+          <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-xl bg-ink-900 p-1" role="radiogroup" aria-label="Difficulty" data-testid="arena-difficulty">
+            {(['easy', 'normal', 'hard'] as const).map((d) => (
+              <button key={d} type="button" role="radio" aria-checked={difficulty === d} onClick={() => onDifficulty(d)} className={`h-11 rounded-lg text-[15px] font-semibold ${difficulty === d ? 'bg-white text-black' : 'text-text'}`} data-testid={`difficulty-${d}`}>
+                {DIFFICULTY[d].name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-1.5 rounded-2xl bg-ink-900 px-4 py-3 text-[15px] font-semibold" data-testid="arena-difficulty">
+            {DIFFICULTY[difficulty].name}, as your campaign
+          </div>
+        )}
+        <p className="mt-1.5 px-1 text-[14px] text-muted">{difficultyText(difficulty)}</p>
         <div className="mt-5 text-[13px] font-semibold text-muted">Your Company</div>
         <ul className="mt-1.5 divide-y divide-line overflow-hidden rounded-2xl bg-ink-900">
           {s.attackers.map((f) => {
@@ -353,6 +420,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const [feed, setFeed] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'plain' }[]>([]);
   const feedId = useRef(0);
   const lastNoop = useRef<{ t: number; x: number; y: number } | null>(null);
+  /** The battle before the last step, while that step can be taken back. */
+  const undoRef = useRef<{ snap: Battle; unit: string } | null>(null);
   const refresh = () => setTick((t) => t + 1);
   /** A line in the kill feed under the title, for a few seconds. */
   const pushFeed = (text: string, tone: 'good' | 'bad' | 'plain') => {
@@ -503,6 +572,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     return out.sort((p, q) => q.info.chance - p.info.chance);
   }, [b, me, myTurn, me?.x, me?.y, me?.acted, visible]);
   const indirect = me ? typeOf(me.type).weapons.find((w) => w.indirect) : undefined;
+  // What a good commander would do with this unit, from your side's picture only.
+  const advice = useMemo(() => (b && me && myTurn && !me.acted ? advise(b, me.id) : []), [b, me?.id, me?.x, me?.y, me?.moved, me?.acted, myTurn, b?.events.length]);
+  const adviceMove = advice.find((a): a is Extract<Action, { type: 'move' }> => a.type === 'move');
 
   // Keep the 3D overlay in step with the selection.
   useEffect(() => {
@@ -516,9 +588,12 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       if (dashReach) o.dash = [...dashReach.cost.keys()].filter((i) => i !== start && !reach?.cost.has(i));
       o.targets = targets.map((t) => t.unit.id);
       const r = dash ? dashReach : reach;
-      if (hover && r?.cost.has(hover.y * b.map.w + hover.x) && (hover.x !== me.x || hover.y !== me.y)) {
+      // The route to the cell under the pointer, or else the advised move.
+      const to = hover && r?.cost.has(hover.y * b.map.w + hover.x) && (hover.x !== me.x || hover.y !== me.y) ? hover : !card && mode.kind === 'none' && adviceMove ? adviceMove.to : null;
+      const route = to && hover === to ? r : adviceMove?.dash ? (dashReach ?? reachable(b, me, true, visible)) : reach;
+      if (to && route?.cost.has(to.y * b.map.w + to.x)) {
         const path: Point[] = [];
-        for (let i: number | undefined = hover.y * b.map.w + hover.x; i !== undefined; i = r.prev.get(i)) path.unshift({ x: i % b.map.w, y: Math.floor(i / b.map.w) });
+        for (let i: number | undefined = to.y * b.map.w + to.x; i !== undefined; i = route.prev.get(i)) path.unshift({ x: i % b.map.w, y: Math.floor(i / b.map.w) });
         o.path = path;
       }
       const aim = card?.kind === 'strike' ? card.at : mode.kind === 'strike' && hover ? hover : null;
@@ -550,14 +625,48 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     setSelected((blue[i + 1] ?? blue[0])?.id ?? null);
   };
 
-  const doAct = (action: Action, keepSelection = true) => {
-    if (!b || !act(b, action)) return false;
+  /**
+   * Play actions in order as one step, stopping at the first the battle refuses. The step can be
+   * taken back when it drew no dice and showed nothing new (a plain move, a turn, overwatch...).
+   */
+  const perform = (actions: Action[], keepSelection: boolean) => {
+    if (!b || !actions.length) return false;
+    const snap = structuredClone(b);
+    let done = 0;
+    for (const a of actions) {
+      if (!act(b, a)) break;
+      done++;
+    }
+    if (!done) return false;
+    const first = actions[0]!;
+    const unit = 'unit' in first && first.unit ? first.unit : null;
+    undoRef.current = unit && undoable(snap, b) ? { snap, unit } : null;
     setCard(null);
     setMode({ kind: 'none' });
     setDash(false);
     flush();
-    if (!keepSelection && 'unit' in action) nextReady(action.unit);
+    if (!keepSelection && unit) nextReady(unit);
     return true;
+  };
+  const doAct = (action: Action, keepSelection = true) => perform([action], keepSelection);
+
+  /** Take back the last step: the battle as it was, every unit back where it stood. */
+  const undo = () => {
+    const u = undoRef.current;
+    const s = stageRef.current;
+    if (!u || !b || !s || !myTurn) return;
+    s.skip();
+    const rec = b as unknown as Record<string, unknown>;
+    for (const k of Object.keys(rec)) delete rec[k];
+    Object.assign(rec, structuredClone(u.snap));
+    cursor.current = b.events.length;
+    s.resync();
+    undoRef.current = null;
+    setSelected(u.unit);
+    setCard(null);
+    setMode({ kind: 'none' });
+    setDash(false);
+    refresh();
   };
 
   /** Act on a tapped cell; false when the tap did nothing (so a second one zooms). */
@@ -690,6 +799,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   const finishTurn = (auto = false) => {
     if (!b || !myTurn) return;
+    undoRef.current = null;
     setSelected(null);
     setCard(null);
     setMode({ kind: 'none' });
@@ -965,6 +1075,17 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 {me.name} · {statusLine(me)}
                 {!me.acted && !indirect ? (targets.length ? ` · ${targets.length} in sight` : ' · nothing in sight') : ''}
               </div>
+              {advice.length > 0 && (
+                <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-ink-900 py-1 pr-1 pl-3" data-testid="arena-advice">
+                  <div className="min-w-0 flex-1 text-[13px] leading-snug">
+                    <span className="font-semibold">Advice </span>
+                    <span className="text-muted">{adviceText(b, me, advice, visible)}</span>
+                  </div>
+                  <button type="button" onClick={() => perform(advice, !advice.some((a) => a.type !== 'move' && a.type !== 'face'))} className="v-btn v-btn-primary h-11 shrink-0 rounded-full px-4 text-[14px] font-semibold" data-testid="arena-do-it">
+                    Do It
+                  </button>
+                </div>
+              )}
               <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5">
                 {actions.map((a) => (
                   <button key={a.id} type="button" disabled={!a.ok} onClick={a.on} aria-pressed={a.pressed} className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${a.pressed ? 'bg-white text-black' : 'bg-ink-800 text-text'}`} data-testid={`arena-${a.id}`}>
@@ -1033,6 +1154,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 );
               })}
             </div>
+            {myTurn && undoRef.current && (
+              <button type="button" onClick={undo} className="v-btn v-btn-secondary h-[58px] shrink-0 px-3 text-[15px] font-semibold" data-testid="arena-undo" aria-label={`Undo the last move of ${b?.units.find((u) => u.id === undoRef.current?.unit)?.name ?? 'your unit'}`}>
+                Undo
+              </button>
+            )}
             <button type="button" disabled={!myTurn} onClick={() => finishTurn()} className={`v-btn h-[58px] shrink-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">
               {busy && ready ? 'Wait…' : readyCount ? (
                 <>
@@ -1188,12 +1314,20 @@ function StrikeCard({ info, smoke }: { info: StrikeInfo | null; smoke: boolean }
   );
 }
 
-export function ArenaScreen({ req, onDone }: { req: BattleRequest; onDone: (o: BattleOutcome) => void }) {
+export function ArenaScreen({ req: given, onDone }: { req: BattleRequest; onDone: (o: BattleOutcome) => void }) {
   const [phase, setPhase] = useState<'brief' | 'fight' | 'done'>('brief');
   const [result, setResult] = useState<{ r: ArenaResult; b: Battle } | null>(null);
+  // Skirmishes take the difficulty chosen here (remembered); war-map battles follow the campaign.
+  const [chosen, setChosen] = useState<Difficulty>(() => readSettings().difficulty);
+  const difficulty: Difficulty = given.skirmish ? chosen : (given.setup.difficulty ?? 'normal');
+  const req = useMemo(() => ({ ...given, setup: { ...given.setup, difficulty } }), [given, difficulty]);
+  const choose = (d: Difficulty) => {
+    setChosen(d);
+    writeSettings({ ...readSettings(), difficulty: d });
+  };
   return (
     <div className="no-select fixed inset-0 z-50 bg-ink-950" role="dialog" aria-label={req.title}>
-      {phase === 'brief' && <Brief req={req} onFight={() => setPhase('fight')} onQuick={() => onDone({ kind: 'quick' })} onBack={() => onDone({ kind: 'back' })} />}
+      {phase === 'brief' && <Brief req={req} onDifficulty={given.skirmish ? choose : undefined} onFight={() => setPhase('fight')} onQuick={() => onDone({ kind: 'quick' })} onBack={() => onDone({ kind: 'back' })} />}
       {phase !== 'brief' && (
         <Field
           req={req}

@@ -48,6 +48,11 @@ export function Manual({ onBack }: { onBack: () => void }) {
             destroy them or break them; after {ROUND_LIMIT} rounds the defenders have held. Win and the hex falls when the turn ends, unless the enemy there changes first,
             in which case the odds decide. Quick resolve skips the fight and uses the odds.
           </p>
+          <p className="mt-2 text-sm text-muted">
+            Stuck? Each unit offers advice (Do It plays it), Undo takes back a move that showed nothing new, and Best Shot finds its best target. Battles follow your
+            campaign's difficulty; skirmishes let you pick Easy, Normal or Hard. Pinch or use the buttons on the right to zoom, go back to your unit or see the whole
+            field; red arrows at the screen edge point to enemies you have seen.
+          </p>
           <p className="mt-2 text-xs text-muted">
             Units rank up with experience (Veteran, Elite, Ace: more armour, steadier aim). Research unlocks battle abilities. Stars earned in battle open Skirmishes, and each war won opens
             a new theatre.

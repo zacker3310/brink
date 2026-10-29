@@ -536,43 +536,69 @@ on a real iPhone is still unmeasured.
 Played on a 393 pt iPhone, v2 had these problems: tanks drew about 25 pt long and soldiers as specks;
 the camera opened high and nearly top-down; the move area was a 17% tint nobody saw; nothing said
 where the enemy was (the battle opened on "0 seen"); the brief said "Enemy Company 100%"; an action
-cam could end up inside a tree; and it was hard. v2.1 fixes the feel without touching the rules'
-numbers.
+cam could end up inside a tree; and it was hard. v2.1 fixes how it looks, moves and feels, and
+adds difficulty on top of the rules (sections 3 to 6 are unchanged).
 
 **See it**
 - Units drawn larger than life: vehicles 1.4x, soldiers 2.2x. The cells and the rules are unchanged.
-- A badge over every unit you can see: its silhouette, its strength bar, and whether it is suppressed,
-  on overwatch or done this turn. Blue for yours, red for theirs (APP-6 affiliation, not decoration).
-  Badges stay the same size on screen at every zoom, so the field reads even zoomed right out.
-- The move area has a solid edge and a stronger fill; the dash area a dashed edge.
-- Where the enemy is expected (the defenders' deployment area, which the war map tells you) is marked
-  until first contact, and the objective always is.
+- A badge over every unit you can see: its pictogram, its strength bar, and whether it is suppressed,
+  pinned, on overwatch or hunkered (a mark), or done this turn (dimmed). Light blue for yours, red for
+  theirs (APP-6 affiliation, not decoration). Badges stay the same size at every zoom and sit just
+  above the unit as drawn; zoomed far out they shrink to the pictogram. Action cams hide them.
+- Seen enemies off the screen get a red arrow at the edge (merged, with a count, when several lie
+  the same way); tapping it brings the camera there.
+- The move area has a solid edge and a stronger fill, and your own units no longer punch holes in
+  it; the dash area has a fainter edge. The advised move is drawn as a route.
+- Where the enemy is expected (the defenders' deployment area, which the war map tells you) is
+  ringed and labelled until first contact; the objective is labelled.
 
 **Move round it**
-- The camera opens close on your first unit, lower and more side-on, and follows whoever you select.
-- Buttons for zoom in, zoom out, back to the selected unit, and a whole-field view (tap again to go
-  back). Pinch zooms toward the fingers; double tap zooms in on that spot. Zoom runs from one tank
-  filling the screen to the whole field.
-- Action cams never pass through ground, trees or buildings, and only fire on kills and big hits.
+- The camera opens close over your line (a cell spans 30 points or more on a phone), lower and
+  more side-on (42 degrees, 40 degree lens), and glides to whichever unit you select.
+- Buttons for zoom in, zoom out, back to the selected unit, and the whole field (tap again to go
+  back where you were). Pinch and the mouse wheel zoom toward the fingers or pointer; a second tap
+  on empty ground zooms in there. Zoom runs from one tank filling the screen to the whole field.
+- During the enemy turn the camera visits what they do: both units when they fit on screen, the
+  target when they do not, and your unit when it is fired on from out of sight.
+- Action cams never pass through ground, trees or buildings (the eye rises until the line is
+  clear, or the shot is skipped), and a vehicle brewing up gets half a second of slow motion.
 
 **Feel it**
-- Every hit says what it did, over the target: Miss, Hit, Penetrated, Knocked Out, Two Down,
-  Suppressed, Pinned. Kills raise a line at the top ("Abrams 2 knocked out a T-72B3").
-- Two strength bars under the title: yours and theirs, with the mark where they break (35%) and
-  where you would (25%). Every hit moves them.
-- The enemy turn is shown: a banner, and the camera visits each thing they do.
-- A short round report before your turn: what you knocked out, what you lost.
+- Every hit says what it did, over the target, as the film reaches it: Miss, Bounced, Hit,
+  Penetrated, Knocked Out, Destroyed, Immobilised, Gun Out, Crew Hit, Two Down, One Wounded,
+  Suppressed, Pinned, Broken, Contact. Kills put a line under the title ("Abrams 2 knocked out a
+  T-72B3", "Lost Bradley 1 by a Kornet team").
+- Two strength bars under the title: yours exact, theirs as far as you have seen it fall, with the
+  marks where you break (25%) and where they pull back (35%). They move when the film is still.
+- The enemy turn has a banner and a Skip button; your turn opens with the round and a line on what
+  happened ("2 knocked out · 1 lost").
+- Best Shot on the unit card opens the shot card on its best target, even off screen.
 
 **Make it easier**
-- Difficulty for battles: Easy (default), Normal, Hard. War-map battles follow the campaign's
-  difficulty; skirmishes have their own choice. Easy gives your crews +15 to hit and theirs -15,
-  and the enemy fields a fifth fewer units; Normal +5 and -5; Hard is the rules as written with the
-  sharper AI. Measured with the AI's own planner in your seat: Easy should win at least 80%, Normal
-  about 55%, Hard about 35%.
-- Advice: every selected unit shows what a good commander would do with it (the AI's planner from
-  your side's view only) and Do It plays it.
-- Undo a move that revealed nothing and drew no dice (no enemy came into view, nobody fired).
-- The brief names what you know of the enemy (types seen, or an estimate of their size).
+- Difficulty: Easy (the default for skirmishes), Normal, Hard. War-map battles follow the campaign's
+  difficulty; skirmishes have their own choice on the brief, remembered. The table
+  (`DIFFICULTY` in `packages/arena/src/v2/rules.ts`) is a named part of every hit chance, so the
+  shot card shows it and the roll uses it:
+
+  | | Your aim | Their aim | Their company | Their skill |
+  |---|---|---|---|---|
+  | Easy | +30 | -30 | half (never under 6 units) | -0.5 |
+  | Normal | +10 | -10 | as built | 0 |
+  | Hard | -10 | +15 | as built | +0.1 |
+
+  Measured with the AI's own planner in your seat over the soak's 60 mixed setups: Easy wins 85%,
+  Normal 58%, Hard 35% (the rules as written win about 44%). A third of those setups attack with a
+  single formation, some with only guns or drones, and run out of rounds whatever the odds; with two
+  formations or more, Easy wins 91%.
+- Advice: the selected unit shows what a good commander would do with it, in words ("Move 4 cells
+  into the trees, then fire at the T-72B3 (64%)") and as a route on the field; Do It plays it. It is
+  planned from your side's picture only (`advise` in `ai.ts`), stops at the first action that rolls,
+  and Do It stops at the first action the battle refuses.
+- Undo takes back the last step when it drew no dice and showed nothing new (`undoable` in
+  `engine.ts`): a move, turn, overwatch, hunker, embark or dismount that revealed no enemy, met no
+  overwatch, mine or hidden unit, and changed no last-known position.
+- The brief tallies your company ("Abrams x4, Bradley...") and gives the scout report: about how
+  many they are and of what kinds.
 
 ## Sources
 

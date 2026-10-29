@@ -1,6 +1,8 @@
 // Render quality for the battle (docs/arena-v2.md, section 8). Phones start on Balanced, computers on
 // High; the battle menu changes it and the choice is remembered on this device.
 
+import type { Difficulty } from '@brink/arena';
+
 export type Quality = 'low' | 'balanced' | 'high';
 
 export interface QualityPreset {
@@ -34,6 +36,8 @@ export interface ArenaSettings {
   actionCams: boolean;
   /** Radio calls from your side. */
   radio: boolean;
+  /** How hard skirmishes are (war-map battles follow the campaign's difficulty). */
+  difficulty: Difficulty;
 }
 
 const KEY = 'brink.arena.settings.v1';
@@ -44,7 +48,7 @@ function isPhone(): boolean {
 }
 
 export function defaultSettings(): ArenaSettings {
-  return { quality: isPhone() ? 'balanced' : 'high', actionCams: true, radio: true };
+  return { quality: isPhone() ? 'balanced' : 'high', actionCams: true, radio: true, difficulty: 'easy' };
 }
 
 export function readSettings(): ArenaSettings {
@@ -57,6 +61,7 @@ export function readSettings(): ArenaSettings {
       quality: s.quality === 'low' || s.quality === 'balanced' || s.quality === 'high' ? s.quality : base.quality,
       actionCams: typeof s.actionCams === 'boolean' ? s.actionCams : base.actionCams,
       radio: typeof s.radio === 'boolean' ? s.radio : base.radio,
+      difficulty: s.difficulty === 'easy' || s.difficulty === 'normal' || s.difficulty === 'hard' ? s.difficulty : base.difficulty,
     };
   } catch {
     return base;

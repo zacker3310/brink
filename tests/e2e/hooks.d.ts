@@ -14,6 +14,10 @@ interface Window {
       round: number;
       turn: 'blue' | 'red';
       map: { w: number; h: number; redSpawn: { x: number; y: number }[] };
+      difficulty: 'easy' | 'normal' | 'hard';
+      ended: 'won' | 'lost' | null;
+      intel: { blue: Record<string, { now: boolean }> };
+      stats: { blue: { shots: number; hits: number; kills: number; lost: number } };
     } | null;
     /** A cell's centre on screen. */
     toScreen(x: number, y: number): { x: number; y: number };

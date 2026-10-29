@@ -14,7 +14,7 @@ Run from the repo root. Node 22+, pnpm 10.
 | api | `pnpm dev:api` (http://127.0.0.1:8787/api/health) |
 | all checks | `pnpm check` (typecheck, lint, unit tests) |
 | unit tests | `pnpm test` |
-| soak | `pnpm test:soak` (100 AI matches, `SOAK_MATCHES=20` for a quick run; 120 AI battles, `ARENA_SOAK=20`) |
+| soak | `pnpm test:soak` (100 AI matches, `SOAK_MATCHES=20` for a quick run; 60 battle setups at each of three difficulties, `ARENA_SOAK=20`) |
 | e2e | `pnpm test:e2e` (builds the web app, serves it on :4173, runs Chromium) |
 | build | `pnpm build` (web bundle in `apps/web/dist`) |
 

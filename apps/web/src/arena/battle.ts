@@ -69,6 +69,8 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
       defenders,
       arsenal: { blue: ARSENAL_OF[view.self.government], red: ARSENAL_OF[view.nations[owner]?.government ?? 'directorate'] },
       skill: enemySkill(view, defenders.length),
+      // Battles are as hard as the campaign.
+      difficulty: view.difficulty ?? 'normal',
       abilities: abilitiesFor(view.self.research.unlocked),
       theatre: view.scenarioId,
     },
