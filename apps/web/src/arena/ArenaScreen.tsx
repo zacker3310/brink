@@ -900,7 +900,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         const a = Math.atan2(n!.y - m!.y, n!.x - m!.x);
         const my = (m!.y + n!.y) / 2;
         if (pinch.current.d > 0 && d > 0) stage.zoomBy(pinch.current.d / d, { x: (m!.x + n!.x) / 2, y: my });
-        stage.orbitBy(-(a - pinch.current.a), (my - pinch.current.my) * 0.004);
+        // The map turns with the fingers (it used to turn against them).
+        stage.twistBy(Math.atan2(Math.sin(a - pinch.current.a), Math.cos(a - pinch.current.a)));
+        stage.orbitBy(0, (my - pinch.current.my) * 0.004);
         pinch.current = { d, a, my };
       } else if (p.moved && (p.button === 2 || e.shiftKey)) stage.orbitBy(-dx * 0.006, dy * 0.004);
       else if (p.moved) stage.panBy(dx, dy);
