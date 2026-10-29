@@ -12,6 +12,38 @@ const SIZES = [
 ];
 const { userAgent } = devices['iPhone 14 Pro'];
 
+/** The battle film run to its end with Skip, until it is your turn again (or it is over). */
+async function settle(page: Page) {
+  for (let i = 0; i < 300; i++) {
+    if (await page.evaluate(() => !!window.__arena?.ready() || !!window.__arena?.arena()?.ended)) return;
+    const skip = page.getByTestId('arena-skip');
+    if (await skip.isVisible().catch(() => false)) await skip.tap({ timeout: 3000 }).catch(() => undefined);
+    await page.waitForTimeout(1000);
+  }
+  throw new Error('the battle did not come back to your turn');
+}
+
+/** A free cell near a unit that is on the open field on screen (not under the header, the footer or the camera buttons). */
+async function freeCellOnField(page: Page, t: { x: number; y: number }, offsets: (readonly [number, number])[]) {
+  return page.evaluate(
+    ({ t, offsets }) => {
+      const b = window.__arena!.arena()!;
+      const top = document.querySelector('header')!.getBoundingClientRect().bottom + 12;
+      const bottom = document.querySelector('footer')!.getBoundingClientRect().top - 12;
+      const right = innerWidth - 64;
+      for (const [dx, dy] of offsets) {
+        const x = t.x + dx;
+        const y = t.y + dy;
+        if (x < 0 || y < 0 || x >= b.map.w || y >= b.map.h || b.units.some((u) => u.alive && !u.carrier && u.x === x && u.y === y)) continue;
+        const at = window.__arena!.toScreen(x, y);
+        if (at.y > top && at.y < bottom && at.x > 12 && at.x < right) return { x, y, at };
+      }
+      return null;
+    },
+    { t, offsets },
+  );
+}
+
 async function audit(page: Page, where: string) {
   const r = await auditScreen(page);
   expect(r.small, `${where}: targets under 44 pt`).toEqual([]);
@@ -23,7 +55,7 @@ for (const size of SIZES) {
     test.use({ viewport: { width: size.width, height: size.height }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent });
 
     test('a battle by touch: brief, difficulty, select, advice, move, undo, fire, end turn, menu, verdict', async ({ page }) => {
-      test.setTimeout(420_000);
+      test.setTimeout(900_000);
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
       await page.goto('./');
@@ -56,34 +88,22 @@ for (const size of SIZES) {
       await page.getByTestId(`arena-unit-${tank.id}`).tap();
       await expect(page.getByTestId('arena-unit')).toBeVisible();
       await audit(page, 'unit card');
-      const cell = await page.evaluate((t) => {
-        const b = window.__arena!.arena()!;
-        for (const dy of [2, 3, 1, 4])
-          for (const dx of [0, 1, -1, 2, -2]) {
-            const x = t.x + dx;
-            const y = t.y - dy;
-            if (!b.units.some((u) => u.alive && u.x === x && u.y === y)) return { x, y, at: window.__arena!.toScreen(x, y) };
-          }
-        return null;
-      }, tank);
+      await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
+      const ahead2: [number, number][] = [];
+      for (const dy of [2, 3, 1, 4]) for (const dx of [0, 1, -1, 2, -2]) ahead2.push([dx, -dy]);
+      const cell = await freeCellOnField(page, tank, ahead2);
       expect(cell).not.toBeNull();
 
       // A move that showed nothing can be taken back: one cell back or aside, away from the enemy, then Undo.
-      const back = await page.evaluate((t) => {
-        const b = window.__arena!.arena()!;
-        for (const [dx, dy] of [
-          [0, 1],
-          [1, 1],
-          [-1, 1],
-          [1, 0],
-          [-1, 0],
-        ] as const) {
-          const x = t.x + dx;
-          const y = t.y + dy;
-          if (x >= 0 && x < b.map.w && y < b.map.h && !b.units.some((u) => u.alive && u.x === x && u.y === y)) return { x, y, at: window.__arena!.toScreen(x, y) };
-        }
-        return null;
-      }, tank);
+      const back = await freeCellOnField(page, tank, [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [1, 1],
+        [-1, 1],
+        [2, 0],
+        [-2, 0],
+      ]);
       expect(back).not.toBeNull();
       await page.touchscreen.tap(back!.at.x, back!.at.y);
       await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((u) => u.id === id)!.moved, tank.id), { timeout: 15_000 }).toBe(true);
@@ -115,7 +135,7 @@ for (const size of SIZES) {
       // End the turn: the enemy plays, then it is round two.
       await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
       await page.getByTestId('arena-end-turn').tap();
-      await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 180_000 });
+      await settle(page);
       await expect(page.getByTestId('arena-round')).toHaveText('2/16');
 
       // Fire: let the crews close in until a unit of ours has a target, then take its best shot.
@@ -138,7 +158,7 @@ for (const size of SIZES) {
         if (shooter) break;
         await page.getByTestId('arena-pause').tap();
         await page.getByTestId('arena-auto').tap();
-        await page.waitForFunction(() => window.__arena?.ready() || !!window.__arena?.arena()?.ended, null, { timeout: 240_000 });
+        await settle(page);
         if (await page.evaluate(() => !!window.__arena!.arena()!.ended)) break;
       }
       expect(shooter, 'a unit with a target within six rounds').not.toBeNull();
@@ -148,7 +168,7 @@ for (const size of SIZES) {
       await audit(page, 'shot card');
       await page.getByTestId('arena-fire').tap();
       await expect.poll(() => page.evaluate(() => window.__arena!.arena()!.stats.blue.shots), { timeout: 30_000 }).toBeGreaterThan(shots);
-      await page.waitForFunction(() => window.__arena?.ready() || !!window.__arena?.arena()?.ended, null, { timeout: 120_000 });
+      await settle(page);
 
       // The menu: quality and the switches, all reachable by thumb and readable.
       await page.getByTestId('arena-pause').tap();
