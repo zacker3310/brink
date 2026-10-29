@@ -21,17 +21,20 @@ are in `docs/arena-v2.md`. This file is the guide to playing it and to the code.
 
 - Tap a unit (or its badge, or its tile in the company strip; Tab on a computer) to select it; the
   camera glides to it.
-- Inside its outline: where it can move this turn; **Dash** shows how far it can go if it does
-  nothing else. **Advice** says what a good commander would do with it and draws the route;
-  **Do It** plays it. **Undo** (beside End Turn) takes back a step that showed nothing new.
+- Inside its outline: where it can move this turn. Tap a cell to see the move (the route, cover or
+  open, what it could hit from there, who could hit it there), then **Move** or tap it again.
+  **Dash** shows how far it can go if it does nothing else. **Advice** says what a good commander
+  would do with it and draws the route; **Do It** plays it. **Undo** (beside End Turn) takes back a
+  step that showed nothing new. You can order the next unit while the last one is still moving.
 - Enemies it can shoot are ringed with the chance to hit. Tap one for the shot card: chance to hit,
   chance to penetrate the armour it faces and to kill, or the expected casualties, every modifier,
   and the weapons it could use. **Fire**, or tap the enemy again.
-- The unit card has the rest: Overwatch, Hunker, Smoke, Turn (vehicles), Dismount (carriers), Board
+- The unit card shows its three most useful actions; **More** has the rest: Overwatch, Hunker, Smoke, Turn (vehicles), Dismount (carriers), Board
   (infantry next to a carrier), Split and Join (squads), Treat (medics), Repair (recovery vehicles),
   Breach and Mine (engineers), Call Fire and Smoke Rounds (mortars and guns: tap any cell).
 - The support strip: HIMARS or Tornado-G rocket missions, and the abilities your research unlocked.
-- **End Turn** (Shift+Enter). The menu has *Let My Crews Play This Turn*, *Skip the Animation*,
+- **End Turn** (Shift+Enter); with units still ready it asks whether the crews should act for them
+  first. The menu has *Let My Crews Play This Turn*, *Skip the Animation*,
   Quality (Low, Balanced, High), Action Cams, Radio Calls and *Retreat*.
 - Drag to pan, pinch to zoom, twist two fingers to turn the view and slide them to tilt; with a mouse,
   right-drag orbits and the wheel zooms; Q and E turn. The buttons on the right zoom in and out, bring

@@ -600,6 +600,33 @@ adds difficulty on top of the rules (sections 3 to 6 are unchanged).
 - The brief tallies your company ("Abrams x4, Bradley...") and gives the scout report: about how
   many they are and of what kinds.
 
+## 12. Play flow (v2.2)
+
+After v2.1 the battle was still hard to play on a phone: orders were slow to give, decisions had
+little to go on, and the battle often sat on "Wait" after an order.
+
+**The Wait bug.** Every order marked the screen busy until its film ended. Overwatch and hunker
+log no events, so they have no film, nothing ended, and the screen stayed busy for good. It was
+found by a browser soak (every skirmish played through the real UI,
+unit by unit, films at full speed, timing each wait), and fixed at the root: the screen's busy
+state follows the film every frame. Defences behind it: a film step that throws is skipped and
+counted, a frame that throws puts the film right (`BattleStage.recover`), the frame loop asks for
+its next frame before doing anything, and a step that runs far past its length is ended.
+
+**Never wait on your own turn.** Your orders do not wait for the last one's film: select the next
+unit and order it while the tank is still driving. The camera goes to the next unit once the shot
+in progress has landed. Only the enemy's turn holds orders, and Skip ends it.
+
+**Moving.** Tapping a cell in the outline previews the move: the route, a mark where it ends, and a
+card that says how far and into what (cover or open), what the unit could hit from there (and how
+likely), and which of the enemies you know of could hit it there. Move, or a second tap on the cell,
+commits; Cancel or another cell changes your mind. Dashes say they end the turn.
+
+**Deciding.** The unit card leads with the advice and Do It, then the unit's three most useful
+actions for its kind (a mortar's Call Fire, a medic's Treat, a carrier's Dismount before Turn or
+Split); More shows the rest. End Turn with units still ready asks: let the crews act for them (the
+advice for each), end now, or keep playing.
+
 ## Sources
 
 Specifications: General Dynamics Land Systems (M1A2 SEPv3, M1126 Stryker, M10 Booker), Krauss-Maffei

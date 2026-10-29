@@ -246,6 +246,11 @@ function Tile({ u, active, onClick }: { u: Unit; active: boolean; onClick: () =>
   );
 }
 
+/** A deep copy of the battle: it is plain JSON (no structuredClone needed on older iPhones). */
+function copyBattle(b: Battle): Battle {
+  return JSON.parse(JSON.stringify(b)) as Battle;
+}
+
 /** Your strength exactly; theirs as far as you have seen it fall. */
 function strengths(b: Battle): { blue: number; red: number } {
   const start = (side: 'blue' | 'red') => b.units.filter((u) => u.side === side).reduce((s, u) => s + u.startValue, 0) || 1;
@@ -723,7 +728,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
    */
   const perform = (actions: Action[], keepSelection: boolean) => {
     if (!b || !actions.length) return false;
-    const snap = structuredClone(b);
+    const snap = copyBattle(b);
     let done = 0;
     for (const a of actions) {
       if (!act(b, a)) break;
@@ -750,7 +755,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     s.skip();
     const rec = b as unknown as Record<string, unknown>;
     for (const k of Object.keys(rec)) delete rec[k];
-    Object.assign(rec, structuredClone(u.snap));
+    Object.assign(rec, copyBattle(u.snap));
     cursor.current = b.events.length;
     s.resync();
     undoRef.current = null;
