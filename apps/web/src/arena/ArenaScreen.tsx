@@ -462,6 +462,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const footerRef = useRef<HTMLElement>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(true);
+  /** Danger Area: every seen enemy's reach shaded on the field. */
+  const [danger, setDanger] = useState(false);
+  /** One enemy's reach (a long-press on it), or null. */
+  const [reachOf, setReachOf] = useState<string | null>(null);
   /** The enemy's turn (or the opening) is playing: orders wait for it. Your own film never blocks you. */
   const [waiting, setWaiting] = useState(true);
   const waitingRef = useRef(true);
@@ -697,7 +701,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     const s = stageRef.current;
     if (!s || !b) return;
     const ghosts = Object.values(b.intel.blue).filter((g) => !g.now).map((g) => ({ x: g.x, y: g.y, type: g.type, age: b.turnIndex - g.turn }));
-    const o: Overlay = { selected: myTurn ? selected : null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts };
+    const o: Overlay = { selected: myTurn ? selected : null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts, danger, reachOf };
     if (myTurn && me) {
       const start = me.y * b.map.w + me.x;
       if (reach) o.reach = [...reach.cost.keys()].filter((i) => i !== start);
@@ -852,6 +856,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const tapAt = (x: number, y: number) => {
     const stage = stageRef.current;
     if (!stage || !b) return;
+    // A tap ends a long-press look at one enemy's reach.
+    if (reachOf) setReachOf(null);
     const c = stage.pick(x, y);
     const near = stage.unitNear(x, y, 30);
     const nearUnit = near ? b.units.find((u) => u.id === near) : undefined;
@@ -1146,6 +1152,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             <CamButton label={overview ? 'Back to Your View' : 'Whole Field'} testid="cam-overview" pressed={overview} onClick={() => setOverview(stageRef.current?.toggleOverview() ?? false)}>
               <path d="M4 7.5 9 5l6 2.5L20 5v11.5L15 19l-6-2.5L4 19Z M9 5v11.5M15 7.5V19" />
             </CamButton>
+            <CamButton label={danger ? 'Hide Danger Area' : 'Danger Area'} testid="cam-danger" pressed={danger} onClick={() => setDanger(!danger)}>
+              <path d="M12 3.5 21 19H3Z M12 9.5v4.5M12 16.6v.1" />
+            </CamButton>
           </div>
         </div>
       )}
@@ -1383,12 +1392,29 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 </button>
               ))}
             </div>
+            <div className="mt-2 text-[13px] font-semibold text-muted">Motion</div>
+            <div className="grid grid-cols-3 gap-1 rounded-xl bg-ink-900 p-1" role="radiogroup" aria-label="Motion">
+              {(['full', 'reduced', 'off'] as const).map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={settings.motion === m} onClick={() => changeSettings({ ...settings, motion: m })} className={`h-11 rounded-lg text-[14px] font-semibold ${settings.motion === m ? 'bg-white text-black' : 'text-text'}`} data-testid={`motion-${m}`}>
+                  {m === 'full' ? 'Full' : m === 'reduced' ? 'Reduced' : 'Off'}
+                </button>
+              ))}
+            </div>
+            <label className="flex min-h-12 items-center gap-3 rounded-xl bg-ink-900 px-4 py-2">
+              <span className="w-24 shrink-0 text-[15px] font-semibold">Shake</span>
+              <input type="range" min={0} max={100} step={10} value={settings.shake} disabled={settings.motion === 'off'} onChange={(e) => changeSettings({ ...settings, shake: Number(e.target.value) })} className="h-11 min-w-0 flex-1 accent-white disabled:opacity-40" aria-label="Screen shake" data-testid="setting-shake" />
+              <span className="w-12 shrink-0 text-right text-[14px] text-muted tabular-nums">{settings.motion === 'off' ? 'Off' : `${settings.shake}%`}</span>
+            </label>
             <ul className="divide-y divide-line overflow-hidden rounded-xl bg-ink-900">
               {(
                 [
                   ['actionCams', 'Action Cams', 'Short close-ups on big hits'],
                   ['radio', 'Radio Calls', 'Your crews call contacts and kills'],
                   ['fastEnemy', 'Fast Enemy Turns', 'Their turn plays at double speed'],
+                  ['endSheet', 'Ask Before Ending Turn', 'When units have not acted'],
+                  ['tips', 'Tips', 'A word when the board shows a mistake'],
+                  ['haptics', 'Haptics', 'A tick on Fire and End Turn'],
+                  ['perfOverlay', 'Show Frame Time', 'For measuring on your phone'],
                 ] as const
               ).map(([k, label, sub]) => (
                 <li key={k}>
@@ -1403,6 +1429,17 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                   </button>
                 </li>
               ))}
+              <li>
+                <button type="button" role="switch" aria-checked={settings.palette === 'colourblind'} onClick={() => changeSettings({ ...settings, palette: settings.palette === 'colourblind' ? 'standard' : 'colourblind' })} className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2 text-left" data-testid="setting-palette">
+                  <span>
+                    <span className="block text-[15px] font-semibold">Colour-Blind Palette</span>
+                    <span className="block text-[13px] text-muted">Blue and orange for friend and foe</span>
+                  </span>
+                  <span className={`relative h-7 w-12 shrink-0 rounded-full ${settings.palette === 'colourblind' ? 'bg-white' : 'bg-ink-700'}`} aria-hidden>
+                    <span className={`absolute top-0.5 h-6 w-6 rounded-full ${settings.palette === 'colourblind' ? 'left-[22px] bg-black' : 'left-0.5 bg-white'}`} />
+                  </span>
+                </button>
+              </li>
             </ul>
             <button
               type="button"

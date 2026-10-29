@@ -40,7 +40,24 @@ export interface ArenaSettings {
   difficulty: Difficulty;
   /** The enemy's turn plays at double speed. */
   fastEnemy: boolean;
+  /** Full motion; Reduced: no slow motion, camera punches or fly-tos (cuts instead); Off: as Reduced, with no shake either. */
+  motion: Motion;
+  /** Screen shake strength, 0..100 (%). */
+  shake: number;
+  /** A haptic tick on your own Fire and End Turn taps (iPhone). */
+  haptics: boolean;
+  /** Friend and foe in a colour-blind-safe pair (blue and orange), on top of the shapes. */
+  palette: Palette;
+  /** Short tips when the board shows a mistake worth knowing about, once per kind. */
+  tips: boolean;
+  /** End Turn with units still ready asks first. */
+  endSheet: boolean;
+  /** Frame time, pixel ratio and draw calls over the battle, for measuring on a device. */
+  perfOverlay: boolean;
 }
+
+export type Motion = 'full' | 'reduced' | 'off';
+export type Palette = 'standard' | 'colourblind';
 
 const KEY = 'brink.arena.settings.v1';
 
@@ -49,8 +66,30 @@ function isPhone(): boolean {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 820);
 }
 
+/** The system's reduced-motion preference sets the default motion. */
+function prefersReducedMotion(): boolean {
+  try {
+    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
 export function defaultSettings(): ArenaSettings {
-  return { quality: isPhone() ? 'balanced' : 'high', actionCams: true, radio: true, difficulty: 'easy', fastEnemy: true };
+  return {
+    quality: isPhone() ? 'balanced' : 'high',
+    actionCams: true,
+    radio: true,
+    difficulty: 'easy',
+    fastEnemy: true,
+    motion: prefersReducedMotion() ? 'reduced' : 'full',
+    shake: 100,
+    haptics: true,
+    palette: 'standard',
+    tips: true,
+    endSheet: true,
+    perfOverlay: false,
+  };
 }
 
 export function readSettings(): ArenaSettings {
@@ -65,6 +104,13 @@ export function readSettings(): ArenaSettings {
       radio: typeof s.radio === 'boolean' ? s.radio : base.radio,
       difficulty: s.difficulty === 'easy' || s.difficulty === 'normal' || s.difficulty === 'hard' ? s.difficulty : base.difficulty,
       fastEnemy: typeof s.fastEnemy === 'boolean' ? s.fastEnemy : base.fastEnemy,
+      motion: s.motion === 'full' || s.motion === 'reduced' || s.motion === 'off' ? s.motion : base.motion,
+      shake: typeof s.shake === 'number' && Number.isFinite(s.shake) ? Math.max(0, Math.min(100, Math.round(s.shake))) : base.shake,
+      haptics: typeof s.haptics === 'boolean' ? s.haptics : base.haptics,
+      palette: s.palette === 'standard' || s.palette === 'colourblind' ? s.palette : base.palette,
+      tips: typeof s.tips === 'boolean' ? s.tips : base.tips,
+      endSheet: typeof s.endSheet === 'boolean' ? s.endSheet : base.endSheet,
+      perfOverlay: typeof s.perfOverlay === 'boolean' ? s.perfOverlay : base.perfOverlay,
     };
   } catch {
     return base;

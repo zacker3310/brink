@@ -53,6 +53,10 @@ export interface Overlay {
   area: { at: Point; r: number } | null;
   /** Last known enemy positions. */
   ghosts: { x: number; y: number; type: TypeId; age: number }[];
+  /** Danger Area: shade every seen enemy's reach. */
+  danger: boolean;
+  /** Shade this one enemy's reach (a long-press on it), or null. */
+  reachOf: string | null;
 }
 
 interface Step {
@@ -150,7 +154,7 @@ export class BattleStage {
   private readonly destMark: THREE.Mesh;
   private pathLine: THREE.Mesh | null = null;
   private readonly ray = new THREE.Raycaster();
-  private overlay: Overlay = { selected: null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts: [] };
+  private overlay: Overlay = { selected: null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts: [], danger: false, reachOf: null };
   /** Fractions of the screen the HUD covers at the top and bottom (eased toward `wantHud`). */
   private hud: [number, number] = [0.12, 0.26];
   private wantHud: [number, number] = [0.12, 0.26];
