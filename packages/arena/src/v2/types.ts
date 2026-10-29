@@ -16,7 +16,9 @@ export const ZONE_RADIUS = 3.5;
 /** Highest elevation level. A level is about 4 m of relief at figure scale. */
 export const MAX_ELEV = 4;
 /** The defender withdraws when its force falls under this share of its starting value. */
-export const WITHDRAW_AT = 0.25;
+export const WITHDRAW_AT = 0.35;
+/** The attacker's company breaks (the battle is lost) under this share of its starting value. */
+export const BREAK_AT = 0.25;
 
 export interface Point {
   x: number;

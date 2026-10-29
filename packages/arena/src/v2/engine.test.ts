@@ -590,7 +590,11 @@ describe('AI tactics', () => {
     let flank = 0;
     for (let seed = 1; seed <= 3; seed++) {
       const b = autoBattle(createBattle(setup({ seed, terrain: 'plains', attackers: [{ id: 'f1', cls: 'armor', strength: 1000, name: 'A', color: '#000', rank: 0 }, { id: 'f2', cls: 'mechanized', strength: 1000, name: 'B', color: '#000', rank: 0 }], defenders: [{ id: 'e1', cls: 'armor', strength: 1000, name: 'C', color: '#000', rank: 0 }] })));
-      for (const e of b.events) if (e.type === 'impact') e.facing === 'front' ? front++ : flank++;
+      for (const e of b.events) {
+        if (e.type !== 'impact') continue;
+        if (e.facing === 'front') front++;
+        else flank++;
+      }
     }
     expect(front + flank).toBeGreaterThan(5);
     expect(flank).toBeGreaterThan(0);

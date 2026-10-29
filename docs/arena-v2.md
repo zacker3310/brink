@@ -67,8 +67,8 @@ snap -12. AD units on overwatch watch the sky only, with no snap penalty (radar 
 
 **Win**: destroy them, or (capitals, cities, objectives) end 2 rounds in a row with a unit in the
 amber circle (radius 3.5) and no defender in it. The defender withdraws (attacker wins) when its
-force falls under 25% of its starting value. Losing every unit, retreating, or reaching the end of
-round 16 loses. Stars: win; lose under 10% of your force value; win by round 9 or take under 20%.
+force falls under 35% of its starting value (combat ineffective); the attacker's company breaks (a
+loss) under 25%. Losing every unit, retreating, or reaching the end of round 16 loses. Stars: win; lose under 10% of your force value; win by round 9 or take under 20%.
 
 ### 3.2 Sight and fog
 

@@ -21,6 +21,7 @@ import {
   W,
   WALL,
   WATER,
+  BREAK_AT,
   WITHDRAW_AT,
   type Action,
   type ArenaResult,
@@ -986,9 +987,11 @@ export function holdingZone(b: Battle): boolean {
   return b.units.some((u) => u.side === 'blue' && inZone(u)) && !b.units.some((u) => u.side === 'red' && inZone(u));
 }
 
+/** A defender bled under a third of its strength pulls out; an attacker under a quarter breaks. */
 function withdrawCheck(b: Battle): void {
   if (b.ended) return;
   if (sideValue(b, 'red') < WITHDRAW_AT * startValue(b, 'red')) end(b, true, 'withdrew');
+  else if (sideValue(b, 'blue') < BREAK_AT * startValue(b, 'blue')) end(b, false, 'withdrew');
 }
 
 /**

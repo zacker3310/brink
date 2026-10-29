@@ -224,11 +224,25 @@ function objectiveAt(v: View, u: Unit, t: UnitType, p: Point): number {
       const clear = !v.enemies.some((e) => e.now && Math.hypot(e.x - z.x, e.y - z.y) <= z.r);
       return -d * 0.3 * urgency + (d <= z.r && !isFlying(t) ? (clear ? 2.5 : 1.2) * urgency : 0);
     }
-    const near = v.enemies.length ? Math.min(...v.enemies.map((e) => dist(e, p))) : p.y;
+    // Nothing known: search the ground a defender would hold (the map shows where that is).
+    const near = v.enemies.length ? Math.min(...v.enemies.map((e) => dist(e, p))) : dist(searchArea(b), p);
     return -Math.max(0, near - 6) * 0.22 * urgency;
   }
   if (z) return -Math.max(0, Math.hypot(p.x - z.x, p.y - z.y) - (z.r + 5)) * 0.35;
   return -Math.max(0, p.y - 26) * 0.2;
+}
+
+const searchCache = new WeakMap<Battle, Point>();
+
+/** The middle of the best defensive ground: where to look for a defender nobody has seen. */
+function searchArea(b: Battle): Point {
+  let p = searchCache.get(b);
+  if (!p) {
+    const top = b.map.redSpawn.slice(0, 30);
+    p = top.length ? { x: top.reduce((s, q) => s + q.x, 0) / top.length, y: top.reduce((s, q) => s + q.y, 0) / top.length } : { x: W / 2, y: 8 };
+    searchCache.set(b, p);
+  }
+  return p;
 }
 
 /** Keep the company together: no one charges far ahead of its friends. */
