@@ -24,7 +24,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('difficulty-normal').click();
   await page.getByTestId('start-game').click();
 
-  await expect(page.getByTestId('top-bar')).toContainText('BRINK');
+  // Building the world takes a few seconds (about 2.6 here, more with other tests running).
+  await expect(page.getByTestId('top-bar')).toContainText('BRINK', { timeout: 30_000 });
   await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
   await expect(page.getByTestId('turn')).toContainText('1 / 20');
   await expect(page.getByTestId('map-canvas')).toBeVisible();
