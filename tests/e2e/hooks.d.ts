@@ -10,7 +10,7 @@ interface Window {
   // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.
   __arena?: {
     arena(): {
-      units: { id: string; type: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean; moved: boolean; acted: boolean; carrier: string | null }[];
+      units: { id: string; type: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean; moved: boolean; acted: boolean; overwatch: boolean; carrier: string | null }[];
       round: number;
       turn: 'blue' | 'red';
       map: { w: number; h: number; redSpawn: { x: number; y: number }[] };

@@ -141,6 +141,20 @@ for (const size of SIZES) {
 
       // End the turn: the enemy plays, then it is round two.
       await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
+      // Overwatch plays no film: the battle must take the next order at once (it used to sit on
+      // "Wait" for good after one).
+      const watcher = await page.evaluate(() => window.__arena!.arena()!.units.find((u) => u.side === 'blue' && u.alive && !u.carrier && !u.moved && !u.acted)?.id ?? null);
+      if (watcher) {
+        await page.getByTestId(`arena-unit-${watcher}`).tap();
+        await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
+        if (!(await page.getByTestId('arena-overwatch').isVisible())) await page.getByTestId('arena-more').tap();
+        await page.getByTestId('arena-overwatch').tap();
+        await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((u) => u.id === id)!.overwatch, watcher)).toBe(true);
+        await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 15_000 });
+        await expect(page.getByTestId('arena-end-turn')).toBeEnabled();
+        await expect(page.getByTestId('arena-end-turn')).not.toContainText('Enemy Turn');
+      }
+
       // Units still ready: End Turn asks first.
       await page.getByTestId('arena-end-turn').tap();
       await expect(page.getByTestId('arena-end-confirm')).toBeVisible();
