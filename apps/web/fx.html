@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Brink effects preview</title>
+    <!-- Dev only: the production build builds index.html alone. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b0d0f;
+        color: #d9dde0;
+        font: 12px/1.3 system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+        overflow: hidden;
+      }
+      #view {
+        position: fixed;
+        inset: 0;
+      }
+      #view canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+      }
+      #ui {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: calc(8px + env(safe-area-inset-bottom));
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        pointer-events: none;
+      }
+      #ui button,
+      #ui select {
+        pointer-events: auto;
+        background: rgba(14, 17, 20, 0.82);
+        color: #e6e9eb;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 6px;
+        padding: 7px 9px;
+        font: inherit;
+        min-height: 32px;
+      }
+      #ui button.on {
+        border-color: #ffc23d;
+        color: #ffc23d;
+      }
+      #stats {
+        position: fixed;
+        top: calc(8px + env(safe-area-inset-top));
+        left: 8px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: rgba(14, 17, 20, 0.72);
+        font: 11px/1.4 ui-monospace, Menlo, monospace;
+        white-space: pre;
+        pointer-events: none;
+      }
+      .hide #ui,
+      .hide #stats {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="view"></div>
+    <div id="stats"></div>
+    <div id="ui"></div>
+    <script type="module" src="/src/arena/fx/preview.ts"></script>
+  </body>
+</html>
