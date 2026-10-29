@@ -217,9 +217,15 @@ function objectiveAt(v: View, u: Unit, t: UnitType, p: Point): number {
   const role = t.role;
   if (role === 'spg' || role === 'mortar' || role === 'arv' || role === 'medic' || role === 'fpv_team' || role === 'loiter_team') return 0;
   if (v.side === 'blue') {
-    if (z) return -Math.hypot(p.x - z.x, p.y - z.y) * 0.3;
+    // The clock presses the attacker: the pull toward the objective grows every round.
+    const urgency = 1 + b.round / 6;
+    if (z) {
+      const d = Math.hypot(p.x - z.x, p.y - z.y);
+      const clear = !v.enemies.some((e) => e.now && Math.hypot(e.x - z.x, e.y - z.y) <= z.r);
+      return -d * 0.3 * urgency + (d <= z.r && !isFlying(t) ? (clear ? 2.5 : 1.2) * urgency : 0);
+    }
     const near = v.enemies.length ? Math.min(...v.enemies.map((e) => dist(e, p))) : p.y;
-    return -Math.max(0, near - 6) * 0.22;
+    return -Math.max(0, near - 6) * 0.22 * urgency;
   }
   if (z) return -Math.max(0, Math.hypot(p.x - z.x, p.y - z.y) - (z.r + 5)) * 0.35;
   return -Math.max(0, p.y - 26) * 0.2;
@@ -227,11 +233,15 @@ function objectiveAt(v: View, u: Unit, t: UnitType, p: Point): number {
 
 /** Keep the company together: no one charges far ahead of its friends. */
 function cohesionAt(v: View, u: Unit, p: Point): number {
-  const ys = v.friends.filter((f) => f !== u && !isFlying(typeOf(f.type))).map((f) => f.y).sort((a, c) => a - c);
-  if (!ys.length) return 0;
+  // Measured against the fighting line, not the guns, medics and snipers behind it.
+  const ys = v.friends
+    .filter((f) => f !== u && !isFlying(typeOf(f.type)) && jobOf(f) === 'fight' || (f !== u && jobOf(f) === 'transport'))
+    .map((f) => f.y)
+    .sort((a, c) => a - c);
+  if (ys.length < 2) return 0;
   const mid = ys[Math.floor(ys.length / 2)]!;
   const ahead = v.side === 'blue' ? mid - p.y : p.y - mid;
-  return -Math.max(0, ahead - 7) * 0.4;
+  return -Math.max(0, ahead - 8) * 0.3;
 }
 
 interface Plan {
@@ -457,9 +467,23 @@ function decideUnit(v: View, u: Unit): Action | null {
       }
       if (best && best.value > 0.3) return tryAct(b, { type: 'fire', unit: u.id, target: best.id, weapon: w.id }, side);
     }
-    if (canMove && threatAt(v, u, t, u) > 0.1) {
-      const safe = safestCell(b, u);
-      const m = safe ? moveAction(u, safe) : null;
+    if (canMove) {
+      // Get within drone range of the enemy, from cover, out of its fire.
+      const range = w?.range ?? 20;
+      const reach = reachable(b, u, false, v.visible);
+      const front = v.enemies.length ? v.enemies : [{ x: W / 2, y: side === 'blue' ? 6 : 38 }];
+      let best: Point | null = null;
+      let score = -Infinity;
+      for (const i of reach.cost.keys()) {
+        const p = { x: i % W, y: Math.floor(i / W) };
+        const near = Math.min(...front.map((e) => dist(e, p)));
+        const s = -Math.max(0, near - (range - 4)) * 0.5 - threatAt(v, u, t, p) * 3 + coverAt(v, u, t, p, 1) + (noise(b, u.id, `v${i}`) - 0.5) * 0.3;
+        if (s > score) {
+          score = s;
+          best = p;
+        }
+      }
+      const m = best ? moveAction(u, best) : null;
       if (m && canAct(b, m, side)) return m;
     }
     return tryAct(b, { type: 'hunker', unit: u.id }, side);

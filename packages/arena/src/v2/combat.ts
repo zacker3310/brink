@@ -376,6 +376,7 @@ export function bestFire(b: Battle, shooter: Unit, target: Unit, from: Point = s
 export function shotValue(b: Battle, info: FireInfo, target: Unit): number {
   const t = typeOf(target.type);
   const hit = info.chance / 100;
+  if (t.mobility === 'drone') return hit * t.value;
   if (t.armour) {
     const kill = (info.kill ?? 0) / 100;
     // Saving ammunition: a missile is worth spending on armour, not on a jeep.
@@ -619,6 +620,11 @@ export function shoot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, ov
       suppress(b, target, 10);
       return;
     }
+  }
+  if (tt.mobility === 'drone') {
+    // A small drone has no armour and no crew aboard: any hit brings it down.
+    kill(b, target, 'shot_down', shooter.side);
+    return;
   }
   if (tt.armour) {
     const forced: { facing: Facing; turret: boolean } | undefined = drone ? { facing: info.facing ?? 'top', turret: false } : undefined;

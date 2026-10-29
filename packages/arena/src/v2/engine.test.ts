@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { UnitClass } from '@brink/contracts';
 import { decide, rejectedActions } from './ai';
 import { fireInfo, penChance, usableWeapons } from './combat';
-import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, strikeInfo, unitById } from './engine';
+import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, retreat, strikeInfo, unitById } from './engine';
 import { typeOf } from './roster';
 import { canSee, lineOfSight, visibleTo } from './sight';
 import { at, BUILDING, H, OPEN, RUBBLE, TREES, W, type Arsenal, type ArenaSetup, type Battle, type TypeId, type Unit, type UnitSpec, type WeaponKind } from './types';
@@ -407,6 +407,91 @@ describe('support', () => {
     b2.map.hp[at(b2.map, 15, 29)] = 80;
     expect(act(b2, { type: 'breach', unit: e2.id, at: { x: 15, y: 29 } })).toBe(true);
     expect(b2.map.cells[at(b2.map, 15, 29)]).toBe(RUBBLE);
+  });
+});
+
+describe('turns', () => {
+  it('an enemy on overwatch fires at the first unit that moves into its sights, and the walk is logged in legs', () => {
+    const b = bare(['m1a2'], ['t90m']);
+    const me = put(unit(b, 'm1a2'), 15, 44, NORTH);
+    const watch = put(unit(b, 't90m', 'red'), 15, 20, SOUTH);
+    // Behind a ridge at first; over it, in its sights.
+    for (let x = 0; x < W; x++) b.map.elev[at(b.map, x, 41)] = 2;
+    for (let x = 0; x < W; x++) b.map.elev[at(b.map, x, 42)] = 1;
+    for (let x = 0; x < W; x++) b.map.elev[at(b.map, x, 40)] = 1;
+    expect(canSee(b, watch, me)).toBe(false);
+    watch.overwatch = true;
+    expect(act(b, { type: 'move', unit: me.id, to: { x: 15, y: 38 } })).toBe(true);
+    const shot = b.events.find((e) => e.type === 'fire');
+    expect(shot).toMatchObject({ unit: watch.id, overwatch: true });
+    expect(watch.overwatch).toBe(false);
+    const legs = b.events.filter((e) => e.type === 'move');
+    expect(legs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('holding the zone two rounds with none of them in it takes it', () => {
+    const b = createBattle(setup({ seed: 2, terrain: 'urban', site: 'city', skill: 0, attackers: [spec('a', ['m1a2'])], defenders: [spec('x', ['squad_e'])] }));
+    const z = b.map.zone!;
+    const me = b.units.find((u) => u.side === 'blue')!;
+    const them = b.units.find((u) => u.side === 'red')!;
+    me.crew = 4;
+    for (let r = 0; r < 2 && !b.ended; r++) {
+      put(me, z.x, z.y);
+      put(them, 0, 0);
+      them.men = them.men.map(() => ({ role: 'rifleman', state: 'fit' }));
+      endTurn(b);
+    }
+    expect(b.ended).toBe('won');
+    expect(b.endReason).toBe('captured');
+  });
+
+  it('the defenders hold when the rounds run out; retreat is a loss that keeps what survived', () => {
+    const b = bare(['m1a2'], ['t90m']);
+    put(unit(b, 'm1a2'), 0, 44);
+    put(unit(b, 't90m', 'red'), 29, 0);
+    for (let x = 0; x < W; x++) b.map.elev[at(b.map, x, 22)] = 4;
+    for (let i = 0; i < 20 && !b.ended; i++) {
+      // Nobody moves: the clock runs out.
+      for (const u of b.units) u.mobilityKill = true;
+      endTurn(b);
+    }
+    expect(b.ended).toBe('lost');
+    expect(b.endReason).toBe('time');
+    expect(b.round).toBe(16);
+    const c = bare(['m1a2', 'squad_w'], ['t90m']);
+    retreat(c);
+    const r = arenaResult(c);
+    expect(r.won).toBe(false);
+    expect(r.kept.b).toBe(1000);
+    expect(r.stars).toBe(0);
+  });
+
+  it('research abilities work once each', () => {
+    const b = bare(['m1a2', 'squad_w'], ['squad_e', 't90m'], { abilities: ['repair', 'airstrike', 'missiles', 'sweep', 'mines', 'armor'] });
+    const tank = put(unit(b, 'm1a2'), 15, 40);
+    tank.mobilityKill = true;
+    expect(act(b, { type: 'ability', id: 'repair', unit: tank.id })).toBe(true);
+    expect(tank.mobilityKill).toBe(false);
+    expect(act(b, { type: 'ability', id: 'repair', unit: tank.id })).toBe(false);
+    const sq = put(unit(b, 'squad_e', 'red'), 15, 10);
+    const before = sq.men.filter((m) => m.state === 'fit').length;
+    expect(act(b, { type: 'ability', id: 'airstrike', at: { x: 15, y: 10 } })).toBe(true);
+    expect(sq.men.filter((m) => m.state === 'fit').length < before || sq.supp > 0).toBe(true);
+    expect(act(b, { type: 'ability', id: 'sweep' })).toBe(true);
+    expect(visibleTo(b, 'blue').has(unit(b, 't90m', 'red').id)).toBe(true);
+    expect(act(b, { type: 'ability', id: 'missiles' })).toBe(true);
+    expect(b.precision).toBe(3);
+    expect(act(b, { type: 'ability', id: 'mines', at: { x: 15, y: 30 } })).toBe(true);
+    expect(b.mines.length).toBeGreaterThanOrEqual(4);
+    // Composite armour is passive: thicker fronts on your tanks.
+    const t90 = put(unit(b, 't90m', 'red'), 15, 30, SOUTH);
+    put(tank, 15, 36, NORTH);
+    const plain = bare(['m1a2'], ['t90m']);
+    const pt = put(unit(plain, 'm1a2'), 15, 36, NORTH);
+    const p90 = put(unit(plain, 't90m', 'red'), 15, 30, SOUTH);
+    const withArmour = fireInfo(b, t90, tank, weapon(t90, 'cannon'), t90, false, new Set([tank.id]))!;
+    const without = fireInfo(plain, p90, pt, weapon(p90, 'cannon'), p90, false, new Set([pt.id]))!;
+    expect(withArmour.pen!).toBeLessThan(without.pen!);
   });
 });
 

@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { UNIT_CLASSES, type TechId, type UnitClass } from '@brink/contracts';
-import { ABILITIES as V1_ABILITIES, abilitiesFor as v1AbilitiesFor, RANKS as V1_RANKS, rankOf as v1RankOf } from '../rules';
+// v1's ranks and ability techs, frozen here when v1 was retired: saves, the war-map UI and research
+// depend on them staying the same.
+const V1_RANKS = [
+  { name: 'Recruit', from: 0, aim: 0 },
+  { name: 'Veteran', from: 15, aim: 5 },
+  { name: 'Elite', from: 35, aim: 9 },
+  { name: 'Ace', from: 60, aim: 13 },
+] as const;
+const v1RankOf = (xp: number) => V1_RANKS.reduce((r, k, i) => (xp >= k.from ? i : r), 0);
+const V1_ABILITIES = { repair: { tech: 'logistics_doctrine' }, sweep: { tech: 'signals_intelligence' }, mines: { tech: 'industrial_automation' }, airstrike: { tech: 'combined_arms' }, missiles: { tech: 'precision_munitions' }, armor: { tech: 'composite_armor' } } as const;
+const v1AbilitiesFor = (unlocked: readonly string[]) => (Object.keys(V1_ABILITIES) as (keyof typeof V1_ABILITIES)[]).filter((a) => unlocked.includes(V1_ABILITIES[a].tech)).sort();
 import { buildForce, companySize, TEMPLATES, type UnitSeed } from './forces';
 import { isAircraft, isFoot, isVehicle, primary, SUPPORT, TYPE_IDS, TYPES, typeOf } from './roster';
 import { ABILITIES, abilitiesFor, RANKS, rankFromSkill, rankOf } from './rules';
