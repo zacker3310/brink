@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-10-28 (overhaul pass 1). Milestone 1 (first playable).
+Updated 2026-10-29 (arena v2). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -192,6 +192,39 @@ Updated 2026-10-28 (overhaul pass 1). Milestone 1 (first playable).
     debris and burning wrecks. Pan, pinch and follow camera. The battle is its own lazy chunk.
   - Fixed: the first frame after building a battle stepped time backwards (a stalled scene glowed).
 
+- Arena v2, combined-arms battles (`docs/arena-v2.md`, `docs/arena.md`), replacing the 1.6.0 battle:
+  - A 30 x 45 field (150 m a cell) built from the hex in five biomes (temperate, steppe, desert,
+    winter, dense urban), dawn, day, dusk or night, clear, overcast, rain, fog or snow. XCOM-style side
+    turns, 16 rounds, capture by holding the zone two rounds, defenders withdraw under 35% of their
+    strength, a broken attack ends under 25%.
+  - Companies of 10 to 16 from your formations and arsenal (US, European, Russian, legacy): 50 unit
+    types with public specifications (M1A2 SEPv3, Leopard 2A7, Challenger 3, T-72B3, T-90M, T-80BVM,
+    Bradley, BMP-3, CV90, Stryker, M10 Booker, AH-64E, Ka-52, Mi-24, AH-6, UH-60, Mi-8, Javelin,
+    Kornet, Stinger, snipers, mortars, engineers, FPV, Switchblade, Paladin, 2S19, HIMARS, Gepard,
+    Tunguska, recovery vehicles, medics and more).
+  - Rules: armour by facing against penetration, component hits (mobility, firepower, crew,
+    catastrophic) by stowage, APS, soldiers who fall one at a time and take firepower with them,
+    suppression that lowers aim and breaks units, hull-down on reverse slopes, smoke that blocks sight
+    for a turn, embark and dismount, carriers that burn with their squad inside, squads that split
+    into fireteams, medics and recovery, engineers who breach, mine and smoke, called fire that is
+    only as good as its observer, drones that can be shot down.
+  - AI from its own side's picture only, never the dice: suppresses then flanks, smokes before open
+    ground, pulls damaged units back, hunts helicopters with air defence, calls fire on what it sees.
+  - Look: every vehicle, helicopter, drone and soldier built in code from real dimensions (the
+    Apache GLB aside), biome-true ground, buildings that crumble, craters and wrecks that stay, lit
+    smoke, tracers, burning wrecks, rotor wash, thermal at night and in fog, orbit camera and action
+    cams; calibre-true sound and radio calls. Low, Balanced and High quality, remembered.
+  - Saves, career stars and the war-map contract (`ArenaBattle`) are unchanged; the eight skirmish
+    ids keep their stars and four new skirmishes join them.
+  - Measured, 120 AI-against-AI battles (`ARENA_SOAK`): the attacker wins 44%, 66 end in a
+    withdrawal, 16 by capture, 38 at the round limit; median 9 rounds (p90 16); 0 rejected AI
+    actions; about 1.6 s a battle. Attackers win 21% with 10 or 11 units, 69% with 14 to 16.
+  - Frame time on an emulated iPhone 13 (CPU 4x slower, software WebGL, so our JavaScript only; First Blood, 20
+    units):
+    Low p50 9.1 ms, p95 17.4 ms, 46 draw calls, 118k triangles; Balanced 12.1 / 30.4 ms, 54 calls,
+    202k; High 13.5 / 61.4 ms, 54 calls, 297k. Battle opens in 7.5, 11.2 and 15.8 s on that
+    throttled CPU. Battle art 1.5 MB, battle code 1.0 MB.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
@@ -199,10 +232,11 @@ Updated 2026-10-28 (overhaul pass 1). Milestone 1 (first playable).
 
 - Balance: of 100 soak matches, 38 end by domination, 19 by supremacy, 43 on score at the turn
   limit (median turn 28). Next lever: AI deadlock-breaking (concentration, artillery before assaults).
-- Arena: tested in Chromium (iPhone 14 Pro emulation with SwiftShader WebGL and desktop), not yet on a
-  real iPhone GPU; frame rate on older phones unmeasured (2048 px shadows and about 2,500 grass
-  instances are the levers if it drops). The infantry slide between cells (no walk cycle yet). New nations per theatre not done (same four
-  powers on new ground).
+- Arena: tested in Chromium (iPhone 13 and 14 Pro emulation, software WebGL, and desktop), not on a
+  real iPhone GPU; GPU frame time is unmeasured. Weakest spots: soldiers read as mannequins close up,
+  T-80BVM and T-72B3 look alike, close-up paint is too clean, trees and house fronts repeat close up,
+  rotor wash and the biggest fireballs are the weakest effects. The AI never splits squads; all-fog,
+  all-artillery and all-drone attacks often run to the round limit. New nations per theatre not done.
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
 ## Blockers
@@ -211,6 +245,7 @@ None.
 
 ## Next recommended tasks
 
-1. Play the turn-based battles on a real iPhone: frame rate, touch feel, audio unlock; tune skill.
-2. New nations for the later theatres.
-3. More skirmishes and arena props per terrain. 5. Shareable end-of-game recap. 6. Haptics and a landscape layout on phones.
+1. Play the arena on a real iPhone: GPU frame time per quality, touch feel, audio unlock.
+2. Arena art close up: soldier faces and gear, T-80 turret, paint wear; rotor wash and fireballs.
+3. AI fireteam splits; break all-artillery and all-drone stalemates.
+4. New nations for the later theatres. 5. Shareable end-of-game recap. 6. Haptics and landscape.
