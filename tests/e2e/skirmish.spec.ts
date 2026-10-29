@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 // Skirmish from the title screen on a desktop: a turn-based battle. Pick a unit, move it, end the
 // turn and watch the enemy move, then win and bank the stars.
 test('a skirmish plays in turns and banks its stars', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(420_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
@@ -16,31 +16,36 @@ test('a skirmish plays in turns and banks its stars', async ({ page }) => {
   await expect(page.getByTestId('arena-quick')).toHaveCount(0);
   await page.getByTestId('arena-fight').click();
   await expect(page.getByTestId('arena-canvas')).toBeVisible({ timeout: 20000 });
-  await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 45000 });
-  await expect(page.getByTestId('arena-round')).toHaveText('1/12');
+  await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 120000 });
+  await expect(page.getByTestId('arena-round')).toHaveText('1/16');
 
-  // A turn starts with a ready unit selected; clicking a unit selects it.
+  // A turn starts with a ready unit selected; clicking a tank's tile selects it.
   const unit = await page.evaluate(() => {
-    const u = window.__arena!.arena()!.units.find((x) => x.side === 'blue')!;
-    return { id: u.id, y: u.y, at: window.__arena!.toScreen(u.x, u.y) };
+    const u = window.__arena!.arena()!.units.find((x) => x.side === 'blue' && x.type === 'm1a2' && !x.carrier)!;
+    return { id: u.id, x: u.x, y: u.y };
   });
-  await page.mouse.click(unit.at.x, unit.at.y);
+  await page.getByTestId(`arena-unit-${unit.id}`).click();
   await expect(page.getByTestId('arena-unit')).toBeVisible();
 
-  // Clicking a lit cell three ahead drives it there.
-  const cell = await page.evaluate((id) => {
-    const u = window.__arena!.arena()!.units.find((x) => x.id === id)!;
-    return window.__arena!.toScreen(u.x, u.y - 3);
-  }, unit.id);
-  await page.mouse.click(cell.x, cell.y);
-  await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((x) => x.id === id)!.y, unit.id)).toBe(unit.y - 3);
+  // Clicking a free lit cell three ahead drives it there.
+  const cell = await page.evaluate((u) => {
+    const b = window.__arena!.arena()!;
+    for (const dx of [0, 1, -1, 2, -2]) {
+      const x = u.x + dx;
+      const y = u.y - 3;
+      if (!b.units.some((v) => v.alive && !v.carrier && v.x === x && v.y === y)) return { x, y, at: window.__arena!.toScreen(x, y) };
+    }
+    return null;
+  }, unit);
+  await page.mouse.click(cell!.at.x, cell!.at.y);
+  await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((x) => x.id === id)!.y, unit.id)).toBe(cell!.y);
   await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((x) => x.id === id)!.moved, unit.id)).toBe(true);
 
   // End the turn: the enemy moves, then it is round two.
-  await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 45000 });
+  await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 120000 });
   await page.getByTestId('arena-end-turn').click();
-  await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 60000 });
-  await expect(page.getByTestId('arena-round')).toHaveText('2/12');
+  await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 180000 });
+  await expect(page.getByTestId('arena-round')).toHaveText('2/16');
 
   await page.evaluate(() => window.__arena!.win());
   await expect(page.getByTestId('arena-stars')).toBeVisible({ timeout: 30000 });

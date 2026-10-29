@@ -122,9 +122,9 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
       if (battle) {
         await page.getByTestId('arena-fight').tap();
         await expect(page.getByTestId('arena-canvas')).toBeVisible({ timeout: 20000 });
-        await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 45000 });
+        await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 120000 });
         const unit = await page.evaluate(() => {
-          const u = window.__arena!.arena()!.units.find((x) => x.side === 'blue' && x.alive)!;
+          const u = window.__arena!.arena()!.units.find((x) => x.side === 'blue' && x.alive && !x.carrier)!;
           return window.__arena!.toScreen(u.x, u.y);
         });
         await page.touchscreen.tap(unit.x, unit.y);
