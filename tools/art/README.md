@@ -25,3 +25,11 @@ are not committed; fetch them from the repositories named in the credits.
    the game finds the T-72's `turret` and `hull` and the Apache's `heli_rotor` and `heli_tail` by name.
 7. **Sky** (`public/art/env/park.exr`): the base64 EXR in `@pmndrs/assets/hdri/park.exr.js`, decoded
    to a file.
+8. **Radio calls** (`radio.py`, `public/art/radio`): short calls from your side ("Contact front!",
+   "Target destroyed.") spoken by Kokoro-82M through kokoro-onnx, two takes a call in different
+   American male voices, then band-passed to 300 to 3,400 Hz, lightly compressed and saturated,
+   laid over static with a squelch click on key-up and a noise tail on release, and written as mono
+   40 kbps MP3 (each under 9 KB) with `manifest.json`. Needs ffmpeg and, in a virtualenv,
+   `pip install kokoro-onnx soundfile`; download `kokoro-v1.0.onnx` and `voices-v1.0.bin` from the
+   kokoro-onnx release `model-files-v1.0` into a folder outside the repo, then run
+   `python -I tools/art/radio.py --model <dir>/kokoro-v1.0.onnx --voices <dir>/voices-v1.0.bin`.

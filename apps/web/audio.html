@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Battle audio</title>
+    <!-- Dev only: `pnpm dev`, then /audio.html. Vite builds index.html alone, so this never ships. -->
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d0f10;
+        --panel: #16191b;
+        --line: #2a2f33;
+        --text: #e6e8e9;
+        --muted: #9aa3a8;
+        --accent: #c9a66b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p {
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+      }
+      h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--accent);
+        margin: 0 0 8px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 0;
+        flex-wrap: wrap;
+      }
+      .name {
+        min-width: 190px;
+        color: var(--muted);
+      }
+      button {
+        min-height: 36px;
+        min-width: 56px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #20252a;
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:active {
+        background: #2c333a;
+      }
+      #meter {
+        font: 13px ui-monospace, monospace;
+        color: var(--accent);
+        padding: 6px 0;
+      }
+      pre {
+        font: 12px ui-monospace, monospace;
+        white-space: pre-wrap;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Battle audio</h1>
+    <p>Weapon reports by calibre at near, mid and far range, impacts, engines, rotors, drones, radio calls and a firefight. Tap once to start sound.</p>
+    <div id="app"></div>
+    <script type="module" src="/src/arena/audio/audition.ts"></script>
+  </body>
+</html>
