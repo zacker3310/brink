@@ -38,6 +38,8 @@ export interface ArenaSettings {
   radio: boolean;
   /** How hard skirmishes are (war-map battles follow the campaign's difficulty). */
   difficulty: Difficulty;
+  /** The enemy's turn plays at double speed. */
+  fastEnemy: boolean;
 }
 
 const KEY = 'brink.arena.settings.v1';
@@ -48,7 +50,7 @@ function isPhone(): boolean {
 }
 
 export function defaultSettings(): ArenaSettings {
-  return { quality: isPhone() ? 'balanced' : 'high', actionCams: true, radio: true, difficulty: 'easy' };
+  return { quality: isPhone() ? 'balanced' : 'high', actionCams: true, radio: true, difficulty: 'easy', fastEnemy: true };
 }
 
 export function readSettings(): ArenaSettings {
@@ -62,6 +64,7 @@ export function readSettings(): ArenaSettings {
       actionCams: typeof s.actionCams === 'boolean' ? s.actionCams : base.actionCams,
       radio: typeof s.radio === 'boolean' ? s.radio : base.radio,
       difficulty: s.difficulty === 'easy' || s.difficulty === 'normal' || s.difficulty === 'hard' ? s.difficulty : base.difficulty,
+      fastEnemy: typeof s.fastEnemy === 'boolean' ? s.fastEnemy : base.fastEnemy,
     };
   } catch {
     return base;

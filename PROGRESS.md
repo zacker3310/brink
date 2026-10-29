@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-10-29 (arena v2). Milestone 1 (first playable).
+Updated 2026-10-29 (arena v2.2). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -226,6 +226,24 @@ Updated 2026-10-29 (arena v2). Milestone 1 (first playable).
     throttled CPU. The largest battle (Last Stand, 32 units, fog) on Balanced: 18.3 / 54.2 ms, 86
     calls, 268k; unthrottled 4.7 / 13.1 ms, almost all of it native WebGL in the software
     rasteriser. Battle art 1.5 MB, battle code 1.0 MB.
+
+- Arena v2.1 and v2.2, a battle you can play on a phone (`docs/arena-v2.md` sections 11 and 12):
+  - Fixed: the battle often sat on "Wait" for good after an order. Overwatch and hunker log no
+    events, so the screen's hand-set busy flag was never cleared; busy now follows the film. Film
+    steps that throw are skipped, the frame loop cannot be stopped, and an overlong step is ended.
+    Found and checked with a browser soak that plays every skirmish through the real UI.
+  - Your own turn never blocks; moves preview first (route, cover, what you could hit from there,
+    who could hit you there); advice with Do It; Undo for a step that showed nothing; the unit card
+    shows its three most useful actions; End Turn with units ready offers to let the crews act;
+    fast enemy turns (on by default) and Skip.
+  - Units drawn 1.4x (vehicles) and 2.2x (soldiers); a closer, lower camera that follows your
+    selection; zoom, back-to-unit and whole-field buttons; pinch toward the fingers; badges over
+    every unit; edge arrows to seen enemies off screen; words over targets as hits land; a kill
+    feed; strength bars; a round report; action cams that never clip.
+  - Difficulty: Easy (default for skirmishes), Normal, Hard; war battles follow the campaign.
+    Measured with the AI in your seat over 60 setups: Easy 85%, Normal 58%, Hard 35%.
+  - Tested: navigation and the full touch flow at 375 x 667, 393 x 852 and 440 x 956 with 44 pt and
+    4.5:1 audits; 126 arena unit tests.
 
 ## Outstanding
 

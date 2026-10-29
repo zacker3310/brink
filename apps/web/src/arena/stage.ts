@@ -638,8 +638,16 @@ export class BattleStage {
   // --- Overlay -------------------------------------------------------------------------------------
 
   /** The film's queue, for tests: steps waiting, whether an action cam runs, the clock. */
-  filmState(): { steps: number; cam: boolean; clock: number; settled: boolean; faults: number } {
-    return { steps: this.steps.length, cam: this.cam !== null, clock: this.clock, settled: this.settled, faults: this.faults };
+  filmState(): { steps: number; cam: boolean; clock: number; settled: boolean; faults: number; camera: number[] } {
+    const r = (v: number) => Math.round(v * 1000) / 1000;
+    return {
+      steps: this.steps.length,
+      cam: this.cam !== null,
+      clock: this.clock,
+      settled: this.settled,
+      faults: this.faults,
+      camera: [this.focus.x, this.focus.y, this.focus.z, this.wantFocus.x, this.wantFocus.y, this.wantFocus.z, this.dist, this.wantDist, this.tilt, this.wantTilt, this.yaw, this.wantYaw].map(r),
+    };
   }
 
   /** What the overlay shows, for tests. */

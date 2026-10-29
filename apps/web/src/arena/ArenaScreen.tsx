@@ -463,6 +463,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   /** The enemy's turn (or the opening) is playing: orders wait for it. Your own film never blocks you. */
   const [waiting, setWaiting] = useState(true);
   const waitingRef = useRef(true);
+  const fastRef = useRef(true);
   /** A unit to bring the camera to once the film in progress has played. */
   const pendingFocus = useRef<string | null>(null);
   /** Ending the turn with units still ready asks first. */
@@ -486,6 +487,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   /** The strength bars, read when the film is still so they never run ahead of it. */
   const [bars, setBars] = useState({ blue: 1, red: 1 });
   const [settings, setSettings] = useState<ArenaSettings>(() => readSettings());
+  fastRef.current = settings.fastEnemy;
   const [thermal, setThermal] = useState(false);
   const [overview, setOverview] = useState(false);
   const [feed, setFeed] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'plain' }[]>([]);
@@ -554,7 +556,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         const stage = stageRef.current;
         if (!stage) return;
         try {
-          if (!document.hidden) stage.frame(dt);
+          // Their turn at double speed, if you like it brisk (the default).
+          if (!document.hidden) stage.frame(waitingRef.current && fastRef.current ? dt * 2 : dt);
         } catch (e) {
           console.warn('battle frame failed; the film is put right', e);
           stage.recover();
@@ -1363,6 +1366,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 [
                   ['actionCams', 'Action Cams', 'Short close-ups on big hits'],
                   ['radio', 'Radio Calls', 'Your crews call contacts and kills'],
+                  ['fastEnemy', 'Fast Enemy Turns', 'Their turn plays at double speed'],
                 ] as const
               ).map(([k, label, sub]) => (
                 <li key={k}>
