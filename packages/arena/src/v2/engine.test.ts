@@ -531,6 +531,72 @@ describe('AI', () => {
   }, BATTLES);
 });
 
+describe('AI tactics', () => {
+  it('pulls a damaged vehicle back out of the guns that can see it', () => {
+    const b = bare(['m1a2'], ['t90m']);
+    const me = put(unit(b, 'm1a2'), 15, 30, NORTH);
+    const them = put(unit(b, 't90m', 'red'), 15, 16, SOUTH);
+    me.crew = 2;
+    me.optics = true;
+    b.intel.blue[them.id] = { unit: them.id, type: them.type, x: them.x, y: them.y, turn: b.turnIndex, now: true };
+    // Woods to fall back into on one side.
+    for (let y = 30; y <= 36; y++) for (let x = 20; x <= 24; x++) b.map.elev[at(b.map, x, y)] = 0;
+    for (let x = 0; x < W; x++) b.map.elev[at(b.map, x, 33)] = 1;
+    const a = decide(b, 'blue');
+    expect(a?.type).toBe('move');
+    if (a?.type === 'move') expect(a.to.y).toBeGreaterThan(me.y);
+  });
+
+  it('air defence goes for the helicopter first', () => {
+    const b = bare(['m1a2', 'ah64e'], ['tunguska']);
+    put(unit(b, 'm1a2'), 14, 30, NORTH);
+    put(unit(b, 'ah64e'), 18, 28, NORTH);
+    const ad = put(unit(b, 'tunguska', 'red'), 16, 18, SOUTH);
+    b.turn = 'red';
+    b.turnIndex = 1;
+    for (const u of b.units) b.intel.red[u.id] = { unit: u.id, type: u.type, x: u.x, y: u.y, turn: 1, now: true };
+    const a = decide(b, 'red');
+    expect(a).toMatchObject({ type: 'fire', unit: ad.id, target: unit(b, 'ah64e').id });
+  });
+
+  it('lays smoke before crossing open ground under known guns', () => {
+    let smoked = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const b = bare(['m1a2', 'm1a2', 'mortar_w'], ['t90m'], { seed });
+      const [t1, t2] = b.units.filter((u) => u.type === 'm1a2');
+      put(t1!, 14, 40, NORTH);
+      put(t2!, 16, 40, NORTH);
+      put(unit(b, 'mortar_w'), 15, 44);
+      const them = put(unit(b, 't90m', 'red'), 15, 22, SOUTH);
+      // Their tank on a rise watching the open ground.
+      b.map.elev[at(b.map, 15, 22)] = 1;
+      b.intel.blue[them.id] = { unit: them.id, type: them.type, x: them.x, y: them.y, turn: 0, now: true };
+      them.revealed = 1;
+      for (let i = 0; i < 6; i++) {
+        const a = decide(b, 'blue');
+        if (!a) break;
+        if ((a.type === 'strike' && a.smoke) || a.type === 'smoke') {
+          smoked++;
+          break;
+        }
+        if (!act(b, a)) break;
+      }
+    }
+    expect(smoked).toBeGreaterThanOrEqual(3);
+  });
+
+  it('suppresses, then works round the side: across battles most hits on armour are not on the front', () => {
+    let front = 0;
+    let flank = 0;
+    for (let seed = 1; seed <= 3; seed++) {
+      const b = autoBattle(createBattle(setup({ seed, terrain: 'plains', attackers: [{ id: 'f1', cls: 'armor', strength: 1000, name: 'A', color: '#000', rank: 0 }, { id: 'f2', cls: 'mechanized', strength: 1000, name: 'B', color: '#000', rank: 0 }], defenders: [{ id: 'e1', cls: 'armor', strength: 1000, name: 'C', color: '#000', rank: 0 }] })));
+      for (const e of b.events) if (e.type === 'impact') e.facing === 'front' ? front++ : flank++;
+    }
+    expect(front + flank).toBeGreaterThan(5);
+    expect(flank).toBeGreaterThan(0);
+  }, BATTLES);
+});
+
 describe('battles', () => {
   it('a strong force beats a weak one, and a hopeless one loses', () => {
     let won = 0;

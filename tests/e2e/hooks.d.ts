@@ -10,10 +10,10 @@ interface Window {
   // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.
   __arena?: {
     arena(): {
-      units: { id: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean; moved: boolean; acted: boolean }[];
+      units: { id: string; type: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean; moved: boolean; acted: boolean; carrier: string | null }[];
       round: number;
       turn: 'blue' | 'red';
-      stats: { shots: number };
+      map: { w: number; h: number };
     } | null;
     /** A cell's centre on screen. */
     toScreen(x: number, y: number): { x: number; y: number };
@@ -21,5 +21,7 @@ interface Window {
     ready(): boolean;
     win(): void;
     lose(): void;
+    /** Frame timing: ms of the game's own work per frame, and what the GPU was asked to draw. */
+    perf(): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
   };
 }

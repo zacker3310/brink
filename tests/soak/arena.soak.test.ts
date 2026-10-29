@@ -76,6 +76,7 @@ describe(`arena soak (${BATTLES} battles)`, () => {
     const ms: number[] = [];
     let rejected = 0;
     let units = 0;
+    const used: Record<string, number> = { smoke: 0, 'called fire': 0, 'off-map rockets': 0, 'drone strikes': 0, dismounts: 0, splits: 0, treated: 0, repairs: 0, 'AD shots at aircraft': 0, 'hits front': 0, 'hits side or rear': 0, 'hits top': 0 };
     for (let seed = 1; seed <= BATTLES; seed++) {
       const setup = setupFor(seed);
       const t0 = performance.now();
@@ -97,6 +98,22 @@ describe(`arena soak (${BATTLES} battles)`, () => {
       reasons[b.endReason ?? 'none'] = (reasons[b.endReason ?? 'none'] ?? 0) + 1;
       rounds.push(b.round);
       units += b.units.length;
+      const typeById = new Map(b.units.map((u) => [u.id, u.type]));
+      for (const e of b.events) {
+        if (e.type === 'smoke') used.smoke!++;
+        else if (e.type === 'fire') {
+          if (e.unit.startsWith('support:')) used['off-map rockets']!++;
+          else if (e.kind === 'mortar' || e.kind === 'howitzer') used['called fire']!++;
+          else if (e.kind === 'fpv' || e.kind === 'loiter') used['drone strikes']!++;
+          const shooter = typeById.get(e.unit);
+          const target = e.target ? typeById.get(e.target) : undefined;
+          if (shooter && target && (typeOf(shooter).role === 'spaa' || typeOf(shooter).role === 'aa_team') && (typeOf(target).mobility === 'heli' || typeOf(target).mobility === 'drone')) used['AD shots at aircraft']!++;
+        } else if (e.type === 'dismount') used.dismounts!++;
+        else if (e.type === 'split') used.splits!++;
+        else if (e.type === 'treat') used.treated!++;
+        else if (e.type === 'repair') used.repairs!++;
+        else if (e.type === 'impact') used[e.facing === 'front' ? 'hits front' : e.facing === 'top' ? 'hits top' : 'hits side or rear']!++;
+      }
       for (const u of b.units) {
         const k = (kills[u.type] ??= [0, 0]);
         k[1]++;
@@ -114,6 +131,7 @@ describe(`arena soak (${BATTLES} battles)`, () => {
     for (const [k, m] of Object.entries(by)) console.log(`attacker wins by ${k}`, pct(m));
     console.log('loss rate by type', Object.fromEntries(Object.entries(kills).sort().map(([k, [d, n]]) => [k, `${Math.round((d / n) * 100)}% of ${n}`])));
     console.log('units per battle', Math.round(units / BATTLES), 'ms per battle median', Math.round(ms[Math.floor(ms.length / 2)]!), 'p95', Math.round(ms[Math.floor(ms.length * 0.95)]!));
+    console.log('tactics used', used);
     console.log('rejected AI actions', rejected);
     expect(rejected).toBe(0);
   });
