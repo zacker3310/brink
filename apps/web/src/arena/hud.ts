@@ -38,6 +38,8 @@ interface Badge {
   bar: HTMLElement;
   mark: HTMLElement;
   key: string;
+  /** What was last written, so a frame that changes nothing writes nothing (no style work). */
+  last: string;
 }
 
 interface Callout {
@@ -67,7 +69,7 @@ export class FieldHud {
   readonly el: HTMLDivElement;
   private readonly badges = new Map<string, Badge>();
   private readonly labels = new Map<string, HTMLDivElement>();
-  private readonly pointers = new Map<string, { el: HTMLButtonElement; arrow: HTMLElement; count: HTMLElement }>();
+  private readonly pointers = new Map<string, { el: HTMLButtonElement; arrow: HTMLElement; count: HTMLElement; last: string }>();
   private callouts: Callout[] = [];
   private clock = 0;
 
@@ -105,17 +107,23 @@ export class FieldHud {
         track.appendChild(bar);
         el.append(glyph, mark, track);
         this.el.appendChild(el);
-        b = { el, bar, mark, key };
+        b = { el, bar, mark, key, last: '' };
         this.badges.set(s.id, b);
       }
+      const x = s.at ? Math.round(s.at.x) : 0;
+      const y = s.at ? Math.round(s.at.y) : 0;
+      const hp = Math.round(Math.max(0, Math.min(1, s.hp)) * 100);
+      const now = s.at ? `${x},${y},${hp},${s.status},${+s.done}${+s.selected}${+compact}` : 'hidden';
+      if (now === b.last) continue;
+      const was = b.last;
+      b.last = now;
       if (!s.at) {
         b.el.style.display = 'none';
         continue;
       }
-      b.el.style.display = '';
-      b.el.style.transform = `translate(${Math.round(s.at.x)}px, ${Math.round(s.at.y)}px) translate(-50%, -100%)`;
-      b.bar.style.width = `${Math.round(Math.max(0, Math.min(1, s.hp)) * 100)}%`;
-      b.el.dataset.hp = s.hp < 0.34 ? 'low' : s.hp < 0.67 ? 'mid' : 'high';
+      if (was === 'hidden' || was === '') b.el.style.display = '';
+      b.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+      b.bar.style.width = `${hp}%`;
       if (b.mark.dataset.status !== s.status) {
         b.mark.dataset.status = s.status;
         b.mark.innerHTML = MARKS[s.status];
@@ -156,12 +164,15 @@ export class FieldHud {
           this.onPointer(p.id);
         });
         this.el.appendChild(el);
-        ptr = { el, arrow, count };
+        ptr = { el, arrow, count, last: '' };
         this.pointers.set(p.id, ptr);
       }
-      ptr.el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -50%)`;
-      ptr.arrow.style.transform = `rotate(${p.angle.toFixed(3)}rad)`;
       const n = p.count && p.count > 1 ? String(p.count) : '';
+      const now = `${Math.round(p.x)},${Math.round(p.y)},${p.angle.toFixed(2)},${n}`;
+      if (now === ptr.last) continue;
+      ptr.last = now;
+      ptr.el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -50%)`;
+      ptr.arrow.style.transform = `rotate(${p.angle.toFixed(2)}rad)`;
       if (ptr.count.textContent !== n) ptr.count.textContent = n;
     }
     for (const [id, ptr] of this.pointers)
@@ -200,6 +211,9 @@ export class FieldHud {
       this.labels.set(id, el);
     }
     if (el.textContent !== text) el.textContent = text;
+    const now = at ? `${Math.round(at.x)},${Math.round(at.y)}` : 'hidden';
+    if (el.dataset.last === now) return;
+    el.dataset.last = now;
     el.style.display = at ? '' : 'none';
     if (at) el.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px) translate(-50%, -50%)`;
   }
