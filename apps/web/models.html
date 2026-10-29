@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brink unit models</title>
+    <!-- Dev only: the production build bundles index.html alone. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #9aa3a6; overflow: hidden; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+      #stats { position: fixed; right: 8px; top: 8px; max-height: 96vh; overflow: auto; background: rgba(10, 12, 12, 0.78); color: #d7dbd6; font: 11px/1.35 ui-monospace, monospace; padding: 8px 10px; border-radius: 6px; white-space: pre; }
+      #stats.hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <pre id="stats" class="hidden"></pre>
+    <script type="module" src="/src/arena/models3d/preview.ts"></script>
+  </body>
+</html>
