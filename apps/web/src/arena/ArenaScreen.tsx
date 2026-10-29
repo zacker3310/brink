@@ -458,6 +458,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const libRef = useRef<Library | null>(null);
   const cursor = useRef(0);
   const labelsRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(true);
   /** The enemy's turn (or the opening) is playing: orders wait for it. Your own film never blocks you. */
@@ -517,11 +519,29 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     refresh();
   };
 
+  /** How much of the screen the header and footer cover now, as fractions of its height. */
+  const hudNow = (): [number, number] => {
+    const box = host.current?.getBoundingClientRect();
+    const head = headerRef.current?.getBoundingClientRect();
+    const foot = footerRef.current?.getBoundingClientRect();
+    if (!box || !box.height) return [0.15, 0.3];
+    return [head ? (head.bottom - box.top) / box.height : 0.15, foot ? (box.bottom - foot.top) / box.height : 0.3];
+  };
+  // The camera keeps the unit you are working with in the middle of the field you can see, as the
+  // cards at the bottom grow and shrink.
+  useEffect(() => {
+    const ro = new ResizeObserver(() => stageRef.current?.setHud(...hudNow()));
+    if (headerRef.current) ro.observe(headerRef.current);
+    if (footerRef.current) ro.observe(footerRef.current);
+    if (host.current) ro.observe(host.current);
+    return () => ro.disconnect();
+  }, []);
+
   const buildStage = (b: Battle, lib: Library | null, quality: Quality) => {
     const el = host.current!;
     stageRef.current?.dispose();
     const s = new BattleStage(el, b, { quality, settings, lib, arsenal, onFeed: pushFeed });
-    s.setHud(0.15, 0.3);
+    s.setHud(...hudNow(), true);
     stageRef.current = s;
     return s;
   };
@@ -1019,7 +1039,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         ))}
       </div>
 
-      <header className="vercel safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-10">
+      <header ref={headerRef} className="vercel safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-10" data-testid="arena-header">
         <div className="pointer-events-auto mx-2 mt-1.5 flex items-center gap-2 rounded-2xl bg-black/80 px-3 py-1.5 backdrop-blur">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[12px] font-semibold text-muted">
@@ -1136,7 +1156,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         </div>
       )}
 
-      <footer className="vercel safe-bottom safe-x absolute inset-x-0 bottom-0 z-10">
+      <footer ref={footerRef} className="vercel safe-bottom safe-x absolute inset-x-0 bottom-0 z-10" data-testid="arena-footer">
         <div className="mx-2 mb-1.5 rounded-2xl bg-black/85 p-2 backdrop-blur">
           {card?.kind === 'move' && b && me && (
             <MoveCard

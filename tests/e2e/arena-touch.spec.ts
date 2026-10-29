@@ -28,8 +28,8 @@ async function freeCellOnField(page: Page, t: { x: number; y: number }, offsets:
   return page.evaluate(
     ({ t, offsets }) => {
       const b = window.__arena!.arena()!;
-      const top = document.querySelector('header')!.getBoundingClientRect().bottom + 12;
-      const bottom = document.querySelector('footer')!.getBoundingClientRect().top - 12;
+      const top = document.querySelector('[data-testid="arena-header"]')!.getBoundingClientRect().bottom + 12;
+      const bottom = document.querySelector('[data-testid="arena-footer"]')!.getBoundingClientRect().top - 12;
       const right = innerWidth - 64;
       for (const [dx, dy] of offsets) {
         const x = t.x + dx;
@@ -55,10 +55,12 @@ for (const size of SIZES) {
     test.use({ viewport: { width: size.width, height: size.height }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent });
 
     test('a battle by touch: brief, difficulty, select, advice, move, undo, fire, end turn, menu, verdict', async ({ page }) => {
-      test.setTimeout(900_000);
+      test.setTimeout(1_800_000);
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
       await page.goto('./');
+      // Action cams off until the menu step turns them on: the test machine renders WebGL in software.
+      await page.evaluate(() => localStorage.setItem('brink.arena.settings.v1', JSON.stringify({ quality: 'balanced', actionCams: false, radio: true, difficulty: 'easy', fastEnemy: true })));
       await page.getByTestId('menu-skirmish').tap();
       await page.getByTestId('skirmish-first-blood').tap();
       await expect(page.getByTestId('arena-brief')).toBeVisible();
@@ -95,15 +97,9 @@ for (const size of SIZES) {
       expect(cell).not.toBeNull();
 
       // A move that showed nothing can be taken back: one cell back or aside, away from the enemy, then Undo.
-      const back = await freeCellOnField(page, tank, [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [1, 1],
-        [-1, 1],
-        [2, 0],
-        [-2, 0],
-      ]);
+      const aside: [number, number][] = [];
+      for (const dy of [0, 1, 2]) for (const dx of [1, -1, 2, -2, 0, 3, -3]) if (dx || dy) aside.push([dx, dy]);
+      const back = await freeCellOnField(page, tank, aside);
       expect(back).not.toBeNull();
       // The first tap shows where it would go and what that means; Move commits.
       await page.touchscreen.tap(back!.at.x, back!.at.y);

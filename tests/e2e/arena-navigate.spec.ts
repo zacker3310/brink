@@ -36,10 +36,12 @@ for (const size of SIZES) {
     test.use({ viewport: { width: size.width, height: size.height }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent });
 
     test('zoom, pinch, drag, back to the unit, whole field, toward the enemy', async ({ page }) => {
-      test.setTimeout(420_000);
+      test.setTimeout(1_200_000);
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
       await page.goto('./');
+      // Low quality: the test machine renders WebGL in software.
+      await page.evaluate(() => localStorage.setItem('brink.arena.settings.v1', JSON.stringify({ quality: 'low', actionCams: false, radio: false, difficulty: 'easy', fastEnemy: true })));
       await page.getByTestId('menu-skirmish').tap();
       await page.getByTestId('skirmish-first-blood').tap();
       await page.getByTestId('arena-fight').tap();

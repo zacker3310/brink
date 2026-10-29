@@ -151,7 +151,9 @@ export class BattleStage {
   private pathLine: THREE.Mesh | null = null;
   private readonly ray = new THREE.Raycaster();
   private overlay: Overlay = { selected: null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts: [] };
+  /** Fractions of the screen the HUD covers at the top and bottom (eased toward `wantHud`). */
   private hud: [number, number] = [0.12, 0.26];
+  private wantHud: [number, number] = [0.12, 0.26];
   // Orbit camera: a focus on the ground, a heading round it, a tilt and a distance.
   private readonly focus = new THREE.Vector3(W / 2, 0, H - 8);
   private readonly wantFocus = new THREE.Vector3(W / 2, 0, H - 8);
@@ -392,8 +394,10 @@ export class BattleStage {
   // --- Camera ------------------------------------------------------------------------------------
 
   /** The HUD covers the top and bottom of the screen; keep the battlefield framed between them. */
-  setHud(top: number, bottom: number): void {
-    this.hud = [top, bottom];
+  setHud(top: number, bottom: number, now = false): void {
+    const clamp = (v: number) => Math.max(0, Math.min(0.6, Number.isFinite(v) ? v : 0));
+    this.wantHud = [clamp(top), clamp(bottom)];
+    if (now) this.hud = [...this.wantHud];
   }
 
   resize(): void {
@@ -416,15 +420,19 @@ export class BattleStage {
   }
 
   private placeCamera(): void {
-    // The focus sits in the middle of the band between the HUD bars.
-    const band = (this.hud[1] - this.hud[0]) * 0.5;
+    // The focus (the unit you are working with) sits in the middle of the band of field between the
+    // HUD bars: the point the camera looks at moves toward the camera so the focus rises above the
+    // screen's middle when the bottom bar is the taller, and the other way round. Exact for flat
+    // ground: the focus is seen `delta` above the view axis, which puts it at that band's middle.
     const half = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const shift = this.dist * band * half;
-    const fx = this.focus.x - Math.sin(this.yaw) * shift;
-    const fz = this.focus.z - Math.cos(this.yaw) * shift;
-    const gy = this.ground(this.focus.x, this.focus.z);
+    const delta = Math.atan((this.hud[1] - this.hud[0]) * half);
+    const h = Math.sin(this.tilt) * this.dist;
     const r = Math.cos(this.tilt) * this.dist;
-    this.camera.position.set(fx + Math.sin(this.yaw) * r, gy + Math.sin(this.tilt) * this.dist, fz + Math.cos(this.yaw) * r);
+    const s = h / Math.tan(Math.max(0.05, this.tilt - delta)) - r;
+    const fx = this.focus.x + Math.sin(this.yaw) * s;
+    const fz = this.focus.z + Math.cos(this.yaw) * s;
+    const gy = this.ground(this.focus.x, this.focus.z);
+    this.camera.position.set(fx + Math.sin(this.yaw) * r, gy + h, fz + Math.cos(this.yaw) * r);
     if (this.shake > 0) this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake));
     this.camera.lookAt(fx, gy, fz);
     this.camera.updateMatrixWorld(true);
@@ -438,6 +446,8 @@ export class BattleStage {
     this.yaw = lerpAngle(this.yaw, this.wantYaw, k);
     this.tilt += (this.wantTilt - this.tilt) * k;
     this.dist += (this.wantDist - this.dist) * k;
+    this.hud[0] += (this.wantHud[0] - this.hud[0]) * k;
+    this.hud[1] += (this.wantHud[1] - this.hud[1]) * k;
     if (this.cam) {
       // An action cam: low and close, then back to the planning view.
       const c = this.cam;
@@ -492,7 +502,15 @@ export class BattleStage {
 
   /** The camera has arrived where it was going (nothing on screen will shift under a tap). */
   get settled(): boolean {
-    return !this.cam && this.focus.distanceTo(this.wantFocus) < 0.02 && Math.abs(this.dist - this.wantDist) < 0.02 && Math.abs(this.tilt - this.wantTilt) < 0.002 && Math.abs(wrap(this.yaw - this.wantYaw)) < 0.002;
+    return (
+      !this.cam &&
+      this.focus.distanceTo(this.wantFocus) < 0.02 &&
+      Math.abs(this.dist - this.wantDist) < 0.02 &&
+      Math.abs(this.tilt - this.wantTilt) < 0.002 &&
+      Math.abs(wrap(this.yaw - this.wantYaw)) < 0.002 &&
+      Math.abs(this.hud[0] - this.wantHud[0]) < 0.002 &&
+      Math.abs(this.hud[1] - this.wantHud[1]) < 0.002
+    );
   }
 
   /** How far in the camera is, 0 (closest) to 1 (whole field). */
