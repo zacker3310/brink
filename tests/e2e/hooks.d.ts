@@ -13,7 +13,7 @@ interface Window {
       units: { id: string; type: string; side: 'blue' | 'red'; x: number; y: number; alive: boolean; moved: boolean; acted: boolean; carrier: string | null }[];
       round: number;
       turn: 'blue' | 'red';
-      map: { w: number; h: number };
+      map: { w: number; h: number; redSpawn: { x: number; y: number }[] };
     } | null;
     /** A cell's centre on screen. */
     toScreen(x: number, y: number): { x: number; y: number };

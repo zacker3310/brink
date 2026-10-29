@@ -342,6 +342,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   /** What happened since your last turn, shown with the round banner. */
   const [report, setReport] = useState<string | null>(null);
   const tally0 = useRef({ killed: 0, lost: 0 });
+  const lastSeen = useRef<Set<string> | null>(null);
+  /** What the screen last drew: your turn, with a unit selected (for the ready hook). */
+  const drawn = useRef({ myTurn: false, selected: false });
   /** The strength bars, read when the film is still so they never run ahead of it. */
   const [bars, setBars] = useState({ blue: 1, red: 1 });
   const [settings, setSettings] = useState<ArenaSettings>(() => readSettings());
@@ -438,7 +441,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       window.__arena = {
         arena: () => battleRef.current,
         toScreen: (x, y) => stageRef.current!.toScreen(x, y),
-        ready: () => !!stageRef.current && !stageRef.current.busy && stageRef.current.settled && battle.turn === 'blue' && !battle.ended,
+        ready: () => !!stageRef.current && !stageRef.current.busy && stageRef.current.settled && battle.turn === 'blue' && !battle.ended && drawn.current.myTurn && drawn.current.selected,
         win: () => {
           for (const u of battle.units) if (u.side === 'red') u.alive = false;
           battle.ended = 'won';
@@ -484,7 +487,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const b = battleRef.current;
   const myTurn = !!b && ready && !busy && b.turn === 'blue' && !b.ended;
   const me = b && selected ? b.units.find((u) => u.id === selected && u.alive && !u.carrier) : undefined;
-  const visible = useMemo(() => (b && myTurn ? visibleTo(b, 'blue') : new Set<string>()), [b, myTurn, busy, b?.events.length]);
+  // Your side's picture, which only changes as the film ends (so the count never runs ahead of it).
+  const visible = useMemo(() => (b && ready && !busy ? visibleTo(b, 'blue') : (lastSeen.current ?? new Set<string>())), [b, ready, busy, b?.events.length]);
+  lastSeen.current = visible;
   const reach = useMemo(() => (b && me && myTurn ? reachable(b, me, false, visible) : null), [b, me, myTurn, me?.x, me?.y, me?.moved, me?.acted, visible]);
   const dashReach = useMemo(() => (b && me && myTurn && dash ? reachable(b, me, true, visible) : null), [b, me, myTurn, dash, me?.x, me?.y, me?.moved, me?.acted, visible]);
   const targets = useMemo(() => {
@@ -522,6 +527,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     if (myTurn && (mode.kind === 'support' || (mode.kind === 'ability' && mode.id === 'airstrike')) && hover) o.area = { at: hover, r: mode.kind === 'support' && mode.asset === 'tornado' ? 2 : 1 };
     if (card?.kind === 'support') o.area = { at: card.at, r: card.asset === 'tornado' ? 2 : 1 };
     s.setOverlay(o);
+    drawn.current = { myTurn, selected: !!o.selected || !b.units.some((u) => u.side === 'blue' && u.alive && !u.acted && !u.carrier) };
   });
 
   // The camera brings the selected unit into view; a new turn starts with a ready unit selected.
