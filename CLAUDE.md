@@ -23,8 +23,8 @@ Run these, do not guess them. Healthy output is shown so a wrong result is obvio
 | test | `pnpm test` | every package `Tests  N passed`, turbo `successful` |
 | lint | `pnpm lint` | turbo `N successful, N total` |
 | types | `pnpm typecheck` | turbo `N successful, N total` |
-| soak | `pnpm test:soak` | `endings {...} rejected AI orders 0`, `1 passed` |
-| e2e | `pnpm test:e2e` | `1 passed` |
+| soak | `pnpm test:soak` | `endings {...} rejected AI orders 0`, `rejected AI actions 0`, `2 passed` |
+| e2e | `pnpm test:e2e` | every spec `passed`, the 3 frame-time probes `skipped` (`ARENA_PERF=1` runs them) |
 | build | `pnpm build` | `apps/web/dist/index.html` written |
 | run | `pnpm dev` | Vite on http://localhost:5173 |
 
@@ -32,7 +32,8 @@ Run these, do not guess them. Healthy output is shown so a wrong result is obvio
 
 Design system: `docs/design-system.md` (APP-6 symbols, tokens, type).
 Entry points: `packages/simulation/src/resolve.ts` (`resolveTurn`), `packages/session/src/session.ts`
-(`GameSession`), `apps/web/src/engine.worker.ts`. State lives in one plain-JSON `WorldState`; the UI and
+(`GameSession`), `apps/web/src/engine.worker.ts`; the battle: `packages/arena/src/v2/engine.ts` (`act`,
+`endTurn`), spec `docs/arena-v2.md`. State lives in one plain-JSON `WorldState`; the UI and
 AI only ever see `NationView` from `fog.ts`. Balance numbers are authored in `packages/game-data`.
 
 ## Conventions
@@ -47,6 +48,9 @@ AI only ever see `NationView` from `fog.ts`. Balance numbers are authored in `pa
 - A test fixture nation without a city is eliminated at the end of the turn - `makeWorld()` gives each one.
 - Units on unowned ground are out of supply and lose 10 strength in logistics - account for it in asserts.
 - Playwright reuses a running server on :4173 - kill stale `vite preview` before e2e after a rebuild.
+- Playwright 1.64.1 wants its own Chromium; on a machine with another one set `PW_CHROMIUM=<path>`.
+- The arena (`packages/arena`) is the one place with a seeded stream: its state rides in `Battle.stream`,
+  drawn only through `draw()`. AI choices use hash noise, never the stream.
 
 ## Shipping contract
 

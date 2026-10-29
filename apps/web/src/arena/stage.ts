@@ -158,7 +158,7 @@ export class BattleStage {
     host.appendChild(this.renderer.domElement);
 
     const lib = opts.lib;
-    this.world = buildWorld(this.renderer, this.scene, battle.map, battle.conditions, opts.quality, battle.seed, lib ? { hesco: lib.hesco, container: lib.container, tower: lib.tower } : undefined);
+    this.world = buildWorld(this.renderer, this.scene, battle.map, battle.conditions, opts.quality, battle.seed, lib ? { hesco: lib.hesco } : undefined);
     const sun = this.world.lights.sun;
     if (this.preset.shadowMap > 0) {
       sun.castShadow = true;

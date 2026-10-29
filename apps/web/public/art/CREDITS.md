@@ -50,18 +50,21 @@ Brink hex mark over it, so they are a derivative of the same imagery and also CC
 The renders modify the models (scaled, posed, repainted, lit and viewed from above). No endorsement
 by any author is implied.
 
-## Battle models and sky (`models/`, `env/`)
+## Battle models (`models/`)
 
-The tactical battles load these 3D models directly: the same T-72, AH-64D, quadcopter drone, Mixamo
-soldiers with the rifle-aiming animation, Hesco barrier, shipping container (rust) and watch tower as
-above, under the same licenses. Each was re-encoded with gltf-transform (meshopt geometry, WebP
-textures at 512 to 1024 px; `tools/art/README.md`), and in the game they are scaled, tinted, posed,
-partly rebuilt (the IFV and the self-propelled howitzer on the T-72 chassis) and lit; no endorsement
-by any author is implied.
+The combined-arms battle builds every vehicle, helicopter, drone and soldier in code from real
+dimensions (`src/arena/models3d/`), with camouflage, wear and dirt generated in code. It loads only two
+sourced models, both CC BY 4.0, re-encoded with gltf-transform (meshopt geometry, WebP textures;
+`tools/art/README.md`), scaled, tinted and lit in the game; no endorsement by any author is implied.
 
-| Use | Asset | Author | License |
+| Use | Model | Author | License |
 |---|---|---|---|
-| Sky light and reflections (`env/park.exr`) | Rooitou Park HDRI, 512 px EXR | Greg Zaal, Poly Haven, packaged in `@pmndrs/assets` | CC0 1.0 |
+| AH-64E Apache (with a Longbow radar added in code) | Boeing AH-64D Apache Combat Helicopter (rotors separated) | Muhamad Mirza Arrafi | CC BY 4.0 |
+| Hesco walls | Hesco Barrier PBR | polbrainstorm | CC BY 4.0 |
+
+The T-72 (free for personal and commercial use, not CC) and the Mixamo soldiers and animation (Adobe
+terms) are no longer used or served by the battle; they remain only as the source of the war map's
+top-down unit sprites above.
 
 ## Battlefield skies (`env/`)
 
@@ -72,7 +75,7 @@ only; the visible sky is a graded dome drawn in code.
 
 | Use | File | HDRI | Author | License |
 |---|---|---|---|---|
-| Day | `env/park.exr` (above) | Rooitou Park | Greg Zaal, Poly Haven | CC0 1.0 |
+| Day | `env/park.exr` (158 KB) | Rooitou Park | Greg Zaal, Poly Haven | CC0 1.0 |
 | Dawn | `env/dawn.exr` (182 KB) | Kiara 1 Dawn | Greg Zaal, Poly Haven | CC0 1.0 |
 | Dusk | `env/dusk.exr` (148 KB) | Venice Sunset | Greg Zaal, Poly Haven | CC0 1.0 |
 | Night | `env/night.exr` (154 KB) | Dikhololo Night | Greg Zaal, Poly Haven | CC0 1.0 |

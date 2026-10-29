@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
-// The battle's sourced 3D models (public/art/models, credits in public/art/CREDITS.md), all CC BY
-// 4.0: the AH-64D Apache (rotors separated), Hesco barriers, shipping containers and a watch tower.
-// Everything else on the field is built in code (models3d/, world/). Loaded once, on the first
+// The battle's sourced 3D models (public/art/models, credits in public/art/CREDITS.md), both CC BY
+// 4.0: the AH-64D Apache (rotors separated) and the Hesco barrier. Everything else on the field is
+// built in code (models3d/, world/). Loaded once, on the first
 // battle, then shared and cached offline by the service worker; if they cannot load (offline on a
 // first visit), the battle uses its code-built Apache and walls instead.
 
@@ -13,8 +13,6 @@ const BASE = `${import.meta.env.BASE_URL}art/`;
 export interface Library {
   heli: GLTF;
   hesco: GLTF;
-  container: GLTF;
-  tower: GLTF;
 }
 
 let library: Promise<Library> | null = null;
@@ -24,7 +22,7 @@ export function loadLibrary(): Promise<Library> {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
   const glb = (name: string) => loader.loadAsync(`${BASE}models/${name}.glb`);
-  library = Promise.all([glb('heli'), glb('hesco'), glb('container'), glb('tower')]).then(([heli, hesco, container, tower]) => ({ heli, hesco, container, tower }));
+  library = Promise.all([glb('heli'), glb('hesco')]).then(([heli, hesco]) => ({ heli, hesco }));
   // A failed load is retried on the next battle.
   library.catch(() => {
     library = null;

@@ -428,20 +428,20 @@ limbs) animated in code (walk, run, kneel, prone, fire, fall), drawn instanced p
 The CC-BY 4.0 AH-64D model (rotors separated) stays as the Apache. Paint, camouflage, wear and
 mud are textures generated in code.
 
-| Asset | Source | Licence | Budget |
+| Asset | Source | Licence | Size |
 |---|---|---|---|
-| 44 unit models | Built in code (`apps/web/src/arena/models/`) | Project | 0 bytes of art; about 150 KB of code in the battle chunk |
-| AH-64 Apache | Muhamad Mirza Arrafi, rotors separated | CC BY 4.0 | 549 KB (existing) |
-| Hesco, containers, watch tower | polbrainstorm; Sousinho, Sebastian Webster; _SeF_ | CC BY 4.0 | 580 KB (existing) |
-| Skies: day, dawn, dusk, night | Poly Haven HDRIs via `@pmndrs/assets` | CC0 | about 1 MB |
-| Explosion and smoke frames | Kenney Smoke Particles | CC0 | 430 KB (existing) |
-| Radio calls | Generated with Kokoro TTS (Apache-2.0 model), radio-filtered offline (`tools/art/radio.py`) | Generated | about 200 KB |
-| Ground, trees, buildings, water, snow | Generated in code per biome | Project | 0 |
+| Every vehicle, helicopter, drone and soldier | Built in code (`apps/web/src/arena/models3d/`) | Project | no art files; code in the battle chunk |
+| AH-64 Apache | Muhamad Mirza Arrafi, rotors separated | CC BY 4.0 | 562 KB |
+| Hesco barrier | polbrainstorm | CC BY 4.0 | 105 KB |
+| Skies: day, dawn, dusk, night | Poly Haven HDRIs via `@pmndrs/assets` | CC0 | 643 KB |
+| Radio calls (26) | Generated with Kokoro TTS (Apache-2.0 model), radio-filtered offline (`tools/art/radio.py`) | Generated | 172 KB |
+| Ground, trees, buildings, water, snow, smoke and fire | Generated in code per biome | Project | 0 |
 | Weapon reports, engines, rotors | Synthesised in WebAudio by calibre | Project | 0 |
 
-Total battle download about 3 MB of the 25 MB budget, fetched on the first battle and cached by
-the service worker; nothing is fetched from a third party at runtime. Retired from the battle: the
-T-72 GLB and the Mixamo soldiers (licences are not CC0 or CC-BY).
+Battle art is 1.5 MB of the 25 MB budget, fetched on the first battle and cached by the service
+worker; nothing is fetched from a third party at runtime. Retired from the battle and no longer
+served: the T-72 GLB, the drone GLB, the Mixamo soldiers, containers and the watch tower (git
+history keeps them; the war map's top-down sprites made from them stay, see `CREDITS.md`).
 
 **World**: biomes temperate, steppe, desert, winter, dense urban (from the theatre, the hex's
 terrain and site, and the seed); times dawn, day, dusk, night (thermal white-hot view at night);
