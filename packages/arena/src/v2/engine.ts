@@ -982,7 +982,7 @@ function checkEnd(b: Battle): void {
 export function holdingZone(b: Battle): boolean {
   const z = b.map.zone;
   if (!z) return false;
-  const inZone = (u: Unit) => onField(u) && !isFlying(typeOf(u.type)) && Math.hypot(u.x + 0.5 - z.x, u.y + 0.5 - z.y) <= z.r;
+  const inZone = (u: Unit) => onField(u) && !isFlying(typeOf(u.type)) && Math.hypot(u.x - z.x, u.y - z.y) <= z.r;
   return b.units.some((u) => u.side === 'blue' && inZone(u)) && !b.units.some((u) => u.side === 'red' && inZone(u));
 }
 

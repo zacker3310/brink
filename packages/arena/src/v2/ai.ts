@@ -2,7 +2,7 @@ import { bestFire, facingFrom, fitMen, penChance, shotValue, suppLevel, usableWe
 import { act, canAct, reachable, pathTo, safestCell, strikeInfo, supportChance, unitAt, unitById, whyNot } from './engine';
 import { passable } from './map';
 import { typeOf } from './roster';
-import { cheb, dist, isFlying, lineOfSight, sightRange, visibleTo } from './sight';
+import { cheb, crestAhead, dist, isFlying, lineOfSight, sightRange, visibleTo } from './sight';
 import { at, BUILDING, H, inside, PROFILE, ROAD, RUBBLE, TREES, W, WALL, type Action, type Battle, type Ghost, type Point, type Side, type Unit, type UnitType, type Weapon } from './types';
 
 // The enemy (and your crews on autopilot) fighting combined arms (docs/arena-v2.md, section 6).
@@ -65,7 +65,8 @@ function gridsFor(b: Battle, e: Known, sig: string): Grids {
       const d = Math.hypot(x - e.x, y - e.y);
       if (d > reach + 0.01) continue;
       const i = at(b.map, x, y);
-      const base = b.map.elev[i]!;
+      // A vehicle there would face this enemy: a crest toward it puts it on the reverse slope.
+      const base = b.map.elev[i]! + (crestAhead(b, { x, y }, Math.atan2(e.y - y, e.x - x)) ? 0.45 : 0);
       if (lineOfSight(b, e, eye, { x, y }, base + 0.3).clear) {
         g.lo[i] = 1;
         g.hi[i] = 1;
@@ -216,11 +217,11 @@ function objectiveAt(v: View, u: Unit, t: UnitType, p: Point): number {
   const role = t.role;
   if (role === 'spg' || role === 'mortar' || role === 'arv' || role === 'medic' || role === 'fpv_team' || role === 'loiter_team') return 0;
   if (v.side === 'blue') {
-    if (z) return -Math.hypot(p.x + 0.5 - z.x, p.y + 0.5 - z.y) * 0.3;
+    if (z) return -Math.hypot(p.x - z.x, p.y - z.y) * 0.3;
     const near = v.enemies.length ? Math.min(...v.enemies.map((e) => dist(e, p))) : p.y;
     return -Math.max(0, near - 6) * 0.22;
   }
-  if (z) return -Math.max(0, Math.hypot(p.x + 0.5 - z.x, p.y + 0.5 - z.y) - (z.r + 5)) * 0.35;
+  if (z) return -Math.max(0, Math.hypot(p.x - z.x, p.y - z.y) - (z.r + 5)) * 0.35;
   return -Math.max(0, p.y - 26) * 0.2;
 }
 
@@ -584,7 +585,7 @@ function decideUnit(v: View, u: Unit): Action | null {
     // A carrier drops its squad near the fight, in cover from what it knows, then fights itself.
     const near = v.enemies.length ? Math.min(...v.enemies.map((e) => dist(e, u))) : 99;
     const z = b.map.zone;
-    const dz = z ? Math.hypot(u.x + 0.5 - z.x, u.y + 0.5 - z.y) : 99;
+    const dz = z ? Math.hypot(u.x - z.x, u.y - z.y) : 99;
     if (near <= 9 || dz <= 8 || damaged(u) || side === 'red' || threatAt(v, u, t, u) > 1.5) {
       const a = tryAct(b, { type: 'dismount', unit: u.id }, side);
       if (a) return a;

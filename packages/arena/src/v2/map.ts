@@ -119,7 +119,10 @@ export function buildMap(setup: MapSetup): BattleMap {
   finishZone(g);
   clearDeployment(g);
   level(g);
-  return finish(g, ensurePassage(g));
+  const map = finish(g, ensurePassage(g));
+  // Rounding small negatives leaves -0, which JSON writes as 0: keep the state exactly what a save holds.
+  for (let i = 0; i < map.elev.length; i++) map.elev[i] = map.elev[i]! + 0;
+  return map;
 }
 
 // --- Setup -----------------------------------------------------------------------------------------

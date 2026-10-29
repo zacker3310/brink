@@ -43,7 +43,25 @@ export function heightOf(b: Battle, u: Unit, part: 'eye' | 'centre' | 'top', cel
   }
   if (b.map.cells[i] === BUILDING) return ground + Math.max(0.5, b.map.storeys[i]! - 0.5);
   if (part === 'eye' && u.hunker) return ground + 0.15;
-  return ground + p[part];
+  return ground + slopeLift(b, u, cell) + p[part];
+}
+
+/**
+ * A vehicle facing a crest one level up sits on the reverse slope, just under it: turret and sights
+ * over the top, hull below it. That is the hull-down position (docs/arena-v2.md, 3.3).
+ */
+export function slopeLift(b: Battle, u: Unit, cell: Point = u): number {
+  const t = typeOf(u.type);
+  if (t.mobility !== 'tracked' && t.mobility !== 'wheeled') return 0;
+  return crestAhead(b, cell, u.facing) ? 0.45 : 0;
+}
+
+/** Is the cell next to `cell` in the direction `facing` exactly one level higher? */
+export function crestAhead(b: Battle, cell: Point, facing: number): boolean {
+  const x = cell.x + Math.round(Math.cos(facing));
+  const y = cell.y + Math.round(Math.sin(facing));
+  if (x < 0 || y < 0 || x >= b.map.w || y >= b.map.h) return false;
+  return b.map.elev[at(b.map, x, y)] === b.map.elev[at(b.map, cell.x, cell.y)]! + 1;
 }
 
 export function smokeAt(b: Battle, x: number, y: number): boolean {

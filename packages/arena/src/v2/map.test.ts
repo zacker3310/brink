@@ -164,6 +164,17 @@ function problems(map: BattleMap, s: MapSetup): string[] {
   return out;
 }
 
+describe('plain data', () => {
+  it('holds no negative zero, so a map survives a JSON round trip exactly', () => {
+    for (const terrain of ['plains', 'hills', 'mountains', 'forest', 'urban'] as const)
+      for (let seed = 1; seed <= 6; seed++) {
+        const m = gen.buildMap({ seed, terrain, river: seed % 2 === 0, site: null, biome: 'temperate' });
+        expect(m.elev.some((v) => Object.is(v, -0)), `${terrain} ${seed}`).toBe(false);
+        expect(JSON.parse(JSON.stringify(m))).toEqual(m);
+      }
+  });
+});
+
 // Each terrain's maps are built once and shared by the tests that look at them.
 for (const terrain of TERRAINS)
   describe(`${terrain} maps`, () => {
