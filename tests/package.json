@@ -10,6 +10,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@brink/arena": "workspace:*",
     "@brink/contracts": "workspace:*",
     "@brink/game-data": "workspace:*",
     "@brink/scenarios": "workspace:*",

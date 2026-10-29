@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { readCareer } from '../arena/career';
+import { typeOf, type Role } from '@brink/arena';
+import type { UnitClass } from '@brink/contracts';
 import { SKIRMISHES, skirmishRequest } from '../arena/skirmish';
 import { ScreenHeader } from '../chrome';
 import { UnitGlyph } from '../glyphs';
@@ -18,6 +20,19 @@ function Stars({ n, of = 3 }: { n: number; of?: number }) {
     </span>
   );
 }
+
+function classOf(role: Role): UnitClass {
+  if (role === 'mbt') return 'armor';
+  if (role === 'ifv' || role === 'apc' || role === 'arv' || role === 'spaa') return 'mechanized';
+  if (role === 'light_tank' || role === 'tank_hunter') return 'recon';
+  if (role === 'spg' || role === 'mortar') return 'artillery';
+  if (role === 'attack_heli' || role === 'gunship' || role === 'scout_heli' || role === 'transport_heli') return 'air';
+  if (role === 'recon_drone' || role === 'fpv_team' || role === 'loiter_team') return 'drone';
+  return 'infantry';
+}
+
+const TIME = { dawn: 'dawn', day: 'day', dusk: 'dusk', night: 'night' } as const;
+const BIOME = { temperate: 'Temperate', steppe: 'Steppe', desert: 'Desert', winter: 'Winter', urban: 'City' } as const;
 
 export function Skirmish({ onBack }: { onBack: () => void }) {
   const fight = useGame((s) => s.fight);
@@ -47,7 +62,7 @@ export function Skirmish({ onBack }: { onBack: () => void }) {
           ))}
         </dl>
         <ul className="mt-4 space-y-2">
-          {SKIRMISHES.map((s) => {
+          {[...SKIRMISHES].sort((a, b) => a.stars - b.stars).map((s) => {
             const locked = career.stars < s.stars;
             const best = career.best[s.id] ?? 0;
             return (
@@ -64,17 +79,21 @@ export function Skirmish({ onBack }: { onBack: () => void }) {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-display text-lg font-bold uppercase">{s.name}</span>
-                    {locked ? <span className="text-[12px] text-faint">{s.stars}★ to unlock</span> : <Stars n={best} />}
+                    {locked ? <span className="text-[12px] text-muted">{s.stars}★ to unlock</span> : <Stars n={best} />}
                   </div>
                   <p className="text-[13px] text-muted">{s.text}</p>
-                  <div className="mt-2 flex items-center gap-1 text-[11px] text-faint">
-                    <span className="mr-1 capitalize">{s.terrain}{s.river ? ' · river' : ''}</span>
+                  <div className="mt-1.5 text-[12px] text-muted">
+                    {BIOME[s.biome]}, {TIME[s.time]}
+                    {s.weather !== 'clear' ? `, ${s.weather}` : ''}
+                    {s.river ? ', river' : ''} · {s.yours.length} units against {s.theirs.length}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-0.5" aria-hidden>
                     {s.yours.map((c, i) => (
-                      <UnitGlyph key={`y${i}`} unitClass={c} color="#3fa796" className="h-4 w-5" />
+                      <UnitGlyph key={`y${i}`} unitClass={classOf(typeOf(c).role)} color="#3fa796" className="h-4 w-5" />
                     ))}
-                    <span className="mx-1">vs</span>
+                    <span className="mx-1 text-[12px] text-muted">vs</span>
                     {s.theirs.map((c, i) => (
-                      <UnitGlyph key={`t${i}`} unitClass={c} color="#c9733a" className="h-4 w-5" />
+                      <UnitGlyph key={`t${i}`} unitClass={classOf(typeOf(c).role)} color="#c9733a" className="h-4 w-5" />
                     ))}
                   </div>
                 </button>

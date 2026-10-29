@@ -214,6 +214,9 @@ importers:
 
   tests:
     dependencies:
+      '@brink/arena':
+        specifier: workspace:*
+        version: link:../packages/arena
       '@brink/contracts':
         specifier: workspace:*
         version: link:../packages/contracts

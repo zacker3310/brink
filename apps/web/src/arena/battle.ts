@@ -1,9 +1,10 @@
 import type { ArenaBattle, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
-import { abilitiesFor, rankOf, type ArenaResult, type ArenaSetup, type SiteKind, type UnitSpec } from '@brink/arena';
+import { abilitiesFor, ARSENAL_OF, rankOf, type ArenaResult, type ArenaSetup, type SiteKind, type UnitSpec } from '@brink/arena';
 
 // A battle request: the stack you sent at a hex and the enemies you can see there, set up as an
-// arena fight. Fought or not, its orders are what the war map gets.
+// arena fight. Each formation becomes a detachment of a company (docs/arena-v2.md, section 5).
+// Fought or not, its orders are what the war map gets.
 
 export interface BattleRequest {
   setup: ArenaSetup;
@@ -52,6 +53,8 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
     color: view.nations[c.owner]?.color ?? '#c0392b',
     rank: veteranEnemy,
   }));
+  // The defenders' kit comes from the strongest power holding the hex.
+  const owner = enemies[0]!.owner;
   const place = site?.name ?? (tile?.terrain ? `the ${tile.terrain}` : 'the line');
   return {
     target,
@@ -64,8 +67,10 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
       site: (site?.kind ?? null) as SiteKind,
       attackers,
       defenders,
+      arsenal: { blue: ARSENAL_OF[view.self.government], red: ARSENAL_OF[view.nations[owner]?.government ?? 'directorate'] },
       skill: enemySkill(view, defenders.length),
       abilities: abilitiesFor(view.self.research.unlocked),
+      theatre: view.scenarioId,
     },
   };
 }

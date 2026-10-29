@@ -293,6 +293,8 @@ export interface Unit {
   dashed: boolean;
   overwatch: boolean;
   hunker: boolean;
+  /** Popped smoke this turn: it may still move, but takes no other action. */
+  smoked: boolean;
   /** Shots left per limited weapon id. */
   ammo: Record<string, number>;
   /** Smoke rounds left per indirect weapon id, and grenade salvos under 'grenades'. */
@@ -334,7 +336,10 @@ export interface Wreck extends Point {
 export interface Ghost extends Point {
   unit: string;
   type: TypeId;
+  /** Turn index it was last seen. */
   turn: number;
+  /** Seen at the latest update. */
+  now: boolean;
 }
 
 export interface SupportAsset {
