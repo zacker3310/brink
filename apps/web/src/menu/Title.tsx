@@ -35,7 +35,7 @@ export function Title({ slots, go, onContinue, onTutorial }: { slots: SlotInfo[]
     ...(fresh ? [guided] : []),
     ...(last ? [{ id: 'continue', label: 'Continue', sub: `${lastNation?.name ?? last.nation} · turn ${last.turn} · ${relativeTime(last.savedAt)}`, swatch: lastNation?.color, go: () => onContinue(last) }] : []),
     { id: 'new', label: 'New campaign', sub: 'Choose a nation. Three AI powers want what you hold.', go: () => go('setup') },
-    { id: 'skirmish', label: 'Skirmish', sub: career.battles ? `${career.stars}★ earned in battle` : 'Drive a tank. Earn stars.', go: () => go('skirmish') },
+    { id: 'skirmish', label: 'Skirmish', sub: career.battles ? `${career.stars}★ earned in battle` : 'Command a company. Earn stars.', go: () => go('skirmish') },
     ...(fresh ? [] : [guided]),
     { id: 'load', label: 'Load campaign', sub: slots.length ? `${slots.length} on file` : 'Saves and files', go: () => go('archive') },
     { id: 'manual', label: 'Field manual', sub: 'How the war works', go: () => go('manual') },

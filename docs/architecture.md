@@ -78,9 +78,11 @@ red. Saves are JSON strings in three localStorage slots or a file.
 ## Battles
 
 An attack order on a hex with enemies in it can be fought by hand. `@brink/arena` is a headless,
-deterministic real-time sim (levels built from the hex's terrain, river and site; seven unit classes;
-bouncing shells; an AI whose skill ramps with difficulty and turn); `apps/web/src/arena` draws it in
-three.js. The result travels with the turn's orders as an `ArenaBattle` (who fought, strength kept per
+deterministic turn-based battle: a company a side on a 30 x 45 field built from the hex's terrain,
+river and site, 50 unit types with armour by facing, soldiers, suppression, transport, called fire and
+drones, and a combined-arms AI that sees only its own side's picture. Its state is plain JSON with
+its seeded stream inside, and it appends an event log; `apps/web/src/arena` plays that log in
+three.js. Design and numbers: `docs/arena-v2.md`. The result travels with the turn's orders as an `ArenaBattle` (who fought, strength kept per
 unit in permille, won or not). At resolution it replaces the dice for that hex only if every hostile
 there at the time was among those fought; otherwise the engagement is fought on the odds and reported
 as `arena: 'voided'`. The engine stays pure: it validates and applies a claimed result, it never runs
@@ -92,6 +94,7 @@ takes several human seats, and loading an old multi-human save hands the other s
 ## Rejected alternatives
 
 - A tick per movement point: forces every unit onto one speed grid. The event clock handles mixed speeds.
-- A sequential seeded PRNG: results would depend on draw order.
+- A sequential seeded PRNG: results would depend on draw order. (The arena accepts that: one battle, one
+  stream, actions in a fixed order, the stream's state saved with the battle.)
 - Server-authoritative single-player: adds a required service for no gain. The API exists for headless
   simulation.

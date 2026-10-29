@@ -3,8 +3,9 @@ import { expect, test } from '@playwright/test';
 // The core journey: title screen, campaign setup, pick a nation, select a formation, order it, end the turn, read the
 // report, save, and resume from the save.
 test('start, order, resolve, report, save and resume', async ({ page }) => {
-  // The whole campaign loop in one test: longer than the default budget.
-  test.setTimeout(120_000);
+  // The whole campaign loop in one test: longer than the default budget. It takes about 110 s on
+  // its own, so 120 s failed whenever other specs ran beside it.
+  test.setTimeout(300_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
