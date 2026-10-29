@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { H, W, typeOf, type Battle, type BattleEvent, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
 import { BattleAudio } from './audio';
 import { Effects } from './fx';
-import { buildModel, buildProjectile, paintFor, SoldierCrowd, type SoldierKit, type UnitModel } from './models3d';
+import { buildModel, buildProjectile, kitFor, paintFor, SoldierCrowd, type UnitModel } from './models3d';
 import { LEVEL, METRE, QUALITY, type ArenaSettings, type Quality } from './quality';
 import { buildWorld, thermalMaterialFor, type World } from './world';
 import type { Library } from './assets';
@@ -64,6 +64,9 @@ interface View {
   hunker: boolean;
   /** Last pose given to its soldiers, so idle frames do not churn. */
   pose: 'stand' | 'walk' | 'run' | 'kneel' | 'prone' | 'aim' | 'fire';
+  /** Where it was last frame, to roll its wheels and tracks by the distance driven. */
+  lastX: number;
+  lastZ: number;
 }
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -77,27 +80,6 @@ const ROTOR: Partial<Record<TypeId, [number, number]>> = { ah64e: [4, 289], ka52
 
 const BLUE_RING = 0x7fb2e5;
 const RED_RING = 0xe0705e;
-
-/** Which kit each soldier carries, by unit and role. */
-function kitOf(type: TypeId, role: string, index: number): SoldierKit {
-  if (role === 'medic' || type.startsWith('medic')) return 'medic';
-  if (role === 'sapper' || type.startsWith('engineer')) return 'sapper';
-  if (role === 'operator' || type.startsWith('fpv') || type === 'switchblade' || type === 'lancet') return 'operator';
-  if (role === 'sniper') return 'sniper';
-  if (role === 'auto_rifleman') return 'saw';
-  if (role === 'gunner') return type.startsWith('mortar') ? 'mortar' : 'pkm';
-  if (role === 'grenadier') return 'grenadier';
-  if (role === 'at') {
-    if (type === 'javelin') return 'javelin';
-    if (type === 'kornet') return 'kornet';
-    if (type === 'gustaf') return 'gustaf';
-    if (type === 'stinger' || type === 'igla') return 'manpads';
-    return 'rpg';
-  }
-  if (type.startsWith('mortar') && index === 0) return 'mortar';
-  if ((type === 'squad_w' || type === 'team_w') && role === 'rifleman' && index % 2 === 0) return 'at4';
-  return 'rifle';
-}
 
 /** Where each soldier of a unit stands in its cell: a loose wedge facing its heading. */
 function slot(i: number, n: number, facing: number, spread: number): [number, number] {
@@ -246,14 +228,14 @@ export class BattleStage {
     ring.position.y = 0.03;
     ring.renderOrder = 1;
     holder.add(ring);
-    const v: View = { id: u.id, side: u.side, type: u.type, t, holder, models: [null, null], lod: 0, men: [], ring, x: u.x + 0.5, z: u.y + 0.5, facing: u.facing, aim: u.aim, alive: u.alive, shown, aboard: !!u.carrier, wreck: false, speed: 0, flash: 0, fall: 0, hunker: u.hunker, pose: 'kneel' };
+    const v: View = { id: u.id, side: u.side, type: u.type, t, holder, models: [null, null], lod: 0, men: [], ring, x: u.x + 0.5, z: u.y + 0.5, facing: u.facing, aim: u.aim, alive: u.alive, shown, aboard: !!u.carrier, wreck: false, speed: 0, flash: 0, fall: 0, hunker: u.hunker, pose: 'kneel', lastX: u.x + 0.5, lastZ: u.y + 0.5 };
     if (t.mobility === 'foot') {
       const faction = t.faction;
       u.men.forEach((m, i) => {
         if (m.state === 'dead') return;
         const id = `${u.id}#${i}`;
         const [ox, oz] = slot(i, u.men.length, u.facing, 1);
-        this.crowd.add(id, faction, kitOf(u.type, m.role, i), v.x + ox, v.z + oz, yawOf(u.facing));
+        this.crowd.add(id, faction, kitFor(u.type, m.role), v.x + ox, v.z + oz, yawOf(u.facing));
         v.men.push(id);
       });
     } else {
@@ -542,7 +524,11 @@ export class BattleStage {
     const m = this.model(v);
     if (!m) return;
     const hot = new Map<THREE.Object3D, number>();
-    for (const h of m.heat) hot.set(h.obj, h.level);
+    for (const h of m.heat) {
+      hot.set(h.obj, h.level);
+      // The engine deck, exhaust and barrel proxies only show in the thermal view.
+      h.obj.visible = on && !v.wreck;
+    }
     m.root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -1005,7 +991,7 @@ export class BattleStage {
         const fit = live.filter(({ m }) => m.state === 'fit').map(({ i }) => `${u.id}#${i}`);
         // Soldiers that left this unit (a split) move to the other half.
         for (const id of v.men) if (!fit.includes(id)) this.crowd.remove(id);
-        for (const id of fit) if (!v.men.includes(id)) this.crowd.add(id, v.t.faction, kitOf(u.type, u.men[Number(id.split('#')[1])]!.role, Number(id.split('#')[1])), v.x, v.z, yawOf(v.facing));
+        for (const id of fit) if (!v.men.includes(id)) this.crowd.add(id, v.t.faction, kitFor(u.type, u.men[Number(id.split('#')[1])]!.role), v.x, v.z, yawOf(v.facing));
         v.men = fit;
         v.type = u.type;
       }
@@ -1058,12 +1044,18 @@ export class BattleStage {
       const near = Math.hypot(v.x - this.focus.x, v.z - this.focus.z) <= this.preset.detailCells;
       this.setLod(v, near ? 0 : 1);
       const mm = this.model(v)!;
+      // Roll the wheels and tracks by the distance driven this frame (forward is along the hull).
+      const moved = (v.x - v.lastX) * Math.cos(v.facing) + (v.z - v.lastZ) * Math.sin(v.facing);
+      v.lastX = v.x;
+      v.lastZ = v.z;
       if (v.alive && !v.wreck) {
         for (const r of mm.rotors) r.obj.rotation[r.axis] += r.rate * dt;
-        for (const w of mm.wheels) w.rotation.x += v.speed * dt * 8;
-        for (const tr of mm.tracks) {
-          const map = (tr as THREE.MeshStandardMaterial).map;
-          if (map) map.offset.y -= v.speed * dt * 1.5;
+        if (moved) {
+          for (const w of mm.wheels) w.rotation.x += moved / Math.max(0.001, mm.wheelRadius);
+          for (const tr of mm.tracks) {
+            const map = (tr as THREE.MeshStandardMaterial).map;
+            if (map) map.offset.y += moved * mm.trackScroll;
+          }
         }
         if (v.t.mobility === 'heli' && v.holder.visible) {
           this.fx.rotorWash(v.id, new THREE.Vector3(v.x, this.ground(v.x, v.z), v.z), 0.8);
