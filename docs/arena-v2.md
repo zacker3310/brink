@@ -500,6 +500,23 @@ not in the game's JavaScript, so the throttled figures overstate a phone with a 
 Every shader compiles before the battle shows (`BattleStage.warm`); that halved the p95. GPU time
 on a real iPhone is still unmeasured.
 
+After v2.2 (2026-10-29, same probe; the camera now opens at 11.5 units with a 40 degree lens, the
+units are drawn larger and the HUD layer rides on top):
+
+| | Low | Balanced | High | Last Stand, Balanced |
+|---|---|---|---|---|
+| Our frame time p50 | 13.9 ms | 16.6 ms | 21.1 ms | 25.8 ms |
+| Our frame time p95 | 22.8 ms | 65.4 ms | 50.9 ms | 87.2 ms |
+| Draw calls | 47 | 56 | 56 | 89 |
+| Battle opens in | 13.9 s | 23.9 s | 36.8 s | 40.8 s |
+
+That is slower than v2 on this machine. A CPU profile unthrottled (Balanced p50 4.0 ms) puts the HUD
+layer's own work under 1% of the time and nearly all of the rest in native WebGL calls in the
+software rasteriser; the closer camera fills more of the screen with full-detail models, which a
+software rasteriser pays for and a phone GPU largely does not. The battle now also waits for the
+camera to settle before it reports itself ready, which lengthens the measured opening. It needs a
+measurement on a real iPhone before anything is tuned for it.
+
 ## 9. Migration (nothing is wiped)
 
 - **War-map contract**: `ArenaBattle { target, attackers, defenders, kept, won }` is unchanged.

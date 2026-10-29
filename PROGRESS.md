@@ -244,6 +244,9 @@ Updated 2026-10-29 (arena v2.2). Milestone 1 (first playable).
     Measured with the AI in your seat over 60 setups: Easy 85%, Normal 58%, Hard 35%.
   - Tested: navigation and the full touch flow at 375 x 667, 393 x 852 and 440 x 956 with 44 pt and
     4.5:1 audits; 126 arena unit tests.
+  - Frame time on the throttled, software-rendered probe rose (Balanced p50 12.1 to 16.6 ms); the
+    profile puts it in native rendering of the closer view, not in the HUD. Measure on a phone.
+  - Fixed on the way: the war-map replay undid a pause pressed as it started.
 
 ## Outstanding
 
