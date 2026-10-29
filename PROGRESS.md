@@ -223,7 +223,9 @@ Updated 2026-10-29 (arena v2). Milestone 1 (first playable).
     units):
     Low p50 9.1 ms, p95 17.4 ms, 46 draw calls, 118k triangles; Balanced 12.1 / 30.4 ms, 54 calls,
     202k; High 13.5 / 61.4 ms, 54 calls, 297k. Battle opens in 7.5, 11.2 and 15.8 s on that
-    throttled CPU. Battle art 1.5 MB, battle code 1.0 MB.
+    throttled CPU. The largest battle (Last Stand, 32 units, fog) on Balanced: 18.3 / 54.2 ms, 86
+    calls, 268k; unthrottled 4.7 / 13.1 ms, almost all of it native WebGL in the software
+    rasteriser. Battle art 1.5 MB, battle code 1.0 MB.
 
 ## Outstanding
 

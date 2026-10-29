@@ -483,15 +483,19 @@ renderer draw calls and triangles; GPU time cannot be measured in this headless 
 WebGL) and is reported as unmeasured.
 
 Measured (2026-10-29, `ARENA_PERF=1 pnpm test:e2e arena-perf`, sampled while the
-camera pans after a 2 s settle; First Blood, 20 units, the smallest company size):
+camera pans after a 2 s settle; First Blood is the smallest battle, 10 a side):
 
-| | Low | Balanced | High |
-|---|---|---|---|
-| Our frame time p50 | 9.1 ms | 12.1 ms | 13.5 ms |
-| Our frame time p95 | 17.4 ms | 30.4 ms | 61.4 ms |
-| Draw calls | 46 | 54 | 54 |
-| Triangles | 118k | 202k | 297k |
-| Battle opens in | 7.5 s | 11.2 s | 15.8 s |
+| | Low | Balanced | High | Last Stand, Balanced |
+|---|---|---|---|---|
+| Our frame time p50 | 9.1 ms | 12.1 ms | 13.5 ms | 18.3 ms |
+| Our frame time p95 | 17.4 ms | 30.4 ms | 61.4 ms | 54.2 ms |
+| Draw calls | 46 | 54 | 54 | 86 |
+| Triangles | 118k | 202k | 297k | 268k |
+| Battle opens in | 7.5 s | 11.2 s | 15.8 s | 15.6 s |
+
+Last Stand is the largest battle (16 a side, winter fog). Unthrottled it runs p50 4.7 ms and p95
+13.1 ms; a CPU profile puts almost all of that in native WebGL calls in the software rasteriser,
+not in the game's JavaScript, so the throttled figures overstate a phone with a real GPU.
 
 Every shader compiles before the battle shows (`BattleStage.warm`); that halved the p95. GPU time
 on a real iPhone is still unmeasured.
