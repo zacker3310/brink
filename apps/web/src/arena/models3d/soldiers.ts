@@ -693,8 +693,12 @@ export class SoldierCrowd {
   private readonly sa = new Float32Array(P.size);
   private readonly sb = new Float32Array(P.size);
 
-  constructor(opts: { max: number; shadows: boolean }) {
+  /** Figures drawn this much larger than life, so a squad reads from a drone's height (miniatures do the same). */
+  private readonly scale: number;
+
+  constructor(opts: { max: number; shadows: boolean; scale?: number }) {
     this.max = opts.max;
+    this.scale = opts.scale ?? 1;
     this.group.name = 'soldiers';
     const pieces: Record<PartName, [Piece, number]> = {
       head: [headPiece(), 1],
@@ -849,7 +853,7 @@ export class SoldierCrowd {
         for (let i = 0; i < P.size; i++) cur[i] = old[i]! + (cur[i]! - old[i]!) * k;
       }
       const smp = cur;
-      const sc = METRE * s.height;
+      const sc = METRE * s.height * this.scale;
       root.compose(_v.set(s.x, s.y, s.z), _q.setFromAxisAngle(_y.set(0, 1, 0), s.facing), _a.set(sc, sc, sc));
       torsoMatrix(smp, torso);
       put('torso', torso, s);

@@ -167,13 +167,13 @@ export class BattleStage {
     const night = battle.conditions.time === 'night';
     this.fx = new Effects(this.scene, opts.quality, { biome: battle.conditions.biome, night, heightAt: (x, z) => this.world.heightAt(x, z) });
     this.fx.setArsenals?.(opts.arsenal.blue, opts.arsenal.red);
-    this.crowd = new SoldierCrowd({ max: 420, shadows: this.preset.soldierShadows });
+    this.crowd = new SoldierCrowd({ max: 420, shadows: this.preset.soldierShadows, scale: 1.7 });
     this.scene.add(this.crowd.group);
     this.audio = new BattleAudio({ radio: opts.settings.radio });
     this.audio.setNight(night);
     this.audio.ambience(battle.conditions.biome, battle.conditions.weather);
 
-    const tileGeo = new THREE.PlaneGeometry(0.86, 0.86).rotateX(-Math.PI / 2);
+    const tileGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     const tile = (color: number, opacity: number, n: number) => {
       const m = new THREE.InstancedMesh(tileGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }), n);
       m.count = 0;
@@ -182,8 +182,8 @@ export class BattleStage {
       this.scene.add(m);
       return m;
     };
-    this.tiles = tile(BLUE_RING, 0.3, W * H);
-    this.dashTiles = tile(BLUE_RING, 0.12, W * H);
+    this.tiles = tile(BLUE_RING, 0.17, W * H);
+    this.dashTiles = tile(BLUE_RING, 0.07, W * H);
     this.areaTiles = tile(RED_RING, 0.55, 49);
     const ringGeo = new THREE.RingGeometry(0.42, 0.5, 40).rotateX(-Math.PI / 2);
     this.targetRings = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.95, depthWrite: false }), 40);

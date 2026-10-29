@@ -323,8 +323,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       flush();
       let last = performance.now();
       const frame = (now: number) => {
-        // Frame timestamps can run behind the clock on some browsers: never step backwards.
-        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+        // Frame timestamps can run behind the clock on some browsers: never step backwards. A slow
+        // device plays the film at real speed in bigger steps rather than in slow motion.
+        const dt = Math.max(0, Math.min(0.25, (now - last) / 1000));
         last = now;
         const stage = stageRef.current;
         if (!stage) return;
