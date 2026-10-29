@@ -72,6 +72,9 @@ const ease = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) /
 /** Grid heading to a three.js yaw for a model that faces +z. */
 const yawOf = (facing: number) => Math.PI / 2 - facing;
 
+/** Main rotor blades and rpm, for the blade slap. */
+const ROTOR: Partial<Record<TypeId, [number, number]>> = { ah64e: [4, 289], ka52: [3, 257], mi35: [5, 240], ah6: [6, 475], uh60: [4, 258], mi8: [5, 192] };
+
 const BLUE_RING = 0x7fb2e5;
 const RED_RING = 0xe0705e;
 
@@ -1064,7 +1067,8 @@ export class BattleStage {
         }
         if (v.t.mobility === 'heli' && v.holder.visible) {
           this.fx.rotorWash(v.id, new THREE.Vector3(v.x, this.ground(v.x, v.z), v.z), 0.8);
-          this.audio.rotor(v.id, mm.rotors.length > 1 ? 4 : 5, 280, v.x - 0.5, v.z - 0.5);
+          const [blades, rpm] = ROTOR[v.type] ?? [4, 280];
+          this.audio.rotor(v.id, blades, rpm, v.x - 0.5, v.z - 0.5, { coaxial: v.type === 'ka52' });
         }
       }
       if (v.fall > 0 && v.fall < 1) {
