@@ -21,7 +21,8 @@ interface Window {
     ready(): boolean;
     win(): void;
     lose(): void;
-    /** Frame timing: ms of the game's own work per frame, and what the GPU was asked to draw. */
-    perf(): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
+    /** Frame timing: ms of the game's own work per frame, and what the GPU was asked to draw.
+     *  `reset` starts a fresh sample after this read. */
+    perf(reset?: boolean): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
   };
 }

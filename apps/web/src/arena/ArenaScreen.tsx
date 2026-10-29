@@ -61,7 +61,7 @@ declare global {
       ready: () => boolean;
       win: () => void;
       lose: () => void;
-      perf: () => ReturnType<BattleStage['perf']> | null;
+      perf: (reset?: boolean) => ReturnType<BattleStage['perf']> | null;
     };
   }
 }
@@ -314,10 +314,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     battleRef.current = battle;
     // The Apache and the props when they load in time; the battle is built in code either way.
     const timeout = new Promise<null>((r) => setTimeout(() => r(null), 15000));
-    void Promise.race([loadLibrary().catch(() => null), timeout]).then((lib: Library | null) => {
+    void Promise.race([loadLibrary().catch(() => null), timeout]).then(async (lib: Library | null) => {
       if (dead) return;
       libRef.current = lib;
-      buildStage(battle, lib, settings.quality);
+      await buildStage(battle, lib, settings.quality).warm();
+      if (dead) return;
       setReady(true);
       setBanner('Your Turn');
       flush();
@@ -368,7 +369,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           flush();
           stageRef.current?.skip();
         },
-        perf: () => stageRef.current?.perf() ?? null,
+        perf: (reset) => stageRef.current?.perf(reset) ?? null,
       };
     });
     const onResize = () => stageRef.current?.resize();

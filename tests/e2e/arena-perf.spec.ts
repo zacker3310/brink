@@ -22,7 +22,9 @@ for (const quality of ['low', 'balanced', 'high'] as const) {
     await page.getByTestId('arena-fight').tap();
     await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 600_000 });
     const load = Date.now() - t0;
-    // Pan the camera across the field.
+    // Measure play, not the load: let it settle, then sample while the camera pans across the field.
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => window.__arena!.perf(true));
     const box = (await page.getByTestId('arena-canvas').boundingBox())!;
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;

@@ -1088,9 +1088,16 @@ export class BattleStage {
     if (this.frameMs.length > 600) this.frameMs.shift();
   }
 
-  /** Our own work per frame (ms) and what the GPU was asked to draw, for the performance probe. */
-  perf(): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: Quality } {
+  /** Compile every shader in the scene before the first frame, so the battle opens without a hitch. */
+  async warm(): Promise<void> {
+    await this.renderer.compileAsync(this.scene, this.camera).catch(() => undefined);
+  }
+
+  /** Our own work per frame (ms) and what the GPU was asked to draw, for the performance probe.
+   *  `reset` starts a fresh sample after this read. */
+  perf(reset = false): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: Quality } {
     const s = [...this.frameMs].sort((a, b) => a - b);
+    if (reset) this.frameMs.length = 0;
     const q = (p: number) => s[Math.min(s.length - 1, Math.floor(p * s.length))] ?? 0;
     return { p50: q(0.5), p95: q(0.95), frames: s.length, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, quality: this.opts.quality };
   }
