@@ -43,8 +43,10 @@ export interface Overlay {
   reach: number[];
   /** Cells it can reach only by dashing. */
   dash: number[];
-  /** The route to the cell under the pointer. */
+  /** The route to the cell under the pointer, the move being looked at, or the advised move. */
   path: Point[] | null;
+  /** The cell a move is being looked at for (marked until it is made or cancelled). */
+  dest: Point | null;
   /** Enemies the selected unit can fire at. */
   targets: string[];
   /** An area strike being aimed: its centre cell and radius. */
@@ -145,9 +147,10 @@ export class BattleStage {
   private readonly targetRings: THREE.InstancedMesh;
   private readonly ghostMarks: THREE.InstancedMesh;
   private readonly selRing: THREE.Mesh;
+  private readonly destMark: THREE.Mesh;
   private pathLine: THREE.Mesh | null = null;
   private readonly ray = new THREE.Raycaster();
-  private overlay: Overlay = { selected: null, reach: [], dash: [], path: null, targets: [], area: null, ghosts: [] };
+  private overlay: Overlay = { selected: null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts: [] };
   private hud: [number, number] = [0.12, 0.26];
   // Orbit camera: a focus on the ground, a heading round it, a tilt and a distance.
   private readonly focus = new THREE.Vector3(W / 2, 0, H - 8);
@@ -161,6 +164,11 @@ export class BattleStage {
   /** The planning view to return to from the whole-field view. */
   private before: { x: number; z: number; dist: number; tilt: number; yaw: number } | null = null;
   private shake = 0;
+  /** Film steps that threw (each is skipped; the film never stops on one). */
+  private faults = 0;
+  /** Real seconds the first step has been playing; a step that will not end is cut (never expected). */
+  private stepAge = 0;
+  private stepNow: Step | null = null;
   /** Seconds of slow motion left (a vehicle brewing up). */
   private slow = 0;
   private clock = 0;
@@ -245,6 +253,10 @@ export class BattleStage {
     this.selRing.visible = false;
     this.selRing.renderOrder = 4;
     this.scene.add(this.selRing);
+    this.destMark = new THREE.Mesh(new THREE.CircleGeometry(0.42, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }));
+    this.destMark.visible = false;
+    this.destMark.renderOrder = 4;
+    this.scene.add(this.destMark);
 
     // Where the defenders were seen to deploy (the war map says they hold the ground), until contact.
     const spawn = battle.map.redSpawn;
@@ -625,6 +637,11 @@ export class BattleStage {
 
   // --- Overlay -------------------------------------------------------------------------------------
 
+  /** The film's queue, for tests: steps waiting, whether an action cam runs, the clock. */
+  filmState(): { steps: number; cam: boolean; clock: number; settled: boolean; faults: number } {
+    return { steps: this.steps.length, cam: this.cam !== null, clock: this.clock, settled: this.settled, faults: this.faults };
+  }
+
   /** What the overlay shows, for tests. */
   overlayCounts(): { selected: string | null; reach: number; dash: number; targets: number } {
     return { selected: this.overlay.selected, reach: this.overlay.reach.length, dash: this.overlay.dash.length, targets: this.overlay.targets.length };
@@ -689,6 +706,8 @@ export class BattleStage {
       this.pathLine.renderOrder = 5;
       this.scene.add(this.pathLine);
     }
+    this.destMark.visible = !!o.dest;
+    if (o.dest) this.destMark.position.set(o.dest.x + 0.5, this.ground(o.dest.x + 0.5, o.dest.y + 0.5) + 0.07, o.dest.y + 0.5);
     const sel = o.selected ? this.views.get(o.selected) : undefined;
     this.selRing.visible = !!sel && sel.holder.visible;
     if (sel) {
@@ -932,22 +951,41 @@ export class BattleStage {
   /** Skip to the end of what is queued (fast-forward). */
   skip(): void {
     for (let n = 0; n < 5000 && this.steps.length; n++) {
-      const s = this.steps[0]!;
+      const s = this.steps.shift()!;
       if (!s.started) {
         s.started = true;
-        s.start?.();
+        this.safely(s.start);
       }
-      s.tick?.(1, 0);
-      s.end?.();
-      this.steps.shift();
+      this.safely(() => s.tick?.(1, 0));
+      this.safely(s.end);
     }
+    this.steps.length = 0;
     this.cam = null;
     this.slow = 0;
     this.hudLayer.clearCallouts();
   }
 
   private step(dur: number, s: Omit<Step, 'dur' | 't' | 'started'>): void {
-    this.steps.push({ dur, t: 0, started: false, ...s });
+    this.steps.push({ dur: Number.isFinite(dur) && dur > 0 ? dur : 0, t: 0, started: false, ...s });
+  }
+
+  /** Run one moment of a step. A fault is counted and skipped: the film never stops on one. */
+  private safely(fn: (() => void) | undefined): void {
+    if (!fn) return;
+    try {
+      fn();
+    } catch (e) {
+      this.faults++;
+      if (this.faults <= 3) console.warn('battle film: a step failed and was skipped', e);
+    }
+  }
+
+  /** Drop whatever is playing and put every unit where the battle says (after a fault). */
+  recover(): void {
+    this.faults++;
+    this.skip();
+    this.cam = null;
+    this.safely(() => this.resync());
   }
 
   private now(fn: () => void): void {
@@ -1010,7 +1048,8 @@ export class BattleStage {
         }
         const pts = e.path.map((p) => new THREE.Vector2(p.x + 0.5, p.y + 0.5));
         const foot = v.t.mobility === 'foot';
-        const per = foot ? (e.dash ? 0.2 : 0.26) : v.t.mobility === 'heli' || v.t.mobility === 'drone' ? 0.1 : v.t.mobility === 'wheeled' ? 0.13 : 0.16;
+        // Brisk: a tank crosses six cells in about two thirds of a second.
+        const per = foot ? (e.dash ? 0.13 : 0.17) : v.t.mobility === 'heli' || v.t.mobility === 'drone' ? 0.07 : v.t.mobility === 'wheeled' ? 0.09 : 0.11;
         let dust = 0;
         const len = pts.length - 1;
         this.step(per * len + 0.1, {
@@ -1459,21 +1498,35 @@ export class BattleStage {
       dt *= 0.3;
     }
     this.clock += dt;
+    // A step that has played far longer than it should is ended where it stands.
+    const head = this.steps[0] ?? null;
+    if (head !== this.stepNow) {
+      this.stepNow = head;
+      this.stepAge = 0;
+    } else if (head) {
+      this.stepAge += real;
+      if (this.stepAge > Math.max(8, head.dur * 3)) {
+        this.faults++;
+        this.steps.shift();
+        this.safely(head.end);
+        this.stepNow = null;
+      }
+    }
     // Play the film: one step at a time.
     let budget = dt;
     while (this.steps.length && budget >= 0) {
       const s = this.steps[0]!;
       if (!s.started) {
         s.started = true;
-        s.start?.();
+        this.safely(s.start);
       }
       const take = Math.min(budget, s.dur - s.t);
       s.t += take;
       budget -= take;
-      s.tick?.(s.dur > 0 ? Math.min(1, s.t / s.dur) : 1, take);
+      this.safely(() => s.tick?.(s.dur > 0 ? Math.min(1, s.t / s.dur) : 1, take));
       if (s.t >= s.dur - 1e-6) {
-        s.end?.();
         this.steps.shift();
+        this.safely(s.end);
         if (s.dur > 0) break;
       } else break;
     }

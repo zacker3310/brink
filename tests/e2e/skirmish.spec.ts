@@ -39,13 +39,16 @@ test('a skirmish plays in turns and banks its stars', async ({ page }) => {
     }
     return null;
   }, unit);
+  // A first click shows the move; Move commits it.
   await page.mouse.click(cell!.at.x, cell!.at.y);
+  await page.getByTestId('arena-move').click();
   await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((x) => x.id === id)!.y, unit.id)).toBe(cell!.y);
   await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((x) => x.id === id)!.moved, unit.id)).toBe(true);
 
   // End the turn: the enemy moves, then it is round two.
   await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 120000 });
   await page.getByTestId('arena-end-turn').click();
+  await page.getByTestId('arena-end-now').click();
   await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 180000 });
   await expect(page.getByTestId('arena-round')).toHaveText('2/16');
 

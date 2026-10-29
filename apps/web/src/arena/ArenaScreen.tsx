@@ -71,6 +71,8 @@ declare global {
       perf: (reset?: boolean) => ReturnType<BattleStage['perf']> | null;
       /** What the field overlay shows now. */
       overlay: () => ReturnType<BattleStage['overlayCounts']> | null;
+      /** The film's queue (steps waiting, action cam, clock). */
+      film: () => ReturnType<BattleStage['filmState']> | null;
     };
   }
 }
@@ -165,6 +167,61 @@ function adviceText(b: Battle, me: Unit, plan: Action[], known: Set<string>): st
   }
   const s = bits.length > 1 ? `${bits.slice(0, -1).join(', ')}, then ${bits.at(-1)}` : (bits[0] ?? 'hold');
   return `${s[0]!.toUpperCase()}${s.slice(1)}.`;
+}
+
+/** A move being looked at: how far, into what, what it could hit from there, and who could hit it. */
+function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me: Unit; at: Point; dash: boolean; known: Set<string>; onCancel: () => void; onMove: () => void }) {
+  const steps = Math.max(Math.abs(at.x - me.x), Math.abs(at.y - me.y));
+  const cell = b.map.cells[at.y * b.map.w + at.x] ?? 0;
+  const place = PLACE[cell];
+  const cover = cell === 2 || cell === 5 || cell === 6 || cell === 8;
+  const there = { ...me, x: at.x, y: at.y, moved: true, dashed: dash };
+  const enemies = b.units.filter((u) => u.side === 'red' && u.alive && known.has(u.id));
+  const shots = dash
+    ? []
+    : enemies
+        .map((u) => ({ u, info: bestFire(b, there, u, at, false, known) }))
+        .filter((x): x is { u: Unit; info: FireInfo } => !!x.info)
+        .sort((p, q) => q.info.chance - p.info.chance);
+  // Who of the enemies you know could hit it there, assuming they see it.
+  const threats = enemies
+    .map((u) => ({ u, info: bestFire(b, u, there, u, false, new Set([me.id])) }))
+    .filter((x): x is { u: Unit; info: FireInfo } => !!x.info)
+    .sort((p, q) => q.info.chance - p.info.chance);
+  const list = (xs: { u: Unit; info: FireInfo }[]) =>
+    xs
+      .slice(0, 3)
+      .map((x) => `${typeOf(x.u.type).short} ${x.info.chance}%`)
+      .join(', ');
+  return (
+    <div className="mb-2 rounded-xl bg-ink-900 p-3" data-testid="move-card">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[16px] font-bold">
+          {dash ? 'Dash' : 'Move'} {steps} {steps === 1 ? 'cell' : 'cells'}
+          {place ? ` into ${place}` : ''}
+        </span>
+        <span className="shrink-0 text-[13px] font-semibold text-muted">{cover ? 'Cover' : 'In the open'}</span>
+      </div>
+      <dl className="mt-1.5 space-y-1 text-[14px] leading-snug">
+        <div className="flex gap-2">
+          <dt className="w-[92px] shrink-0 text-muted">From there</dt>
+          <dd className="min-w-0" data-testid="move-shots">{dash ? 'A dash ends its turn: no shot' : shots.length ? list(shots) : 'Nothing you know of in sight'}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-[92px] shrink-0 text-muted">Can hit it</dt>
+          <dd className="min-w-0" data-testid="move-threats">{threats.length ? list(threats) : 'None you know of'}</dd>
+        </div>
+      </dl>
+      <div className="mt-2.5 flex gap-2">
+        <button type="button" className="v-btn v-btn-secondary h-11 flex-1 text-[15px]" onClick={onCancel} data-testid="move-cancel">
+          Cancel
+        </button>
+        <button type="button" className="v-btn v-btn-primary h-11 flex-[1.6] text-[15px] font-semibold" onClick={onMove} data-testid="arena-move">
+          {dash ? 'Dash' : 'Move'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Tile({ u, active, onClick }: { u: Unit; active: boolean; onClick: () => void }) {
@@ -387,7 +444,7 @@ function Verdict({ result, req, battle, onDone }: { result: ArenaResult; req: Ba
 }
 
 type Mode = { kind: 'none' } | { kind: 'strike'; smoke: boolean } | { kind: 'face' } | { kind: 'breach' } | { kind: 'mine' } | { kind: 'support'; asset: 'himars' | 'tornado' } | { kind: 'ability'; id: AbilityId };
-type Card = { kind: 'fire'; target: string; weapon: string } | { kind: 'strike'; at: Point; smoke: boolean } | { kind: 'support'; asset: 'himars' | 'tornado'; at: Point } | null;
+type Card = { kind: 'fire'; target: string; weapon: string } | { kind: 'strike'; at: Point; smoke: boolean } | { kind: 'support'; asset: 'himars' | 'tornado'; at: Point } | { kind: 'move'; at: Point; dash: boolean } | null;
 
 function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: Battle) => void }) {
   const host = useRef<HTMLDivElement>(null);
@@ -398,6 +455,15 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const labelsRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(true);
+  /** The enemy's turn (or the opening) is playing: orders wait for it. Your own film never blocks you. */
+  const [waiting, setWaiting] = useState(true);
+  const waitingRef = useRef(true);
+  /** A unit to bring the camera to once the film in progress has played. */
+  const pendingFocus = useRef<string | null>(null);
+  /** Ending the turn with units still ready asks first. */
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  /** The unit card shows its three most useful actions; More shows the rest. */
+  const [more, setMore] = useState(false);
   const [, setTick] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [card, setCard] = useState<Card>(null);
@@ -438,7 +504,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     if (!b || !s) return;
     s.play(b.events.slice(cursor.current));
     cursor.current = b.events.length;
-    setBusy(true);
+    // Busy only if there is something to play: overwatch and hunker log nothing, and a busy flag
+    // set by hand for them was never cleared (the battle sat on "Wait" for good).
+    setBusy(s.busy);
     refresh();
   };
 
@@ -470,14 +538,22 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       setBanner('Your Turn');
       flush();
       let last = performance.now();
+      let shownTurn = battle.turnIndex;
       const frame = (now: number) => {
+        // The next frame is asked for first, so nothing below can ever stop the loop.
+        raf = requestAnimationFrame(frame);
         // Frame timestamps can run behind the clock on some browsers: never step backwards. A slow
         // device plays the film at real speed in bigger steps rather than in slow motion.
         const dt = Math.max(0, Math.min(0.25, (now - last) / 1000));
         last = now;
         const stage = stageRef.current;
         if (!stage) return;
-        if (!document.hidden) stage.frame(dt);
+        try {
+          if (!document.hidden) stage.frame(dt);
+        } catch (e) {
+          console.warn('battle frame failed; the film is put right', e);
+          stage.recover();
+        }
         // Odds labels ride over their targets as the camera moves.
         const box = el.getBoundingClientRect();
         for (const n of labelsRef.current?.children ?? []) {
@@ -486,11 +562,22 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           (n as HTMLElement).style.transform = `translate(${at.x - box.left}px, ${at.y - box.top}px) translate(-50%, -100%)`;
         }
         const b = stage.busy;
+        if (!b && waitingRef.current) {
+          waitingRef.current = false;
+          setWaiting(false);
+        }
+        if (!b && pendingFocus.current) {
+          const u = battle.units.find((x) => x.id === pendingFocus.current);
+          pendingFocus.current = null;
+          if (u) stage.recenter(u);
+        }
         if (b !== wasBusy) {
           wasBusy = b;
           setBusy(b);
           if (!b) setBars(strengths(battle));
-          if (!b && !battle.ended && battle.turn === 'blue') {
+          // The round banner once per turn of yours, not after each of your own actions.
+          if (!b && !battle.ended && battle.turn === 'blue' && battle.turnIndex !== shownTurn) {
+            shownTurn = battle.turnIndex;
             setBanner(`Round ${battle.round} · Your Turn`);
             const now = counts(battle);
             const killed = now.killed - tally0.current.killed;
@@ -501,10 +588,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         }
         if (battle.ended && !b && !ended) ended = now;
         if (ended && now - ended > 700) {
+          cancelAnimationFrame(raf);
           onEnd(arenaResult(battle), battle);
-          return;
         }
-        raf = requestAnimationFrame(frame);
       };
       raf = requestAnimationFrame(frame);
       window.__arena = {
@@ -526,6 +612,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         },
         perf: (reset) => stageRef.current?.perf(reset) ?? null,
         overlay: () => stageRef.current?.overlayCounts() ?? null,
+        film: () => stageRef.current?.filmState() ?? null,
       };
     });
     const onResize = () => stageRef.current?.resize();
@@ -554,10 +641,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   }, [banner]);
 
   const b = battleRef.current;
-  const myTurn = !!b && ready && !busy && b.turn === 'blue' && !b.ended;
+  // Your turn, even while your own last order is still playing out on screen.
+  const myTurn = !!b && ready && !waiting && b.turn === 'blue' && !b.ended;
   const me = b && selected ? b.units.find((u) => u.id === selected && u.alive && !u.carrier) : undefined;
-  // Your side's picture, which only changes as the film ends (so the count never runs ahead of it).
-  const visible = useMemo(() => (b && ready && !busy ? visibleTo(b, 'blue') : (lastSeen.current ?? new Set<string>())), [b, ready, busy, b?.events.length]);
+  // Your side's picture as the battle stands on your turn; during theirs, the last one you had.
+  const visible = useMemo(() => (b && myTurn ? visibleTo(b, 'blue') : (lastSeen.current ?? new Set<string>())), [b, myTurn, b?.events.length]);
   lastSeen.current = visible;
   const reach = useMemo(() => (b && me && myTurn ? reachable(b, me, false, visible) : null), [b, me, myTurn, me?.x, me?.y, me?.moved, me?.acted, visible]);
   const dashReach = useMemo(() => (b && me && myTurn && dash ? reachable(b, me, true, visible) : null), [b, me, myTurn, dash, me?.x, me?.y, me?.moved, me?.acted, visible]);
@@ -581,16 +669,18 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     const s = stageRef.current;
     if (!s || !b) return;
     const ghosts = Object.values(b.intel.blue).filter((g) => !g.now).map((g) => ({ x: g.x, y: g.y, type: g.type, age: b.turnIndex - g.turn }));
-    const o: Overlay = { selected: myTurn ? selected : null, reach: [], dash: [], path: null, targets: [], area: null, ghosts };
+    const o: Overlay = { selected: myTurn ? selected : null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts };
     if (myTurn && me) {
       const start = me.y * b.map.w + me.x;
       if (reach) o.reach = [...reach.cost.keys()].filter((i) => i !== start);
       if (dashReach) o.dash = [...dashReach.cost.keys()].filter((i) => i !== start && !reach?.cost.has(i));
       o.targets = targets.map((t) => t.unit.id);
       const r = dash ? dashReach : reach;
-      // The route to the cell under the pointer, or else the advised move.
-      const to = hover && r?.cost.has(hover.y * b.map.w + hover.x) && (hover.x !== me.x || hover.y !== me.y) ? hover : !card && mode.kind === 'none' && adviceMove ? adviceMove.to : null;
-      const route = to && hover === to ? r : adviceMove?.dash ? (dashReach ?? reachable(b, me, true, visible)) : reach;
+      // The route to the move being looked at, else the cell under the pointer, else the advised move.
+      const looked = card?.kind === 'move' ? card : null;
+      const to = looked ? looked.at : hover && r?.cost.has(hover.y * b.map.w + hover.x) && (hover.x !== me.x || hover.y !== me.y) ? hover : !card && mode.kind === 'none' && adviceMove ? adviceMove.to : null;
+      const route = looked ? (looked.dash ? (dashReach ?? reachable(b, me, true, visible)) : reach) : to && hover === to ? r : adviceMove?.dash ? (dashReach ?? reachable(b, me, true, visible)) : reach;
+      if (looked) o.dest = looked.at;
       if (to && route?.cost.has(to.y * b.map.w + to.x)) {
         const path: Point[] = [];
         for (let i: number | undefined = to.y * b.map.w + to.x; i !== undefined; i = route.prev.get(i)) path.unshift({ x: i % b.map.w, y: Math.floor(i / b.map.w) });
@@ -607,10 +697,12 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   // The camera brings the selected unit into view; a new turn starts with a ready unit selected.
   useEffect(() => {
-    if (me) {
-      stageRef.current?.recenter(me);
-      setOverview(false);
-    }
+    setMore(false);
+    if (!me) return;
+    // While a shot or a move is still playing, let it finish on screen, then go to the unit.
+    if (stageRef.current?.busy) pendingFocus.current = me.id;
+    else stageRef.current?.recenter(me);
+    setOverview(false);
   }, [selected]);
   useEffect(() => {
     if (!myTurn || !b) return;
@@ -715,7 +807,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     }
     const r = dash ? dashReach : reach;
     if (r?.cost.has(p.y * b.map.w + p.x) && (p.x !== me.x || p.y !== me.y)) {
-      doAct({ type: 'move', unit: me.id, to: p, ...(dash ? { dash: true } : {}) });
+      // The first tap shows the route and what the place means; the second (or Move) goes.
+      if (card?.kind === 'move' && card.at.x === p.x && card.at.y === p.y) doAct({ type: 'move', unit: me.id, to: p, ...(card.dash ? { dash: true } : {}) });
+      else setCard({ kind: 'move', at: p, dash });
       return true;
     }
     setCard(null);
@@ -799,6 +893,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   const finishTurn = (auto = false) => {
     if (!b || !myTurn) return;
+    setConfirmEnd(false);
+    waitingRef.current = true;
+    setWaiting(true);
     undoRef.current = null;
     setSelected(null);
     setCard(null);
@@ -848,7 +945,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const formations = req.setup.attackers;
 
   // What the selected unit can do now, as buttons.
-  const actions: { id: string; label: string; on: () => void; ok: boolean; pressed?: boolean }[] = [];
+  /** What the selected unit can do now, most useful first (the card shows three; More shows the rest). */
+  const actions: { id: string; label: string; on: () => void; ok: boolean; pressed?: boolean; pri: number }[] = [];
   if (me && b && myTurn) {
     const t = typeOf(me.type);
     const ok = (a: Action) => whyNot(b, a) === null;
@@ -856,7 +954,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     const best = targets[0];
     if (best && !me.acted)
       actions.push({
-        id: 'best',
+        id: 'best', pri: 0,
         label: `Best Shot ${best.info.chance}%`,
         on: () => {
           setCard({ kind: 'fire', target: best.unit.id, weapon: best.info.weapon.id });
@@ -864,34 +962,38 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         },
         ok: true,
       });
-    if (!me.moved && !me.mobilityKill && t.move > 0) actions.push({ id: 'dash', label: 'Dash', on: () => setDash(!dash), ok: !me.acted, pressed: dash });
+    if (!me.moved && !me.mobilityKill && t.move > 0) actions.push({ id: 'dash', pri: 4, label: 'Dash', on: () => setDash(!dash), ok: !me.acted, pressed: dash });
     if (indirect) {
-      actions.push({ id: 'strike', label: 'Call Fire', on: () => setMode(mode.kind === 'strike' && !mode.smoke ? { kind: 'none' } : { kind: 'strike', smoke: false }), ok: !me.acted && (me.ammo[indirect.id] ?? 0) > 0, pressed: mode.kind === 'strike' && !mode.smoke });
-      if (indirect.smoke) actions.push({ id: 'strike-smoke', label: `Smoke Rounds ${me.smoke[indirect.id] ?? 0}`, on: () => setMode(mode.kind === 'strike' && mode.smoke ? { kind: 'none' } : { kind: 'strike', smoke: true }), ok: !me.acted && (me.smoke[indirect.id] ?? 0) > 0, pressed: mode.kind === 'strike' && mode.smoke });
+      actions.push({ id: 'strike', pri: 1, label: 'Call Fire', on: () => setMode(mode.kind === 'strike' && !mode.smoke ? { kind: 'none' } : { kind: 'strike', smoke: false }), ok: !me.acted && (me.ammo[indirect.id] ?? 0) > 0, pressed: mode.kind === 'strike' && !mode.smoke });
+      if (indirect.smoke) actions.push({ id: 'strike-smoke', pri: 3, label: `Smoke Rounds ${me.smoke[indirect.id] ?? 0}`, on: () => setMode(mode.kind === 'strike' && mode.smoke ? { kind: 'none' } : { kind: 'strike', smoke: true }), ok: !me.acted && (me.smoke[indirect.id] ?? 0) > 0, pressed: mode.kind === 'strike' && mode.smoke });
     }
-    actions.push({ id: 'overwatch', label: 'Overwatch', on: () => doAct({ type: 'overwatch', unit: me.id }, false), ok: ok({ type: 'overwatch', unit: me.id }) });
-    if (t.mobility === 'foot') actions.push({ id: 'hunker', label: 'Hunker', on: () => doAct({ type: 'hunker', unit: me.id }, false), ok: ok({ type: 'hunker', unit: me.id }) });
-    if ((me.smoke.grenades ?? 0) > 0 || (me.smoke.pots ?? 0) > 0) actions.push({ id: 'smoke', label: `Smoke ${me.smoke.grenades ?? me.smoke.pots ?? 0}`, on: () => doAct({ type: 'smoke', unit: me.id }), ok: ok({ type: 'smoke', unit: me.id }) });
-    if (me.passengers.length) actions.push({ id: 'dismount', label: 'Dismount', on: () => doAct({ type: 'dismount', unit: me.id }), ok: ok({ type: 'dismount', unit: me.id }) });
-    if (t.mobility !== 'foot' && t.mobility !== 'heli' && t.mobility !== 'drone') actions.push({ id: 'face', label: 'Turn', on: () => setMode(mode.kind === 'face' ? { kind: 'none' } : { kind: 'face' }), ok: ok({ type: 'face', unit: me.id, facing: me.facing }), pressed: mode.kind === 'face' });
-    if (me.type === 'squad_w' || me.type === 'squad_e') actions.push({ id: 'split', label: 'Split', on: () => doAct({ type: 'split', unit: me.id }), ok: ok({ type: 'split', unit: me.id }) });
+    actions.push({ id: 'overwatch', pri: 2, label: 'Overwatch', on: () => doAct({ type: 'overwatch', unit: me.id }, false), ok: ok({ type: 'overwatch', unit: me.id }) });
+    if (t.mobility === 'foot') actions.push({ id: 'hunker', pri: 3, label: 'Hunker', on: () => doAct({ type: 'hunker', unit: me.id }, false), ok: ok({ type: 'hunker', unit: me.id }) });
+    if ((me.smoke.grenades ?? 0) > 0 || (me.smoke.pots ?? 0) > 0) actions.push({ id: 'smoke', pri: 3, label: `Smoke ${me.smoke.grenades ?? me.smoke.pots ?? 0}`, on: () => doAct({ type: 'smoke', unit: me.id }), ok: ok({ type: 'smoke', unit: me.id }) });
+    if (me.passengers.length) actions.push({ id: 'dismount', pri: 1, label: 'Dismount', on: () => doAct({ type: 'dismount', unit: me.id }), ok: ok({ type: 'dismount', unit: me.id }) });
+    if (t.mobility !== 'foot' && t.mobility !== 'heli' && t.mobility !== 'drone') actions.push({ id: 'face', pri: 5, label: 'Turn', on: () => setMode(mode.kind === 'face' ? { kind: 'none' } : { kind: 'face' }), ok: ok({ type: 'face', unit: me.id, facing: me.facing }), pressed: mode.kind === 'face' });
+    if (me.type === 'squad_w' || me.type === 'squad_e') actions.push({ id: 'split', pri: 5, label: 'Split', on: () => doAct({ type: 'split', unit: me.id }), ok: ok({ type: 'split', unit: me.id }) });
     const half = b.units.find((o) => o !== me && o.alive && !o.carrier && o.side === 'blue' && (o.parent === me.id || me.parent === o.id || (!!me.parent && o.parent === me.parent)));
-    if (half) actions.push({ id: 'merge', label: 'Join', on: () => doAct({ type: 'merge', unit: me.id, with: half.id }, false), ok: ok({ type: 'merge', unit: me.id, with: half.id }) });
+    if (half) actions.push({ id: 'merge', pri: 5, label: 'Join', on: () => doAct({ type: 'merge', unit: me.id, with: half.id }, false), ok: ok({ type: 'merge', unit: me.id, with: half.id }) });
     const carrier = b.units.find((o) => o.side === 'blue' && o.alive && !o.carrier && typeOf(o.type).seats > 0 && ok({ type: 'embark', unit: me.id, carrier: o.id }));
-    if (t.mobility === 'foot' && carrier) actions.push({ id: 'embark', label: `Board ${typeOf(carrier.type).short}`, on: () => doAct({ type: 'embark', unit: me.id, carrier: carrier.id }, false), ok: true });
+    if (t.mobility === 'foot' && carrier) actions.push({ id: 'embark', pri: 1, label: `Board ${typeOf(carrier.type).short}`, on: () => doAct({ type: 'embark', unit: me.id, carrier: carrier.id }, false), ok: true });
     if (t.treat) {
       const hurt = b.units.find((o) => o.side === 'blue' && ok({ type: 'treat', unit: me.id, target: o.id }));
-      actions.push({ id: 'treat', label: 'Treat', on: () => hurt && doAct({ type: 'treat', unit: me.id, target: hurt.id }, false), ok: !!hurt });
+      actions.push({ id: 'treat', pri: 1, label: 'Treat', on: () => hurt && doAct({ type: 'treat', unit: me.id, target: hurt.id }, false), ok: !!hurt });
     }
     if (t.repair) {
       const broke = b.units.find((o) => o.side === 'blue' && ok({ type: 'repair', unit: me.id, target: o.id }));
-      actions.push({ id: 'repair', label: 'Repair', on: () => broke && doAct({ type: 'repair', unit: me.id, target: broke.id }, false), ok: !!broke });
+      actions.push({ id: 'repair', pri: 1, label: 'Repair', on: () => broke && doAct({ type: 'repair', unit: me.id, target: broke.id }, false), ok: !!broke });
     }
     if (t.engineer) {
-      actions.push({ id: 'breach', label: 'Breach', on: () => setMode(mode.kind === 'breach' ? { kind: 'none' } : { kind: 'breach' }), ok: !me.acted, pressed: mode.kind === 'breach' });
-      actions.push({ id: 'mine', label: `Mine ${me.ammo.mines ?? 0}`, on: () => setMode(mode.kind === 'mine' ? { kind: 'none' } : { kind: 'mine' }), ok: !me.acted && (me.ammo.mines ?? 0) > 0, pressed: mode.kind === 'mine' });
+      actions.push({ id: 'breach', pri: 2, label: 'Breach', on: () => setMode(mode.kind === 'breach' ? { kind: 'none' } : { kind: 'breach' }), ok: !me.acted, pressed: mode.kind === 'breach' });
+      actions.push({ id: 'mine', pri: 3, label: `Mine ${me.ammo.mines ?? 0}`, on: () => setMode(mode.kind === 'mine' ? { kind: 'none' } : { kind: 'mine' }), ok: !me.acted && (me.ammo.mines ?? 0) > 0, pressed: mode.kind === 'mine' });
     }
   }
+
+  const ranked = [...actions].sort((p, q) => p.pri - q.pri);
+  const shownActions = more ? ranked : ranked.filter((a, i) => i < 3 || a.pressed);
+  const hiddenActions = ranked.length - shownActions.length;
 
   return (
     <div className="absolute inset-0 bg-ink-950" data-testid="arena">
@@ -1028,7 +1130,18 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
       <footer className="vercel safe-bottom safe-x absolute inset-x-0 bottom-0 z-10">
         <div className="mx-2 mb-1.5 rounded-2xl bg-black/85 p-2 backdrop-blur">
-          {card && b && (
+          {card?.kind === 'move' && b && me && (
+            <MoveCard
+              b={b}
+              me={me}
+              at={card.at}
+              dash={card.dash}
+              known={visible}
+              onCancel={() => setCard(null)}
+              onMove={() => doAct({ type: 'move', unit: me.id, to: card.at, ...(card.dash ? { dash: true } : {}) })}
+            />
+          )}
+          {card && card.kind !== 'move' && b && (
             <div className="mb-2 rounded-xl bg-ink-900 p-3" data-testid="shot-card">
               {card.kind === 'fire' && me ? (
                 <ShotCard b={b} shooter={me} target={b.units.find((u) => u.id === card.target)!} weapon={card.weapon} visible={visible} onWeapon={(w) => setCard({ ...card, weapon: w })} />
@@ -1086,12 +1199,17 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                   </button>
                 </div>
               )}
-              <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5">
-                {actions.map((a) => (
+              <div className={`mt-1.5 flex gap-1.5 pb-0.5 ${more ? 'flex-wrap' : 'overflow-x-auto'}`}>
+                {shownActions.map((a) => (
                   <button key={a.id} type="button" disabled={!a.ok} onClick={a.on} aria-pressed={a.pressed} className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${a.pressed ? 'bg-white text-black' : 'bg-ink-800 text-text'}`} data-testid={`arena-${a.id}`}>
                     {a.label}
                   </button>
                 ))}
+                {(hiddenActions > 0 || more) && (
+                  <button type="button" onClick={() => setMore(!more)} aria-expanded={more} className="h-11 shrink-0 rounded-full bg-ink-800 px-3.5 text-[14px] font-semibold text-muted" data-testid="arena-more">
+                    {more ? 'Less' : `More ${hiddenActions}`}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1159,8 +1277,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 Undo
               </button>
             )}
-            <button type="button" disabled={!myTurn} onClick={() => finishTurn()} className={`v-btn h-[58px] shrink-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">
-              {busy && ready ? 'Wait…' : readyCount ? (
+            <button type="button" disabled={!myTurn} onClick={() => (readyCount > 0 ? setConfirmEnd(true) : finishTurn())} className={`v-btn h-[58px] shrink-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">
+              {waiting && ready ? 'Enemy Turn' : readyCount ? (
                 <>
                   End Turn
                   <br />
@@ -1173,6 +1291,30 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           </div>
         </div>
       </footer>
+
+      {confirmEnd && myTurn && (
+        <div className="vercel absolute inset-0 z-20 flex items-end bg-black/60" data-testid="arena-end-confirm" onClick={() => setConfirmEnd(false)}>
+          <div className="safe-bottom safe-x w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-2 mb-2 rounded-2xl bg-ink-900 p-4">
+              <div className="text-[17px] font-bold">
+                {readyCount} {readyCount === 1 ? 'unit has' : 'units have'} not acted
+              </div>
+              <p className="mt-0.5 text-[14px] text-muted">Your crews can take their turns for them, the way the advice would.</p>
+              <div className="mt-3 flex flex-col gap-2">
+                <button type="button" onClick={() => finishTurn(true)} className="v-btn v-btn-primary h-12 text-[16px] font-semibold" data-testid="arena-end-auto">
+                  Crews Act, Then End Turn
+                </button>
+                <button type="button" onClick={() => finishTurn()} className="v-btn v-btn-secondary h-12 text-[15px]" data-testid="arena-end-now">
+                  End Turn Now
+                </button>
+                <button type="button" onClick={() => setConfirmEnd(false)} className="v-btn v-btn-secondary h-12 text-[15px]" data-testid="arena-end-cancel">
+                  Keep Playing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {menu && (
         <div className="vercel absolute inset-0 z-20 overflow-y-auto bg-black/90" data-testid="arena-paused">

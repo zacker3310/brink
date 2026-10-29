@@ -105,7 +105,11 @@ for (const size of SIZES) {
         [-2, 0],
       ]);
       expect(back).not.toBeNull();
+      // The first tap shows where it would go and what that means; Move commits.
       await page.touchscreen.tap(back!.at.x, back!.at.y);
+      await expect(page.getByTestId('move-card')).toBeVisible();
+      await audit(page, 'move card');
+      await page.getByTestId('arena-move').tap();
       await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((u) => u.id === id)!.moved, tank.id), { timeout: 15_000 }).toBe(true);
       await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
       await expect(page.getByTestId('arena-undo')).toBeVisible();
@@ -119,6 +123,9 @@ for (const size of SIZES) {
       await page.getByTestId(`arena-unit-${tank.id}`).tap();
       await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
       const ahead = await page.evaluate((c) => window.__arena!.toScreen(c.x, c.y), cell!);
+      // Tapping the same cell twice also goes.
+      await page.touchscreen.tap(ahead.x, ahead.y);
+      await expect(page.getByTestId('move-card')).toBeVisible();
       await page.touchscreen.tap(ahead.x, ahead.y);
       await expect.poll(() => page.evaluate((id) => window.__arena!.arena()!.units.find((u) => u.id === id)!.moved, tank.id), { timeout: 15_000 }).toBe(true);
 
@@ -134,7 +141,11 @@ for (const size of SIZES) {
 
       // End the turn: the enemy plays, then it is round two.
       await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
+      // Units still ready: End Turn asks first.
       await page.getByTestId('arena-end-turn').tap();
+      await expect(page.getByTestId('arena-end-confirm')).toBeVisible();
+      await audit(page, 'end turn');
+      await page.getByTestId('arena-end-now').tap();
       await settle(page);
       await expect(page.getByTestId('arena-round')).toHaveText('2/16');
 
