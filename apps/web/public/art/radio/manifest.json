@@ -1,0 +1,235 @@
+{
+ "source": "Kokoro-82M (hexgrad, Apache-2.0) via kokoro-onnx (MIT), radio-filtered by tools/art/radio.py",
+ "calls": {
+  "contact": {
+   "front": [
+    "contact-front-1.mp3",
+    "contact-front-2.mp3"
+   ],
+   "left": [
+    "contact-left-1.mp3",
+    "contact-left-2.mp3"
+   ],
+   "right": [
+    "contact-right-1.mp3",
+    "contact-right-2.mp3"
+   ],
+   "rear": [
+    "contact-rear-1.mp3",
+    "contact-rear-2.mp3"
+   ]
+  },
+  "destroyed": {
+   "any": [
+    "destroyed-1.mp3",
+    "destroyed-2.mp3"
+   ]
+  },
+  "taking_fire": {
+   "any": [
+    "taking-fire-1.mp3",
+    "taking-fire-2.mp3"
+   ]
+  },
+  "man_down": {
+   "any": [
+    "man-down-1.mp3",
+    "man-down-2.mp3"
+   ]
+  },
+  "smoke": {
+   "any": [
+    "smoke-1.mp3",
+    "smoke-2.mp3"
+   ]
+  },
+  "splash": {
+   "any": [
+    "splash-1.mp3",
+    "splash-2.mp3"
+   ]
+  },
+  "vehicle_hit": {
+   "any": [
+    "vehicle-hit-1.mp3",
+    "vehicle-hit-2.mp3"
+   ]
+  },
+  "air_threat": {
+   "any": [
+    "air-threat-1.mp3",
+    "air-threat-2.mp3"
+   ]
+  },
+  "moving": {
+   "any": [
+    "moving-1.mp3",
+    "moving-2.mp3"
+   ]
+  },
+  "dismount": {
+   "any": [
+    "dismount-1.mp3",
+    "dismount-2.mp3"
+   ]
+  }
+ },
+ "clips": {
+  "contact-front-1.mp3": {
+   "text": "Contact front!",
+   "voice": "am_michael",
+   "seconds": 1.19,
+   "bytes": 6451
+  },
+  "contact-front-2.mp3": {
+   "text": "Contact front!",
+   "voice": "am_onyx",
+   "seconds": 1.29,
+   "bytes": 6974
+  },
+  "contact-left-1.mp3": {
+   "text": "Contact left!",
+   "voice": "am_adam",
+   "seconds": 1.13,
+   "bytes": 6190
+  },
+  "contact-left-2.mp3": {
+   "text": "Contact left!",
+   "voice": "am_eric",
+   "seconds": 1.13,
+   "bytes": 6190
+  },
+  "contact-right-1.mp3": {
+   "text": "Contact right!",
+   "voice": "am_eric",
+   "seconds": 1.1,
+   "bytes": 6059
+  },
+  "contact-right-2.mp3": {
+   "text": "Contact right!",
+   "voice": "am_michael",
+   "seconds": 1.1,
+   "bytes": 6059
+  },
+  "contact-rear-1.mp3": {
+   "text": "Contact rear!",
+   "voice": "am_onyx",
+   "seconds": 1.29,
+   "bytes": 6974
+  },
+  "contact-rear-2.mp3": {
+   "text": "Contact rear!",
+   "voice": "am_adam",
+   "seconds": 1.13,
+   "bytes": 6190
+  },
+  "destroyed-1.mp3": {
+   "text": "Target destroyed.",
+   "voice": "am_adam",
+   "seconds": 1.29,
+   "bytes": 6974
+  },
+  "destroyed-2.mp3": {
+   "text": "Good kill, target down.",
+   "voice": "am_michael",
+   "seconds": 1.6,
+   "bytes": 8541
+  },
+  "taking-fire-1.mp3": {
+   "text": "Taking fire!",
+   "voice": "am_eric",
+   "seconds": 1.07,
+   "bytes": 5798
+  },
+  "taking-fire-2.mp3": {
+   "text": "We're under fire!",
+   "voice": "am_onyx",
+   "seconds": 1.08,
+   "bytes": 5929
+  },
+  "man-down-1.mp3": {
+   "text": "Man down!",
+   "voice": "am_michael",
+   "seconds": 0.95,
+   "bytes": 5276
+  },
+  "man-down-2.mp3": {
+   "text": "Casualty, need a medic!",
+   "voice": "am_adam",
+   "seconds": 1.35,
+   "bytes": 7235
+  },
+  "smoke-1.mp3": {
+   "text": "Smoke out!",
+   "voice": "am_onyx",
+   "seconds": 1.03,
+   "bytes": 5668
+  },
+  "smoke-2.mp3": {
+   "text": "Popping smoke!",
+   "voice": "am_eric",
+   "seconds": 1.04,
+   "bytes": 5668
+  },
+  "splash-1.mp3": {
+   "text": "Splash, over.",
+   "voice": "am_adam",
+   "seconds": 1.17,
+   "bytes": 6321
+  },
+  "splash-2.mp3": {
+   "text": "Rounds on target.",
+   "voice": "am_onyx",
+   "seconds": 1.62,
+   "bytes": 8672
+  },
+  "vehicle-hit-1.mp3": {
+   "text": "We're hit!",
+   "voice": "am_fenrir",
+   "seconds": 0.74,
+   "bytes": 4231
+  },
+  "vehicle-hit-2.mp3": {
+   "text": "Vehicle hit, still in the fight.",
+   "voice": "am_michael",
+   "seconds": 1.62,
+   "bytes": 8541
+  },
+  "air-threat-1.mp3": {
+   "text": "Air threat, helo inbound!",
+   "voice": "am_michael",
+   "seconds": 1.59,
+   "bytes": 8541
+  },
+  "air-threat-2.mp3": {
+   "text": "Enemy aircraft!",
+   "voice": "am_adam",
+   "seconds": 1.12,
+   "bytes": 6190
+  },
+  "moving-1.mp3": {
+   "text": "Moving.",
+   "voice": "am_onyx",
+   "seconds": 0.92,
+   "bytes": 5145
+  },
+  "moving-2.mp3": {
+   "text": "Oscar Mike.",
+   "voice": "am_eric",
+   "seconds": 1.07,
+   "bytes": 5798
+  },
+  "dismount-1.mp3": {
+   "text": "Dismount, dismount!",
+   "voice": "am_adam",
+   "seconds": 1.24,
+   "bytes": 6712
+  },
+  "dismount-2.mp3": {
+   "text": "Troops out!",
+   "voice": "am_michael",
+   "seconds": 0.96,
+   "bytes": 5276
+  }
+ }
+}

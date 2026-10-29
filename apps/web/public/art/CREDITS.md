@@ -70,3 +70,18 @@ The battlefield itself (ground, grass, trees, rocks, buildings, water) is genera
 | Use | Asset | Author | License |
 |---|---|---|---|
 | Explosions, smoke | Smoke Particles (explosion, black smoke) | Kenney | CC0 1.0 |
+
+## Radio calls (`radio/`)
+
+Radio calls: generated with Kokoro-82M (hexgrad, Apache-2.0) via kokoro-onnx (MIT), radio-filtered by
+tools/art/radio.py.
+
+| Part | Source | License |
+|---|---|---|
+| Speech model and voices (`am_michael`, `am_adam`, `am_eric`, `am_onyx`, `am_fenrir`) | Kokoro-82M v1.0, hexgrad (github.com/hexgrad/kokoro) | Apache-2.0 (the model's weights; no separate license is stated for the voices, which ship with the model) |
+| ONNX runtime wrapper and the `kokoro-v1.0.onnx` and `voices-v1.0.bin` files | kokoro-onnx, thewh1teagle (github.com/thewh1teagle/kokoro-onnx, release `model-files-v1.0`) | MIT |
+
+Each clip is synthetic speech, band-passed to 300 to 3,400 Hz, compressed, saturated, laid over static
+with a squelch click and tail, and encoded as mono MP3 (`radio/manifest.json` lists the line and voice
+of every clip). The rest of the battle audio (weapon reports, impacts, engines, rotors, drones,
+weather) is synthesised in code in `src/arena/audio/`; there are no recordings.
