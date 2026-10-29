@@ -1,6 +1,6 @@
 import { draw } from '../rng';
 import { typeOf } from './roster';
-import { RANKS } from './rules';
+import { difficultyAim, difficultyDef, RANKS } from './rules';
 import { canSee, cheb, dist, groundAt, heightOf, isFlying, lineOfSight, other, visibleTo } from './sight';
 import {
   at,
@@ -235,7 +235,14 @@ function shooterParts(b: Battle, u: Unit, w: Weapon, parts: [string, number][], 
     parts.push(['Moved', t.stabilised ? -5 : -10]);
   }
   if (u.side === 'blue' && b.precision > 0) parts.push(['Precision rounds', 30]);
+  difficultyPart(b, u.side, parts);
   return true;
+}
+
+/** The battle's difficulty, as a named part of a hit chance: the shot card shows it, the roll uses it. */
+export function difficultyPart(b: Battle, side: Side, parts: [string, number][]): void {
+  const d = difficultyAim(b.difficulty, side);
+  if (d) parts.push([difficultyDef(b.difficulty).name, d]);
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { TechId } from '@brink/contracts';
-import type { AbilityDef, AbilityId } from './types';
+import type { AbilityDef, AbilityId, Difficulty, Side } from './types';
 
 // Ranks and research abilities for the v2 arena. The ids, techs and rank thresholds are v1's
 // (docs/arena-v2.md sections 3.4, 3.10 and 9); the effects are v2's.
@@ -24,6 +24,51 @@ export function rankFromSkill(skill: number): number {
   if (skill < 0.6) return 1;
   if (skill < 0.8) return 2;
   return 3;
+}
+
+export interface DifficultyDef {
+  /** On the shot card, by the aim it gives. */
+  name: string;
+  /** Added to every hit chance of the player's (blue) shots, direct, called and off-map. */
+  aim: number;
+  /** Added to every hit chance of the enemy's (red) shots. */
+  enemyAim: number;
+  /** The enemy company's unit count is scaled by this (never under FEWEST_ENEMIES). */
+  enemyUnits: number;
+  /** Added to the enemy skill (then clamped 0..1); it sets their decisions and their crews' rank. */
+  skill: number;
+}
+
+/**
+ * Battle difficulty (docs/arena-v2.md, section 11), tuned with the arena soak's mixed setups and
+ * the AI's own planner in the player's seat, to win: Easy at least 80%, Normal about 55%, Hard
+ * about 35%. Measured over 120 setups: Easy 80%, Normal 53%, Hard 34% (the rules as written win
+ * 44%). Easy needs a lot because a third of those setups attack with one formation, some with only
+ * guns or drones, and run out of rounds whatever the odds: two formations or more win 91% on Easy.
+ */
+export const DIFFICULTY: Record<Difficulty, DifficultyDef> = {
+  easy: { name: 'Easy', aim: 30, enemyAim: -30, enemyUnits: 0.5, skill: -0.5 },
+  normal: { name: 'Normal', aim: 10, enemyAim: -10, enemyUnits: 1, skill: 0 },
+  hard: { name: 'Hard', aim: -10, enemyAim: 15, enemyUnits: 1, skill: 0.1 },
+};
+
+/** A smaller enemy company never drops under this many units (a template company is 10 to 16). */
+export const FEWEST_ENEMIES = 6;
+
+/** The table row for a difficulty; absent (a battle saved before there were any) is Normal. */
+export function difficultyDef(d: Difficulty | undefined): DifficultyDef {
+  return DIFFICULTY[d ?? 'normal'] ?? DIFFICULTY.normal;
+}
+
+/** The difficulty's hit-chance points for one side's shots. */
+export function difficultyAim(d: Difficulty | undefined, side: Side): number {
+  const def = difficultyDef(d);
+  return side === 'blue' ? def.aim : def.enemyAim;
+}
+
+/** The enemy skill a battle plays at: the setup's, moved by the difficulty, within 0..1. */
+export function battleSkill(skill: number, d: Difficulty | undefined): number {
+  return Math.max(0, Math.min(1, (Number.isFinite(skill) ? skill : 0) + difficultyDef(d).skill));
 }
 
 /** Research on the war map unlocks one battle ability per technology; each is used once a battle. */

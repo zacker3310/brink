@@ -1,9 +1,9 @@
 import { pickConditions } from './conditions';
-import { blast, blueSees, bestFire, fireInfo, fitMen, freeCellNear, kill, rankAim, roll, shoot, suppLevel, suppress, usableWeapons, woundedMen, type FireInfo } from './combat';
+import { blast, blueSees, bestFire, difficultyPart, fireInfo, fitMen, freeCellNear, kill, rankAim, roll, shoot, suppLevel, suppress, usableWeapons, woundedMen, type FireInfo } from './combat';
 import { buildForce, type UnitSeed } from './forces';
 import { canStep, passable, buildMap } from './map';
 import { typeOf } from './roster';
-import { ABILITIES } from './rules';
+import { ABILITIES, battleSkill, DIFFICULTY, difficultyAim } from './rules';
 import { canSee, cheb, dist, isFlying, observation, other, updateIntel, visibleTo } from './sight';
 import {
   at,
@@ -27,6 +27,8 @@ import {
   type ArenaResult,
   type ArenaSetup,
   type Battle,
+  type BattleEvent,
+  type Difficulty,
   type Point,
   type Side,
   type Soldier,
@@ -126,6 +128,7 @@ export function createBattle(setup: ArenaSetup): Battle {
   for (const u of units) if (u.carrier) units.find((c) => c.id === u.carrier)?.passengers.push(u.id);
   const abilities: Battle['abilities'] = {};
   for (const a of [...setup.abilities].sort()) abilities[a] = 'ready';
+  const difficulty: Difficulty = setup.difficulty && Object.hasOwn(DIFFICULTY, setup.difficulty) ? setup.difficulty : 'normal';
   const b: Battle = {
     version: 2,
     seed: setup.seed,
@@ -137,7 +140,8 @@ export function createBattle(setup: ArenaSetup): Battle {
     turnIndex: 0,
     ended: null,
     endReason: null,
-    skill: Math.max(0, Math.min(1, setup.skill)),
+    skill: battleSkill(setup.skill, difficulty),
+    difficulty,
     abilities,
     support: [...blue.support.map((s) => ({ ...s, side: 'blue' as const })), ...red.support.map((s) => ({ ...s, side: 'red' as const }))],
     precision: 0,
@@ -445,6 +449,7 @@ export function strikeInfo(b: Battle, u: Unit, cell: Point, weapon: Weapon, smok
   if (lvl === 'pinned') parts.push(['Pinned', -30]);
   else if (lvl === 'suppressed') parts.push(['Suppressed', -15]);
   if (u.side === 'blue' && b.precision > 0) parts.push(['Precision rounds', 30]);
+  difficultyPart(b, u.side, parts);
   const chance = Math.max(5, Math.min(95, Math.round(parts.reduce((s, [, v]) => s + v, 0))));
   return { weapon, chance, parts, observed };
 }
@@ -491,8 +496,8 @@ function strike(b: Battle, u: Unit, cell: Point, w: Weapon, smoke: boolean): voi
 /** Off-map rockets: HIMARS lands where it is told when the cell is watched; Tornado-G drenches the area. */
 export function supportChance(b: Battle, side: Side, id: 'himars' | 'tornado', cell: Point): number {
   const obs = observation(b, side, cell);
-  if (id === 'himars') return obs ? 95 : 50;
-  return obs ? 60 : 40;
+  const base = id === 'himars' ? (obs ? 95 : 50) : obs ? 60 : 40;
+  return Math.max(5, Math.min(95, base + difficultyAim(b.difficulty, side)));
 }
 
 function callSupport(b: Battle, side: Side, id: 'himars' | 'tornado', cell: Point): void {
@@ -1032,6 +1037,71 @@ export function autoTurn(b: Battle): void {
 export function autoBattle(b: Battle, limit = ROUND_LIMIT + 1): Battle {
   for (let i = 0; i < limit && !b.ended; i++) autoTurn(b);
   return b;
+}
+
+// --- Undo ------------------------------------------------------------------------------------------
+
+/**
+ * Which events leave a step safe to take back. Safe: a unit moving (and the walls its tracks flatten),
+ * turning, embarking or dismounting, and their radio calls; overwatch and hunker log nothing. Unsafe:
+ * anything that rolled or showed the player something (fire, intercept, impact, casualties,
+ * suppressed, destroyed, boom, mine, crater, spotted, lost: either side's sightings, since the
+ * enemy seeing you tells you where it is), or that did more than move a unit (smoke, split,
+ * merge, treat, repair, ability, turn, capture, end).
+ */
+export const UNDO_SAFE: Record<BattleEvent['type'], boolean> = {
+  move: true,
+  face: true,
+  embark: true,
+  dismount: true,
+  terrain: true,
+  radio: true,
+  turn: false,
+  fire: false,
+  intercept: false,
+  impact: false,
+  casualties: false,
+  suppressed: false,
+  destroyed: false,
+  boom: false,
+  smoke: false,
+  crater: false,
+  split: false,
+  merge: false,
+  treat: false,
+  repair: false,
+  mine: false,
+  spotted: false,
+  lost: false,
+  ability: false,
+  capture: false,
+  end: false,
+};
+
+const ghostsOf = (b: Battle) =>
+  Object.keys(b.intel.blue)
+    .sort()
+    .map((id) => {
+      const g = b.intel.blue[id]!;
+      return `${id}:${g.type}@${g.x},${g.y}:${g.turn}:${g.now ? 1 : 0}`;
+    })
+    .join(';');
+
+/**
+ * Can the player take back the step from `before` to `after` (a snapshot taken before one action)?
+ * Only when it drew no dice (the stream is unchanged), showed nothing (blue sees the same enemies,
+ * its last known positions are as they were, no enemy was bumped into, no unsafe event was logged:
+ * see UNDO_SAFE), and was a move, face, overwatch, hunker, embark or dismount in the same turn.
+ */
+export function undoable(before: Battle, after: Battle): boolean {
+  if (before.ended || after.ended || before.turn !== 'blue' || after.turn !== 'blue' || before.turnIndex !== after.turnIndex) return false;
+  if (after.stream !== before.stream || after.events.length < before.events.length) return false;
+  if (after.events.slice(before.events.length).some((e) => !UNDO_SAFE[e.type])) return false;
+  const seen = (b: Battle) => [...visibleTo(b, 'blue')].sort().join();
+  if (seen(after) !== seen(before) || ghostsOf(after) !== ghostsOf(before)) return false;
+  // A hidden enemy walked into is revealed (the move stops short), even out of sight.
+  const revealed = (b: Battle) => b.units.filter((u) => u.side === 'red').map((u) => `${u.id}:${u.revealed}`).join();
+  return revealed(after) === revealed(before);
 }
 
 /** Pull back: the battle is lost, the units keep what they have left. */

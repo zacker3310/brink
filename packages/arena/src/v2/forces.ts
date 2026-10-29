@@ -1,6 +1,6 @@
 import type { UnitClass } from '@brink/contracts';
 import { isAircraft, isFoot, SUPPORT, TYPES } from './roster';
-import { RANKS, rankFromSkill } from './rules';
+import { battleSkill, difficultyDef, FEWEST_ENEMIES, RANKS, rankFromSkill } from './rules';
 import { FACTION_OF, type Arsenal, type ArenaSetup, type Faction, type Side, type SupportAsset, type TypeId, type UnitSpec, type UnitType } from './types';
 
 // The force builder: each war-map formation in the battle becomes a detachment, and together they make
@@ -21,6 +21,10 @@ import { FACTION_OF, type Arsenal, type ArenaSetup, type Faction, type Side, typ
 //
 // Explicit `types` on a spec (skirmishes) are used exactly, outside the count; a squad listed right after
 // a carrier with seats starts inside it. A side with only explicit specs gets no attachments.
+//
+// Difficulty: an easier battle scales the defenders' count (DIFFICULTY.enemyUnits), never under
+// FEWEST_ENEMIES. A template company shrinks before the shares are dealt; an explicit list loses
+// units spread from its back, where the support sits.
 
 export interface UnitSeed {
   /** Unique in the battle and stable: `${formation}:${n}`, n from 1. */
@@ -111,6 +115,22 @@ export function companySize(specs: readonly UnitSpec[]): number {
   // In ten-thousandths, so the rounding is exact: 4 + 3.5 x strength / 1000 + 1.5 x formations.
   const n = Math.round((40000 + 35 * strength + 15000 * specs.length) / 10000);
   return Math.max(10, Math.min(16, n));
+}
+
+/** A count scaled by the difficulty: never under FEWEST_ENEMIES, never over what it was. */
+function scaled(n: number, k: number): number {
+  return k >= 1 ? n : Math.min(n, Math.max(FEWEST_ENEMIES, Math.round(n * k)));
+}
+
+/** Explicit lists cut to the difficulty's share, one about every 1 / (1 - k) counting from the back. */
+function thinLists(lists: readonly (readonly TypeId[] | undefined)[], k: number): (readonly TypeId[] | undefined)[] {
+  const total = lists.reduce((sum, l) => sum + (l?.length ?? 0), 0);
+  const drops = total - scaled(total, k);
+  if (drops <= 0) return [...lists];
+  const gone = new Set<number>();
+  for (let j = 0; j < drops; j++) gone.add(total - 1 - Math.floor((j * total) / drops));
+  let i = 0;
+  return lists.map((l) => l?.filter(() => !gone.has(i++)));
 }
 
 /** FNV-1a: a stable hash of a formation id, to settle its template choices. */
@@ -216,12 +236,14 @@ export function buildForce(setup: ArenaSetup, side: Side): ForceSeeds {
   const foes = side === 'blue' ? setup.defenders : setup.attackers;
   const arsenal = setup.arsenal[side];
   const faction = FACTION_OF[arsenal];
-  const items: Item[][] = specs.map((s) => (s.types ? explicit(s.types) : []));
+  const k = side === 'red' ? difficultyDef(setup.difficulty).enemyUnits : 1;
+  const lists = thinLists(specs.map((s) => s.types), k);
+  const items: Item[][] = lists.map((l) => (l ? explicit(l) : []));
   const built = specs.map((s, i) => ({ s, i })).filter(({ s }) => !s.types);
   const attach: { type: TypeId; to: number }[] = [];
 
   if (built.length) {
-    const n = companySize(built.map(({ s }) => s));
+    const n = scaled(companySize(built.map(({ s }) => s)), k);
     const maxA = Math.min(Math.floor((n * 3) / 10), Math.max(0, n - 2 * built.length));
     const weights = built.map(({ s }) => strengthOf(s));
     const foeArsenal = setup.arsenal[foe];
@@ -250,7 +272,7 @@ export function buildForce(setup: ArenaSetup, side: Side): ForceSeeds {
   }
 
   const rank = (s: UnitSpec) => {
-    const r = side === 'blue' ? s.rank : Math.max(s.rank, rankFromSkill(setup.skill));
+    const r = side === 'blue' ? s.rank : Math.max(s.rank, rankFromSkill(battleSkill(setup.skill, setup.difficulty)));
     return Math.max(0, Math.min(RANKS.length - 1, Math.floor(Number.isFinite(r) ? r : 0)));
   };
   const units: UnitSeed[] = [];

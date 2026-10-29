@@ -238,11 +238,28 @@ const searchCache = new WeakMap<Battle, Point>();
 function searchArea(b: Battle): Point {
   let p = searchCache.get(b);
   if (!p) {
-    const top = b.map.redSpawn.slice(0, 30);
-    p = top.length ? { x: top.reduce((s, q) => s + q.x, 0) / top.length, y: top.reduce((s, q) => s + q.y, 0) / top.length } : { x: W / 2, y: 8 };
+    p = spawnCentre(b.map.redSpawn);
     searchCache.set(b, p);
   }
   return p;
+}
+
+/** The middle of the 30 best defender cells (the map's own ranking, which both sides may read). */
+function spawnCentre(cells: readonly Point[]): Point {
+  const top = cells.slice(0, 30);
+  return top.length ? { x: top.reduce((s, q) => s + q.x, 0) / top.length, y: top.reduce((s, q) => s + q.y, 0) / top.length } : { x: W / 2, y: 8 };
+}
+
+/**
+ * Where the defenders are expected before first contact: the middle of their best ground and a
+ * radius holding four in five of the cells they deploy among. It reads only the map's deployment
+ * ranking (what the war map tells an attacker), the same picture the attacker's AI searches.
+ */
+export function enemyArea(b: Battle): { x: number; y: number; r: number } {
+  const c = spawnCentre(b.map.redSpawn);
+  const d = b.map.redSpawn.map((p) => dist(p, c)).sort((m, n) => m - n);
+  const r = d.length ? Math.max(4, Math.ceil(d[Math.min(d.length - 1, Math.floor(d.length * 0.8))]!)) : 8;
+  return { x: c.x, y: c.y, r };
 }
 
 /** Keep the company together: no one charges far ahead of its friends. */
@@ -674,6 +691,18 @@ function decideUnit(v: View, u: Unit): Action | null {
   return finish(v, u);
 }
 
+/** A fighter's good shot from where it stands, when it is not badly exposed there: it fires before anyone moves. */
+function standingShot(v: View, u: Unit): Action | null {
+  const b = v.b;
+  if (u.moved || u.acted || jobOf(u) !== 'fight' || damaged(u)) return null;
+  const shot = finish(v, u);
+  if (shot?.type !== 'fire') return null;
+  const target = unitById(b, shot.target)!;
+  const info = bestFire(b, u, target, u, false, v.visible);
+  const t = typeOf(u.type);
+  return info && shotValue(b, info, target) >= 0.5 && threatAt(v, u, t, u) * caution(v, t) < shotValue(b, info, target) * 1.5 ? shot : null;
+}
+
 /** The next action for `side`, or null when its turn is done. Pure: reads the state, changes nothing. */
 export function decide(b: Battle, side: Side, skip: ReadonlySet<string> = new Set()): Action | null {
   if (b.ended || b.turn !== side) return null;
@@ -697,20 +726,67 @@ export function decide(b: Battle, side: Side, skip: ReadonlySet<string> = new Se
     .sort((p, q) => JOB_ORDER[jobOf(p)] - JOB_ORDER[jobOf(q)] || (p.id < q.id ? -1 : 1));
   // Fire support first: whoever has a good shot from where it stands and is not badly exposed
   // there shoots before the others move, so the maneuver goes in against suppressed targets.
-  const ready = order.filter((u) => !u.moved && !u.acted && jobOf(u) === 'fight' && !damaged(u));
-  for (const u of ready) {
-    const shot = finish(v, u);
-    if (shot?.type !== 'fire') continue;
-    const target = unitById(b, shot.target)!;
-    const info = bestFire(b, u, target, u, false, v.visible);
-    const t = typeOf(u.type);
-    if (info && shotValue(b, info, target) >= 0.5 && threatAt(v, u, t, u) * caution(v, t) < shotValue(b, info, target) * 1.5) return shot;
+  for (const u of order) {
+    const shot = standingShot(v, u);
+    if (shot) return shot;
   }
   for (const u of order) {
     const a = decideUnit(v, u);
     if (a) return a;
   }
   return null;
+}
+
+// --- Advice for the player ----------------------------------------------------------------------------
+
+/** Marks an enemy the player cannot see: aboard nothing, but off the field of the picture. */
+const UNSEEN = '?unseen';
+
+/**
+ * The battle as the player (blue) knows it, to plan on: enemies it cannot see are off the field,
+ * enemy mines are gone, nobody of theirs is on watch, and the stream is not the battle's. A move in
+ * it draws no dice and bumps into nothing hidden.
+ */
+function bluePicture(b: Battle): Battle {
+  // The state is plain JSON (docs/arena-v2.md), so this is a deep copy; the film is not needed.
+  const p = JSON.parse(JSON.stringify({ ...b, events: [] })) as Battle;
+  const seen = visibleTo(p, 'blue');
+  for (const u of p.units) {
+    if (u.side !== 'red') continue;
+    u.overwatch = false;
+    if (u.alive && u.carrier === null && !seen.has(u.id)) u.carrier = UNSEEN;
+  }
+  p.mines = p.mines.filter((m) => m.side === 'blue');
+  p.stream = 0;
+  return p;
+}
+
+/**
+ * What the player's own side's planner would do with one unit right now: typically a move and then
+ * an action, a single action, or [] when it is done or nothing makes sense. Pure (it plans on a
+ * copy) and fair: the copy holds only what blue knows, so a hidden enemy never changes the advice,
+ * and it stops at the first action whose outcome is down to the dice. The first action is legal
+ * now; the rest are legal when the move goes as planned (nothing hidden fires on it or blocks it),
+ * so play them in order with `act` and stop at the first it refuses, or ask again after each one.
+ */
+export function advise(b: Battle, unitId: string): Action[] {
+  if (b.ended || b.turn !== 'blue') return [];
+  const u0 = unitById(b, unitId);
+  if (!u0 || u0.side !== 'blue' || !u0.alive || u0.carrier !== null) return [];
+  if (u0.acted && !(u0.smoked && !u0.moved)) return [];
+  const p = bluePicture(b);
+  const out: Action[] = [];
+  for (let step = 0; step < 4; step++) {
+    const u = unitById(p, unitId);
+    if (!u || !u.alive || u.carrier !== null || (u.acted && !u.smoked) || (u.acted && u.moved) || p.ended) break;
+    const v = viewOf(p, 'blue');
+    const a = standingShot(v, u) ?? decideUnit(v, u);
+    if (!a || !canAct(p, a, 'blue')) break;
+    out.push(a);
+    const stream = p.stream;
+    if (!act(p, a, 'blue') || p.stream !== stream) break;
+  }
+  return out;
 }
 
 /** Actions the AI chose that the rules refused, per battle (the soak expects none). */
