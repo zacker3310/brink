@@ -14,3 +14,7 @@ test-results/
 .DS_Store
 .env
 .claude/worktrees/
+
+# Deep-research working notes and reports (local)
+research_notes/
+reports/
