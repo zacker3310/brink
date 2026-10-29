@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { Terrain, UnitClass } from '@brink/contracts';
-import { arenaResult, autoBattle, createBattle, rejectedActions, typeOf, type Arsenal, type ArenaSetup, type Battle, type SiteKind, type UnitSpec } from '@brink/arena';
+import { arenaResult, autoBattle, createBattle, DIFFICULTY, FEWEST_ENEMIES, rejectedActions, typeOf, type Arsenal, type ArenaSetup, type Battle, type Difficulty, type SiteKind, type UnitSpec } from '@brink/arena';
 import { mulberry32 } from '@brink/arena';
 
 // Arena v2 soak: AI against AI over many battles across arsenals, biomes, times and weather.
 // Every battle must end, the AI must never choose an action the rules refuse, and no state may
 // break. The balance it measures is printed for docs/arena-v2.md.
+//
+// Each setup is fought at every difficulty, the AI's own planner in the player's seat (the way
+// the war campaign's difficulty was measured), so the win rates per difficulty compare like with
+// like. `ARENA_SOAK` is the number of setups.
 
-const BATTLES = Number(process.env.ARENA_SOAK ?? 120);
+const SETUPS = Number(process.env.ARENA_SOAK ?? 60);
+const LEVELS: Difficulty[] = ['easy', 'normal', 'hard'];
+const BATTLES = SETUPS * LEVELS.length;
 const CLASSES: UnitClass[] = ['armor', 'mechanized', 'infantry', 'recon', 'artillery', 'air', 'drone'];
 const TERRAINS: Terrain[] = ['plains', 'forest', 'hills', 'mountains', 'urban'];
 const SITES: SiteKind[] = [null, null, 'city', 'objective', 'depot', 'capital'];
@@ -62,14 +68,14 @@ function invariants(b: Battle): string[] {
   return bad;
 }
 
-describe(`arena soak (${BATTLES} battles)`, () => {
+describe(`arena soak (${SETUPS} setups at ${LEVELS.length} difficulties)`, () => {
   it('every battle ends, the AI never breaks a rule, and no state breaks', () => {
     const tally = (m: Record<string, [number, number]>, k: string, won: boolean) => {
       const e = (m[k] ??= [0, 0]);
       e[0] += won ? 1 : 0;
       e[1]++;
     };
-    const by = { biome: {}, time: {}, weather: {}, mode: {}, matchup: {}, size: {} } as Record<string, Record<string, [number, number]>>;
+    const by = { difficulty: {}, biome: {}, time: {}, weather: {}, mode: {}, matchup: {}, size: {} } as Record<string, Record<string, [number, number]>>;
     const reasons: Record<string, number> = {};
     const kills: Record<string, [number, number]> = {};
     const rounds: number[] = [];
@@ -77,17 +83,22 @@ describe(`arena soak (${BATTLES} battles)`, () => {
     let rejected = 0;
     let units = 0;
     const used: Record<string, number> = { smoke: 0, 'called fire': 0, 'off-map rockets': 0, 'drone strikes': 0, dismounts: 0, splits: 0, treated: 0, repairs: 0, 'AD shots at aircraft': 0, 'hits front': 0, 'hits side or rear': 0, 'hits top': 0 };
-    for (let seed = 1; seed <= BATTLES; seed++) {
-      const setup = setupFor(seed);
+    const msBy: Record<string, number> = {};
+    for (let n = 0; n < BATTLES; n++) {
+      const seed = 1 + Math.floor(n / LEVELS.length);
+      const difficulty = LEVELS[n % LEVELS.length]!;
+      const setup = { ...setupFor(seed), difficulty };
       const t0 = performance.now();
       const b = autoBattle(createBattle(setup));
       ms.push(performance.now() - t0);
+      msBy[difficulty] = (msBy[difficulty] ?? 0) + ms.at(-1)!;
       const bad = invariants(b);
-      expect(bad, `seed ${seed}`).toEqual([]);
+      expect(bad, `seed ${seed} ${difficulty}`).toEqual([]);
       const refused = rejectedActions(b);
-      if (refused.length) console.log('refused', seed, refused.slice(0, 5));
+      if (refused.length) console.log('refused', seed, difficulty, refused.slice(0, 5));
       rejected += refused.length;
       const won = b.ended === 'won';
+      tally(by.difficulty!, difficulty, won);
       tally(by.biome!, b.conditions.biome, won);
       tally(by.time!, b.conditions.time, won);
       tally(by.weather!, b.conditions.weather, won);
@@ -119,13 +130,20 @@ describe(`arena soak (${BATTLES} battles)`, () => {
         k[1]++;
         if (!u.alive) k[0]++;
       }
-      expect(b.units.filter((u) => u.side === 'red').length).toBeGreaterThanOrEqual(10);
+      // A template company is 10 to 16 a side; Easy fields a smaller one, never under the floor.
+      expect(b.units.filter((u) => u.side === 'red').length).toBeGreaterThanOrEqual(DIFFICULTY[difficulty].enemyUnits < 1 ? FEWEST_ENEMIES : 10);
     }
     rounds.sort((a, c) => a - c);
     ms.sort((a, c) => a - c);
     const pct = (m: Record<string, [number, number]>) => Object.fromEntries(Object.entries(m).sort().map(([k, [w, n]]) => [k, `${Math.round((w / n) * 100)}% of ${n}`]));
     const wins = Object.values(by.mode!).reduce((s, [w]) => s + w, 0);
     console.log(`attacker wins ${wins}/${BATTLES} (${Math.round((wins / BATTLES) * 100)}%)`);
+    // The difficulty table, measured: the AI's planner in the player's seat.
+    for (const d of LEVELS) {
+      const [w, n] = by.difficulty![d]!;
+      const { aim, enemyAim, enemyUnits, skill } = DIFFICULTY[d];
+      console.log(`difficulty ${d}: attacker wins ${w}/${n} (${Math.round((w / n) * 100)}%), aim ${aim}, enemy aim ${enemyAim}, enemy units x${enemyUnits}, skill ${skill >= 0 ? '+' : ''}${skill}, ${Math.round((msBy[d] ?? 0) / n)} ms a battle`);
+    }
     console.log('end reasons', reasons);
     console.log('rounds median', rounds[Math.floor(rounds.length / 2)], 'p90', rounds[Math.floor(rounds.length * 0.9)]);
     for (const [k, m] of Object.entries(by)) console.log(`attacker wins by ${k}`, pct(m));
@@ -134,5 +152,10 @@ describe(`arena soak (${BATTLES} battles)`, () => {
     console.log('tactics used', used);
     console.log('rejected AI actions', rejected);
     expect(rejected).toBe(0);
+    // The same setups get harder from Easy to Hard (the bands themselves are noisy: see the log).
+    if (SETUPS >= 20) {
+      expect(by.difficulty!.easy![0]).toBeGreaterThan(by.difficulty!.normal![0]);
+      expect(by.difficulty!.normal![0]).toBeGreaterThan(by.difficulty!.hard![0]);
+    }
   });
 });

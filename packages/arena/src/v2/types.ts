@@ -26,6 +26,8 @@ export interface Point {
 }
 
 export type Side = 'blue' | 'red';
+/** How hard a battle is: the player's and the enemy's aim, how many they field, how sharp they play (DIFFICULTY in rules.ts). */
+export type Difficulty = 'easy' | 'normal' | 'hard';
 export type Faction = 'west' | 'east';
 /** Equipment pools: Commonwealth (US), Federation (Europe), Directorate (modern Russian), Union (older Russian). */
 export type Arsenal = 'us' | 'europe' | 'russia' | 'legacy';
@@ -369,8 +371,9 @@ export interface Battle {
   turnIndex: number;
   ended: 'won' | 'lost' | null;
   endReason: 'destroyed' | 'captured' | 'withdrew' | 'retreat' | 'time' | 'wiped' | null;
-  /** Enemy decision quality, 0..1. */
+  /** Enemy decision quality, 0..1, after the difficulty's offset. */
   skill: number;
+  difficulty: Difficulty;
   abilities: Partial<Record<AbilityId, 'ready' | 'used'>>;
   support: SupportAsset[];
   /** Precision rounds left (blue). */
@@ -416,8 +419,10 @@ export interface ArenaSetup {
   attackers: UnitSpec[];
   defenders: UnitSpec[];
   arsenal: { blue: Arsenal; red: Arsenal };
-  /** Enemy skill, 0 (raw) to 1 (sharp). */
+  /** Enemy skill, 0 (raw) to 1 (sharp), before the difficulty's offset. */
   skill: number;
+  /** Absent: 'normal'. */
+  difficulty?: Difficulty;
   abilities: AbilityId[];
   /** Drawn from the seed, terrain and theatre when absent. */
   biome?: Biome;

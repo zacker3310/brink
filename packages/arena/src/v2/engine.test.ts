@@ -1,66 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { UnitClass } from '@brink/contracts';
 import { decide, rejectedActions } from './ai';
 import { fireInfo, penChance, usableWeapons } from './combat';
-import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, retreat, strikeInfo, unitById } from './engine';
+import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, retreat, strikeInfo, undoable, UNDO_SAFE, unitById } from './engine';
+import { bare, BATTLES, copy, EAST, NORTH, put, setup, SOUTH, spec, unit, weapon } from './fixture.test-util';
 import { typeOf } from './roster';
 import { canSee, lineOfSight, visibleTo } from './sight';
-import { at, BUILDING, H, OPEN, RUBBLE, TREES, W, type Arsenal, type ArenaSetup, type Battle, type TypeId, type Unit, type UnitSpec, type WeaponKind } from './types';
+import { at, BUILDING, OPEN, RUBBLE, TREES, W, type Arsenal, type Battle } from './types';
 
 // Arena v2 rules, one mechanic at a time on a bare field, then whole battles on autopilot.
-
-function spec(id: string, types: TypeId[], cls: UnitClass = 'armor'): UnitSpec {
-  return { id, cls, strength: 1000, name: id, color: '#888888', rank: 0, types };
-}
-
-function setup(p: Partial<ArenaSetup> & Pick<ArenaSetup, 'attackers' | 'defenders'>): ArenaSetup {
-  return { seed: 1, terrain: 'plains', river: false, site: null, arsenal: { blue: 'us', red: 'russia' }, skill: 0.5, abilities: [], biome: 'temperate', time: 'day', weather: 'clear', ...p };
-}
-
-/** A flat, empty field with the units placed by hand, so a rule can be tested on its own. */
-function bare(blue: TypeId[], red: TypeId[], extra: Partial<ArenaSetup> = {}): Battle {
-  const b = createBattle(setup({ attackers: [spec('b', blue)], defenders: [spec('r', red)], ...extra }));
-  const n = W * H;
-  for (let i = 0; i < n; i++) {
-    b.map.cells[i] = OPEN;
-    b.map.elev[i] = 0;
-    b.map.storeys[i] = 0;
-    b.map.hp[i] = 0;
-    b.map.crater[i] = 0;
-  }
-  b.map.mode = 'destroy';
-  b.map.zone = null;
-  // Defenders start dismounted and away; put everyone where the test says.
-  let x = 0;
-  for (const u of b.units) {
-    u.x = x++ % W;
-    u.y = u.side === 'blue' ? H - 1 : 0;
-    u.facing = u.side === 'blue' ? -Math.PI / 2 : Math.PI / 2;
-    u.aim = u.facing;
-    u.carrier = null;
-    u.passengers = [];
-  }
-  b.intel = { blue: {}, red: {} };
-  return b;
-}
-
-const unit = (b: Battle, type: TypeId, side: 'blue' | 'red' = 'blue', n = 0): Unit => b.units.filter((u) => u.type === type && u.side === side)[n]!;
-function put(u: Unit, x: number, y: number, facing?: number): Unit {
-  u.x = x;
-  u.y = y;
-  if (facing !== undefined) {
-    u.facing = facing;
-    u.aim = facing;
-  }
-  return u;
-}
-const weapon = (u: Unit, kind: WeaponKind) => typeOf(u.type).weapons.find((w) => w.kind === kind)!;
-const NORTH = -Math.PI / 2;
-const SOUTH = Math.PI / 2;
-const EAST = 0;
-
-/** Whole battles on autopilot can take a few seconds each on a shared CI runner. */
-const BATTLES = 120_000;
 
 describe('state', () => {
   it('is plain JSON: a battle saved mid-fight resumes exactly as one that never stopped', () => {
@@ -492,6 +439,101 @@ describe('turns', () => {
     const withArmour = fireInfo(b, t90, tank, weapon(t90, 'cannon'), t90, false, new Set([tank.id]))!;
     const without = fireInfo(plain, p90, pt, weapon(p90, 'cannon'), p90, false, new Set([pt.id]))!;
     expect(withArmour.pen!).toBeLessThan(without.pen!);
+  });
+});
+
+describe('undo', () => {
+  /** A ridge across rows 40 to 42: a tank at the bottom edge sees nothing beyond it until it crosses. */
+  function ridge(b: Battle): void {
+    for (let x = 0; x < W; x++) {
+      b.map.elev[at(b.map, x, 42)] = 1;
+      b.map.elev[at(b.map, x, 41)] = 2;
+      b.map.elev[at(b.map, x, 40)] = 1;
+    }
+  }
+
+  it('a move into empty ground, a turn, overwatch, hunker, embark and dismount can be taken back', () => {
+    const b = bare(['m1a2', 'm2a3', 'squad_w', 'squad_w'], ['t90m']);
+    const tank = put(unit(b, 'm1a2'), 15, 44, NORTH);
+    const ifv = put(unit(b, 'm2a3'), 20, 44, NORTH);
+    const rider = put(unit(b, 'squad_w', 'blue', 0), 21, 44);
+    const squad = put(unit(b, 'squad_w', 'blue', 1), 10, 44);
+    put(unit(b, 't90m', 'red'), 3, 0, SOUTH);
+    const steps = [
+      { type: 'move', unit: tank.id, to: { x: 15, y: 40 } },
+      { type: 'face', unit: ifv.id, facing: EAST },
+      { type: 'overwatch', unit: tank.id },
+      { type: 'hunker', unit: squad.id },
+      { type: 'embark', unit: rider.id, carrier: ifv.id },
+      { type: 'dismount', unit: ifv.id },
+    ] as const;
+    const first = copy(b);
+    for (const a of steps) {
+      const before = copy(b);
+      expect(act(b, a), a.type).toBe(true);
+      expect(undoable(before, b), a.type).toBe(true);
+    }
+    expect(b.events.some((e) => e.type === 'move')).toBe(true);
+    expect(rider.carrier).toBeNull();
+    // The snapshot is the battle as it was: restoring it is the undo.
+    expect(first.units.find((u) => u.id === tank.id)).toMatchObject({ x: 15, y: 44, moved: false, overwatch: false });
+  });
+
+  it('a move that brings an enemy into view cannot', () => {
+    const b = bare(['m1a2'], ['t90m']);
+    ridge(b);
+    const me = put(unit(b, 'm1a2'), 15, 44, NORTH);
+    const them = put(unit(b, 't90m', 'red'), 15, 20, SOUTH);
+    expect(visibleTo(b, 'blue').has(them.id)).toBe(false);
+    const before = copy(b);
+    expect(act(b, { type: 'move', unit: me.id, to: { x: 15, y: 38 } })).toBe(true);
+    expect(visibleTo(b, 'blue').has(them.id)).toBe(true);
+    expect(b.stream).toBe(before.stream);
+    expect(undoable(before, b)).toBe(false);
+  });
+
+  it('a move that draws overwatch fire cannot', () => {
+    const b = bare(['m1a2'], ['t90m']);
+    ridge(b);
+    const me = put(unit(b, 'm1a2'), 15, 44, NORTH);
+    const watch = put(unit(b, 't90m', 'red'), 15, 20, SOUTH);
+    watch.overwatch = true;
+    const before = copy(b);
+    expect(act(b, { type: 'move', unit: me.id, to: { x: 15, y: 38 } })).toBe(true);
+    expect(b.events.some((e) => e.type === 'fire' && e.unit === watch.id)).toBe(true);
+    expect(b.stream).not.toBe(before.stream);
+    expect(undoable(before, b)).toBe(false);
+  });
+
+  it('a move that finds a last known position empty cannot, though nothing new is in sight', () => {
+    const b = bare(['m1a2'], ['t90m']);
+    ridge(b);
+    const me = put(unit(b, 'm1a2'), 15, 44, NORTH);
+    const them = put(unit(b, 't90m', 'red'), 3, 0, SOUTH);
+    b.intel.blue[them.id] = { unit: them.id, type: them.type, x: 15, y: 30, turn: 0, now: false };
+    const before = copy(b);
+    expect(act(b, { type: 'move', unit: me.id, to: { x: 15, y: 38 } })).toBe(true);
+    expect(visibleTo(b, 'blue').size).toBe(0);
+    expect(b.intel.blue[them.id]).toBeUndefined();
+    expect(undoable(before, b)).toBe(false);
+  });
+
+  it('a shot cannot, nor anything across the end of a turn', () => {
+    const b = bare(['m1a2', 'm1a2'], ['t90m']);
+    const me = put(unit(b, 'm1a2'), 15, 30, NORTH);
+    put(unit(b, 'm1a2', 'blue', 1), 5, 44, NORTH);
+    const them = put(unit(b, 't90m', 'red'), 15, 20, SOUTH);
+    const before = copy(b);
+    expect(act(b, { type: 'fire', unit: me.id, target: them.id, weapon: weapon(me, 'cannon').id })).toBe(true);
+    expect(undoable(before, b)).toBe(false);
+    const turn = copy(b);
+    endTurn(b);
+    expect(undoable(turn, b)).toBe(false);
+  });
+
+  it('every kind of event is classed, and the ones that roll or reveal are unsafe', () => {
+    for (const k of ['fire', 'intercept', 'impact', 'casualties', 'suppressed', 'destroyed', 'boom', 'mine', 'spotted', 'lost', 'turn', 'end'] as const) expect(UNDO_SAFE[k], k).toBe(false);
+    for (const k of ['move', 'face', 'embark', 'dismount'] as const) expect(UNDO_SAFE[k], k).toBe(true);
   });
 });
 
