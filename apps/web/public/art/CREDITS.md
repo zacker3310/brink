@@ -63,6 +63,20 @@ by any author is implied.
 |---|---|---|---|
 | Sky light and reflections (`env/park.exr`) | Rooitou Park HDRI, 512 px EXR | Greg Zaal, Poly Haven, packaged in `@pmndrs/assets` | CC0 1.0 |
 
+## Battlefield skies (`env/`)
+
+Image-based light for the Arena v2 battlefield by time of day: Poly Haven HDRIs, 512 x 256 EXR (DWAB),
+as packaged in `@pmndrs/assets` 1.7.0 (`hdri/*.exr.js`, decoded from their base64 data to `.exr`
+files unchanged). In the game they are desaturated and turned to match the sun, then used for light
+only; the visible sky is a graded dome drawn in code.
+
+| Use | File | HDRI | Author | License |
+|---|---|---|---|---|
+| Day | `env/park.exr` (above) | Rooitou Park | Greg Zaal, Poly Haven | CC0 1.0 |
+| Dawn | `env/dawn.exr` (182 KB) | Kiara 1 Dawn | Greg Zaal, Poly Haven | CC0 1.0 |
+| Dusk | `env/dusk.exr` (148 KB) | Venice Sunset | Greg Zaal, Poly Haven | CC0 1.0 |
+| Night | `env/night.exr` (154 KB) | Dikhololo Night | Greg Zaal, Poly Haven | CC0 1.0 |
+
 The battlefield itself (ground, grass, trees, rocks, buildings, water) is generated in code.
 
 ## Effects
