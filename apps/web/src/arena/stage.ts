@@ -161,6 +161,8 @@ export class BattleStage {
   /** The planning view to return to from the whole-field view. */
   private before: { x: number; z: number; dist: number; tilt: number; yaw: number } | null = null;
   private shake = 0;
+  /** Seconds of slow motion left (a vehicle brewing up). */
+  private slow = 0;
   private clock = 0;
   private thermal = false;
   /** An action cam in progress: where to look from and at, and for how long. */
@@ -940,6 +942,7 @@ export class BattleStage {
       this.steps.shift();
     }
     this.cam = null;
+    this.slow = 0;
     this.hudLayer.clearCallouts();
   }
 
@@ -1150,6 +1153,7 @@ export class BattleStage {
             v.ring.visible = false;
             if (e.how === 'destroyed' || e.how === 'shot_down') {
               this.fx.catastrophic(c);
+              this.slow = 0.45;
               this.fx.burn(v.id, c, v.t.armour && v.t.armour.hf[0] >= 300 ? 1.2 : 0.8);
               this.audio.impact('big', e.x, e.y);
               this.shake = Math.max(this.shake, 0.14);
@@ -1448,6 +1452,12 @@ export class BattleStage {
 
   frame(dt: number): void {
     const t0 = performance.now();
+    // A beat of slow motion when something big goes up; the camera still moves at full speed.
+    const real = dt;
+    if (this.slow > 0) {
+      this.slow = Math.max(0, this.slow - dt);
+      dt *= 0.3;
+    }
     this.clock += dt;
     // Play the film: one step at a time.
     let budget = dt;
@@ -1511,14 +1521,14 @@ export class BattleStage {
       }
     }
     this.shake = Math.max(0, this.shake - dt * 0.6);
-    this.applyCamera(dt);
+    this.applyCamera(real);
     this.world.update(dt, this.camera);
     this.fx.update(dt, this.camera);
     this.crowd.update(dt);
     this.audio.setListener({ x: this.focus.x - 0.5, y: this.focus.z - 0.5, zoom: Math.min(1, this.dist / this.maxDist) });
     this.audio.update(dt);
     this.renderer.render(this.scene, this.camera);
-    this.updateHud(dt);
+    this.updateHud(real);
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
   }
