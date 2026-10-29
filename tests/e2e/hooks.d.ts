@@ -17,12 +17,14 @@ interface Window {
     } | null;
     /** A cell's centre on screen. */
     toScreen(x: number, y: number): { x: number; y: number };
-    /** Nothing animating, and it is the player's turn. */
+    /** Nothing animating, the camera settled, and it is the player's turn. */
     ready(): boolean;
     win(): void;
     lose(): void;
     /** Frame timing: ms of the game's own work per frame, and what the GPU was asked to draw.
      *  `reset` starts a fresh sample after this read. */
     perf(reset?: boolean): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
+    /** What the field overlay shows now: the selected unit, its move and dash cells, its targets. */
+    overlay(): { selected: string | null; reach: number; dash: number; targets: number } | null;
   };
 }

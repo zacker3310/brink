@@ -1,16 +1,41 @@
 import * as THREE from 'three';
-import { H, W, typeOf, type Battle, type BattleEvent, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
+import { H, W, typeOf, type Battle, type BattleEvent, type Effect, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
 import { BattleAudio } from './audio';
 import { Effects } from './fx';
 import { buildModel, buildProjectile, kitFor, paintFor, SoldierCrowd, type UnitModel } from './models3d';
 import { LEVEL, METRE, QUALITY, type ArenaSettings, type Quality } from './quality';
 import { buildWorld, thermalMaterialFor, type World } from './world';
 import type { Library } from './assets';
+import { FieldHud, type BadgeState, type EdgePointer, type Tone } from './hud';
+import { badgeStatus, classOf, health } from './units';
 
 // The battle drawn in three.js: the world (ground, buildings, weather, light), the units (built in
 // code; soldiers drawn one by one), the effects and the sound, all driven by the engine's event log
 // played back as a film. The film shows only what the player's side saw. The camera is a tactical
-// orbit (pan, pinch, twist, tilt) with short action cams on big hits.
+// orbit (pan, pinch, twist, tilt) with short action cams on big hits. Units are drawn larger than
+// life so they read on a phone, and a layer of DOM badges and words rides over the field.
+
+/** Vehicles and aircraft are drawn this much larger than life, soldiers more; cells are unchanged. */
+const VEHICLE_SCALE = 1.4;
+const SOLDIER_SCALE = 2.2;
+/** How far apart a squad's soldiers stand, for their larger figures. */
+const SPREAD = 1.35;
+/** Closest and default camera distances (world units). */
+const MIN_DIST = 3.5;
+const PLAY_DIST = 11.5;
+
+/** What a penetrating hit did, in a word or two. */
+const EFFECT_TEXT: Partial<Record<Effect, string>> = {
+  catastrophic: 'Destroyed',
+  knocked_out: 'Knocked Out',
+  mobility: 'Immobilised',
+  tracks: 'Tracks Hit',
+  firepower: 'Gun Out',
+  optics: 'Optics Out',
+  crew: 'Crew Hit',
+  forced_landing: 'Forced Down',
+  shot_down: 'Shot Down',
+};
 
 export interface Overlay {
   selected: string | null;
@@ -62,6 +87,8 @@ interface View {
   flash: number;
   fall: number;
   hunker: boolean;
+  /** Strength shown on its badge, 0..1: it drops as the film shows the hits, then matches the battle. */
+  hp: number;
   /** Last pose given to its soldiers, so idle frames do not churn. */
   pose: 'stand' | 'walk' | 'run' | 'kneel' | 'prone' | 'aim' | 'fire';
   /** Where it was last frame, to roll its wheels and tracks by the distance driven. */
@@ -98,12 +125,14 @@ export interface StageOptions {
   settings: ArenaSettings;
   lib: Library | null;
   arsenal: { blue: 'us' | 'europe' | 'russia' | 'legacy'; red: 'us' | 'europe' | 'russia' | 'legacy' };
+  /** A line for the kill feed, as the film shows it. */
+  onFeed?: (text: string, tone: Tone) => void;
 }
 
 export class BattleStage {
   readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(34, 1, 0.1, 400);
+  private readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
   private readonly world: World;
   private readonly fx: Effects;
   private readonly crowd: SoldierCrowd;
@@ -125,10 +154,12 @@ export class BattleStage {
   private readonly wantFocus = new THREE.Vector3(W / 2, 0, H - 8);
   private yaw = 0;
   private wantYaw = 0;
-  private tilt = THREE.MathUtils.degToRad(52);
-  private wantTilt = THREE.MathUtils.degToRad(52);
-  private dist = 22;
-  private wantDist = 22;
+  private tilt = THREE.MathUtils.degToRad(42);
+  private wantTilt = THREE.MathUtils.degToRad(42);
+  private dist = PLAY_DIST;
+  private wantDist = PLAY_DIST;
+  /** The planning view to return to from the whole-field view. */
+  private before: { x: number; z: number; dist: number; tilt: number; yaw: number } | null = null;
   private shake = 0;
   private clock = 0;
   private thermal = false;
@@ -138,6 +169,17 @@ export class BattleStage {
   /** Frame timing (ms of our own work per frame), for the performance probe. */
   private readonly frameMs: number[] = [];
   private readonly saved = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+  private readonly hudLayer: FieldHud;
+  /** Edges of the move and dash areas, rebuilt when the areas change. */
+  private reachEdge: THREE.Mesh | null = null;
+  private dashEdge: THREE.Mesh | null = null;
+  private edgeKey = '';
+  /** Where the defenders were expected, shown until the first contact. */
+  private readonly enemyMark: THREE.Group | null;
+  private readonly enemyAt: { x: number; z: number; r: number } | null;
+  private contact = false;
+  /** Who last fired at each unit, for the kill feed. */
+  private readonly lastShooter = new Map<string, string>();
 
   constructor(
     private readonly host: HTMLElement,
@@ -167,7 +209,7 @@ export class BattleStage {
     const night = battle.conditions.time === 'night';
     this.fx = new Effects(this.scene, opts.quality, { biome: battle.conditions.biome, night, heightAt: (x, z) => this.world.heightAt(x, z) });
     this.fx.setArsenals?.(opts.arsenal.blue, opts.arsenal.red);
-    this.crowd = new SoldierCrowd({ max: 420, shadows: this.preset.soldierShadows, scale: 1.7 });
+    this.crowd = new SoldierCrowd({ max: 420, shadows: this.preset.soldierShadows, scale: SOLDIER_SCALE });
     this.scene.add(this.crowd.group);
     this.audio = new BattleAudio({ radio: opts.settings.radio });
     this.audio.setNight(night);
@@ -182,8 +224,8 @@ export class BattleStage {
       this.scene.add(m);
       return m;
     };
-    this.tiles = tile(BLUE_RING, 0.17, W * H);
-    this.dashTiles = tile(BLUE_RING, 0.07, W * H);
+    this.tiles = tile(BLUE_RING, 0.26, W * H);
+    this.dashTiles = tile(BLUE_RING, 0.1, W * H);
     this.areaTiles = tile(RED_RING, 0.55, 49);
     const ringGeo = new THREE.RingGeometry(0.42, 0.5, 40).rotateX(-Math.PI / 2);
     this.targetRings = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.95, depthWrite: false }), 40);
@@ -202,13 +244,41 @@ export class BattleStage {
     this.selRing.renderOrder = 4;
     this.scene.add(this.selRing);
 
+    // Where the defenders were seen to deploy (the war map says they hold the ground), until contact.
+    const spawn = battle.map.redSpawn;
+    if (spawn.length) {
+      const ax = spawn.reduce((s, p) => s + p.x + 0.5, 0) / spawn.length;
+      const az = spawn.reduce((s, p) => s + p.y + 0.5, 0) / spawn.length;
+      const r = Math.max(3, Math.min(9, Math.max(...spawn.map((p) => Math.hypot(p.x + 0.5 - ax, p.y + 0.5 - az))) * 0.8));
+      this.enemyAt = { x: ax, z: az, r };
+      this.enemyMark = new THREE.Group();
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.12, r, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.75, depthWrite: false, depthTest: false }));
+      const fill = new THREE.Mesh(new THREE.CircleGeometry(r, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.1, depthWrite: false, depthTest: false }));
+      ring.renderOrder = fill.renderOrder = 2;
+      this.enemyMark.add(fill, ring);
+      this.enemyMark.position.set(ax, this.ground(ax, az) + 0.3, az);
+      this.scene.add(this.enemyMark);
+    } else {
+      this.enemyAt = null;
+      this.enemyMark = null;
+    }
+    this.contact = Object.values(battle.intel.blue).some((g) => g.now) || battle.events.some((e) => e.type === 'spotted' && e.side === 'blue');
+    if (this.contact && this.enemyMark) this.enemyMark.visible = false;
+    this.hudLayer = new FieldHud(host, (id) => {
+      const v = this.views.get(id);
+      const at = v ? { x: v.x, z: v.z } : id === 'enemy' && this.enemyAt ? this.enemyAt : null;
+      if (!at) return;
+      this.wantFocus.set(at.x, 0, at.z);
+      this.before = null;
+    });
+
     const seen = new Set(Object.keys(battle.intel.blue).filter((id) => battle.intel.blue[id]!.now));
     for (const u of battle.units) this.addUnit(u, u.side === 'blue' || seen.has(u.id));
-    // Open over the attackers' line, close enough to read the models.
-    const blue = battle.units.filter((u) => u.side === 'blue');
+    // Open close over the attackers' line, looking up the field toward the enemy.
+    const blue = battle.units.filter((u) => u.side === 'blue' && u.alive);
     const cx = blue.reduce((s, u) => s + u.x + 0.5, 0) / Math.max(1, blue.length);
     const cz = blue.reduce((s, u) => s + u.y + 0.5, 0) / Math.max(1, blue.length);
-    this.wantFocus.set(cx, 0, cz - 4);
+    this.wantFocus.set(cx, 0, cz - 2);
     this.focus.copy(this.wantFocus);
     this.resize();
   }
@@ -224,29 +294,36 @@ export class BattleStage {
     const t = typeOf(u.type);
     const holder = new THREE.Group();
     this.scene.add(holder);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.45, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: u.side === 'blue' ? BLUE_RING : RED_RING, transparent: true, opacity: 0.55, depthWrite: false }));
+    const big = t.mobility !== 'foot';
+    const ring = new THREE.Mesh(new THREE.RingGeometry(big ? 0.6 : 0.42, big ? 0.66 : 0.48, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: u.side === 'blue' ? BLUE_RING : RED_RING, transparent: true, opacity: 0.55, depthWrite: false }));
     ring.position.y = 0.03;
     ring.renderOrder = 1;
     holder.add(ring);
-    const v: View = { id: u.id, side: u.side, type: u.type, t, holder, models: [null, null], lod: 0, men: [], ring, x: u.x + 0.5, z: u.y + 0.5, facing: u.facing, aim: u.aim, alive: u.alive, shown, aboard: !!u.carrier, wreck: false, speed: 0, flash: 0, fall: 0, hunker: u.hunker, pose: 'kneel', lastX: u.x + 0.5, lastZ: u.y + 0.5 };
+    const v: View = { id: u.id, side: u.side, type: u.type, t, holder, models: [null, null], lod: 0, men: [], ring, x: u.x + 0.5, z: u.y + 0.5, facing: u.facing, aim: u.aim, alive: u.alive, shown, aboard: !!u.carrier, wreck: false, speed: 0, flash: 0, fall: 0, hunker: u.hunker, hp: health(u), pose: 'kneel', lastX: u.x + 0.5, lastZ: u.y + 0.5 };
     if (t.mobility === 'foot') {
       const faction = t.faction;
       u.men.forEach((m, i) => {
         if (m.state === 'dead') return;
         const id = `${u.id}#${i}`;
-        const [ox, oz] = slot(i, u.men.length, u.facing, 1);
+        const [ox, oz] = slot(i, u.men.length, u.facing, SPREAD);
         this.crowd.add(id, faction, kitFor(u.type, m.role), v.x + ox, v.z + oz, yawOf(u.facing));
         v.men.push(id);
       });
     } else {
       const lod: 0 | 1 = this.preset.detailCells > 0 ? 0 : 1;
       v.lod = lod;
-      v.models[lod] = buildModel(u.type, { paint: this.paint(u.side), lod, ...(this.opts.lib && u.type === 'ah64e' ? { apache: this.opts.lib.heli } : {}) });
+      v.models[lod] = this.makeModel(u.type, u.side, lod);
       holder.add(v.models[lod]!.root);
     }
     this.views.set(u.id, v);
     this.place(v);
     this.setShown(v, shown && !v.aboard);
+  }
+
+  private makeModel(type: TypeId, side: Side, lod: 0 | 1): UnitModel {
+    const m = buildModel(type, { paint: this.paint(side), lod, ...(this.opts.lib && type === 'ah64e' ? { apache: this.opts.lib.heli } : {}) });
+    m.root.scale.multiplyScalar(VEHICLE_SCALE);
+    return m;
   }
 
   private model(v: View): UnitModel | null {
@@ -257,7 +334,7 @@ export class BattleStage {
   private setLod(v: View, lod: 0 | 1): void {
     if (v.lod === lod || v.t.mobility === 'foot' || v.wreck) return;
     const old = this.model(v);
-    if (!v.models[lod]) v.models[lod] = buildModel(v.type, { paint: this.paint(v.side), lod, ...(this.opts.lib && v.type === 'ah64e' ? { apache: this.opts.lib.heli } : {}) });
+    if (!v.models[lod]) v.models[lod] = this.makeModel(v.type, v.side, lod);
     if (old) v.holder.remove(old.root);
     v.lod = lod;
     v.holder.add(v.models[lod]!.root);
@@ -284,7 +361,7 @@ export class BattleStage {
     if (v.t.mobility === 'foot' && v.shown && !v.aboard) {
       const n = v.men.length;
       v.men.forEach((id, i) => {
-        const [ox, oz] = slot(i, n, v.facing, 1);
+        const [ox, oz] = slot(i, n, v.facing, SPREAD);
         const x = v.x + ox;
         const z = v.z + oz;
         this.crowd.set(id, { x, z, y: this.ground(x, z), facing: yawOf(v.facing) });
@@ -314,12 +391,18 @@ export class BattleStage {
     this.applyCamera(0);
   }
 
+  /** Far enough to see the whole field between the HUD bars, at the whole-field view's tilt. */
   private get maxDist(): number {
-    return this.camera.aspect < 1 ? 70 : 52;
+    const vHalf = THREE.MathUtils.degToRad(this.camera.fov / 2);
+    const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
+    const band = Math.max(0.3, 1 - this.hud[0] - this.hud[1]);
+    const byW = (W / 2 + 1) / Math.tan(hHalf);
+    const byH = ((H / 2 + 1) * Math.sin(THREE.MathUtils.degToRad(64))) / Math.tan(vHalf * band);
+    return Math.min(160, Math.max(byW, byH));
   }
 
   private placeCamera(): void {
-    // The focus sits a little above the middle of the screen, between the HUD bars.
+    // The focus sits in the middle of the band between the HUD bars.
     const band = (this.hud[1] - this.hud[0]) * 0.5;
     const half = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const shift = this.dist * band * half;
@@ -370,17 +453,77 @@ export class BattleStage {
     this.wantFocus.x += mx * c + mz * s;
     this.wantFocus.z += -mx * s + mz * c;
     this.focus.copy(this.wantFocus);
+    this.before = null;
   }
 
-  /** Zoom in (factor below 1) or out. */
-  zoomBy(factor: number): void {
-    this.wantDist = Math.max(6, Math.min(this.maxDist, this.wantDist * factor));
+  /**
+   * Zoom in (factor below 1) or out. With a screen point the ground under it stays put (pinch and
+   * wheel, which also apply at once); without one it eases about the centre (the buttons).
+   */
+  zoomBy(factor: number, at?: { x: number; y: number }): void {
+    const next = Math.max(MIN_DIST, Math.min(this.maxDist, this.wantDist * factor));
+    if (at) {
+      const p = this.groundPoint(at.x, at.y);
+      if (p) {
+        const k = 1 - next / this.wantDist;
+        this.wantFocus.x += (p.x - this.wantFocus.x) * k;
+        this.wantFocus.z += (p.z - this.wantFocus.z) * k;
+      }
+      this.wantDist = next;
+      this.dist = next;
+      this.focus.copy(this.wantFocus);
+    } else this.wantDist = next;
+    this.before = null;
+  }
+
+  /** The camera has arrived where it was going (nothing on screen will shift under a tap). */
+  get settled(): boolean {
+    return !this.cam && this.focus.distanceTo(this.wantFocus) < 0.02 && Math.abs(this.dist - this.wantDist) < 0.02 && Math.abs(this.tilt - this.wantTilt) < 0.002 && Math.abs(wrap(this.yaw - this.wantYaw)) < 0.002;
+  }
+
+  /** How far in the camera is, 0 (closest) to 1 (whole field). */
+  get zoom(): number {
+    return (this.wantDist - MIN_DIST) / Math.max(1, this.maxDist - MIN_DIST);
   }
 
   /** Orbit round the focus (radians) and tilt (radians, positive looks more straight down). */
   orbitBy(yaw: number, tilt = 0): void {
     this.wantYaw = wrap(this.wantYaw + yaw);
     this.wantTilt = Math.max(THREE.MathUtils.degToRad(28), Math.min(THREE.MathUtils.degToRad(82), this.wantTilt + tilt));
+  }
+
+  /** The whole field from above, or (on) back to where the player was; returns whether it is on. */
+  toggleOverview(): boolean {
+    if (this.before) {
+      const b = this.before;
+      this.before = null;
+      this.wantFocus.set(b.x, 0, b.z);
+      this.wantDist = b.dist;
+      this.wantTilt = b.tilt;
+      this.wantYaw = b.yaw;
+      return false;
+    }
+    const was = { x: this.wantFocus.x, z: this.wantFocus.z, dist: this.wantDist, tilt: this.wantTilt, yaw: this.wantYaw };
+    this.wantFocus.set(W / 2, 0, H / 2);
+    this.wantDist = this.maxDist;
+    this.wantTilt = THREE.MathUtils.degToRad(64);
+    this.wantYaw = 0;
+    this.before = was;
+    return true;
+  }
+
+  get overview(): boolean {
+    return this.before !== null;
+  }
+
+  /** Centre on a cell at the playing distance (the unit you are working with). */
+  recenter(cell: Point): void {
+    this.wantFocus.set(cell.x + 0.5, 0, cell.y + 0.5);
+    if (this.wantDist > PLAY_DIST * 1.5 || this.wantDist < MIN_DIST * 1.5) this.wantDist = PLAY_DIST;
+    if (this.before) {
+      this.wantTilt = this.before.tilt;
+      this.before = null;
+    }
   }
 
   /** Bring a point into view if it is near the edge or off screen; `centre` always centres it. */
@@ -396,8 +539,8 @@ export class BattleStage {
     this.follow(cell.x + 0.5, cell.y + 0.5);
   }
 
-  /** The cell under a screen point, or null off the field. */
-  pick(clientX: number, clientY: number): Point | null {
+  /** Where a screen point meets the ground (world units), or null off the field. */
+  groundPoint(clientX: number, clientY: number): THREE.Vector3 | null {
     const r = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
     this.ray.setFromCamera(ndc, this.camera);
@@ -405,12 +548,10 @@ export class BattleStage {
     const o = this.ray.ray.origin;
     const d = this.ray.ray.direction;
     let prev = 0;
-    for (let s = 0; s < 400; s += 0.25) {
-      const x = o.x + d.x * s;
+    const far = Math.max(400, this.dist * 4);
+    for (let s = 0; s < far; s += 0.25) {
       const y = o.y + d.y * s;
-      const z = o.z + d.z * s;
-      const g = this.ground(x, z);
-      if (y <= g) {
+      if (y <= this.ground(o.x + d.x * s, o.z + d.z * s)) {
         // Refine between the last two samples.
         let lo = prev;
         let hi = s;
@@ -419,13 +560,38 @@ export class BattleStage {
           if (o.y + d.y * m <= this.ground(o.x + d.x * m, o.z + d.z * m)) hi = m;
           else lo = m;
         }
-        const cx = Math.floor(o.x + d.x * hi);
-        const cy = Math.floor(o.z + d.z * hi);
-        return cx >= 0 && cy >= 0 && cx < W && cy < H ? { x: cx, y: cy } : null;
+        return new THREE.Vector3(o.x + d.x * hi, o.y + d.y * hi, o.z + d.z * hi);
       }
       prev = s;
     }
     return null;
+  }
+
+  /** The cell under a screen point, or null off the field. */
+  pick(clientX: number, clientY: number): Point | null {
+    const p = this.groundPoint(clientX, clientY);
+    if (!p) return null;
+    const cx = Math.floor(p.x);
+    const cy = Math.floor(p.z);
+    return cx >= 0 && cy >= 0 && cx < W && cy < H ? { x: cx, y: cy } : null;
+  }
+
+  /** The unit drawn nearest a screen point, within `radius` pixels (badges and models sit above their cells). */
+  unitNear(clientX: number, clientY: number, radius: number, side?: Side): string | null {
+    let best: string | null = null;
+    let bestD = radius;
+    for (const v of this.views.values()) {
+      if (!v.alive || !v.holder.visible || v.aboard || (side && v.side !== side)) continue;
+      for (const h of [0.15, this.headOf(v), this.headOf(v) + 0.35]) {
+        const p = this.toScreen(v.x - 0.5, v.z - 0.5, h);
+        const d = Math.hypot(p.x - clientX, p.y - clientY);
+        if (d < bestD) {
+          bestD = d;
+          best = v.id;
+        }
+      }
+    }
+    return best;
   }
 
   /** A cell's centre on screen, `h` world units above the ground. */
@@ -435,13 +601,32 @@ export class BattleStage {
     return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
   }
 
+  /** Height of the top of a unit above the ground, where its badge sits. */
+  private headOf(v: View): number {
+    return v.t.mobility === 'foot' ? 0.5 : (this.model(v)?.lift ?? 0) + 0.45;
+  }
+
   unitScreen(id: string): Point | null {
     const v = this.views.get(id);
     if (!v || !v.holder.visible) return null;
-    return this.toScreen(v.x - 0.5, v.z - 0.5, (this.model(v)?.lift ?? 0) + 0.3);
+    return this.toScreen(v.x - 0.5, v.z - 0.5, this.headOf(v));
+  }
+
+  /** A world point on the HUD layer (CSS pixels from the canvas corner), or null behind the camera. */
+  private onLayer(x: number, y: number, z: number): { x: number; y: number } | null {
+    const p = new THREE.Vector3(x, y, z).project(this.camera);
+    if (p.z > 1 || p.z < -1) return null;
+    const w = this.host.clientWidth;
+    const h = this.host.clientHeight;
+    return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h };
   }
 
   // --- Overlay -------------------------------------------------------------------------------------
+
+  /** What the overlay shows, for tests. */
+  overlayCounts(): { selected: string | null; reach: number; dash: number; targets: number } {
+    return { selected: this.overlay.selected, reach: this.overlay.reach.length, dash: this.overlay.dash.length, targets: this.overlay.targets.length };
+  }
 
   setOverlay(o: Overlay): void {
     this.overlay = o;
@@ -460,6 +645,7 @@ export class BattleStage {
     };
     put(this.tiles, o.reach);
     put(this.dashTiles, o.dash);
+    this.setEdges(o);
     if (o.area) {
       const cells: number[] = [];
       for (let dy = -o.area.r; dy <= o.area.r; dy++)
@@ -503,7 +689,194 @@ export class BattleStage {
     }
     const sel = o.selected ? this.views.get(o.selected) : undefined;
     this.selRing.visible = !!sel && sel.holder.visible;
-    if (sel) this.selRing.position.set(sel.x, this.ground(sel.x, sel.z) + 0.06, sel.z);
+    if (sel) {
+      this.selRing.position.set(sel.x, this.ground(sel.x, sel.z) + 0.06, sel.z);
+      this.selRing.scale.setScalar(sel.t.mobility === 'foot' ? 1 : 1.3);
+    }
+  }
+
+  /** A solid edge round the move area and a fainter one round the dash area. */
+  private setEdges(o: Overlay): void {
+    const key = `${o.selected}|${o.reach.length}:${o.reach[0] ?? -1}:${o.reach.at(-1) ?? -1}|${o.dash.length}:${o.dash[0] ?? -1}`;
+    if (key === this.edgeKey) return;
+    this.edgeKey = key;
+    for (const m of [this.reachEdge, this.dashEdge]) {
+      if (!m) continue;
+      this.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    this.reachEdge = null;
+    this.dashEdge = null;
+    if (!o.selected || (!o.reach.length && !o.dash.length)) return;
+    const sel = this.views.get(o.selected);
+    const home = sel ? Math.floor(sel.z) * W + Math.floor(sel.x) : -1;
+    // Our own units stand inside the area: do not cut holes round them.
+    const area = new Set([...o.reach, home]);
+    for (const v of this.views.values()) if (v.side === 'blue' && v.alive && !v.aboard) area.add(Math.floor(v.z) * W + Math.floor(v.x));
+    this.reachEdge = this.edgeMesh(area, 0.06, 0.8);
+    if (o.dash.length) this.dashEdge = this.edgeMesh(new Set([...area, ...o.dash]), 0.045, 0.4);
+  }
+
+  /** Flat ribbons along the outside edges of a set of cells, following the ground. */
+  private edgeMesh(cells: Set<number>, width: number, opacity: number): THREE.Mesh {
+    const pos: number[] = [];
+    const quad = (ax: number, az: number, bx: number, bz: number, nx: number, nz: number) => {
+      // Inset by half the width so the ribbon sits just inside the edge.
+      const steps = 4;
+      for (let i = 0; i < steps; i++) {
+        const t0 = i / steps;
+        const t1 = (i + 1) / steps;
+        const x0 = ax + (bx - ax) * t0;
+        const z0 = az + (bz - az) * t0;
+        const x1 = ax + (bx - ax) * t1;
+        const z1 = az + (bz - az) * t1;
+        const y0 = this.ground(x0, z0) + 0.06;
+        const y1 = this.ground(x1, z1) + 0.06;
+        const ix0 = x0 - nx * width;
+        const iz0 = z0 - nz * width;
+        const ix1 = x1 - nx * width;
+        const iz1 = z1 - nz * width;
+        pos.push(x0, y0, z0, x1, y1, z1, ix1, y1, iz1, x0, y0, z0, ix1, y1, iz1, ix0, y0, iz0);
+      }
+    };
+    for (const i of cells) {
+      if (i < 0) continue;
+      const x = i % W;
+      const y = Math.floor(i / W);
+      const has = (dx: number, dy: number) => {
+        const nx = x + dx;
+        const ny = y + dy;
+        return nx >= 0 && ny >= 0 && nx < W && ny < H && cells.has(ny * W + nx);
+      };
+      if (!has(0, -1)) quad(x, y, x + 1, y, 0, -1);
+      if (!has(0, 1)) quad(x, y + 1, x + 1, y + 1, 0, 1);
+      if (!has(-1, 0)) quad(x, y, x, y + 1, -1, 0);
+      if (!has(1, 0)) quad(x + 1, y, x + 1, y + 1, 1, 0);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }));
+    m.renderOrder = 3;
+    m.frustumCulled = false;
+    this.scene.add(m);
+    return m;
+  }
+
+  // --- Badges, words and places --------------------------------------------------------------------
+
+  /** Badges follow the film; when it is still, they read the battle as it stands. */
+  private updateHud(dt: number): void {
+    const still = !this.busy;
+    // An action cam is a shot, not a map: no badges, arrows or labels in it.
+    const cinematic = this.cam !== null;
+    const states: BadgeState[] = [];
+    const compact = this.zoom > 0.55;
+    for (const v of this.views.values()) {
+      const u = still ? this.battle.units.find((x) => x.id === v.id) : undefined;
+      if (u) v.hp = health(u);
+      const shown = v.alive && v.holder.visible && !v.aboard && (v.t.mobility !== 'foot' || v.men.length > 0);
+      const at = shown && !cinematic ? this.badgePoint(v) : null;
+      const unit = u ?? this.battle.units.find((x) => x.id === v.id);
+      states.push({
+        id: v.id,
+        side: v.side,
+        cls: classOf(v.t.role),
+        at,
+        hp: v.hp,
+        status: unit && still ? badgeStatus(unit) : 'none',
+        done: v.side === 'blue' && !!unit && (unit.acted || !!unit.carrier) && this.battle.turn === 'blue',
+        selected: this.overlay.selected === v.id,
+      });
+    }
+    this.hudLayer.setBadges(states, compact);
+    this.hudLayer.setPointers(cinematic ? [] : this.edgePointers());
+    this.hudLayer.update(dt);
+    // The objective and, until the first contact, where the enemy is expected.
+    const zone = this.battle.map.zone;
+    this.hudLayer.label('objective', zone && !cinematic ? 'Objective' : null, zone ? this.onLayer(zone.x + 0.5, this.ground(zone.x + 0.5, zone.y + 0.5) + 0.2, zone.y + 0.5) : null);
+    const ea = this.enemyAt;
+    this.hudLayer.label('enemy', ea && !this.contact && !cinematic ? 'Enemy Expected' : null, ea && !this.contact ? this.onLayer(ea.x, this.ground(ea.x, ea.z) + 0.2, ea.z) : null);
+  }
+
+  /**
+   * Seen enemies off the screen, nearest first (and, before the first contact, where they are
+   * expected), as arrows clamped inside the band between the HUD bars.
+   */
+  private edgePointers(): EdgePointer[] {
+    const w = this.host.clientWidth;
+    const h = this.host.clientHeight;
+    const top = this.hud[0] * h + 34;
+    const bottom = (1 - this.hud[1]) * h - 34;
+    const left = 30;
+    const right = w - 30;
+    const cx = w / 2;
+    const cy = (top + bottom) / 2;
+    const out: (EdgePointer & { d: number })[] = [];
+    const consider = (id: string, label: string, x: number, y: number, z: number) => {
+      const p = new THREE.Vector3(x, y, z).project(this.camera);
+      let sx = ((p.x + 1) / 2) * w;
+      let sy = ((1 - p.y) / 2) * h;
+      if (p.z > 1) {
+        // Behind the camera: the projection flips.
+        sx = w - sx;
+        sy = h - sy;
+      } else if (sx >= left && sx <= right && sy >= top && sy <= bottom) return;
+      const dx = sx - cx;
+      const dy = sy - cy;
+      const k = Math.min(Math.abs((dx > 0 ? right - cx : left - cx) / (dx || 1e-6)), Math.abs((dy > 0 ? bottom - cy : top - cy) / (dy || 1e-6)));
+      let px = cx + dx * k;
+      let py = cy + dy * k;
+      // Keep clear of the camera buttons down the right edge.
+      if (px > w - 70 && py < this.hud[0] * h + 260) px = w - 76;
+      px = Math.max(left, Math.min(right, px));
+      py = Math.max(top, Math.min(bottom, py));
+      out.push({ id, label, x: px, y: py, angle: Math.atan2(dy, dx), d: Math.hypot(x - this.focus.x, z - this.focus.z) });
+    };
+    for (const v of this.views.values()) {
+      if (v.side !== 'red' || !v.alive || !v.holder.visible || v.aboard) continue;
+      consider(v.id, `Show the ${typeOf(v.type).short}`, v.x, this.ground(v.x, v.z) + 0.3, v.z);
+    }
+    if (!this.contact && this.enemyAt) consider('enemy', 'Show where the enemy is expected', this.enemyAt.x, this.ground(this.enemyAt.x, this.enemyAt.z), this.enemyAt.z);
+    // Arrows that would sit on each other become one, with a count.
+    const kept: (EdgePointer & { d: number })[] = [];
+    for (const p of out.sort((a, b) => a.d - b.d)) {
+      const near = kept.find((k) => Math.hypot(k.x - p.x, k.y - p.y) < 48);
+      if (near) near.count = (near.count ?? 1) + 1;
+      else kept.push(p);
+    }
+    return kept.slice(0, 6);
+  }
+
+  /** Just above the top of a unit as drawn (its box projected to the screen), where its badge sits. */
+  private badgePoint(v: View): { x: number; y: number } | null {
+    const r = v.t.mobility === 'foot' ? 0.35 : 0.7;
+    const g = this.ground(v.x, v.z);
+    const top = g + this.headOf(v);
+    const c = this.onLayer(v.x, top, v.z);
+    if (!c) return null;
+    let minY = c.y;
+    for (const [dx, dz] of [
+      [r, r],
+      [r, -r],
+      [-r, r],
+      [-r, -r],
+    ] as const) {
+      const p = this.onLayer(v.x + dx, top, v.z + dz);
+      if (p) minY = Math.min(minY, p.y);
+    }
+    return { x: c.x, y: minY - 4 };
+  }
+
+  /** Words over a unit, as the film reaches the moment. */
+  private say(v: View | undefined, text: string, tone: Tone): void {
+    if (!v) return;
+    this.hudLayer.callout(text, tone, () => (v.holder.visible || !v.alive ? this.badgePoint(v) : null), v.id);
+  }
+
+  /** Good news when it happens to them, bad when it happens to us. */
+  private toneFor(v: View): Tone {
+    return v.side === 'red' ? 'good' : 'bad';
   }
 
   // --- Night and thermal -------------------------------------------------------------------------
@@ -567,6 +940,7 @@ export class BattleStage {
       this.steps.shift();
     }
     this.cam = null;
+    this.hudLayer.clearCallouts();
   }
 
   private step(dur: number, s: Omit<Step, 'dur' | 't' | 'started'>): void {
@@ -590,14 +964,26 @@ export class BattleStage {
   }
 
   private centreOf(v: View): THREE.Vector3 {
-    return new THREE.Vector3(v.x, this.ground(v.x, v.z) + (this.model(v)?.lift ?? 0) + (v.t.mobility === 'foot' ? 0.1 : 0.14), v.z);
+    return new THREE.Vector3(v.x, this.ground(v.x, v.z) + (this.model(v)?.lift ?? 0) + (v.t.mobility === 'foot' ? 0.18 : 0.14 * VEHICLE_SCALE), v.z);
   }
 
   private actionCam(at: THREE.Vector3, from?: THREE.Vector3): void {
     if (!this.opts.settings.actionCams || this.cam) return;
     const dir = from ? at.clone().sub(from).setY(0).normalize() : new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw)).negate();
-    const eye = at.clone().sub(dir.multiplyScalar(3.2)).add(new THREE.Vector3(0, 1.1, 0));
-    eye.y = Math.max(eye.y, this.ground(eye.x, eye.z) + 0.6);
+    const eye = at.clone().sub(dir.multiplyScalar(3.6)).add(new THREE.Vector3(0, 1.3, 0));
+    // Keep the line from the eye to the target clear of ground, trees and buildings: raise the eye
+    // until it is, and skip the shot if that takes it high above the action.
+    for (let i = 0; i <= 12; i++) {
+      const f = 0.2 + (0.8 * i) / 12;
+      const x = at.x + (eye.x - at.x) * f;
+      const z = at.z + (eye.z - at.z) * f;
+      const cx = Math.floor(x);
+      const cz = Math.floor(z);
+      const top = Math.max(this.ground(x, z), cx >= 0 && cz >= 0 && cx < W && cz < H ? this.world.topAt(cx, cz) : 0) + 0.3;
+      const need = at.y + (top - at.y) / f;
+      if (need > eye.y) eye.y = need;
+    }
+    if (eye.y - at.y > 4.5) return;
     this.cam = { from: eye, at: at.clone(), t: 0, dur: 1.6 };
   }
 
@@ -694,6 +1080,11 @@ export class BattleStage {
           start: () => {
             if (!e.seen && v.side === 'red') return;
             const c = this.centreOf(v);
+            if (e.pen && e.effect !== 'none') {
+              if (e.effect === 'catastrophic' || e.effect === 'knocked_out' || e.effect === 'shot_down') v.hp = 0;
+              else v.hp = Math.max(0.1, v.hp - 0.3);
+            }
+            this.say(v, e.pen ? (EFFECT_TEXT[e.effect] ?? 'Penetrated') : e.effect === 'bounce' || e.effect === 'none' ? 'Bounced' : 'Hit', e.pen ? this.toneFor(v) : 'plain');
             this.fx.hit(c, new THREE.Vector3(0, 1, 0), e.pen ? 'pen' : 'bounce');
             this.audio.impact(e.pen ? 'ke_hit' : 'bounce', e.x, e.y);
             v.flash = e.pen ? 1 : 0.5;
@@ -708,6 +1099,12 @@ export class BattleStage {
           let killed = e.killed;
           let wounded = e.wounded;
           const u = this.battle.units.find((x) => x.id === v.id);
+          const men = typeOf(v.type).men?.length ?? 1;
+          v.hp = Math.max(0, v.hp - (e.killed + e.wounded) / Math.max(1, men));
+          if (e.seen || v.side === 'blue') {
+            const parts = [e.killed ? `${e.killed} Down` : '', e.wounded ? `${e.wounded} Wounded` : ''].filter(Boolean);
+            if (parts.length) this.say(v, parts.join(', '), this.toneFor(v));
+          }
           for (const id of [...v.men].reverse()) {
             if (!killed && !wounded) break;
             if (killed) {
@@ -723,14 +1120,20 @@ export class BattleStage {
         });
         break;
       case 'suppressed':
-        if (!v || v.t.mobility !== 'foot') break;
-        this.now(() => this.posePeople(v, e.level === 'pinned' || e.level === 'broken' ? 'prone' : 'kneel'));
-        break;
-      case 'destroyed':
         if (!v) break;
+        this.now(() => {
+          if (e.level !== 'steady' && (e.seen || v.side === 'blue')) this.say(v, e.level === 'broken' ? 'Broken' : e.level === 'pinned' ? 'Pinned' : 'Suppressed', this.toneFor(v));
+          if (v.t.mobility === 'foot') this.posePeople(v, e.level === 'pinned' || e.level === 'broken' ? 'prone' : 'kneel');
+        });
+        break;
+      case 'destroyed': {
+        if (!v) break;
+        const by = this.lastShooter.get(e.unit);
         this.step(e.how === 'wiped' || e.how === 'expended' ? 0.1 : 0.7, {
           start: () => {
             v.alive = false;
+            v.hp = 0;
+            if (e.how !== 'expended') this.feedKill(v, by, e.how, e.seen);
             const c = this.centreOf(v);
             const seen = e.seen || v.side === 'blue';
             if (v.t.mobility === 'foot') {
@@ -759,6 +1162,7 @@ export class BattleStage {
           },
         });
         break;
+      }
       case 'boom':
         this.step(0.3, {
           start: () => {
@@ -848,8 +1252,13 @@ export class BattleStage {
       case 'spotted':
         if (e.side !== 'blue') break;
         this.now(() => {
+          if (!this.contact) {
+            this.contact = true;
+            if (this.enemyMark) this.enemyMark.visible = false;
+          }
           const s = this.views.get(e.unit);
           if (!s) return;
+          if (!s.shown) this.say(s, 'Contact', 'plain');
           s.shown = true;
           s.x = e.x + 0.5;
           s.z = e.y + 0.5;
@@ -895,6 +1304,7 @@ export class BattleStage {
 
   private queueFire(e: Extract<BattleEvent, { type: 'fire' }>, v: View | undefined): void {
     const target = e.target ? this.views.get(e.target) : undefined;
+    if (e.target) this.lastShooter.set(e.target, e.unit);
     const to = target ? this.centreOf(target) : this.worldOf(e.to, 0.05);
     if (!e.hit && target) {
       // A miss goes past: land it a little beyond.
@@ -910,7 +1320,9 @@ export class BattleStage {
     if (v && shooterShown) {
       this.step(0.18, {
         start: () => {
-          this.follow((v.x + to.x) / 2, (v.z + to.z) / 2);
+          // Frame both when they fit; otherwise watch the target (where the news is).
+          if (Math.hypot(v.x - to.x, v.z - to.z) < 9) this.follow((v.x + to.x) / 2, (v.z + to.z) / 2);
+          else this.follow(to.x, to.z, true);
           if (foot) this.posePeople(v, 'aim');
           if (v.side === 'red' && !v.holder.visible) this.setShown(v, true);
         },
@@ -941,6 +1353,8 @@ export class BattleStage {
           if (foot) this.posePeople(v, 'fire');
           v.flash = Math.max(v.flash, 0.15);
         }
+        // Fire from out of sight: show who is taking it.
+        if (!shooterShown && target && target.side === 'blue') this.follow(target.x, target.z, true);
         if (shooterShown || offMap || (target && target.holder.visible)) this.audio.shot(e.calibre, (v?.x ?? to.x) - 0.5, (v?.z ?? to.z) - 0.5, { night: this.night });
         const shownTo = target ? target.holder.visible : true;
         if (!shooterShown && !shownTo && !offMap) return;
@@ -962,8 +1376,28 @@ export class BattleStage {
       end: () => {
         if (foot && v) this.posePeople(v, 'aim');
         if (!e.hit && !(kind === 'mortar' || kind === 'howitzer')) this.fx.hit(to, new THREE.Vector3(0, 1, 0), 'small');
+        if (!e.hit && target && target.holder.visible) this.say(target, 'Miss', 'plain');
       },
     });
+  }
+
+  /** A line for the kill feed: who got whom, as far as we saw. */
+  private feedKill(v: View, by: string | undefined, how: string, seen: boolean): void {
+    const onFeed = this.opts.onFeed;
+    if (!onFeed) return;
+    const name = (id: string) => {
+      const u = this.battle.units.find((x) => x.id === id);
+      return u ? (u.side === 'blue' ? u.name : typeOf(u.type).short) : null;
+    };
+    const verb = how === 'shot_down' ? 'shot down' : how === 'wiped' ? 'wiped out' : how === 'landed' ? 'forced down' : 'knocked out';
+    const shooter = by ? this.battle.units.find((x) => x.id === by) : undefined;
+    if (v.side === 'red') {
+      if (!seen) return;
+      onFeed(`${shooter?.side === 'blue' ? shooter.name : 'We'} ${verb} ${/^[AEIOU]/.test(typeOf(v.type).short) ? 'an' : 'a'} ${typeOf(v.type).short}`, 'good');
+    } else {
+      const who = shooter && shooter.side === 'red' && this.views.get(shooter.id)?.shown ? ` by ${/^[AEIOU]/.test(typeOf(shooter.type).short) ? 'an' : 'a'} ${typeOf(shooter.type).short}` : '';
+      onFeed(`${name(v.id) ?? 'A unit'} ${verb}${who}`, 'bad');
+    }
   }
 
   private wreck(v: View): void {
@@ -1051,10 +1485,10 @@ export class BattleStage {
       if (v.alive && !v.wreck) {
         for (const r of mm.rotors) r.obj.rotation[r.axis] += r.rate * dt;
         if (moved) {
-          for (const w of mm.wheels) w.rotation.x += moved / Math.max(0.001, mm.wheelRadius);
+          for (const w of mm.wheels) w.rotation.x += moved / Math.max(0.001, mm.wheelRadius * VEHICLE_SCALE);
           for (const tr of mm.tracks) {
             const map = (tr as THREE.MeshStandardMaterial).map;
-            if (map) map.offset.y += moved * mm.trackScroll;
+            if (map) map.offset.y += (moved * mm.trackScroll) / VEHICLE_SCALE;
           }
         }
         if (v.t.mobility === 'heli' && v.holder.visible) {
@@ -1084,6 +1518,7 @@ export class BattleStage {
     this.audio.setListener({ x: this.focus.x - 0.5, y: this.focus.z - 0.5, zoom: Math.min(1, this.dist / this.maxDist) });
     this.audio.update(dt);
     this.renderer.render(this.scene, this.camera);
+    this.updateHud(dt);
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
   }
@@ -1103,6 +1538,7 @@ export class BattleStage {
   }
 
   dispose(): void {
+    this.hudLayer.dispose();
     this.audio.dispose();
     this.fx.dispose();
     this.crowd.dispose();

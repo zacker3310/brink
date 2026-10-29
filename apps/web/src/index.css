@@ -772,3 +772,171 @@ aside[data-testid^='panel-'] section:first-of-type > header {
     transform: translateY(14px);
   }
 }
+
+/* Battle field layer: unit badges, words over targets, place labels (apps/web/src/arena/hud.ts).
+   Badges carry the APP-6 affiliation: friendly light blue, hostile red. */
+.arena-hud {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.arena-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 5px 0 4px;
+  border-radius: 6px;
+  background: #9cc6ee;
+  color: #0b1220;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  will-change: transform;
+}
+.arena-badge[data-side='red'] {
+  background: #c8473a;
+  color: #ffffff;
+}
+.arena-badge-glyph {
+  display: inline-flex;
+  width: 20px;
+  height: 13px;
+}
+.arena-badge-glyph > svg {
+  width: 100%;
+  height: 100%;
+}
+.arena-badge-mark {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+}
+.arena-badge-mark:empty {
+  display: none;
+}
+.arena-badge-mark > svg {
+  width: 100%;
+  height: 100%;
+}
+.arena-badge-bar {
+  position: relative;
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+.arena-badge-bar > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: currentColor;
+  transition: width 250ms;
+}
+.arena-badge.is-done {
+  opacity: 0.55;
+}
+.arena-badge.is-selected {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+  z-index: 1;
+}
+.arena-badge.is-compact {
+  height: 16px;
+  padding: 0 3px;
+}
+.arena-badge.is-compact .arena-badge-bar,
+.arena-badge.is-compact .arena-badge-mark {
+  display: none;
+}
+.arena-badge.is-compact .arena-badge-glyph {
+  width: 16px;
+  height: 11px;
+}
+.arena-callout {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+.arena-callout[data-tone='bad'] {
+  color: #ffb4a8;
+}
+.arena-callout[data-tone='plain'] {
+  font-size: 14px;
+  font-weight: 700;
+}
+.arena-place {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.feed-in {
+  animation: feed-in 220ms ease-out;
+}
+@keyframes feed-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.arena-pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #c8473a;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+.arena-pointer-arrow {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+}
+.arena-pointer-arrow > svg {
+  width: 100%;
+  height: 100%;
+}
+.arena-pointer-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+}
+.arena-pointer-count:empty {
+  display: none;
+}

@@ -26,6 +26,8 @@ test('a skirmish plays in turns and banks its stars', async ({ page }) => {
   });
   await page.getByTestId(`arena-unit-${unit.id}`).click();
   await expect(page.getByTestId('arena-unit')).toBeVisible();
+  // Selecting glides the camera to the unit: aim once it has arrived.
+  await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 30000 });
 
   // Clicking a free lit cell three ahead drives it there.
   const cell = await page.evaluate((u) => {

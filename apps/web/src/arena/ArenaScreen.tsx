@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { UnitClass } from '@brink/contracts';
 import {
   ABILITIES,
+  BREAK_AT,
   act,
   arenaResult,
   autoTurn,
@@ -23,7 +23,9 @@ import {
   typeOf,
   unitAt,
   usableWeapons,
+  unitValue,
   visibleTo,
+  WITHDRAW_AT,
   whyNot,
   woundedMen,
   type AbilityId,
@@ -42,6 +44,7 @@ import { loadLibrary, type Library } from './assets';
 import type { BattleRequest } from './battle';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
 import { BattleStage, type Overlay } from './stage';
+import { classOf, health } from './units';
 
 // One battle, fought in turns: a brief, the fight, the verdict. On your turn tap a unit, tap a lit
 // cell to move it, tap a ringed enemy to see the odds, Fire to shoot; the unit card has the rest
@@ -57,11 +60,13 @@ declare global {
       arena: () => Battle | null;
       /** A cell's centre on screen. */
       toScreen: (x: number, y: number) => Point;
-      /** True when nothing is animating and it is your turn. */
+      /** True when nothing is animating, the camera has settled, and it is your turn. */
       ready: () => boolean;
       win: () => void;
       lose: () => void;
       perf: (reset?: boolean) => ReturnType<BattleStage['perf']> | null;
+      /** What the field overlay shows now. */
+      overlay: () => ReturnType<BattleStage['overlayCounts']> | null;
     };
   }
 }
@@ -74,27 +79,6 @@ const MODE_TEXT = {
 const TIME_TEXT = { dawn: 'Dawn', day: 'Day', dusk: 'Dusk', night: 'Night' } as const;
 const WEATHER_TEXT = { clear: 'clear', overcast: 'overcast', rain: 'rain', fog: 'fog', snow: 'snow' } as const;
 const BIOME_TEXT = { temperate: 'Temperate', steppe: 'Steppe', desert: 'Desert', winter: 'Winter', urban: 'City' } as const;
-
-function classOf(role: Role): UnitClass {
-  if (role === 'mbt') return 'armor';
-  if (role === 'ifv' || role === 'apc' || role === 'arv' || role === 'spaa') return 'mechanized';
-  if (role === 'light_tank' || role === 'tank_hunter') return 'recon';
-  if (role === 'spg' || role === 'mortar') return 'artillery';
-  if (role === 'attack_heli' || role === 'gunship' || role === 'scout_heli' || role === 'transport_heli') return 'air';
-  if (role === 'recon_drone' || role === 'fpv_team' || role === 'loiter_team') return 'drone';
-  return 'infantry';
-}
-
-/** How whole a unit is, 0..1, for its tile. */
-function health(u: Unit): number {
-  const t = typeOf(u.type);
-  if (!u.alive) return 0;
-  if (t.mobility === 'foot') return fitMen(u) / Math.max(1, t.men?.length ?? 1);
-  let h = 1 - 0.2 * Math.max(0, t.crew - u.crew);
-  if (u.mobilityKill) h -= 0.3;
-  if (u.firepowerKill) h -= 0.3;
-  return Math.max(0.1, h);
-}
 
 function statusLine(u: Unit): string {
   const t = typeOf(u.type);
@@ -113,6 +97,34 @@ function statusLine(u: Unit): string {
   if (u.passengers.length) bits.push(`${u.passengers.length} squad aboard`);
   bits.push(u.acted ? 'Done' : u.moved ? 'Moved, can act' : 'Ready');
   return bits.join(' · ');
+}
+
+/** "Abrams x4, Bradley, Squad" from a list of names. */
+function tally(names: string[]): string {
+  const n = new Map<string, number>();
+  for (const x of names) n.set(x, (n.get(x) ?? 0) + 1);
+  return [...n].map(([k, c]) => (c > 1 ? `${k} x${c}` : k)).join(', ');
+}
+
+const KIND_WORDS: [Role[], string][] = [
+  [['mbt'], 'tanks'],
+  [['ifv', 'apc'], 'armoured carriers'],
+  [['light_tank', 'tank_hunter'], 'tank hunters'],
+  [['rifle_squad', 'fireteam'], 'infantry'],
+  [['at_team'], 'anti-tank teams'],
+  [['aa_team', 'spaa'], 'air defence'],
+  [['mortar', 'spg'], 'artillery'],
+  [['attack_heli', 'gunship', 'scout_heli', 'transport_heli'], 'helicopters'],
+  [['recon_drone', 'fpv_team', 'loiter_team'], 'drones'],
+  [['sniper'], 'snipers'],
+];
+
+/** "Tanks, infantry and anti-tank teams" from a list of roles. */
+function kinds(roles: Role[]): string {
+  const words = KIND_WORDS.filter(([rs]) => roles.some((r) => rs.includes(r))).map(([, w]) => w);
+  if (!words.length) return 'Unknown';
+  const s = words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words[0]!;
+  return s[0]!.toUpperCase() + s.slice(1);
 }
 
 function Tile({ u, active, onClick }: { u: Unit; active: boolean; onClick: () => void }) {
@@ -137,10 +149,61 @@ function Tile({ u, active, onClick }: { u: Unit; active: boolean; onClick: () =>
   );
 }
 
+/** Your strength exactly; theirs as far as you have seen it fall. */
+function strengths(b: Battle): { blue: number; red: number } {
+  const start = (side: 'blue' | 'red') => b.units.filter((u) => u.side === side).reduce((s, u) => s + u.startValue, 0) || 1;
+  const blue = b.units.filter((u) => u.side === 'blue').reduce((s, u) => s + unitValue(u), 0) / start('blue');
+  // Theirs: start from all of them, take off what was seen destroyed and what the badges show.
+  const gone = new Set(b.events.filter((e) => e.type === 'destroyed' && e.seen).map((e) => (e as { unit: string }).unit));
+  const seen = visibleTo(b, 'blue');
+  let red = start('red');
+  for (const u of b.units) {
+    if (u.side !== 'red') continue;
+    if (gone.has(u.id)) red -= u.startValue;
+    else if (seen.has(u.id)) red -= u.startValue - unitValue(u);
+  }
+  return { blue: Math.max(0, blue), red: Math.max(0, red / start('red')) };
+}
+
+/** Units knocked out (seen) and lost so far. */
+function counts(b: Battle): { killed: number; lost: number } {
+  return {
+    killed: new Set(b.events.filter((e) => e.type === 'destroyed' && e.seen && b.units.find((u) => u.id === e.unit)?.side === 'red').map((e) => (e as { unit: string }).unit)).size,
+    lost: b.units.filter((u) => u.side === 'blue' && !u.alive).length,
+  };
+}
+
+function Strength({ label, value, mark, side }: { label: string; value: number; mark: number; side: 'blue' | 'red' }) {
+  return (
+    <div className="min-w-0" aria-label={`${label}: ${Math.round(value * 100)}%`}>
+      <div className="flex items-baseline justify-between text-[11px] leading-tight font-semibold">
+        <span className="truncate text-muted">{label}</span>
+        <span className="text-white tabular-nums">{Math.round(value * 100)}%</span>
+      </div>
+      <div className="relative mt-0.5 h-1.5 rounded-full bg-white/15">
+        <div className={`h-full rounded-full transition-[width] duration-500 ${side === 'blue' ? 'bg-[#9cc6ee]' : 'bg-[#e0705e]'}`} style={{ width: `${Math.min(100, value * 100)}%` }} />
+        <div className="absolute -top-0.5 h-2.5 w-0.5 rounded bg-white" style={{ left: `${mark * 100}%` }} title={side === 'blue' ? 'You break here' : 'They pull back here'} />
+      </div>
+    </div>
+  );
+}
+
+function CamButton({ label, testid, onClick, pressed, children }: { label: string; testid: string; onClick: () => void; pressed?: boolean; children: React.ReactNode }) {
+  return (
+    <button type="button" aria-label={label} aria-pressed={pressed} onClick={onClick} className={`flex h-11 w-11 items-center justify-center rounded-full shadow-lg ${pressed ? 'bg-white text-black' : 'bg-ink-900 text-white'}`} data-testid={testid}>
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {children}
+      </svg>
+    </button>
+  );
+}
+
 function Brief({ req, onFight, onQuick, onBack }: { req: BattleRequest; onFight: () => void; onQuick: () => void; onBack: () => void }) {
   const s = req.setup;
   const cond = useMemo(() => pickConditions(s), [s]);
   const mine = useMemo(() => buildForce(s, 'blue'), [s]);
+  // What reconnaissance would tell you before an attack: roughly how many, and of what kinds.
+  const theirs = useMemo(() => buildForce(s, 'red'), [s]);
   const mode = s.site === 'capital' || s.site === 'city' || s.site === 'objective' ? 'capture' : 'destroy';
   const [title, text] = MODE_TEXT[mode];
   return (
@@ -161,8 +224,8 @@ function Brief({ req, onFight, onQuick, onBack }: { req: BattleRequest; onFight:
             const units = mine.units.filter((u) => u.formation === f.id);
             return (
               <li key={f.id} className="px-4 py-3">
-                <div className="text-[15px] font-semibold">{f.name}</div>
-                <div className="text-[14px] text-muted">{units.map((u) => typeOf(u.type).short).join(', ')}</div>
+                {s.attackers.length > 1 && <div className="text-[15px] font-semibold">{f.name}</div>}
+                <div className={s.attackers.length > 1 ? 'text-[14px] text-muted' : 'text-[15px]'}>{tally(units.map((u) => typeOf(u.type).short))}</div>
               </li>
             );
           })}
@@ -175,18 +238,15 @@ function Brief({ req, onFight, onQuick, onBack }: { req: BattleRequest; onFight:
             </li>
           ))}
         </ul>
-        <div className="mt-5 text-[13px] font-semibold text-muted">Enemy Seen</div>
-        <ul className="mt-1.5 divide-y divide-line overflow-hidden rounded-2xl bg-ink-900">
-          {s.defenders.map((f) => (
-            <li key={f.id} className="flex items-center justify-between px-4 py-3">
-              <span className="text-[15px] font-semibold">{f.name}</span>
-              <span className="text-[14px] text-muted tabular-nums">{Math.round(f.strength / 10)}%</span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-5 text-[13px] font-semibold text-muted">What Scouts Report</div>
+        <div className="mt-1.5 rounded-2xl bg-ink-900 px-4 py-3" data-testid="arena-intel">
+          <div className="text-[15px] font-semibold">About {theirs.units.length} units, dug in toward the far edge</div>
+          <div className="text-[14px] text-muted">{kinds(theirs.units.map((u) => typeOf(u.type).role))}</div>
+        </div>
         <ul className="mt-5 space-y-2 text-[15px] text-muted">
-          <li>Each unit moves, then acts. Tap a unit, tap a lit cell to move, tap a ringed enemy for the odds.</li>
+          <li>Each unit moves, then acts. Tap a unit, tap inside its outline to move, tap a red badge for the odds.</li>
           <li>Hit them in the side or rear: their front armour is far thicker. Smoke hides you for a turn.</li>
+          <li>Pinch or use the plus and minus buttons to zoom; the target button brings the camera back to your unit, the map button shows the whole field.</li>
           {s.abilities.length > 0 && <li>From your research: {s.abilities.map((a) => ABILITIES[a].name).join(', ')}.</li>}
         </ul>
         <div className="mt-auto flex flex-col gap-2 pt-6 pb-4">
@@ -279,9 +339,24 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const [dash, setDash] = useState(false);
   const [menu, setMenu] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  /** What happened since your last turn, shown with the round banner. */
+  const [report, setReport] = useState<string | null>(null);
+  const tally0 = useRef({ killed: 0, lost: 0 });
+  /** The strength bars, read when the film is still so they never run ahead of it. */
+  const [bars, setBars] = useState({ blue: 1, red: 1 });
   const [settings, setSettings] = useState<ArenaSettings>(() => readSettings());
   const [thermal, setThermal] = useState(false);
+  const [overview, setOverview] = useState(false);
+  const [feed, setFeed] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'plain' }[]>([]);
+  const feedId = useRef(0);
+  const lastNoop = useRef<{ t: number; x: number; y: number } | null>(null);
   const refresh = () => setTick((t) => t + 1);
+  /** A line in the kill feed under the title, for a few seconds. */
+  const pushFeed = (text: string, tone: 'good' | 'bad' | 'plain') => {
+    const id = ++feedId.current;
+    setFeed((f) => [...f.slice(-2), { id, text, tone }]);
+    setTimeout(() => setFeed((f) => f.filter((x) => x.id !== id)), 3600);
+  };
   const arsenal = req.setup.arsenal;
 
   /** Hand everything the engine has logged since last time to the film. */
@@ -298,8 +373,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const buildStage = (b: Battle, lib: Library | null, quality: Quality) => {
     const el = host.current!;
     stageRef.current?.dispose();
-    const s = new BattleStage(el, b, { quality, settings, lib, arsenal });
-    s.setHud(0.11, 0.3);
+    const s = new BattleStage(el, b, { quality, settings, lib, arsenal, onFeed: pushFeed });
+    s.setHud(0.15, 0.3);
     stageRef.current = s;
     return s;
   };
@@ -342,7 +417,15 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         if (b !== wasBusy) {
           wasBusy = b;
           setBusy(b);
-          if (!b && !battle.ended && battle.turn === 'blue') setBanner(`Round ${battle.round} · Your Turn`);
+          if (!b) setBars(strengths(battle));
+          if (!b && !battle.ended && battle.turn === 'blue') {
+            setBanner(`Round ${battle.round} · Your Turn`);
+            const now = counts(battle);
+            const killed = now.killed - tally0.current.killed;
+            const lost = now.lost - tally0.current.lost;
+            tally0.current = now;
+            setReport(battle.round > 1 ? (killed || lost ? [killed ? `${killed} knocked out` : '', lost ? `${lost} lost` : ''].filter(Boolean).join(' · ') : 'No losses either side') : null);
+          }
         }
         if (battle.ended && !b && !ended) ended = now;
         if (ended && now - ended > 700) {
@@ -355,7 +438,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       window.__arena = {
         arena: () => battleRef.current,
         toScreen: (x, y) => stageRef.current!.toScreen(x, y),
-        ready: () => !!stageRef.current && !stageRef.current.busy && battle.turn === 'blue' && !battle.ended,
+        ready: () => !!stageRef.current && !stageRef.current.busy && stageRef.current.settled && battle.turn === 'blue' && !battle.ended,
         win: () => {
           for (const u of battle.units) if (u.side === 'red') u.alive = false;
           battle.ended = 'won';
@@ -370,6 +453,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           stageRef.current?.skip();
         },
         perf: (reset) => stageRef.current?.perf(reset) ?? null,
+        overlay: () => stageRef.current?.overlayCounts() ?? null,
       };
     });
     const onResize = () => stageRef.current?.resize();
@@ -387,7 +471,13 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   useEffect(() => {
     if (!banner) return;
-    const t = setTimeout(() => setBanner(null), 1400);
+    const t = setTimeout(
+      () => {
+        setBanner(null);
+        setReport(null);
+      },
+      report ? 2400 : 1400,
+    );
     return () => clearTimeout(t);
   }, [banner]);
 
@@ -436,7 +526,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   // The camera brings the selected unit into view; a new turn starts with a ready unit selected.
   useEffect(() => {
-    if (me) stageRef.current?.focusOn(me);
+    if (me) {
+      stageRef.current?.recenter(me);
+      setOverview(false);
+    }
   }, [selected]);
   useEffect(() => {
     if (!myTurn || !b) return;
@@ -461,56 +554,86 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     return true;
   };
 
-  const tapCell = (p: Point) => {
-    if (!b || !myTurn) return;
+  /** Act on a tapped cell; false when the tap did nothing (so a second one zooms). */
+  const tapCell = (p: Point): boolean => {
+    if (!b || !myTurn) return false;
     if (mode.kind === 'ability') {
       doAct({ type: 'ability', id: mode.id, at: p });
-      return;
+      return true;
     }
     if (mode.kind === 'support') {
       setCard({ kind: 'support', asset: mode.asset, at: p });
-      return;
+      return true;
     }
     const there = unitAt(b, p.x, p.y) ?? unitAt(b, p.x, p.y, true);
     if (mode.kind === 'face' && me) {
       doAct({ type: 'face', unit: me.id, facing: Math.atan2(p.y - me.y, p.x - me.x) });
-      return;
+      return true;
     }
     if ((mode.kind === 'breach' || mode.kind === 'mine') && me) {
       doAct({ type: mode.kind, unit: me.id, at: p }, false);
-      return;
+      return true;
     }
     if (there?.side === 'blue' && !(mode.kind === 'strike')) {
       // Tapping your own carrier with infantry selected boards it.
       if (me && there.passengers !== undefined && typeOf(there.type).seats > 0 && typeOf(me.type).mobility === 'foot' && whyNot(b, { type: 'embark', unit: me.id, carrier: there.id }) === null) {
         doAct({ type: 'embark', unit: me.id, carrier: there.id }, false);
-        return;
+        return true;
       }
       setSelected(there.id);
       setCard(null);
       setDash(false);
-      return;
+      return true;
     }
-    if (!me) return;
+    if (!me) return false;
     if (there?.side === 'red' && visible.has(there.id) && mode.kind !== 'strike') {
       const t = targets.find((x) => x.unit.id === there.id);
-      if (!t) return;
+      if (!t) return false;
       if (card?.kind === 'fire' && card.target === there.id) doAct({ type: 'fire', unit: me.id, target: there.id, weapon: card.weapon }, false);
       else setCard({ kind: 'fire', target: there.id, weapon: t.info.weapon.id });
-      return;
+      return true;
     }
     if (mode.kind === 'strike' && indirect) {
       if (card?.kind === 'strike' && card.at.x === p.x && card.at.y === p.y) doAct({ type: 'strike', unit: me.id, at: p, weapon: indirect.id, smoke: card.smoke }, false);
       else if (strikeInfo(b, me, p, indirect, mode.smoke)) setCard({ kind: 'strike', at: p, smoke: mode.smoke });
-      return;
+      return true;
     }
     const r = dash ? dashReach : reach;
     if (r?.cost.has(p.y * b.map.w + p.x) && (p.x !== me.x || p.y !== me.y)) {
       doAct({ type: 'move', unit: me.id, to: p, ...(dash ? { dash: true } : {}) });
-      return;
+      return true;
     }
     setCard(null);
+    return false;
   };
+
+  /**
+   * A tap on the field. Badges and larger-than-life models stand above their cells, so a tap near
+   * one counts for that unit: an enemy you can shoot, else a move into the lit area, else a unit of
+   * yours. A second tap that does nothing, close to the first, zooms in there.
+   */
+  const tapAt = (x: number, y: number) => {
+    const stage = stageRef.current;
+    if (!stage || !b) return;
+    const c = stage.pick(x, y);
+    const near = stage.unitNear(x, y, 30);
+    const nearUnit = near ? b.units.find((u) => u.id === near) : undefined;
+    let done = false;
+    if (nearUnit && nearUnit.side === 'red' && targets.some((t) => t.unit.id === nearUnit.id) && mode.kind === 'none') done = tapCell(nearUnit);
+    else if (c && me && myTurn && mode.kind === 'none' && (dash ? dashReach : reach)?.cost.has(c.y * b.map.w + c.x) && !unitAt(b, c.x, c.y) && (c.x !== me.x || c.y !== me.y)) done = tapCell(c);
+    else if (nearUnit && nearUnit.side === 'blue' && mode.kind === 'none') done = tapCell(nearUnit);
+    else if (c) done = tapCell(c);
+    const now = performance.now();
+    const last = lastNoop.current;
+    if (!done && last && now - last.t < 380 && Math.hypot(x - last.x, y - last.y) < 40) {
+      stage.zoomBy(0.55, { x, y });
+      lastNoop.current = null;
+      return;
+    }
+    lastNoop.current = done ? null : { t: now, x, y };
+  };
+
+
 
   // One finger (or the mouse) drags the board, two pinch to zoom, twist to turn and slide to tilt;
   // right-drag orbits with a mouse. A press that does not move is a tap.
@@ -539,7 +662,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         const d = Math.hypot(m!.x - n!.x, m!.y - n!.y);
         const a = Math.atan2(n!.y - m!.y, n!.x - m!.x);
         const my = (m!.y + n!.y) / 2;
-        if (pinch.current.d > 0 && d > 0) stage.zoomBy(pinch.current.d / d);
+        if (pinch.current.d > 0 && d > 0) stage.zoomBy(pinch.current.d / d, { x: (m!.x + n!.x) / 2, y: my });
         stage.orbitBy(-(a - pinch.current.a), (my - pinch.current.my) * 0.004);
         pinch.current = { d, a, my };
       } else if (p.moved && (p.button === 2 || e.shiftKey)) stage.orbitBy(-dx * 0.006, dy * 0.004);
@@ -555,10 +678,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinch.current = null;
     if (!p || p.moved || p.button === 2) return;
-    const c = stageRef.current?.pick(e.clientX, e.clientY);
-    if (c) tapCell(c);
+    tapAt(e.clientX, e.clientY);
   };
-  const onWheel = (e: React.WheelEvent) => stageRef.current?.zoomBy(Math.exp(e.deltaY * 0.0012));
+  const onWheel = (e: React.WheelEvent) => stageRef.current?.zoomBy(Math.exp(e.deltaY * 0.0012), { x: e.clientX, y: e.clientY });
 
   const finishTurn = (auto = false) => {
     if (!b || !myTurn) return;
@@ -614,6 +736,18 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   if (me && b && myTurn) {
     const t = typeOf(me.type);
     const ok = (a: Action) => whyNot(b, a) === null;
+    // The best shot it has, one tap from the card (targets can be off screen).
+    const best = targets[0];
+    if (best && !me.acted)
+      actions.push({
+        id: 'best',
+        label: `Best Shot ${best.info.chance}%`,
+        on: () => {
+          setCard({ kind: 'fire', target: best.unit.id, weapon: best.info.weapon.id });
+          stageRef.current?.follow(best.unit.x + 0.5, best.unit.y + 0.5);
+        },
+        ok: true,
+      });
     if (!me.moved && !me.mobilityKill && t.move > 0) actions.push({ id: 'dash', label: 'Dash', on: () => setDash(!dash), ok: !me.acted, pressed: dash });
     if (indirect) {
       actions.push({ id: 'strike', label: 'Call Fire', on: () => setMode(mode.kind === 'strike' && !mode.smoke ? { kind: 'none' } : { kind: 'strike', smoke: false }), ok: !me.acted && (me.ammo[indirect.id] ?? 0) > 0, pressed: mode.kind === 'strike' && !mode.smoke });
@@ -697,6 +831,12 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             </svg>
           </button>
         </div>
+        {b && (
+          <div className="pointer-events-auto mx-2 mt-1 grid grid-cols-2 gap-2 rounded-xl bg-black/80 px-3 py-1.5 backdrop-blur" data-testid="arena-strength">
+            <Strength label="You" value={bars.blue} mark={BREAK_AT} side="blue" />
+            <Strength label="Them, as seen" value={bars.red} mark={WITHDRAW_AT} side="red" />
+          </div>
+        )}
         {battleMode === 'capture' && b && (
           <div className="mx-4 mt-1.5 flex gap-1" aria-label={`Holding the ground: ${b.capture} of ${CAPTURE_ROUNDS} rounds`}>
             {Array.from({ length: CAPTURE_ROUNDS }, (_, i) => (
@@ -707,10 +847,61 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       </header>
 
       {banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-[22%] z-10 text-center" data-testid="arena-banner">
+        <div className="pointer-events-none absolute inset-x-0 top-[22%] z-10 flex flex-col items-center gap-1.5 text-center" data-testid="arena-banner">
           <span className="rounded-full bg-white px-5 py-2 text-[17px] font-bold text-black shadow-lg">{banner}</span>
+          {report && (
+            <span className="rounded-full bg-black/85 px-4 py-1.5 text-[14px] font-semibold text-white" data-testid="arena-report">
+              {report}
+            </span>
+          )}
         </div>
       )}
+      {busy && ready && b && !myTurn && !b.ended && (
+        <div className="safe-bottom pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center">
+          <button type="button" onClick={() => stageRef.current?.skip()} className="v-btn v-btn-secondary pointer-events-auto mb-[118px] h-11 rounded-full px-5 text-[15px] font-semibold" data-testid="arena-skip">
+            Skip
+          </button>
+        </div>
+      )}
+      {feed.length > 0 && (
+        <div className="safe-top pointer-events-none absolute inset-x-0 top-0 z-10" data-testid="arena-feed">
+          <div className="mt-[124px] flex flex-col items-center gap-1 px-4">
+            {feed.map((f) => (
+              <div key={f.id} className={`feed-in max-w-full truncate rounded-full bg-black/85 px-3.5 py-1.5 text-[14px] font-semibold ${f.tone === 'bad' ? 'text-[#ffb4a8]' : 'text-white'}`}>
+                {f.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {ready && (
+        <div className="safe-top safe-x pointer-events-none absolute top-0 right-0 z-10" data-testid="arena-camera">
+          <div className="pointer-events-auto mt-[132px] mr-2 flex flex-col gap-2">
+            <CamButton label="Zoom In" testid="cam-in" onClick={() => stageRef.current?.zoomBy(0.65)}>
+              <path d="M12 5v14M5 12h14" />
+            </CamButton>
+            <CamButton label="Zoom Out" testid="cam-out" onClick={() => stageRef.current?.zoomBy(1 / 0.65)}>
+              <path d="M5 12h14" />
+            </CamButton>
+            <CamButton
+              label="Back to Selected Unit"
+              testid="cam-unit"
+              onClick={() => {
+                if (me) stageRef.current?.recenter(me);
+                setOverview(false);
+              }}
+            >
+              <circle cx="12" cy="12" r="6.5" />
+              <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" />
+            </CamButton>
+            <CamButton label={overview ? 'Back to Your View' : 'Whole Field'} testid="cam-overview" pressed={overview} onClick={() => setOverview(stageRef.current?.toggleOverview() ?? false)}>
+              <path d="M4 7.5 9 5l6 2.5L20 5v11.5L15 19l-6-2.5L4 19Z M9 5v11.5M15 7.5V19" />
+            </CamButton>
+          </div>
+        </div>
+      )}
+
       {mode.kind !== 'none' && (
         <div className="pointer-events-none absolute inset-x-0 top-[30%] z-10 text-center">
           <span className="rounded-full bg-black/85 px-4 py-2 text-[15px] font-semibold text-white">
