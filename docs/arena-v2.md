@@ -482,6 +482,20 @@ iPhone (Playwright, 390 x 844 at DPR 3, CPU throttled 4x): JavaScript frame time
 renderer draw calls and triangles; GPU time cannot be measured in this headless build (software
 WebGL) and is reported as unmeasured.
 
+Measured (2026-10-29, `ARENA_PERF=1 pnpm test:e2e arena-perf`, sampled while the
+camera pans after a 2 s settle; First Blood, 20 units, the smallest company size):
+
+| | Low | Balanced | High |
+|---|---|---|---|
+| Our frame time p50 | 9.1 ms | 12.1 ms | 13.5 ms |
+| Our frame time p95 | 17.4 ms | 30.4 ms | 61.4 ms |
+| Draw calls | 46 | 54 | 54 |
+| Triangles | 118k | 202k | 297k |
+| Battle opens in | 7.5 s | 11.2 s | 15.8 s |
+
+Every shader compiles before the battle shows (`BattleStage.warm`); that halved the p95. GPU time
+on a real iPhone is still unmeasured.
+
 ## 9. Migration (nothing is wiped)
 
 - **War-map contract**: `ArenaBattle { target, attackers, defenders, kept, won }` is unchanged.

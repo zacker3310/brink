@@ -9,13 +9,27 @@ const { userAgent } = devices['iPhone 13'];
 test.skip(!process.env.ARENA_PERF, 'set ARENA_PERF=1 to measure frame time');
 test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent });
 
-for (const quality of ['low', 'balanced', 'high'] as const) {
-  test(`frame time on an emulated iPhone 13, ${quality}`, async ({ page }) => {
+// First Blood is the smallest battle (10 a side, clear day); Last Stand the largest (16 a side,
+// winter fog), measured at the phone default.
+const RUNS = [
+  ['first-blood', 'low'],
+  ['first-blood', 'balanced'],
+  ['first-blood', 'high'],
+  ['last-stand', 'balanced'],
+] as const;
+
+for (const [skirmish, quality] of RUNS) {
+  test(`frame time on an emulated iPhone 13, ${skirmish}, ${quality}`, async ({ page }) => {
     test.setTimeout(900_000);
     await page.goto('./');
-    await page.evaluate((q) => localStorage.setItem('brink.arena.settings.v1', JSON.stringify({ quality: q, actionCams: true, radio: true })), quality);
+    await page.evaluate((q) => {
+      localStorage.setItem('brink.arena.settings.v1', JSON.stringify({ quality: q, actionCams: true, radio: true }));
+      // Every skirmish unlocked.
+      localStorage.setItem('brink.career.v1', JSON.stringify({ battles: 0, wins: 0, stars: 99, best: {}, warsWon: [] }));
+    }, quality);
+    await page.reload();
     await page.getByTestId('menu-skirmish').tap();
-    await page.getByTestId('skirmish-first-blood').tap();
+    await page.getByTestId(`skirmish-${skirmish}`).tap();
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     const t0 = Date.now();
@@ -36,7 +50,7 @@ for (const quality of ['low', 'balanced', 'high'] as const) {
     }
     await page.waitForTimeout(4000);
     const perf = (await page.evaluate(() => window.__arena!.perf()))!;
-    console.log(`frame time ${quality}: load ${load} ms, ${JSON.stringify(perf)}`);
+    console.log(`frame time ${skirmish} ${quality}: load ${load} ms, ${JSON.stringify(perf)}`);
     expect(perf.quality).toBe(quality);
     expect(perf.frames).toBeGreaterThan(5);
   });
