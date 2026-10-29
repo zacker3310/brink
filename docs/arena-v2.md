@@ -531,6 +531,49 @@ on a real iPhone is still unmeasured.
   44 px targets and 4.5:1 text contrast checked on every battle screen; battle from the war map on
   an emulated iPhone; frame-time probe.
 
+## 11. Play feel, navigation and difficulty (v2.1)
+
+Played on a 393 pt iPhone, v2 had these problems: tanks drew about 25 pt long and soldiers as specks;
+the camera opened high and nearly top-down; the move area was a 17% tint nobody saw; nothing said
+where the enemy was (the battle opened on "0 seen"); the brief said "Enemy Company 100%"; an action
+cam could end up inside a tree; and it was hard. v2.1 fixes the feel without touching the rules'
+numbers.
+
+**See it**
+- Units drawn larger than life: vehicles 1.4x, soldiers 2.2x. The cells and the rules are unchanged.
+- A badge over every unit you can see: its silhouette, its strength bar, and whether it is suppressed,
+  on overwatch or done this turn. Blue for yours, red for theirs (APP-6 affiliation, not decoration).
+  Badges stay the same size on screen at every zoom, so the field reads even zoomed right out.
+- The move area has a solid edge and a stronger fill; the dash area a dashed edge.
+- Where the enemy is expected (the defenders' deployment area, which the war map tells you) is marked
+  until first contact, and the objective always is.
+
+**Move round it**
+- The camera opens close on your first unit, lower and more side-on, and follows whoever you select.
+- Buttons for zoom in, zoom out, back to the selected unit, and a whole-field view (tap again to go
+  back). Pinch zooms toward the fingers; double tap zooms in on that spot. Zoom runs from one tank
+  filling the screen to the whole field.
+- Action cams never pass through ground, trees or buildings, and only fire on kills and big hits.
+
+**Feel it**
+- Every hit says what it did, over the target: Miss, Hit, Penetrated, Knocked Out, Two Down,
+  Suppressed, Pinned. Kills raise a line at the top ("Abrams 2 knocked out a T-72B3").
+- Two strength bars under the title: yours and theirs, with the mark where they break (35%) and
+  where you would (25%). Every hit moves them.
+- The enemy turn is shown: a banner, and the camera visits each thing they do.
+- A short round report before your turn: what you knocked out, what you lost.
+
+**Make it easier**
+- Difficulty for battles: Easy (default), Normal, Hard. War-map battles follow the campaign's
+  difficulty; skirmishes have their own choice. Easy gives your crews +15 to hit and theirs -15,
+  and the enemy fields a fifth fewer units; Normal +5 and -5; Hard is the rules as written with the
+  sharper AI. Measured with the AI's own planner in your seat: Easy should win at least 80%, Normal
+  about 55%, Hard about 35%.
+- Advice: every selected unit shows what a good commander would do with it (the AI's planner from
+  your side's view only) and Do It plays it.
+- Undo a move that revealed nothing and drew no dice (no enemy came into view, nobody fired).
+- The brief names what you know of the enemy (types seen, or an estimate of their size).
+
 ## Sources
 
 Specifications: General Dynamics Land Systems (M1A2 SEPv3, M1126 Stryker, M10 Booker), Krauss-Maffei
