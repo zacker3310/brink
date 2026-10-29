@@ -11,6 +11,10 @@ export interface A11yReport {
 }
 
 export async function auditScreen(page: Page): Promise<A11yReport> {
+  // Judge the screen at rest: wait for fades and slides (not endless loops) to finish.
+  await page
+    .waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity), null, { timeout: 8000 })
+    .catch(() => undefined);
   return page.evaluate(() => {
     const parse = (c: string): [number, number, number, number] => {
       const m = c.match(/rgba?\(([^)]+)\)/);
@@ -29,7 +33,12 @@ export async function auditScreen(page: Page): Promise<A11yReport> {
       if (r.width < 1 || r.height < 1) return false;
       if (r.bottom < 0 || r.right < 0 || r.top > innerHeight || r.left > innerWidth) return false;
       const s = getComputedStyle(el);
-      return s.visibility !== 'hidden' && s.display !== 'none';
+      if (s.visibility === 'hidden' || s.display === 'none') return false;
+      // Only what is on top where it stands: a screen under a full-screen sheet is not on show.
+      const x = Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2));
+      const y = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2));
+      const top = document.elementFromPoint(x, y);
+      return !!top && (top === el || el.contains(top) || top.contains(el));
     };
     const disabled = (el: Element) => !!el.closest('button:disabled, [aria-disabled="true"]');
     const small: string[] = [];

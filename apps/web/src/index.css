@@ -527,37 +527,41 @@ aside[data-testid^='panel-'] section:first-of-type > header {
   font-family: var(--font-mono);
   border-radius: 4px;
 }
-/* Buttons: white primary, hairline secondary. */
-.v-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  transition:
-    background-color 150ms,
-    border-color 150ms,
-    color 150ms;
-}
-.v-btn-primary {
-  background: #ededed;
-  color: #0a0a0a;
-}
-.v-btn-primary:hover {
-  background: #ffffff;
-}
-.v-btn-secondary {
-  background: #0a0a0a;
-  color: #ededed;
-  border: 1px solid #2e2e2e;
-}
-.v-btn-secondary:hover {
-  background: #1a1a1a;
-  border-color: #3d3d3d;
+/* Buttons: white primary, hairline secondary. In the components layer, so a button's own size and
+   type utilities win; never under the 44 pt touch target. */
+@layer components {
+  .v-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    transition:
+      background-color 150ms,
+      border-color 150ms,
+      color 150ms;
+  }
+  .v-btn-primary {
+    background: #ededed;
+    color: #0a0a0a;
+  }
+  .v-btn-primary:hover {
+    background: #ffffff;
+  }
+  .v-btn-secondary {
+    background: #0a0a0a;
+    color: #ededed;
+    border: 1px solid #2e2e2e;
+  }
+  .v-btn-secondary:hover {
+    background: #1a1a1a;
+    border-color: #3d3d3d;
+  }
 }
 .v-card {
   background: #0a0a0a;
