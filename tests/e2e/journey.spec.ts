@@ -83,9 +83,15 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.keyboard.press(' ');
   await expect(page.getByTestId('replay-pause')).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press(' ');
-  // Unpaused: it plays on (or, on a quiet turn, has already finished).
+  // Unpaused: it plays on (or, on a quiet turn, has already finished). Read in one go: the replay
+  // can end, and its button go, between a count and a read.
   await expect
-    .poll(async () => (await page.getByTestId('replay-pause').count()) === 0 || (await page.getByTestId('replay-pause').getAttribute('aria-pressed')) === 'false')
+    .poll(() =>
+      page.evaluate(() => {
+        const el = document.querySelector('[data-testid="replay-pause"]');
+        return !el || el.getAttribute('aria-pressed') === 'false';
+      }),
+    )
     .toBe(true);
   await expect(page.getByTestId('notifications')).toBeVisible();
   await page.getByTestId('open-report').click();

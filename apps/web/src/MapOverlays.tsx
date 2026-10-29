@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { HexKey } from '@brink/contracts';
 import { GOVERNMENTS, RIVER_ASSAULT_PENALTY, TERRAIN, UNITS } from '@brink/game-data';
 import { nationModifiers, previewAssault, previewStrike, threatZones } from '@brink/simulation';
@@ -165,6 +165,8 @@ function ReplayBar() {
   const playback = useGame((s) => s.playback)!;
   const finishPlayback = useGame((s) => s.finishPlayback);
   const { paused, speed, marks, progress } = useReplay();
+  // A replay closed while paused leaves the next one playing.
+  useEffect(() => () => useReplay.setState({ paused: false }), []);
   const steps = ['movement', 'combat', 'aftermath'] as const;
   const btn = 'border border-line px-2 py-1 text-[11px] text-muted hover:border-faint hover:text-text';
   return (

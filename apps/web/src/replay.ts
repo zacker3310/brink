@@ -323,7 +323,9 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
   let last = performance.now();
   let phase: Phase | null = null;
   let done = false;
-  useReplay.setState({ paused: false, seek: null, progress: 0, marks: { movement: tl.move[0], combat: tl.combat[0], aftermath: tl.after[0], end: tl.end } });
+  // A pause pressed while the replay was getting ready stands (it used to be undone here, so a
+  // second press paused it again). The pause is cleared when a replay ends, below.
+  useReplay.setState({ seek: null, progress: 0, marks: { movement: tl.move[0], combat: tl.combat[0], aftermath: tl.after[0], end: tl.end } });
 
   const frame = () => {
     if (done) return;
@@ -456,11 +458,14 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
 
     if (t >= tl.end) {
       done = true;
+      useReplay.setState({ paused: false });
       opts.onDone();
     }
   };
 
   app.ticker.add(frame);
+  // Torn down (the map restarts a replay when its art arrives): the pause stands. It is cleared
+  // when the replay ends, above, or is closed (the replay bars clear it as they go).
   return () => {
     done = true;
     app.ticker.remove(frame);

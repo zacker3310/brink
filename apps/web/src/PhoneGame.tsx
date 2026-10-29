@@ -305,6 +305,8 @@ function ReplayDock() {
   const playback = useGame((s) => s.playback)!;
   const finishPlayback = useGame((s) => s.finishPlayback);
   const { paused, speed, progress } = useReplay();
+  // A replay closed while paused leaves the next one playing.
+  useEffect(() => () => useReplay.setState({ paused: false }), []);
   const btn = 'flex h-11 min-w-11 items-center justify-center border border-line bg-ink-900 px-3 text-sm';
   return (
     <div className="pointer-events-auto relative border-t border-signal/60 bg-ink-950/95 px-3 pt-2.5" data-testid="replay" role="status">

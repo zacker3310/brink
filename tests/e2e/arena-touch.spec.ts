@@ -36,7 +36,9 @@ async function freeCellOnField(page: Page, t: { x: number; y: number }, offsets:
         const y = t.y + dy;
         if (x < 0 || y < 0 || x >= b.map.w || y >= b.map.h || b.units.some((u) => u.alive && !u.carrier && u.x === x && u.y === y)) continue;
         const at = window.__arena!.toScreen(x, y);
-        if (at.y > top && at.y < bottom && at.x > 12 && at.x < right) return { x, y, at };
+        // Not under a button (the camera buttons, an arrow at the edge): a tap there is the button's.
+        const over = document.elementFromPoint(at.x, at.y);
+        if (at.y > top && at.y < bottom && at.x > 12 && at.x < right && !over?.closest('button')) return { x, y, at };
       }
       return null;
     },
@@ -118,7 +120,9 @@ for (const size of SIZES) {
       // Now the move forward, aimed after the camera has come back to the tank.
       await page.getByTestId(`arena-unit-${tank.id}`).tap();
       await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 90_000 });
-      const ahead = await page.evaluate((c) => window.__arena!.toScreen(c.x, c.y), cell!);
+      const forward = await freeCellOnField(page, tank, ahead2);
+      expect(forward).not.toBeNull();
+      const ahead = forward!.at;
       // Tapping the same cell twice also goes.
       await page.touchscreen.tap(ahead.x, ahead.y);
       await expect(page.getByTestId('move-card')).toBeVisible();
