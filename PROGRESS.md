@@ -276,8 +276,9 @@ Updated 2026-10-30 (arena v2.3). Milestone 1 (first playable).
     and engineer orders that told of hidden units, Undo greyed by a hidden spotter, the film showing
     hidden shooters (and blue's picture missing shooters the film showed), the enemy's skill in
     blue's picture, and a move that could end on a cell its own side held.
-  - Tested: 221 arena and 62 web unit tests; both soaks (Easy 85%, Normal 60%, Hard 38%; rejected
-    AI actions 0); the matrix (0 genuine failures); the full e2e suite (result below when run).
+  - Tested: 221 arena and 63 web unit tests; both soaks (Easy 85%, Normal 60%, Hard 38%; rejected
+    AI actions 0); the matrix (0 genuine failures); the full e2e suite, 23 passed (13 specs, gestures,
+    touch and navigation at 375, 393 and 440 pt), the frame-time probes and the long leak run opt-in.
   - Not measured: anything on a real iPhone (GPU frame time, touch feel on glass, haptics, Safari
     memory pressure). The checklist is `docs/device-testing.md`.
 
