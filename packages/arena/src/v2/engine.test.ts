@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { decide, rejectedActions } from './ai';
+import { mulberry32 } from '../rng';
+import { advise, decide, playSide, rejectedActions } from './ai';
 import { fireInfo, penChance, usableWeapons } from './combat';
-import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, retreat, strikeInfo, undoable, UNDO_SAFE, unitById } from './engine';
+import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, retreat, strikeInfo, undoable, UNDO_SAFE, unitById, whyNot } from './engine';
 import { bare, BATTLES, copy, EAST, NORTH, put, setup, SOUTH, spec, unit, weapon } from './fixture.test-util';
 import { typeOf } from './roster';
 import { canSee, lineOfSight, visibleTo } from './sight';
-import { at, BUILDING, OPEN, RUBBLE, TREES, W, type Arsenal, type Battle } from './types';
+import { ABILITIES } from './rules';
+import { at, BUILDING, H, OPEN, ROUND_LIMIT, RUBBLE, TREES, W, type AbilityId, type Action, type Arsenal, type Battle } from './types';
 
 // Arena v2 rules, one mechanic at a time on a bare field, then whole battles on autopilot.
 
@@ -29,6 +31,35 @@ describe('state', () => {
   it('the same seed and actions give the same battle', () => {
     const make = () => autoBattle(createBattle(setup({ seed: 11, terrain: 'urban', site: 'city', attackers: [spec('a', ['m1a2', 'm1a2', 'stryker', 'squad_w', 'javelin', 'mortar_w'], 'mechanized')], defenders: [spec('x', ['t72b3', 'bmp3', 'squad_e', 'squad_e', 'rpg'], 'infantry')] })));
     expect(make().events).toEqual(make().events);
+  }, BATTLES);
+
+  it('holds replay exactly: the same seed, holds and orders give the same battle, saved mid-turn or not', () => {
+    const make = () => createBattle(setup({ seed: 11, terrain: 'urban', site: 'city', attackers: [spec('a', ['m1a2', 'm1a2', 'stryker', 'squad_w', 'javelin', 'mortar_w'], 'mechanized')], defenders: [spec('x', ['t72b3', 'bmp3', 'squad_e', 'squad_e', 'rpg'], 'infantry')] }));
+    const play = (saveAt: number) => {
+      let b = make();
+      let holds = 0;
+      for (let i = 0; i <= ROUND_LIMIT && !b.ended; i++) {
+        // A third of the company holds each turn, the crews play the rest.
+        b.units.forEach((u, k) => {
+          if (k % 3 !== i % 3 || b.ended || u.side !== 'blue' || !u.alive || u.acted || u.carrier) return;
+          expect(act(b, { type: 'hold', unit: u.id })).toBe(true);
+          holds++;
+        });
+        if (i === saveAt) b = JSON.parse(JSON.stringify(b)) as Battle;
+        playSide(b, 'blue');
+        endTurn(b);
+      }
+      return { b, holds };
+    };
+    const once = play(-1);
+    const again = play(-1);
+    const saved = play(2);
+    expect(once.holds).toBeGreaterThan(3);
+    expect(once.b.ended).not.toBeNull();
+    expect(again.b.events).toEqual(once.b.events);
+    expect(saved.b.events).toEqual(once.b.events);
+    expect(arenaResult(saved.b)).toEqual(arenaResult(once.b));
+    expect(rejectedActions(once.b)).toEqual([]);
   }, BATTLES);
 
   it('a company a side: formations become 10 to 16 units', () => {
@@ -535,6 +566,110 @@ describe('undo', () => {
     for (const k of ['fire', 'intercept', 'impact', 'casualties', 'suppressed', 'destroyed', 'boom', 'mine', 'spotted', 'lost', 'turn', 'end'] as const) expect(UNDO_SAFE[k], k).toBe(false);
     for (const k of ['move', 'face', 'embark', 'dismount'] as const) expect(UNDO_SAFE[k], k).toBe(true);
   });
+});
+
+describe('hold', () => {
+  it('marks a unit done for the turn and nothing else: no roll, no event, safe to take back', () => {
+    const b = bare(['m1a2', 'squad_w'], ['t90m']);
+    const tank = put(unit(b, 'm1a2'), 15, 44, NORTH);
+    const squad = put(unit(b, 'squad_w'), 10, 44);
+    put(unit(b, 't90m', 'red'), 3, 0, SOUTH);
+    const before = copy(b);
+    expect(whyNot(b, { type: 'hold', unit: tank.id })).toBeNull();
+    expect(act(b, { type: 'hold', unit: tank.id })).toBe(true);
+    expect(tank).toMatchObject({ acted: true, moved: false, overwatch: false, hunker: false, x: 15, y: 44, facing: NORTH });
+    expect(b.events).toHaveLength(before.events.length);
+    expect(b.stream).toBe(before.stream);
+    expect(undoable(before, b)).toBe(true);
+    // Nothing else in the battle moved.
+    const marked = copy(before);
+    unitById(marked, tank.id)!.acted = true;
+    expect(b).toEqual(marked);
+    // Done: it cannot hold, move or turn again this turn; the others still can.
+    expect(whyNot(b, { type: 'hold', unit: tank.id })).toBe('Done this turn');
+    expect(canAct(b, { type: 'move', unit: tank.id, to: { x: 15, y: 42 } })).toBe(false);
+    expect(canAct(b, { type: 'face', unit: tank.id, facing: EAST })).toBe(false);
+    // A unit that has moved can still hold.
+    expect(act(b, { type: 'move', unit: squad.id, to: { x: 10, y: 42 } })).toBe(true);
+    const moved = copy(b);
+    expect(act(b, { type: 'hold', unit: squad.id })).toBe(true);
+    expect(undoable(moved, b)).toBe(true);
+    // Its next turn it is ready again.
+    endTurn(b);
+    expect(b.turn).toBe('blue');
+    expect(tank.acted).toBe(false);
+  });
+
+  it('only for a unit of the side whose turn it is, on the field', () => {
+    const b = bare(['m2a3', 'squad_w'], ['t90m']);
+    const ifv = put(unit(b, 'm2a3'), 15, 44, NORTH);
+    const rider = put(unit(b, 'squad_w'), 16, 44);
+    const them = put(unit(b, 't90m', 'red'), 3, 0, SOUTH);
+    expect(whyNot(b, { type: 'hold', unit: them.id })).toBe('Not your unit');
+    expect(act(b, { type: 'embark', unit: rider.id, carrier: ifv.id })).toBe(true);
+    expect(whyNot(b, { type: 'hold', unit: rider.id })).toBe('Aboard a carrier');
+    expect(whyNot(b, { type: 'hold', unit: ifv.id })).toBeNull();
+    b.turn = 'red';
+    expect(whyNot(b, { type: 'hold', unit: ifv.id }, 'blue')).toBe('Not your turn');
+  });
+});
+
+describe('commands', () => {
+  it('asking changes nothing, and an action the rules refuse changes nothing at all', () => {
+    const b = createBattle(setup({ seed: 5, terrain: 'forest', site: 'city', abilities: ['airstrike', 'sweep'], attackers: [spec('a', ['m1a2', 'm2a3', 'squad_w', 'squad_w', 'mortar_w', 'engineer_w', 'medic_w', 'm88', 'fpv_w'])], defenders: [spec('x', ['t90m', 'bmp3', 'squad_e', 'kornet', 'tunguska'])] }));
+    autoTurn(b);
+    // Some done, some moved, some ready: a turn part played.
+    for (const u of b.units.filter((x) => x.side === 'blue').slice(0, 3)) for (const a of advise(b, u.id)) if (!act(b, a)) break;
+    const r = mulberry32(99);
+    const pick = <T>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]!;
+    const ids = [...b.units.map((u) => u.id), 'nobody'];
+    const cell = () => ({ x: Math.floor(r() * (W + 4)) - 2, y: Math.floor(r() * (H + 4)) - 2 });
+    const weaponOf = (id: string) => pick([...(b.units.find((u) => u.id === id) ? typeOf(b.units.find((u) => u.id === id)!.type).weapons.map((w) => w.id) : []), 'nothing']);
+    const random = (): Action => {
+      const u = pick(ids);
+      switch (pick(['move', 'face', 'fire', 'strike', 'support', 'overwatch', 'hunker', 'hold', 'smoke', 'embark', 'dismount', 'split', 'merge', 'treat', 'repair', 'breach', 'mine', 'ability'] as const)) {
+        case 'move':
+          return { type: 'move', unit: u, to: cell(), ...(r() < 0.3 ? { dash: true } : {}) };
+        case 'face':
+          return { type: 'face', unit: u, facing: r() * 7 - 3.5 };
+        case 'fire':
+          return { type: 'fire', unit: u, target: pick(ids), weapon: weaponOf(u) };
+        case 'strike':
+          return { type: 'strike', unit: u, at: cell(), weapon: weaponOf(u), ...(r() < 0.3 ? { smoke: true } : {}) };
+        case 'support':
+          return { type: 'support', asset: pick(['himars', 'tornado'] as const), at: cell() };
+        case 'smoke':
+          return r() < 0.5 ? { type: 'smoke', unit: u } : { type: 'smoke', unit: u, at: cell() };
+        case 'embark':
+          return { type: 'embark', unit: u, carrier: pick(ids) };
+        case 'merge':
+          return { type: 'merge', unit: u, with: pick(ids) };
+        case 'treat':
+        case 'repair':
+          return { type: pick(['treat', 'repair'] as const), unit: u, target: pick(ids) };
+        case 'breach':
+        case 'mine':
+          return { type: pick(['breach', 'mine'] as const), unit: u, at: cell() };
+        case 'ability':
+          return { type: 'ability', id: pick(Object.keys(ABILITIES) as AbilityId[]), ...(r() < 0.5 ? { unit: u } : {}), ...(r() < 0.5 ? { at: cell() } : {}) };
+        default:
+          return { type: pick(['overwatch', 'hunker', 'hold', 'dismount', 'split'] as const), unit: u };
+      }
+    };
+    let refused = 0;
+    for (let i = 0; i < 400; i++) {
+      const a = random();
+      const side = r() < 0.15 ? 'red' : 'blue';
+      const before = JSON.stringify(b);
+      const why = whyNot(b, a, side);
+      expect(JSON.stringify(b)).toBe(before);
+      if (why === null) continue;
+      expect(act(b, a, side), JSON.stringify(a)).toBe(false);
+      expect(JSON.stringify(b), JSON.stringify(a)).toBe(before);
+      refused++;
+    }
+    expect(refused).toBeGreaterThan(200);
+  }, BATTLES);
 });
 
 describe('AI', () => {

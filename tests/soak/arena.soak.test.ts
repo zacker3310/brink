@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Terrain, UnitClass } from '@brink/contracts';
-import { arenaResult, autoBattle, createBattle, DIFFICULTY, FEWEST_ENEMIES, rejectedActions, typeOf, type Arsenal, type ArenaSetup, type Battle, type Difficulty, type SiteKind, type UnitSpec } from '@brink/arena';
+import { act, arenaResult, autoBattle, createBattle, DIFFICULTY, endTurn, FEWEST_ENEMIES, playSide, rejectedActions, ROUND_LIMIT, typeOf, type Arsenal, type ArenaSetup, type Battle, type Difficulty, type SiteKind, type UnitSpec } from '@brink/arena';
 import { mulberry32 } from '@brink/arena';
 
 // Arena v2 soak: AI against AI over many battles across arsenals, biomes, times and weather.
@@ -157,5 +157,30 @@ describe(`arena soak (${SETUPS} setups at ${LEVELS.length} difficulties)`, () =>
       expect(by.difficulty!.easy![0]).toBeGreaterThan(by.difficulty!.normal![0]);
       expect(by.difficulty!.normal![0]).toBeGreaterThan(by.difficulty!.hard![0]);
     }
+  });
+
+  it('a player who holds part of the company each turn: every hold is taken, the AI still breaks no rule', () => {
+    let rejected = 0;
+    let holds = 0;
+    let refusedHolds = 0;
+    const n = Math.min(SETUPS, 20);
+    for (let seed = 1; seed <= n; seed++) {
+      const b = createBattle({ ...setupFor(seed), difficulty: LEVELS[seed % LEVELS.length]! });
+      for (let i = 0; i <= ROUND_LIMIT && !b.ended; i++) {
+        b.units.forEach((u, k) => {
+          if (k % 3 !== i % 3 || b.ended || u.side !== 'blue' || !u.alive || u.acted || u.carrier) return;
+          holds++;
+          if (!act(b, { type: 'hold', unit: u.id })) refusedHolds++;
+        });
+        playSide(b, 'blue');
+        endTurn(b);
+      }
+      expect(invariants(b), `seed ${seed}`).toEqual([]);
+      rejected += rejectedActions(b).length;
+    }
+    console.log('holds', holds, 'refused holds', refusedHolds, 'rejected AI actions with holds', rejected);
+    expect(holds).toBeGreaterThan(n);
+    expect(refusedHolds).toBe(0);
+    expect(rejected).toBe(0);
   });
 });

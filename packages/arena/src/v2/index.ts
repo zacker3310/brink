@@ -11,3 +11,5 @@ export * from './ai';
 export * from './insight';
 export * from './replay';
 export * from './observe';
+export * from './report';
+export * from './rewind';

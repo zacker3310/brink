@@ -456,6 +456,8 @@ export type Action =
   | { type: 'support'; asset: SupportAsset['id']; at: Point }
   | { type: 'overwatch'; unit: string }
   | { type: 'hunker'; unit: string }
+  /** Done for this turn as it stands: no roll, no event (so End Turn does not count it as waiting). */
+  | { type: 'hold'; unit: string }
   /** Vehicle smoke grenades (a screen ahead) or engineer smoke pots (`at`: an adjacent cell). */
   | { type: 'smoke'; unit: string; at?: Point }
   | { type: 'embark'; unit: string; carrier: string }

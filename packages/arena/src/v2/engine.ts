@@ -599,6 +599,8 @@ export function whyNot(b: Battle, a: Action, side: Side = b.turn): string | null
       return broken ? 'Broken' : usableWeapons(u).some((w) => !w.indirect) ? null : 'Nothing to watch with';
     case 'hunker':
       return t.mobility === 'foot' ? null : 'Infantry only';
+    case 'hold':
+      return null;
     case 'smoke':
       if (t.engineer) return (u.smoke.pots ?? 0) > 0 && fitMen(u) > 0 ? null : 'No smoke pots';
       return (u.smoke.grenades ?? 0) > 0 && isVehicle(t) ? null : 'No smoke';
@@ -691,6 +693,9 @@ export function act(b: Battle, a: Action, side: Side = b.turn): boolean {
         break;
       case 'hunker':
         u.hunker = true;
+        u.acted = true;
+        break;
+      case 'hold':
         u.acted = true;
         break;
       case 'smoke':
@@ -1052,7 +1057,7 @@ export function autoBattle(b: Battle, limit = ROUND_LIMIT + 1): Battle {
 
 /**
  * Which events leave a step safe to take back. Safe: a unit moving (and the walls its tracks flatten),
- * turning, embarking or dismounting, and their radio calls; overwatch and hunker log nothing. Unsafe:
+ * turning, embarking or dismounting, and their radio calls; overwatch, hunker and hold log nothing. Unsafe:
  * anything that rolled or showed the player something (fire, intercept, impact, casualties,
  * suppressed, destroyed, boom, mine, crater, and the player's own spotted and lost), or that did
  * more than move a unit (smoke, split, merge, treat, repair, ability, turn, capture, end). The
@@ -1100,7 +1105,7 @@ const ghostsOf = (b: Battle) =>
  * Can the player take back the step from `before` to `after` (a snapshot taken before one action)?
  * Only when it drew no dice (the stream is unchanged), showed nothing (blue sees the same enemies,
  * its last known positions are as they were, no enemy was bumped into, no unsafe event was logged:
- * see UNDO_SAFE), and was a move, face, overwatch, hunker, embark or dismount in the same turn.
+ * see UNDO_SAFE), and was a move, face, overwatch, hunker, hold, embark or dismount in the same turn.
  */
 export function undoable(before: Battle, after: Battle): boolean {
   if (before.ended || after.ended || before.turn !== 'blue' || after.turn !== 'blue' || before.turnIndex !== after.turnIndex) return false;
