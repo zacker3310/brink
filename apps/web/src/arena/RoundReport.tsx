@@ -3,7 +3,8 @@ import type { NewsRow, RoundNews } from './report';
 
 /**
  * The round report under the round banner: the line, then each unit something happened to, yours
- * first. `children` go beside Done (more actions, such as opening the battle log).
+ * first, clear of the camera buttons down the right edge. `children` go beside Done (more actions,
+ * such as opening the battle log).
  */
 export function RoundReport({ news, onClose, children }: { news: RoundNews; onClose: () => void; children?: ReactNode }) {
   const groups: [string, NewsRow[]][] = [
@@ -11,7 +12,7 @@ export function RoundReport({ news, onClose, children }: { news: RoundNews; onCl
     ['Theirs, as Seen', news.rows.filter((r) => r.side === 'red')],
   ];
   return (
-    <div className="pointer-events-auto w-[22rem] max-w-[calc(100%-2rem)] rounded-2xl bg-black/85 px-4 pt-3 pb-2 text-left text-white shadow-lg backdrop-blur" role="status" data-testid="arena-report">
+    <div className="pointer-events-auto mr-auto ml-4 w-[22rem] max-w-[calc(100%-4.5rem)] rounded-2xl bg-black/85 px-4 pt-3 pb-2 text-left text-white shadow-lg backdrop-blur" role="status" data-testid="arena-report">
       <div className="text-[15px] font-semibold" data-testid="arena-report-summary">
         {news.summary}
       </div>

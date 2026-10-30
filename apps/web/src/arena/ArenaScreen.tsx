@@ -1474,7 +1474,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 [
                   ['actionCams', 'Action Cams', 'Short close-ups on big hits'],
                   ['radio', 'Radio Calls', 'Your crews call contacts and kills'],
-                  ['fastEnemy', 'Fast Enemy Turns', 'Their turn at double speed, without the waits'],
+                  ['fastEnemy', 'Fast Enemy Turns', 'Double speed, without the waits'],
                   ['endSheet', 'Ask Before Ending Turn', 'When units have not acted'],
                   ['tips', 'Tips', 'A word when the board shows a mistake'],
                   ['haptics', 'Haptics', 'A tick on Fire and End Turn'],

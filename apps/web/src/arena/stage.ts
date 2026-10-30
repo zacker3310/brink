@@ -1025,7 +1025,12 @@ export class BattleStage {
   /** Words over a unit, as the film reaches the moment; `group` words over one unit replace each other. */
   private say(v: View | undefined, text: string, tone: Tone, weight: Weight = 'major', group = ''): void {
     if (!v) return;
-    this.hudLayer.callout(text, tone, () => (v.holder.visible || !v.alive ? this.badgePoint(v) : null), v.id, weight, group);
+    // Over a unit off the screen a word is not shown (and gives way first).
+    const anchor = () => {
+      const at = v.holder.visible || !v.alive ? this.badgePoint(v) : null;
+      return at && at.x > -40 && at.y > -40 && at.x < this.host.clientWidth + 40 && at.y < this.host.clientHeight + 40 ? at : null;
+    };
+    this.hudLayer.callout(text, tone, anchor, v.id, weight, group);
   }
 
   /** Good news when it happens to them, bad when it happens to us. */

@@ -55,6 +55,8 @@ interface Callout {
   key: string;
   /** Words of one group over one unit replace each other ("2 Down" then "3 Down"). */
   group: string;
+  /** Its unit is off the screen: not shown, and the first to give way. */
+  off: boolean;
 }
 
 /** Seconds a word stays, by weight. */
@@ -205,7 +207,7 @@ export class FieldHud {
       return;
     }
     if (this.callouts.length >= MAX_WORDS) {
-      const give = this.callouts.find((c) => c.weight === 'minor') ?? (weight === 'minor' ? undefined : (this.callouts.find((c) => c.weight === 'major') ?? this.callouts[0]));
+      const give = this.callouts.find((c) => c.off) ?? this.callouts.find((c) => c.weight === 'minor') ?? (weight === 'minor' ? undefined : (this.callouts.find((c) => c.weight === 'major') ?? this.callouts[0]));
       if (!give) return;
       give.el.remove();
       this.callouts.splice(this.callouts.indexOf(give), 1);
@@ -219,7 +221,7 @@ export class FieldHud {
     this.el.appendChild(el);
     const stack = key ? this.callouts.filter((c) => c.key === key && this.clock - c.born < 0.6).length : 0;
     if (key) el.dataset.key = key;
-    this.callouts.push({ el, anchor, born: this.clock, stack, weight, key, group });
+    this.callouts.push({ el, anchor, born: this.clock, stack, weight, key, group, off: false });
   }
 
   /** A label pinned to a place on the ground; null removes it. */
@@ -255,6 +257,7 @@ export class FieldHud {
         return false;
       }
       const at = c.anchor();
+      c.off = !at;
       if (!at) {
         c.el.style.display = 'none';
         return true;
