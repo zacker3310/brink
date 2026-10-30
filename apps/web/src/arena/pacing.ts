@@ -132,8 +132,8 @@ const DOWN_AFTER = 60;
 const UP_AFTER = 180;
 /** Up and down moves that reverse each other before it stops climbing. */
 const FLIPS = 2;
-/** Intervals over this are pauses (a tab switch, a hitch), not frame rate. */
-const OUTLIER_MS = 250;
+/** Intervals over this are pauses (a tab switch, the page coming back), not frame rate. */
+const OUTLIER_MS = 1000;
 const LOW_POWER_MS = 1000 / 30;
 /** The rate it aims for: 60 a second (Safari's rate even on 120 Hz screens; a faster screen is a bonus). */
 const VSYNC_MS = 1000 / 60;

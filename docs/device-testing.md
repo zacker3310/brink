@@ -21,7 +21,7 @@ that it survives a lost GPU context and a closed page, and that nothing leaks ac
   a second. The shadow map is redrawn only when a shadow caster or the sun's frame moved.
 - **Adaptive pixel ratio.** It starts at the quality's cap (Low 1, Balanced 1.6, High 2, never above
   the device's own) and steps down 0.2 (0.4 when frames take over twice as long as they should)
-  when the median of the last 60 real frame intervals is over 20.8 ms, to no lower than 1. It
+  when the median of the last 60 real frame intervals is over 20.8 ms (intervals over a second are pauses, not frames), to no lower than 1. It
   steps back up when the last 180 intervals keep 60 a second, and stops climbing after it has
   turned back on itself twice ("Frozen"). A steady 33 ms cadence is read as Low Power Mode (iOS
   caps animation frames at 30 a second there) and holds the ratio rather than lowering it.

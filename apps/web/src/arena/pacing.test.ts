@@ -33,8 +33,9 @@ describe('the pixel ratio', () => {
     expect(feed(new RatioGovernor(3, 2), 60, 600)).toEqual([1.6, 1.2, 1]);
   });
 
-  it('takes pauses (a tab switch, a hitch) for pauses, not frame rate', () => {
-    expect(feed(new RatioGovernor(3, 1.6), 900, 300)).toEqual([]);
+  it('takes pauses (a tab switch) for pauses, not frame rate; very slow frames still count', () => {
+    expect(feed(new RatioGovernor(3, 1.6), 1500, 300)).toEqual([]);
+    expect(feed(new RatioGovernor(3, 1.6), 600, 300)).toEqual([1.2, 1]);
   });
 
   it('steps back up when frames keep 60 a second, and stops climbing after turning back twice', () => {
