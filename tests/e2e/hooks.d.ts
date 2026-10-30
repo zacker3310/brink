@@ -61,5 +61,7 @@ interface Window {
     film(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number } | null;
     /** The field's palette, who wears an outline, and how many hull meshes are drawn. */
     look(): { palette: 'standard' | 'colourblind'; selected: string | null; target: string | null; hulls: number } | null;
+    /** The cells (y * w + x) the selected unit can be tapped to move to now. */
+    reach(): number[];
   };
 }

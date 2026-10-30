@@ -54,6 +54,8 @@ export interface ArenaSettings {
   endSheet: boolean;
   /** Frame time, pixel ratio and draw calls over the battle, for measuring on a device. */
   perfOverlay: boolean;
+  /** Camera buttons down the left edge, and End Turn and Undo at the left of the footer. */
+  leftHanded: boolean;
 }
 
 export type Motion = 'full' | 'reduced' | 'off';
@@ -89,6 +91,7 @@ export function defaultSettings(): ArenaSettings {
     tips: true,
     endSheet: true,
     perfOverlay: false,
+    leftHanded: false,
   };
 }
 
@@ -111,6 +114,7 @@ export function readSettings(): ArenaSettings {
       tips: typeof s.tips === 'boolean' ? s.tips : base.tips,
       endSheet: typeof s.endSheet === 'boolean' ? s.endSheet : base.endSheet,
       perfOverlay: typeof s.perfOverlay === 'boolean' ? s.perfOverlay : base.perfOverlay,
+      leftHanded: typeof s.leftHanded === 'boolean' ? s.leftHanded : base.leftHanded,
     };
   } catch {
     return base;
