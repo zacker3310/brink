@@ -1,6 +1,6 @@
 import { act, autoTurn, createBattle, endTurn, retreat } from './engine';
-import { ABILITIES } from './rules';
-import { H, W, type Action, type ArenaSetup, type Battle, type Point } from './types';
+import { wellFormed } from './orders';
+import { type Action, type ArenaSetup, type Battle } from './types';
 
 // The player's command log (docs/architecture.md, Battles). A battle is a pure function of its
 // setup and the commands the player gave that were accepted: the enemy's turns and Let Crews Play
@@ -11,51 +11,7 @@ import { H, W, type Action, type ArenaSetup, type Battle, type Point } from './t
 /** What the player can do: an order to a unit or the side, End Turn, Let Crews Play, or Retreat. */
 export type PlayerCommand = { type: 'act'; action: Action } | { type: 'end' } | { type: 'auto' } | { type: 'retreat' };
 
-const isCell = (p: unknown): p is Point => {
-  const q = p as Point | null;
-  return typeof q === 'object' && q !== null && Number.isInteger(q.x) && Number.isInteger(q.y) && q.x >= 0 && q.y >= 0 && q.x < W && q.y < H;
-};
-const isId = (s: unknown): s is string => typeof s === 'string' && s.length > 0;
-const isFlag = (v: unknown) => v === undefined || typeof v === 'boolean';
-
-/** The shape of an order: known kind, ids as strings, points on cells of the field, a finite facing. */
-export function wellFormed(a: unknown): a is Action {
-  if (typeof a !== 'object' || a === null) return false;
-  const x = a as Record<string, unknown>;
-  switch (x.type) {
-    case 'move':
-      return isId(x.unit) && isCell(x.to) && isFlag(x.dash);
-    case 'face':
-      return isId(x.unit) && typeof x.facing === 'number' && Number.isFinite(x.facing);
-    case 'fire':
-      return isId(x.unit) && isId(x.target) && isId(x.weapon);
-    case 'strike':
-      return isId(x.unit) && isCell(x.at) && isId(x.weapon) && isFlag(x.smoke);
-    case 'support':
-      return (x.asset === 'himars' || x.asset === 'tornado') && isCell(x.at);
-    case 'overwatch':
-    case 'hunker':
-    case 'dismount':
-    case 'split':
-      return isId(x.unit);
-    case 'smoke':
-      return isId(x.unit) && (x.at === undefined || isCell(x.at));
-    case 'embark':
-      return isId(x.unit) && isId(x.carrier);
-    case 'merge':
-      return isId(x.unit) && isId(x.with);
-    case 'treat':
-    case 'repair':
-      return isId(x.unit) && isId(x.target);
-    case 'breach':
-    case 'mine':
-      return isId(x.unit) && isCell(x.at);
-    case 'ability':
-      return typeof x.id === 'string' && Object.hasOwn(ABILITIES, x.id) && (x.unit === undefined || isId(x.unit)) && (x.at === undefined || isCell(x.at));
-    default:
-      return false;
-  }
-}
+export { wellFormed } from './orders';
 
 /**
  * Apply one player command through the engine (`act` for blue, `endTurn`, `autoTurn`, `retreat`)

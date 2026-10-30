@@ -16,7 +16,7 @@ import { arenaSetup, blueUnits, change, CHANGES, copyBattle, family, knownLeak, 
 // blue; the dice; what red units in sight carry), and every reading from blue's seat must be the
 // same. Leaks found are reported defects, pinned below with fixtures that reproduce them.
 
-/** Battles at a few points each: the start of a player turn, and in the middle of one. Built once. */
+/** Battles at a few points each: the start of player turns, and the middle of one. Built once. */
 let built: { b: Battle; at: string }[] | null = null;
 function points(): { b: Battle; at: string }[] {
   if (built) return built;
@@ -36,6 +36,10 @@ function points(): { b: Battle; at: string }[] {
     playTurn(p, b);
     playTurn(p, b, undefined, 6);
     if (!b.ended) out.push({ b: copyBattle(b), at: `setup ${80 + i}, turn 3 after 6 orders` });
+    // Later, with more contacts and more hidden units able to move: every kind of change gets tried.
+    playTurn(p, b);
+    playTurn(p, b);
+    if (!b.ended) out.push({ b: copyBattle(b), at: `setup ${80 + i}, turn 4` });
   });
   built = out;
   return out;
@@ -191,7 +195,7 @@ describe('fog: leaks found (reported defects)', () => {
     expect(visibleTo(f.b, 'blue').has(f.them.id)).toBe(false);
     expect(f.at(f.them.id)).not.toBeNull();
   });
-  it.fails('refusing a shot at someone out of sight says the same as at someone who is not there', () => {
+  it('refusing a shot at someone out of sight says the same as at someone who is not there', () => {
     const f = outOfSight();
     expect(f.at(f.them.id)).toBe(f.at('nobody:1'));
   });
@@ -209,7 +213,7 @@ describe('fog: leaks found (reported defects)', () => {
   it('fixture: the mine is hidden from blue', () => {
     expect(hashBattle(sapper(true)[2])).toBe(hashBattle(sapper(false)[2]));
   });
-  it.fails('an engineer’s orders next to it do not tell where a hidden mine is', () => {
+  it('an engineer’s orders next to it do not tell where a hidden mine is', () => {
     expect(sapper(true).slice(0, 2)).toEqual(sapper(false).slice(0, 2));
   });
 

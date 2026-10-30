@@ -1,4 +1,5 @@
 import { pickConditions } from './conditions';
+import { wellFormed } from './orders';
 import { blast, blueSees, bestFire, difficultyPart, fireInfo, fitMen, freeCellNear, kill, rankAim, roll, shoot, suppLevel, suppress, usableWeapons, woundedMen, type FireInfo } from './combat';
 import { buildForce, type UnitSeed } from './forces';
 import { canStep, passable, buildMap } from './map';
@@ -544,6 +545,7 @@ function screenCells(u: Unit): Point[] {
 
 /** Why an action cannot be taken now, or null when it can. The UI greys out what it cannot do. */
 export function whyNot(b: Battle, a: Action, side: Side = b.turn): string | null {
+  if (!wellFormed(a)) return 'Not an order';
   if (b.ended) return 'The battle is over';
   if (b.turn !== side) return 'Not your turn';
   if (a.type === 'ability') {
@@ -586,10 +588,11 @@ export function whyNot(b: Battle, a: Action, side: Side = b.turn): string | null
       return t.mobility === 'foot' || isFlying(t) ? 'Not needed' : u.moved ? 'Already moved' : u.mobilityKill ? 'Immobilised' : null;
     case 'fire': {
       const w = weaponOf(u, a.weapon);
-      const target = unitById(b, a.target);
-      if (!w || !target) return 'No such weapon';
+      if (!w) return 'No such weapon';
       if (!usableWeapons(u).includes(w)) return 'Weapon unavailable';
-      return fireInfo(b, u, target, w) ? null : 'No shot';
+      // The same answer for a unit out of sight as for one that is not there: no telling them apart.
+      const target = unitById(b, a.target);
+      return target && fireInfo(b, u, target, w) ? null : 'No shot';
     }
     case 'strike': {
       const w = weaponOf(u, a.weapon);
@@ -633,14 +636,16 @@ export function whyNot(b: Battle, a: Action, side: Side = b.turn): string | null
       const o = unitById(b, a.target);
       return t.repair && o && onField(o) && o.side === side && o.id !== u.id && cheb(u, o) <= 1 && (o.mobilityKill || o.firepowerKill) ? null : 'Nothing to repair next to it';
     }
-    case 'breach': {
-      if (!t.engineer || fitMen(u) < 2 || cheb(u, a.at) !== 1 || !inside(a.at.x, a.at.y)) return 'Next to it, with engineers';
-      const c = b.map.cells[at(b.map, a.at.x, a.at.y)];
-      return c === BUILDING || c === WALL || c === ROCK || b.mines.some((m) => m.x === a.at.x && m.y === a.at.y) ? null : 'Nothing to breach';
-    }
+    case 'breach':
+      // Any cell next to it: a wall, rock or building is blown; open ground is swept for mines. (It
+      // was allowed on open ground only where a mine lay, which told the player where hidden mines were.)
+      return t.engineer && fitMen(u) >= 2 && cheb(u, a.at) === 1 && inside(a.at.x, a.at.y) ? null : 'Next to it, with engineers';
     case 'mine': {
       if (!t.engineer || (u.ammo.mines ?? 0) <= 0 || cheb(u, a.at) !== 1 || !inside(a.at.x, a.at.y)) return 'Next to it, with engineers';
-      if (!passable(b.map, a.at.x, a.at.y, 'tracked') || unitAt(b, a.at.x, a.at.y) || b.mines.some((m) => m.x === a.at.x && m.y === a.at.y)) return 'Cannot mine there';
+      // Refused only for what this side knows is there; what it cannot see is found in the doing.
+      const known = visibleTo(b, side);
+      const there = unitAt(b, a.at.x, a.at.y);
+      if (!passable(b.map, a.at.x, a.at.y, 'tracked') || (there && (there.side === side || known.has(there.id))) || b.mines.some((m) => m.side === side && m.x === a.at.x && m.y === a.at.y)) return 'Cannot mine there';
       return null;
     }
   }
@@ -783,21 +788,36 @@ export function act(b: Battle, a: Action, side: Side = b.turn): boolean {
           if (inside_) {
             blast(b, a.at, { lethality: 3, pen: 0, supp: 70, demo: 0, radius: 0, crater: false, kind: 'he' }, u.side);
           }
-        } else {
+        } else if (c === WALL || c === ROCK) {
           b.map.cells[i] = c === ROCK ? RUBBLE : OPEN;
           b.map.hp[i] = 0;
           b.events.push({ type: 'boom', x: a.at.x, y: a.at.y, size: 1, kind: 'he', seen: blueSees(b, u) }, { type: 'terrain', x: a.at.x, y: a.at.y, cell: b.map.cells[i]! });
         }
+        // Anything else: swept, and nothing found.
         u.acted = true;
         updateIntel(b);
         break;
       }
-      case 'mine':
+      case 'mine': {
+        u.acted = true;
+        const there = unitAt(b, a.at.x, a.at.y);
+        if (there && there.side !== u.side) {
+          // An enemy unseen in that cell: the engineers find it there and lay nothing.
+          there.revealed = Math.max(there.revealed, b.turnIndex);
+          updateIntel(b);
+          break;
+        }
+        // An enemy mine there is lifted first, as a breach would.
+        const found = b.mines.findIndex((m) => m.side !== u.side && m.x === a.at.x && m.y === a.at.y);
+        if (found >= 0) {
+          b.mines.splice(found, 1);
+          b.events.push({ type: 'mine', x: a.at.x, y: a.at.y, side: other(u.side), laid: false });
+        }
         u.ammo.mines = (u.ammo.mines ?? 1) - 1;
         b.mines.push({ x: a.at.x, y: a.at.y, side: u.side });
-        u.acted = true;
         if (u.side === 'blue') b.events.push({ type: 'mine', x: a.at.x, y: a.at.y, side: u.side, laid: true });
         break;
+      }
     }
   }
   checkEnd(b);

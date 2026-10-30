@@ -114,12 +114,15 @@ describe('commands are all or nothing', () => {
         }
         offered++;
         kinds.add(a.type);
-        expect(['move', 'face', 'overwatch', 'hunker', 'embark', 'dismount']).toContain(a.type);
+        // A breach that only swept open ground and found nothing, and a hold, are as safe as a move.
+        expect(['move', 'face', 'overwatch', 'hunker', 'hold', 'breach', 'embark', 'dismount']).toContain(a.type);
         expect(st.b.stream, `${a.type} drew from the stream`).toBe(before.stream);
         expect([...visibleTo(st.b, 'blue')].sort(), `${a.type} changed what blue sees`).toEqual([...visibleTo(before, 'blue')].sort());
         expect(st.b.intel.blue, `${a.type} changed blue's last known positions`).toEqual(before.intel.blue);
         expect(st.b.units.filter((u) => u.side === 'red').map((u) => u.revealed)).toEqual(before.units.filter((u) => u.side === 'red').map((u) => u.revealed));
-        for (const e of st.b.events.slice(before.events.length)) expect(UNDO_SAFE[e.type], e.type).toBe(true);
+        // Safe events only, but for the enemy's own sightings: the player never sees those, and Undo
+        // restores red's picture with the rest (a greyed Undo would tell of an unseen spotter).
+        for (const e of st.b.events.slice(before.events.length)) expect(UNDO_SAFE[e.type] || ((e.type === 'spotted' || e.type === 'lost') && e.side === 'red'), e.type).toBe(true);
         expect(st.b.turnIndex).toBe(before.turnIndex);
       });
     }
@@ -169,20 +172,20 @@ describe('commands are all or nothing', () => {
     return { b, tank: put(unit(b, 'm1a2'), 15, 40, NORTH), gun: put(unit(b, 'paladin'), 10, 44, NORTH) };
   };
 
-  it.fails('the engine refuses an order of no known kind', () => {
+  it('the engine refuses an order of no known kind', () => {
     const { b, tank } = field();
     const before = JSON.stringify(b);
     expect(act(b, { type: 'bogus', unit: tank.id } as unknown as Action)).toBe(false);
     expect(JSON.stringify(b)).toBe(before);
   });
 
-  it.fails('the engine refuses a facing that is not a number, so none gets into the state', () => {
+  it('the engine refuses a facing that is not a number, so none gets into the state', () => {
     const { b, tank } = field();
     expect(act(b, { type: 'face', unit: tank.id, facing: Number.NaN })).toBe(false);
     expect(Number.isFinite(b.units.find((u) => u.id === tank.id)!.facing)).toBe(true);
   });
 
-  it.fails('the engine refuses called fire aimed between cells', () => {
+  it('the engine refuses called fire aimed between cells', () => {
     const { b, gun } = field();
     const shell = typeOf(gun.type).weapons.find((w) => w.indirect)!.id;
     expect(whyNot(copy(b), { type: 'strike', unit: gun.id, at: { x: 12.5, y: 30 }, weapon: shell })).not.toBeNull();
