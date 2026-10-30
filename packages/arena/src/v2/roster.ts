@@ -1093,6 +1093,22 @@ export function typeOf(id: TypeId): UnitType {
   return TYPES[id];
 }
 
+/** What a unit of a type goes into battle with: shots per limited weapon, smoke rounds, grenades, pots and mines. */
+export function startingLoad(t: UnitType): { ammo: Record<string, number>; smoke: Record<string, number> } {
+  const ammo: Record<string, number> = {};
+  const smoke: Record<string, number> = {};
+  for (const w of t.weapons) {
+    if (w.ammo !== null) ammo[w.id] = w.ammo;
+    if (w.indirect && w.smoke) smoke[w.id] = w.smoke;
+  }
+  if (t.smoke) smoke.grenades = t.smoke;
+  if (t.engineer) {
+    smoke.pots = 2;
+    ammo.mines = 3;
+  }
+  return { ammo, smoke };
+}
+
 /** Tracked and wheeled vehicles. */
 export const isVehicle = (t: UnitType): boolean => t.mobility === 'tracked' || t.mobility === 'wheeled';
 /** Helicopters and recon drones: what air defence and `air` weapons engage. */

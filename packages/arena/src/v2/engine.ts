@@ -3,7 +3,7 @@ import { wellFormed } from './orders';
 import { blast, blueSees, bestFire, difficultyPart, fireInfo, fitMen, freeCellNear, kill, rankAim, roll, shoot, suppLevel, suppress, usableWeapons, woundedMen, type FireInfo } from './combat';
 import { buildForce, type UnitSeed } from './forces';
 import { canStep, passable, buildMap } from './map';
-import { typeOf } from './roster';
+import { startingLoad, typeOf } from './roster';
 import { ABILITIES, battleSkill, DIFFICULTY, difficultyAim } from './rules';
 import { canSee, cheb, dist, isFlying, observation, other, updateIntel, visibleTo } from './sight';
 import {
@@ -69,17 +69,7 @@ export function unitValue(u: Unit, won = false): number {
 
 function makeUnit(seed: UnitSeed, side: Side): Unit {
   const t = typeOf(seed.type);
-  const ammo: Record<string, number> = {};
-  const smoke: Record<string, number> = {};
-  for (const w of t.weapons) {
-    if (w.ammo !== null) ammo[w.id] = w.ammo;
-    if (w.indirect && w.smoke) smoke[w.id] = w.smoke;
-  }
-  if (t.smoke) smoke.grenades = t.smoke;
-  if (t.engineer) {
-    smoke.pots = 2;
-    ammo.mines = 3;
-  }
+  const { ammo, smoke } = startingLoad(t);
   const men = t.mobility === 'foot' && t.men ? thin(t.men, seed.men ?? t.men.length) : [];
   const facing = side === 'blue' ? -Math.PI / 2 : Math.PI / 2;
   const u: Unit = {

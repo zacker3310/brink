@@ -99,7 +99,7 @@ looks, and none does another's job.
 | Layer | Where | Invariant | Tested in |
 |---|---|---|---|
 | Simulation | `packages/arena/src/v2` (`act`, `endTurn`, `autoTurn`, `retreat`; `submit` and `replay` in `replay.ts`) | A battle is a pure function of its setup, its seed, the rules version (`Battle.version` and the code) and the player's command log. It never reads the clock, `Math.random` or the renderer; its dice come only from `Battle.stream` through `draw()`, and the AI chooses with hash noise, so the log holds only the player's commands. A refused command changes nothing; an accepted one is logged once. | `replay.test.ts` (replay to the same hash at every turn across company shapes, terrain, sites, biomes, times, weather and difficulty; the same battle twice; a JSON save carried on; the clock and `Math.random` trapped), `invariants.test.ts` (all or nothing, duplicates, Undo against the stream and the sight picture), the matrix |
-| Visibility | `observe(b, side)` in `observe.ts`; `advise` plans on its own copy of the same picture | Everything shown to a side is computed from what it may know: its own units, enemies in sight, its own last known positions, its own mines, the map, smoke and wrecks. `observe` returns that as a `Battle` with a constant stream and no film, and every reader the player uses (sight, reach, shot cards, called fire, advice, the strength bar, Undo) answers the same on it as on the truth. | `fog.test.ts` (eleven kinds of hidden change at many points; the observation is enough), the matrix (fog sampled twice a battle) |
+| Visibility | `observe(b, side)` in `observe.ts`, the one sanitizer; `observeBlue` in `insight.ts` is `observe(b, 'blue')` with the kills blue saw as its only events; `advise` plans on its own copy of the same picture | Everything shown to a side is computed from what it may know: its own units, enemies in sight (where they are and what their badges show: suppression as its state, a full load assumed whatever they have left, no passengers), its own last known positions, its own mines and support, the map and smoke, and the wrecks it can know of (its own, kills it saw, any next to a unit it has or sees). Not the enemy's skill, tallies, mines or picture. `observe` returns that as a `Battle` with a constant stream and no film; every reader the player uses (sight, reach, shot cards, called fire, advice, the strength bar, Undo, the Danger Area, overwatch, air-defence and likely-target overlays) answers the same on it as on the truth, or is computed only from it. | `fog.test.ts` (eleven kinds of hidden change at many points; the observation is enough; the wreck rule), `insight.test.ts` (every overlay unchanged under hidden mutations, the enemy's skill among them), the matrix (fog sampled twice a battle) |
 | Presentation | `apps/web/src/arena` (the film plays `Battle.events`) | The film reads events and never resolves combat: an order is settled when `act` returns, so skipping the film, or playing none (every test runs headless), changes nothing. It shows what the events say blue saw (`seen`). | the engine tests and the matrix, all headless, to the same hashes |
 
 `hashBattle(b)` is a stable 16-character hash of everything a battle holds but its command log (two
@@ -115,14 +115,31 @@ to `tests/soak/arena-failing-seeds.json` and run first next time. Its table sepa
 from reported defects it meets and from unusual but valid outcomes (a retreat, a battle held to the
 round limit, no contact all battle).
 
-Reported and pinned (each an `it.fails` with a fixture, until fixed): the AI's sight-grid cache keys
-on smoke and the count of buildings and trees, but walls and rocks fall in play too, so a battle that
-never stopped can plan on stale grids where its save, resumed, does not; `act` accepts an order of no
-known kind, a NaN facing and fire aimed between cells (`submit` refuses them); `whyNot` tells a hidden
-unit's id from one nobody has, and an engineer's breach and mine orders find hidden mines and units
-next to it; Undo greys out when a hidden enemy sees the step; the shot card tells whether a seen
-tank's active protection is spent; and a `fire` event is `seen` when blue sees only its target, so the
-film shows a shooter the rules keep hidden.
+Found by these tests and fixed (each test now passes as it was written): the AI's sight-grid cache
+keyed on smoke and the count of buildings and trees, so a battle could plan on stale grids after a
+wall fell (it now keys on a hash of every cell and storey); `act` accepted an order of no known kind,
+a NaN facing and fire aimed between cells (the engine now checks an order's shape, `wellFormed` in
+`orders.ts`); `whyNot` told a hidden unit's id from one nobody has, and an engineer's breach and mine
+orders found hidden mines and units (refusals now say only what blue knows; a breach on a cell
+holding a hidden mine lifts it, a mine laid on a hidden unit finds it); Undo greyed out when a
+hidden enemy saw the step; a `fire` event was `seen` when blue saw only its target, so the film
+showed a hidden shooter (events now carry `shooterSeen`, and the film brings an unseen shooter's
+round in from off-screen); and blue's picture carried the enemy's skill. A stated rule rather than a
+fix: a seen tank's active protection shows as loaded, so the shot card never tells whether it is spent.
+
+Known and not fixed: facings and aim are stored as doubles from `Math.atan2`, and armour facing, range
+and the capture zone use `Math.atan2`, `Math.sin`, `Math.cos` and `Math.hypot`, which the language does
+not require to give the same last bit on every JavaScript engine. A command log is proven to replay to
+the same hash on one engine (Node's V8, in the tests); on another (Safari's JavaScriptCore) a facing
+could differ in its last bit, and a shot on an exact armour-facing or range boundary could then go the
+other way. Not measured. The fix: facings as integers (sixteenths of a turn) in the state, and integer
+distance checks (squared cells).
+
+Known and not fixed: the move outline is reckoned on the battle itself (`reachable(b, ...)` with the
+enemies blue knows of), so a wreck blue cannot know of (a kill out of sight, far from its units)
+shows as a cell a vehicle cannot enter. Reckoning it on the observation would show the cell as open
+and the move would then be refused by the rules; the clean fix is a rule (a move stops short at an
+obstacle it meets), not a filter.
 
 ## Rejected alternatives
 

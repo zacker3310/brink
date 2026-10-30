@@ -697,6 +697,114 @@ actions for its kind (a mortar's Call Fire, a medic's Treat, a carrier's Dismoun
 Split); More shows the rest. End Turn with units still ready asks: let the crews act for them (the
 advice for each), end now, or keep playing.
 
+## 13. The battle as a phone game (v2.3)
+
+Thirty-five changes from the research report on mobile tactics design (touch and camera,
+information design, pacing, readability, performance), plus a verification backbone. The film's
+pacing and feel are under "Watch it (v2.3)" in section 11. The rules (sections 3 to 6) change in
+three places only: a Hold order, an engineer's breach on any adjacent cell (it lifts a mine there,
+or sweeps), and Reset Turn.
+
+**Touch and camera** (`apps/web/src/arena/ArenaScreen.tsx`, `stage.ts`)
+<!-- A: filled in on merge -->
+
+**Reading the field** (`packages/arena/src/v2/insight.ts`, drawn by `apps/web/src/arena/overlays.ts`)
+- Every answer below is computed from blue's picture only (`observeBlue`; see the last part),
+  and every chance shown comes from the engine's own rules (`fireInfo`, `interceptors`,
+  `suppRecovery`), never a copy of their formulas.
+- Danger Area (the eye button on the camera rail): each cell shaded by how many seen enemies could
+  fire on it next turn, in three steps, from where each stands and the four cells it could reach
+  furthest toward you (mortars, tripod missiles and snipers only from where they stand, since they
+  cannot fire after moving). A long press on an enemy shows its reach alone, with a pill naming it.
+- Facing glyph: a previewed move shows, on the move card and flat on the field at the cell, the
+  armour face each seen enemy would strike (a hull with shaded faces for vehicles, a full or half
+  shield for troops) and warns of an exposed flank in its own shape and words ("Flank exposed:
+  Tunguska 38% right side").
+- Overwatch footprints: seen enemies and your own units on overwatch draw their line-of-sight-clipped
+  area (no arc: the rules give overwatch none); air defence on watch draws a dome as a double ring.
+- Air-defence rings: with a helicopter or recon drone selected, each seen enemy that can shoot at it
+  is ringed at its anti-air range and labelled "AA 38%"; with a drone team selected, guns that can
+  intercept get 4-cell squares labelled "Intercept 60%". Suspected air defence (ghosts up to six
+  turns old) is dashed and labelled with a question mark.
+- Likely targets (Easy and Normal): a dashed arrow from each seen enemy to the shot it would most
+  likely take, chosen as the AI chooses (`bestFire`, `shotValue`).
+- Fog: last known positions are a dashed frame with the faded pictogram, fading with age, never like
+  a seen badge; the expected enemy area is a stipple of dots that shrink away as you see each cell
+  empty (woods, buildings and rubble only clear from close).
+- Suppression in words: the unit card says what the state does and when it eases ("Pinned: moves
+  half as far, cannot dash, aims badly. Eases to suppressed next turn.").
+
+**Deciding and turn flow** (`OutcomeBar.tsx`, `BattleLog.tsx`, `EndTurnSheet.tsx`, `tips.ts`,
+`AfterAction.tsx`; `packages/arena/src/v2/report.ts`, `rewind.ts`)
+- Outcome bar on the shot card: Miss, Stopped (active protection), Bounce, Penetrate and Knock Out
+  for vehicles, Miss and Hit with expected casualties for troops, Shot Down for drones, in the order
+  the shot is rolled (`outcomeShares`, whole numbers adding to 100). Each segment has its own pattern
+  and a legend with its percentage, and a word band under the chance (Sure Kill to Slim Chance).
+  Checked against 12,000 seeded shots: the largest gap between card and roll was 1.05 points.
+- Battle log (menu, or the round report's link): every roll you saw, newest first, by round
+  ("Bradley 1 fired at a Sniper: 95%, hit, 1 down, suppressed"), with All, My Units and Enemy
+  filters. An enemy you never spotted is "Fire from out of sight": no unit, no weapon.
+- Reset Turn: back to the last step this turn that drew dice or showed something new. Easy without
+  limit, Normal once a battle, Hard never. In the End Turn sheet and the menu, greyed with the reason
+  when it cannot be used. Undo still takes back one step.
+- Next ("4 of 9 Left") selects the next ready unit; Hold (unit card, More) ends a unit's turn with no
+  roll and no event. End Turn with units ready opens a sheet listing each with its advice, Do It and
+  Hold; the End Turn Sheet setting turns it off.
+- Tips: one at a time, each kind once per device, from blue's picture (side or rear armour showing,
+  infantry in the open to two known enemies, firing blind, a helicopter inside known air defence,
+  smoke unused before open ground, a squad pinned). The Tips setting turns them off.
+- After-action grade on the verdict: Speed (rounds used, on a win), Power (enemy strength destroyed)
+  and Technique (your strength kept), S to C, and the round that turned it.
+- Fire and End Turn take one tap: a second tap before the first has landed does nothing.
+
+**Look and sound** (`palette.ts`, `models3d/rim.ts`, `models3d/outline.ts`, `haptics.tsx`, `audio/`)
+- Friend and foe by shape as well as colour (APP-6): hostile badges have an angled frame, pointed at
+  both ends, friendly ones stay rounded, and off-screen enemies point with a diamond; gains and
+  losses in words carry an up or down triangle. Colour is never the only cue. The Colour-Blind
+  Palette setting swaps to the Okabe-Ito pair: deep blue #0072B2 and orange #E69F00 on badges, sky
+  blue and orange on the field, switched live (the DOM by `data-palette`, the 3D field by one shared
+  colour per side, the insight overlays redrawn).
+- A team-tinted rim light on every unit (stronger at dusk and at night, out on a wreck), and an
+  outline on the selected unit and on the shot card's target, stencilled to the silhouette.
+- Heavy reports in layers (transient, body, sub and tail) for tank guns, artillery and rockets,
+  weighed by distance.
+- A haptic tick on your own Fire and End Turn on iPhone (Safari 17.4 and up), off with the Haptics
+  setting. Not felt here: there is no iPhone in this environment.
+- Badges: one `will-change` on the HUD layer, none per badge; no layout reads in the frame; badges
+  off the screen hidden; badges of one side stacked on each other merge with a count.
+
+**Performance and resilience** (`apps/web/src/arena/pacing.ts`, `resume.ts`, `PerfOverlay.tsx`;
+`packages/arena/src/v2/snapshot.ts`)
+- Render on demand: every frame during the film, a camera move or input; 30 a second for 15 s of
+  ambient motion (smoke, fire, rain, rotors and soldiers in view); then nothing at all until
+  something changes. Shadows are drawn only when a caster or the sun's frame moves. Measured in the
+  container: 0 frames drawn a second idle, hidden or with the context lost.
+- The pixel ratio follows the frame rate between 1.0 and the quality's cap (never above the
+  device's), down 0.2 a step when the median of 60 frames runs over 20.8 ms, back up after 180 good
+  frames, frozen after two reversals; a steady 30 fps is read as Low Power Mode and left alone.
+- A lost GPU context pauses the field ("Restoring the Battlefield") and rebuilds it from the battle
+  as it stands; if the context never returns, a new one is made after 3 s in view; if that fails,
+  Try Again or Reload. A stage that goes releases everything its renderer uploaded.
+- Saves: the battle is written as a checked snapshot (header, length, FNV-1a hash, the battle whole
+  with its stream, the rules version) to a spare slot, read back, then pointed at; after every
+  committed order, at each turn's end, when the page is hidden and when the context is lost.
+  Skirmishes resume from the Skirmish menu; a war-map battle resumes when the same attack is ordered
+  again on the same turn.
+- Show Frame Time (menu) draws real frame intervals, the scheduler's state, JavaScript, render, HUD
+  and engine time (p50 and p95), the pixel ratio, draw calls and uploads: main-thread time, not GPU
+  time. Device numbers: `docs/device-testing.md` (none measured yet; this environment has no iPhone).
+
+**Verification backbone** (`packages/arena/src/v2/replay.ts`, `observe.ts`, `orders.ts`;
+`docs/architecture.md`, "The battle's three layers")
+- Every order, End Turn, Let Crews Play and Retreat the screen gives goes through `submit`, which
+  checks the order's shape, applies it and logs it once if accepted; `replay(setup, commands)`
+  rebuilds the battle and `hashBattle` proves it the same.
+- `observe(b, side)` is the one visibility layer; the insight overlays read it through `observeBlue`,
+  advice plans on its own copy of the same picture, and the tests check that the player's readers
+  (sight, reach, shot cards, called fire, advice) answer the same on it as on the truth.
+- The tests found eight defects; seven are fixed and one is kept as a stated rule (a seen tank's
+  active protection shows as loaded). `docs/architecture.md` lists them, and the known gaps.
+
 ## Sources
 
 Specifications: General Dynamics Land Systems (M1A2 SEPv3, M1126 Stryker, M10 Booker), Krauss-Maffei

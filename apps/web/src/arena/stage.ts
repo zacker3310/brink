@@ -615,7 +615,8 @@ export class BattleStage {
       this.filmUntil = now + AFTER_FILM * 1000;
       return 'playback';
     }
-    if (now < this.filmUntil || this.live || this.fx.busy || this.hudLayer.live) return 'playback';
+    // Scouted dots shrinking away (the insight layer) play out like the film's tail.
+    if (now < this.filmUntil || this.live || this.fx.busy || this.hudLayer.live || this.insight.animating) return 'playback';
     for (const v of this.views.values()) if (v.flash > 0 || (v.fall > 0 && v.fall < 1)) return 'playback';
     this.camState(this.camNow);
     let moved = false;

@@ -1,12 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { decide, enemyArea } from './ai';
-import { bestFire, fireInfo } from './combat';
+import { bestFire, fireInfo, suppLevel } from './combat';
 import { act, createBattle, reachable, strikeInfo, supportChance, undoable, whyNot } from './engine';
 import { bare, BATTLES, copy, NORTH, put, SOUTH, unit, weapon } from './fixture.test-util';
 import { observe, OBSERVED_STREAM } from './observe';
 import { hashBattle } from './replay';
-import { typeOf } from './roster';
-import { visibleTo } from './sight';
+import { startingLoad, typeOf } from './roster';
+import { cheb, visibleTo } from './sight';
 import { at, TREES, W, type Battle } from './types';
 import { arenaSetup, blueUnits, change, CHANGES, copyBattle, family, knownLeak, leaks, player, playTurn, probe, probeAsk, probeIds, rng, type Change, type Leak } from './verify.test-util';
 
@@ -126,11 +126,54 @@ describe('fog: the observation', () => {
     expect(o.events).toEqual([]);
     expect(o.support.every((s) => s.side === 'blue')).toBe(true);
     expect(o.stats.red).toEqual({ shots: 0, hits: 0, kills: 0, lost: 0 });
-    for (const u of o.units.filter((x) => x.side === 'red' && x.alive)) expect(u).toMatchObject({ ammo: {}, smoke: {}, passengers: [], moved: false, acted: false });
+    // A seen enemy: its full load whatever it has left, its suppression only as its badge's state.
+    for (const u of o.units.filter((x) => x.side === 'red' && x.alive)) {
+      const truth = b.units.find((x) => x.id === u.id)!;
+      const load = startingLoad(typeOf(u.type));
+      expect(u.ammo, u.id).toEqual(load.ammo);
+      expect(u.smoke, u.id).toEqual(load.smoke);
+      expect(u, u.id).toMatchObject({ passengers: [], moved: false, acted: false, optics: false });
+      expect(suppLevel(u.supp), u.id).toBe(suppLevel(truth.supp));
+      expect(u.supp, u.id).toBeLessThanOrEqual(truth.supp);
+    }
+    // Red's skill is not blue's to know; blue knows a wreck it made, saw made, or stands or sees next to.
+    expect(o.skill).toBe(0);
+    const fell = new Set(b.events.flatMap((e) => (e.type === 'destroyed' && e.seen ? [e.unit] : [])));
+    const near = o.units.filter((u) => u.alive && u.carrier === null);
+    for (const w of o.wrecks) expect(b.units.find((u) => u.id === w.unit)!.side === 'blue' || fell.has(w.unit) || near.some((u) => cheb(u, w) <= 1), w.unit).toBe(true);
     const red = observe(b, 'red');
+    expect(red.skill).toBe(b.skill);
+    expect(red.wrecks).toEqual(b.wrecks);
     expect(red.units.filter((u) => u.side === 'blue').every((u) => visibleTo(b, 'red').has(u.id))).toBe(true);
     expect(red.intel.blue).toEqual({});
   }, BATTLES);
+
+  it('shows blue a wreck it saw made, or stands or sees next to, and no other', () => {
+    const b = bare(['m1a2', 'm1a2'], ['t90m', 't90m']);
+    const [t1, t2] = b.units.filter((u) => u.side === 'blue');
+    put(t1!, 15, 40, NORTH);
+    put(t2!, 4, 40, NORTH);
+    const [far, other] = b.units.filter((u) => u.side === 'red');
+    put(far!, 15, 3, SOUTH);
+    put(other!, 28, 3, SOUTH);
+    far!.alive = false;
+    b.wrecks.push({ x: 15, y: 3, unit: far!.id, type: far!.type, burning: 0 });
+    const wrecks = () => observe(b, 'blue').wrecks.map((w) => w.unit);
+    // Killed out of sight, far off: nothing tells blue it is there.
+    expect(wrecks()).toEqual([]);
+    // Seen destroyed: it knows.
+    b.events.push({ type: 'destroyed', unit: far!.id, how: 'destroyed', x: 15, y: 3, seen: true });
+    expect(wrecks()).toEqual([far!.id]);
+    // Not seen destroyed, but a tank of its own pulls up beside it.
+    b.events.pop();
+    put(t1!, 15, 4, NORTH);
+    expect(wrecks()).toEqual([far!.id]);
+    // Blue's own wreck it always knows.
+    t2!.alive = false;
+    b.wrecks.push({ x: 4, y: 40, unit: t2!.id, type: t2!.type, burning: 0 });
+    put(t1!, 15, 40, NORTH);
+    expect(wrecks()).toEqual([t2!.id]);
+  });
 
   it('is enough: the player’s readers answer the same on it as on the battle, and red’s planner on red’s', () => {
     let checks = 0;

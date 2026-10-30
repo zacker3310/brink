@@ -1,8 +1,9 @@
 import { bestFire, coverAgainst, fireInfo, interceptors, INTERCEPT_RANGE, shotValue, suppLevel, usableWeapons, type CoverKind } from './combat';
 import { mainThreat, pathTo, reachable, suppRecovery } from './engine';
+import { observe } from './observe';
 import { typeOf } from './roster';
 import { cheb, dist, heightOf, isFlying, lineOfSight, observation, sightRange, visibleTo } from './sight';
-import { at, BUILDING, PROFILE, RUBBLE, TREES, type Battle, type BattleEvent, type Point, type Side, type Unit, type UnitType, type Weapon } from './types';
+import { at, BUILDING, PROFILE, RUBBLE, TREES, type Battle, type Point, type Side, type Unit, type UnitType, type Weapon } from './types';
 
 // What the player can read off the field: where the enemies they see could fire next turn, whom
 // each would most likely shoot, what overwatch and air defence cover, which armour a move shows to
@@ -27,46 +28,16 @@ const onField = (u: Unit) => u.alive && u.carrier === null;
 
 // --- The player's observation ------------------------------------------------------------------------
 
-/** The least suppression that shows as each badge state. */
-const LEVEL_FLOOR = new Map<ReturnType<typeof suppLevel>, number>();
-for (let s = 100; s >= 0; s--) LEVEL_FLOOR.set(suppLevel(s), s);
-
-/** A seen enemy as far as it can be seen: no passengers, a full load, suppression as its badge shows it. */
-function asSeen(u: Unit): Unit {
-  const t = typeOf(u.type);
-  const ammo: Record<string, number> = {};
-  for (const w of t.weapons) if (w.ammo !== null) ammo[w.id] = w.ammo;
-  return { ...u, passengers: [], ammo, aps: t.aps?.charges ?? 0, supp: LEVEL_FLOOR.get(suppLevel(u.supp)) ?? 0 };
-}
-
 /**
- * The battle as the player (blue) can know it, the only input of everything below. Kept: their own
- * units, mines, support, abilities and last known positions; the field as it stands; the enemies
- * they see now, as far as they can be seen (where, which way, damage and strength, on watch or
- * hunkered as their badges show, suppression only as the badge shows it); the kills they saw.
- * Gone: every enemy they cannot see, enemy mines, support, tallies and last known positions, the
- * rest of the film, the wrecks of kills they did not see, what is aboard enemy vehicles, how much
- * ammunition enemies have left (assumed full), and the random stream. Pure: a new object; the map
- * is shared, never written.
+ * The battle as the player (blue) can know it, the only input of everything below: the visibility
+ * layer's picture (`observe`: their own units, mines, support, abilities and last known positions;
+ * the field; the enemies they see now as far as they can be seen; the wrecks they can know of; no
+ * stream), with the kills they saw as its only events. Pure: a new object.
  */
 export function observeBlue(b: Battle): Battle {
-  const seen = visibleTo(b, 'blue');
-  const blue = new Set(b.units.filter((u) => u.side === 'blue').map((u) => u.id));
-  const witnessed = b.events.filter((e): e is Extract<BattleEvent, { type: 'destroyed' }> => e.type === 'destroyed' && e.seen);
-  const kills = new Set(witnessed.map((e) => e.unit));
-  return {
-    ...b,
-    units: b.units.filter((u) => u.side === 'blue' || seen.has(u.id)).map((u) => (u.side === 'blue' ? u : asSeen(u))),
-    mines: b.mines.filter((m) => m.side === 'blue'),
-    support: b.support.filter((s) => s.side === 'blue'),
-    wrecks: b.wrecks.filter((w) => blue.has(w.unit) || kills.has(w.unit)),
-    intel: { blue: b.intel.blue, red: {} },
-    stats: { blue: b.stats.blue, red: { shots: 0, hits: 0, kills: 0, lost: 0 } },
-    // Only the kills it saw: they say which wrecks it knows of.
-    events: witnessed,
-    skill: 0,
-    stream: 0,
-  };
+  const o = observe(b, 'blue');
+  o.events = b.events.filter((e) => e.type === 'destroyed' && e.seen);
+  return o;
 }
 
 // --- Cached per state --------------------------------------------------------------------------------
