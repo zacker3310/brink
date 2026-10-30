@@ -28,7 +28,14 @@ interface Window {
     /** Frame timing: ms of the game's own work per frame, and what the GPU was asked to draw.
      *  `reset` starts a fresh sample after this read. */
     perf(reset?: boolean): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
-    /** What the field overlay shows now: the selected unit, its move and dash cells, its targets. */
-    overlay(): { selected: string | null; reach: number; dash: number; targets: number } | null;
+    /** What the field overlay shows now: the selected unit, its move and dash cells, its targets, and what it shows of the enemy. */
+    overlay(): {
+      selected: string | null;
+      reach: number;
+      dash: number;
+      targets: number;
+      /** Cells shaded by the Danger Area (or one enemy's reach), overwatch footprints, air-defence rings seen and suspected, likely lines, the facing glyph, ghosts drawn, expected-area cells not yet scouted. */
+      insight: { threat: number; threatOf: number; watch: number; air: number; suspected: number; likely: number; glyph: string | null; ghosts: number; expected: number };
+    } | null;
   };
 }

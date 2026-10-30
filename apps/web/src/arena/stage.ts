@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { H, W, typeOf, type Battle, type BattleEvent, type Effect, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
+import { expectedArea, H, W, typeOf, type Battle, type BattleEvent, type Effect, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
 import { BattleAudio } from './audio';
 import { Effects } from './fx';
 import { buildModel, buildProjectile, kitFor, paintFor, SoldierCrowd, type UnitModel } from './models3d';
@@ -8,6 +8,7 @@ import { buildWorld, thermalMaterialFor, type World } from './world';
 import type { Library } from './assets';
 import { FieldHud, type BadgeState, type EdgePointer, type Tone } from './hud';
 import { badgeStatus, classOf, health } from './units';
+import { InsightLayer, type InsightOverlay } from './overlays';
 
 // The battle drawn in three.js: the world (ground, buildings, weather, light), the units (built in
 // code; soldiers drawn one by one), the effects and the sound, all driven by the engine's event log
@@ -37,7 +38,7 @@ const EFFECT_TEXT: Partial<Record<Effect, string>> = {
   shot_down: 'Shot Down',
 };
 
-export interface Overlay {
+export interface Overlay extends InsightOverlay {
   selected: string | null;
   /** Cells the selected unit can move to. */
   reach: number[];
@@ -51,8 +52,6 @@ export interface Overlay {
   targets: string[];
   /** An area strike being aimed: its centre cell and radius. */
   area: { at: Point; r: number } | null;
-  /** Last known enemy positions. */
-  ghosts: { x: number; y: number; type: TypeId; age: number }[];
   /** Danger Area: shade every seen enemy's reach. */
   danger: boolean;
   /** Shade this one enemy's reach (a long-press on it), or null. */
@@ -149,12 +148,13 @@ export class BattleStage {
   private readonly dashTiles: THREE.InstancedMesh;
   private readonly areaTiles: THREE.InstancedMesh;
   private readonly targetRings: THREE.InstancedMesh;
-  private readonly ghostMarks: THREE.InstancedMesh;
+  /** What the player knows of the enemy, drawn on the field (overlays.ts). */
+  private readonly insight: InsightLayer;
   private readonly selRing: THREE.Mesh;
   private readonly destMark: THREE.Mesh;
   private pathLine: THREE.Mesh | null = null;
   private readonly ray = new THREE.Raycaster();
-  private overlay: Overlay = { selected: null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts: [], danger: false, reachOf: null };
+  private overlay: Overlay = { selected: null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts: [], danger: false, reachOf: null, threat: null, threatOf: null, watch: [], air: [], likely: [], glyph: null, scouted: [] };
   /** Fractions of the screen the HUD covers at the top and bottom (eased toward `wantHud`). */
   private hud: [number, number] = [0.12, 0.26];
   private wantHud: [number, number] = [0.12, 0.26];
@@ -190,10 +190,11 @@ export class BattleStage {
   private reachEdge: THREE.Mesh | null = null;
   private dashEdge: THREE.Mesh | null = null;
   private edgeKey = '';
-  /** Where the defenders were expected, shown until the first contact. */
-  private readonly enemyMark: THREE.Group | null;
+  /** Where the defenders are expected (labelled until the first contact; its cells shade until scouted). */
   private readonly enemyAt: { x: number; z: number; r: number } | null;
   private contact = false;
+  /** Overlay chips on the HUD layer last frame. */
+  private shownLabels = new Set<string>();
   /** Who last fired at each unit, for the kill feed. */
   private readonly lastShooter = new Map<string, string>();
 
@@ -249,12 +250,6 @@ export class BattleStage {
     this.targetRings.renderOrder = 3;
     this.targetRings.frustumCulled = false;
     this.scene.add(this.targetRings);
-    const ghostGeo = new THREE.RingGeometry(0.28, 0.34, 4, 1).rotateX(-Math.PI / 2).rotateY(Math.PI / 4);
-    this.ghostMarks = new THREE.InstancedMesh(ghostGeo, new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.6, depthWrite: false }), 64);
-    this.ghostMarks.count = 0;
-    this.ghostMarks.renderOrder = 3;
-    this.ghostMarks.frustumCulled = false;
-    this.scene.add(this.ghostMarks);
     this.selRing = new THREE.Mesh(new THREE.RingGeometry(0.46, 0.56, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false }));
     this.selRing.visible = false;
     this.selRing.renderOrder = 4;
@@ -264,26 +259,12 @@ export class BattleStage {
     this.destMark.renderOrder = 4;
     this.scene.add(this.destMark);
 
-    // Where the defenders were seen to deploy (the war map says they hold the ground), until contact.
-    const spawn = battle.map.redSpawn;
-    if (spawn.length) {
-      const ax = spawn.reduce((s, p) => s + p.x + 0.5, 0) / spawn.length;
-      const az = spawn.reduce((s, p) => s + p.y + 0.5, 0) / spawn.length;
-      const r = Math.max(3, Math.min(9, Math.max(...spawn.map((p) => Math.hypot(p.x + 0.5 - ax, p.y + 0.5 - az))) * 0.8));
-      this.enemyAt = { x: ax, z: az, r };
-      this.enemyMark = new THREE.Group();
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.12, r, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.75, depthWrite: false, depthTest: false }));
-      const fill = new THREE.Mesh(new THREE.CircleGeometry(r, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.1, depthWrite: false, depthTest: false }));
-      ring.renderOrder = fill.renderOrder = 2;
-      this.enemyMark.add(fill, ring);
-      this.enemyMark.position.set(ax, this.ground(ax, az) + 0.3, az);
-      this.scene.add(this.enemyMark);
-    } else {
-      this.enemyAt = null;
-      this.enemyMark = null;
-    }
+    // Where the defenders deploy (the war map says they hold the ground): shaded until scouted.
+    const expected = expectedArea(battle);
+    this.enemyAt = expected ? { x: expected.x, z: expected.y, r: expected.r } : null;
+    this.insight = new InsightLayer((x, z) => this.ground(x, z), { blue: BLUE_RING, red: RED_RING }, expected?.cells ?? []);
+    this.scene.add(this.insight.group);
     this.contact = Object.values(battle.intel.blue).some((g) => g.now) || battle.events.some((e) => e.type === 'spotted' && e.side === 'blue');
-    if (this.contact && this.enemyMark) this.enemyMark.visible = false;
     this.hudLayer = new FieldHud(host, (id) => {
       const v = this.views.get(id);
       const at = v ? { x: v.x, z: v.z } : id === 'enemy' && this.enemyAt ? this.enemyAt : null;
@@ -683,8 +664,8 @@ export class BattleStage {
   }
 
   /** What the overlay shows, for tests. */
-  overlayCounts(): { selected: string | null; reach: number; dash: number; targets: number } {
-    return { selected: this.overlay.selected, reach: this.overlay.reach.length, dash: this.overlay.dash.length, targets: this.overlay.targets.length };
+  overlayCounts(): { selected: string | null; reach: number; dash: number; targets: number; insight: ReturnType<InsightLayer['counts']> } {
+    return { selected: this.overlay.selected, reach: this.overlay.reach.length, dash: this.overlay.dash.length, targets: this.overlay.targets.length, insight: this.insight.counts() };
   }
 
   setOverlay(o: Overlay): void {
@@ -724,16 +705,7 @@ export class BattleStage {
     }
     this.targetRings.count = n;
     this.targetRings.instanceMatrix.needsUpdate = true;
-    n = 0;
-    for (const g of o.ghosts) {
-      if (n >= 64) break;
-      const x = g.x + 0.5;
-      const z = g.y + 0.5;
-      m.makeTranslation(x, this.ground(x, z) + 0.05, z);
-      this.ghostMarks.setMatrixAt(n++, m);
-    }
-    this.ghostMarks.count = n;
-    this.ghostMarks.instanceMatrix.needsUpdate = true;
+    this.insight.set(o);
     if (this.pathLine) {
       this.scene.remove(this.pathLine);
       this.pathLine.geometry.dispose();
@@ -858,6 +830,29 @@ export class BattleStage {
     this.hudLayer.label('objective', zone && !cinematic ? 'Objective' : null, zone ? this.onLayer(zone.x + 0.5, this.ground(zone.x + 0.5, zone.y + 0.5) + 0.2, zone.y + 0.5) : null);
     const ea = this.enemyAt;
     this.hudLayer.label('enemy', ea && !this.contact && !cinematic ? 'Enemy Expected' : null, ea && !this.contact ? this.onLayer(ea.x, this.ground(ea.x, ea.z) + 0.2, ea.z) : null);
+    this.insightLabels(cinematic);
+  }
+
+  /**
+   * The overlay's chips (air-defence chances, likely targets), pinned to the ground: one that would
+   * sit on another moves down out of its way, and a second chip saying the same there is dropped.
+   */
+  private insightLabels(cinematic: boolean): void {
+    const live = new Set<string>();
+    const placed: { x: number; y: number; w: number; text: string }[] = [];
+    for (const l of this.insight.labels) {
+      const p = cinematic ? null : this.onLayer(l.x, l.y, l.z);
+      let at = p ? { x: p.x, y: p.y + l.dy } : null;
+      const w = l.text.length * 8 + 22;
+      if (at && placed.some((q) => q.text === l.text && Math.abs(q.x - at!.x) < (q.w + w) / 2 && Math.abs(q.y - at!.y) < 26)) at = null;
+      for (let k = 0; at && k < 4 && placed.some((q) => Math.abs(q.x - at!.x) < (q.w + w) / 2 && Math.abs(q.y - at!.y) < 26); k++) at = { x: at.x, y: at.y + 28 };
+      if (!at) continue;
+      placed.push({ ...at, w, text: l.text });
+      live.add(l.id);
+      this.hudLayer.label(l.id, l.text, at);
+    }
+    for (const id of this.shownLabels) if (!live.has(id)) this.hudLayer.label(id, null, null);
+    this.shownLabels = live;
   }
 
   /**
@@ -1335,10 +1330,7 @@ export class BattleStage {
       case 'spotted':
         if (e.side !== 'blue') break;
         this.now(() => {
-          if (!this.contact) {
-            this.contact = true;
-            if (this.enemyMark) this.enemyMark.visible = false;
-          }
+          this.contact = true;
           const s = this.views.get(e.unit);
           if (!s) return;
           if (!s.shown) this.say(s, 'Contact', 'plain');
@@ -1615,6 +1607,7 @@ export class BattleStage {
     }
     this.shake = Math.max(0, this.shake - dt * 0.6);
     this.applyCamera(real);
+    this.insight.tick(real, { yaw: this.yaw, perPx: (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / Math.max(1, this.host.clientHeight), cinematic: this.cam !== null });
     this.world.update(dt, this.camera);
     this.fx.update(dt, this.camera);
     this.crowd.update(dt);
@@ -1641,6 +1634,7 @@ export class BattleStage {
   }
 
   dispose(): void {
+    this.insight.dispose();
     this.hudLayer.dispose();
     this.audio.dispose();
     this.fx.dispose();

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ABILITIES,
+  airThreats,
   BREAK_AT,
   DIFFICULTY,
   act,
@@ -11,14 +12,22 @@ import {
   buildForce,
   CAPTURE_ROUNDS,
   createBattle,
+  dangerArea,
   endTurn,
+  enemyReach,
   fireInfo,
   fitMen,
+  isFlying,
+  likelyTargets,
+  moveExposure,
+  overwatchAreas,
   pickConditions,
   RANKS,
   reachable,
+  recovery,
   retreat,
   ROUND_LIMIT,
+  scoutedEmpty,
   strikeInfo,
   suppLevel,
   supportChance,
@@ -36,6 +45,7 @@ import {
   type ArenaResult,
   type Battle,
   type Difficulty,
+  type Exposure,
   type FireInfo,
   type Point,
   type Role,
@@ -48,6 +58,8 @@ import { loadLibrary, type Library } from './assets';
 import type { BattleRequest } from './battle';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
 import { BattleStage, type Overlay } from './stage';
+import { faceFill, glyphOf, HULL_FACES, HULL_GUN, HULL_TURRET, SHIELD, SHIELD_HALF, warnPath, type FacingGlyph } from './facing';
+import type { InsightOverlay } from './overlays';
 import { classOf, health } from './units';
 
 // One battle, fought in turns: a brief, the fight, the verdict. On your turn tap a unit, tap a lit
@@ -97,12 +109,27 @@ function statusLine(u: Unit): string {
   if (u.mobilityKill) bits.push(t.mobility === 'heli' ? 'Damaged' : 'Immobilised');
   if (u.firepowerKill) bits.push('Gun out');
   if (u.optics) bits.push('Optics hit');
-  const lvl = suppLevel(u.supp);
-  if (lvl !== 'steady') bits.push(lvl === 'suppressed' ? 'Suppressed' : lvl === 'pinned' ? 'Pinned' : 'Broken');
   if (u.carrier) bits.push('Aboard');
   if (u.passengers.length) bits.push(`${u.passengers.length} squad aboard`);
   bits.push(u.acted ? 'Done' : u.moved ? 'Moved, can act' : 'Ready');
   return bits.join(' · ');
+}
+
+/** What each suppression state does to a unit (docs/arena-v2.md, 3.6). */
+const SUPPRESSION: Record<'suppressed' | 'pinned' | 'broken', [string, string]> = {
+  suppressed: ['Suppressed', 'aims worse'],
+  pinned: ['Pinned', 'moves half as far, cannot dash, aims badly'],
+  broken: ['Broken', 'cannot move or fire, falls back on its own'],
+};
+
+/** The unit's suppression in a line: what it means, and how it stands next turn if nothing hits it. */
+function suppressionNote(b: Battle, u: Unit): { title: string; text: string } | null {
+  const lvl = suppLevel(u.supp);
+  if (lvl === 'steady') return null;
+  const [title, meaning] = SUPPRESSION[lvl];
+  const r = recovery(b, u.id);
+  const next = !r ? '' : r.next === 'steady' ? ' Recovers next turn.' : r.next === lvl ? ` Still ${lvl} next turn.` : ` Eases to ${r.next} next turn.`;
+  return { title, text: `${meaning}.${next}` };
 }
 
 /** "Abrams x4, Bradley, Squad" from a list of names. */
@@ -169,12 +196,70 @@ function adviceText(b: Battle, me: Unit, plan: Action[], known: Set<string>): st
   return `${s[0]!.toUpperCase()}${s.slice(1)}.`;
 }
 
-/** A move being looked at: how far, into what, what it could hit from there, and who could hit it. */
+/** The field's hostile colour (RED_RING in stage.ts), for the glyph on the card. */
+const FOE = '#e0705e';
+
+/** The facing glyph on the card: the same shapes as at the cell on the field (facing.ts), front up. */
+function FacingIcon({ g }: { g: FacingGlyph }) {
+  const warn = g.warn ? warnPath(g.warn, g.kind === 'shield') : null;
+  return (
+    <svg viewBox="0 0 100 100" className="h-12 w-12 shrink-0" aria-hidden data-testid="move-glyph" data-kind={g.kind} data-flanked={g.flanked ? 'true' : 'false'}>
+      {g.kind === 'hull' ? (
+        <>
+          {(['front', 'rear', 'left', 'right'] as const).map((f) => {
+            const { colour, alpha } = faceFill(g.faces[f]);
+            return <path key={f} d={HULL_FACES[f]} fill={colour === 'red' ? FOE : '#ffffff'} fillOpacity={alpha} stroke="#ffffff" strokeWidth={3} strokeLinejoin="round" />;
+          })}
+          <path d={HULL_TURRET} fill="#ffffff" />
+          <path d={HULL_GUN} fill="#ffffff" />
+        </>
+      ) : (
+        <>
+          {g.shield !== 'none' && <path d={g.shield === 'full' ? SHIELD : SHIELD_HALF} fill="#ffffff" fillOpacity={0.9} />}
+          <path d={SHIELD} fill="none" stroke="#ffffff" strokeWidth={3} strokeLinejoin="round" strokeDasharray={g.shield === 'none' ? '7 5' : undefined} />
+        </>
+      )}
+      {warn && (
+        <>
+          <path d={warn.tri} fill={FOE} stroke="#ffffff" strokeWidth={2} strokeLinejoin="round" />
+          <path d={warn.mark} fill="#ffffff" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+const FACE_WORD = { front: 'front', left: 'left side', right: 'right side', rear: 'rear', top: 'top' } as const;
+
+/** A unit's short name ("T-72B3"), by id. */
+const nameOf = (b: Battle, id: string) => {
+  const u = b.units.find((x) => x.id === id);
+  return u ? typeOf(u.type).short : 'enemy';
+};
+
+/** Who would catch it on a flank there, in words. */
+function flankText(b: Battle, ex: Exposure): string {
+  if (ex.vehicle) {
+    const t = ex.threats.find((x) => x.face === 'rear') ?? ex.threats.find((x) => x.face === 'left' || x.face === 'right');
+    return t ? `the ${nameOf(b, t.unit)} would hit its ${t.face === 'rear' ? 'rear' : 'side'}` : 'a known enemy would hit its side';
+  }
+  const t = ex.threats.find((x) => x.flanking);
+  return t ? `the ${nameOf(b, t.unit)} sees round its cover` : 'a known enemy sees round its cover';
+}
+
+/**
+ * A move being looked at: how far, into what, what it could hit from there, who could hit it there
+ * and on which armour (the heading the move leaves it with), and a warning when that is a flank.
+ */
 function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me: Unit; at: Point; dash: boolean; known: Set<string>; onCancel: () => void; onMove: () => void }) {
   const steps = Math.max(Math.abs(at.x - me.x), Math.abs(at.y - me.y));
   const cell = b.map.cells[at.y * b.map.w + at.x] ?? 0;
   const place = PLACE[cell];
-  const cover = cell === 2 || cell === 5 || cell === 6 || cell === 8;
+  const t = typeOf(me.type);
+  const ex = moveExposure(b, me.id, at, dash);
+  const g = glyphOf(ex, isFlying(t));
+  const troops = !!ex && !ex.vehicle && !isFlying(t);
+  const cover = troops ? (ex.shield === 'full' ? 'Full cover' : ex.shield === 'half' ? 'Half cover' : 'In the open') : cell === 2 || cell === 5 || cell === 6 || cell === 8 ? 'Cover' : 'In the open';
   const there = { ...me, x: at.x, y: at.y, moved: true, dashed: dash };
   const enemies = b.units.filter((u) => u.side === 'red' && u.alive && known.has(u.id));
   const shots = dash
@@ -183,16 +268,16 @@ function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me:
         .map((u) => ({ u, info: bestFire(b, there, u, at, false, known) }))
         .filter((x): x is { u: Unit; info: FireInfo } => !!x.info)
         .sort((p, q) => q.info.chance - p.info.chance);
-  // Who of the enemies you know could hit it there, assuming they see it.
-  const threats = enemies
-    .map((u) => ({ u, info: bestFire(b, u, there, u, false, new Set([me.id])) }))
-    .filter((x): x is { u: Unit; info: FireInfo } => !!x.info)
-    .sort((p, q) => q.info.chance - p.info.chance);
   const list = (xs: { u: Unit; info: FireInfo }[]) =>
     xs
       .slice(0, 3)
       .map((x) => `${typeOf(x.u.type).short} ${x.info.chance}%`)
       .join(', ');
+  // Who of the enemies you know could hit it there, assuming they see it, and where (insight.ts).
+  const threats = (ex?.threats ?? [])
+    .slice(0, 3)
+    .map((x) => `${nameOf(b, x.unit)} ${x.chance}%${ex?.vehicle && x.face ? ` ${FACE_WORD[x.face]}` : ''}`)
+    .join(', ');
   return (
     <div className="mb-2 rounded-xl bg-ink-900 p-3" data-testid="move-card">
       <div className="flex items-baseline justify-between gap-2">
@@ -200,18 +285,34 @@ function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me:
           {dash ? 'Dash' : 'Move'} {steps} {steps === 1 ? 'cell' : 'cells'}
           {place ? ` into ${place}` : ''}
         </span>
-        <span className="shrink-0 text-[13px] font-semibold text-muted">{cover ? 'Cover' : 'In the open'}</span>
+        <span className="shrink-0 text-[13px] font-semibold text-muted" data-testid="move-cover">
+          {cover}
+        </span>
       </div>
-      <dl className="mt-1.5 space-y-1 text-[14px] leading-snug">
-        <div className="flex gap-2">
-          <dt className="w-[92px] shrink-0 text-muted">From there</dt>
-          <dd className="min-w-0" data-testid="move-shots">{dash ? 'A dash ends its turn: no shot' : shots.length ? list(shots) : 'Nothing you know of in sight'}</dd>
+      <div className="mt-1.5 flex items-start gap-2.5">
+        {g && <FacingIcon g={g} />}
+        <dl className="min-w-0 flex-1 space-y-1 text-[14px] leading-snug">
+          <div className="flex gap-2">
+            <dt className="w-[84px] shrink-0 text-muted">From there</dt>
+            <dd className="min-w-0" data-testid="move-shots">{dash ? 'A dash ends its turn: no shot' : shots.length ? list(shots) : 'Nothing you know of in sight'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-[84px] shrink-0 text-muted">Can hit it</dt>
+            <dd className="min-w-0" data-testid="move-threats">{threats || 'None you know of'}</dd>
+          </div>
+        </dl>
+      </div>
+      {ex?.flanked && (
+        <div className="mt-1.5 flex items-center gap-2 text-[14px] leading-snug" data-testid="move-flank">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" aria-hidden>
+            <path d="M12 2.5 22.5 20.5H1.5Z" fill={FOE} stroke="#ffffff" strokeWidth="1.5" strokeLinejoin="round" />
+            <path d="M11 8.5h2v6h-2zM11 16h2v2h-2z" fill="#ffffff" />
+          </svg>
+          <span>
+            <span className="font-semibold">Flank exposed:</span> {flankText(b, ex)}
+          </span>
         </div>
-        <div className="flex gap-2">
-          <dt className="w-[92px] shrink-0 text-muted">Can hit it</dt>
-          <dd className="min-w-0" data-testid="move-threats">{threats.length ? list(threats) : 'None you know of'}</dd>
-        </div>
-      </dl>
+      )}
       <div className="mt-2.5 flex gap-2">
         <button type="button" className="v-btn v-btn-secondary h-11 flex-1 text-[15px]" onClick={onCancel} data-testid="move-cancel">
           Cancel
@@ -222,6 +323,32 @@ function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me:
       </div>
     </div>
   );
+}
+
+/** Nothing of the enemy to draw (their turn, or nothing switched on). */
+const NO_INSIGHT: Omit<InsightOverlay, 'ghosts'> = { threat: null, threatOf: null, watch: [], air: [], likely: [], glyph: null, scouted: [] };
+
+/**
+ * What the field shows of the enemy, from your side's observation only (insight.ts): the Danger Area
+ * or one enemy's reach, overwatch, air defence for your aircraft and drones, likely targets (Easy and
+ * Normal), the facing glyph at a move being looked at, and the expected area seen empty.
+ */
+function insightFor(b: Battle, me: Unit | undefined, danger: boolean, reachOf: string | null, looked: { at: Point; dash: boolean } | null): Omit<InsightOverlay, 'ghosts'> {
+  const air = (u: Unit) => isFlying(typeOf(u.type)) || typeOf(u.type).weapons.some((w) => w.kind === 'fpv' || w.kind === 'loiter');
+  const mine = b.units.filter((u) => u.side === 'blue' && u.alive && !u.carrier);
+  // Rings for the aircraft (or drone team) you have selected, else for your first one when you ask.
+  const ref = me && air(me) ? me : danger || reachOf ? (mine.find((u) => isFlying(typeOf(u.type))) ?? mine.find(air)) : undefined;
+  const rings = !ref ? [] : reachOf ? airThreats(b, ref.id).filter((r) => r.unit === reachOf) : me === ref ? airThreats(b, ref.id) : airThreats(b, ref.id, true);
+  const glyph = looked && me ? glyphOf(moveExposure(b, me.id, looked.at, looked.dash), isFlying(typeOf(me.type))) : null;
+  return {
+    threat: !reachOf && danger ? dangerArea(b) : null,
+    threatOf: reachOf ? enemyReach(b, reachOf) : null,
+    watch: overwatchAreas(b),
+    air: rings,
+    likely: danger || reachOf ? likelyTargets(b).filter((l) => !reachOf || l.from === reachOf).map((l) => ({ from: l.fromAt, to: l.toAt })) : [],
+    glyph: glyph && looked ? { at: looked.at, g: glyph } : null,
+    scouted: scoutedEmpty(b),
+  };
 }
 
 function Tile({ u, active, onClick }: { u: Unit; active: boolean; onClick: () => void }) {
@@ -466,6 +593,14 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const [danger, setDanger] = useState(false);
   /** One enemy's reach (a long-press on it), or null. */
   const [reachOf, setReachOf] = useState<string | null>(null);
+  /** The Danger Area's line on what the shading means, for a moment after it comes on. */
+  const [dangerNote, setDangerNote] = useState(false);
+  useEffect(() => {
+    setDangerNote(danger);
+    if (!danger) return;
+    const t = setTimeout(() => setDangerNote(false), 2600);
+    return () => clearTimeout(t);
+  }, [danger]);
   /** The enemy's turn (or the opening) is playing: orders wait for it. Your own film never blocks you. */
   const [waiting, setWaiting] = useState(true);
   const waitingRef = useRef(true);
@@ -488,6 +623,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const [report, setReport] = useState<string | null>(null);
   const tally0 = useRef({ killed: 0, lost: 0 });
   const lastSeen = useRef<Set<string> | null>(null);
+  /** Last known positions as drawn on your last turn, held through theirs. */
+  const ghostsRef = useRef<Overlay['ghosts'] | null>(null);
   /** What the screen last drew: your turn, with a unit selected (for the ready hook). */
   const drawn = useRef({ myTurn: false, selected: false });
   /** The strength bars, read when the film is still so they never run ahead of it. */
@@ -700,8 +837,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   useEffect(() => {
     const s = stageRef.current;
     if (!s || !b) return;
-    const ghosts = Object.values(b.intel.blue).filter((g) => !g.now).map((g) => ({ x: g.x, y: g.y, type: g.type, age: b.turnIndex - g.turn }));
-    const o: Overlay = { selected: myTurn ? selected : null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts, danger, reachOf };
+    // Last known positions as of your turn: during theirs the battle is ahead of the film.
+    const ghosts = myTurn || !ghostsRef.current ? Object.values(b.intel.blue).filter((g) => !g.now).map((g) => ({ x: g.x, y: g.y, type: g.type, age: b.turnIndex - g.turn })) : ghostsRef.current;
+    if (myTurn) ghostsRef.current = ghosts;
+    const looked = card?.kind === 'move' ? card : null;
+    const o: Overlay = { selected: myTurn ? selected : null, reach: [], dash: [], path: null, dest: null, targets: [], area: null, ghosts, danger, reachOf, ...(myTurn ? insightFor(b, me, danger, reachOf, looked) : NO_INSIGHT) };
     if (myTurn && me) {
       const start = me.y * b.map.w + me.x;
       if (reach) o.reach = [...reach.cost.keys()].filter((i) => i !== start);
@@ -709,7 +849,6 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       o.targets = targets.map((t) => t.unit.id);
       const r = dash ? dashReach : reach;
       // The route to the move being looked at, else the cell under the pointer, else the advised move.
-      const looked = card?.kind === 'move' ? card : null;
       const to = looked ? looked.at : hover && r?.cost.has(hover.y * b.map.w + hover.x) && (hover.x !== me.x || hover.y !== me.y) ? hover : !card && mode.kind === 'none' && adviceMove ? adviceMove.to : null;
       const route = looked ? (looked.dash ? (dashReach ?? reachable(b, me, true, visible)) : reach) : to && hover === to ? r : adviceMove?.dash ? (dashReach ?? reachable(b, me, true, visible)) : reach;
       if (looked) o.dest = looked.at;
@@ -1028,6 +1167,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   }
 
   const ranked = [...actions].sort((p, q) => p.pri - q.pri);
+  const suppressed = me && b && myTurn ? suppressionNote(b, me) : null;
   const shownActions = more ? ranked : ranked.filter((a, i) => i < 3 || a.pressed);
   const hiddenActions = ranked.length - shownActions.length;
 
@@ -1159,6 +1299,13 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         </div>
       )}
 
+      {myTurn && mode.kind === 'none' && (reachOf || dangerNote) && (
+        <div className="pointer-events-none absolute inset-x-0 top-[30%] z-10 px-4 text-center" data-testid="arena-danger-note">
+          <span className="inline-block max-w-[340px] rounded-2xl bg-black/85 px-4 py-2 text-[14px] leading-snug font-semibold text-white">
+            {reachOf && b ? `Where the ${nameOf(b, reachOf)} could fire next turn` : 'Where the enemies you see could fire next turn. Darker where more of them could.'}
+          </span>
+        </div>
+      )}
       {mode.kind !== 'none' && (
         <div className="pointer-events-none absolute inset-x-0 top-[30%] z-10 text-center">
           <span className="rounded-full bg-black/85 px-4 py-2 text-[15px] font-semibold text-white">
@@ -1227,6 +1374,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 {me.name} · {statusLine(me)}
                 {!me.acted && !indirect ? (targets.length ? ` · ${targets.length} in sight` : ' · nothing in sight') : ''}
               </div>
+              {suppressed && (
+                <div className="px-1 text-[13px] leading-snug" data-testid="arena-suppression">
+                  <span className="font-semibold">{suppressed.title}:</span> <span className="text-muted">{suppressed.text}</span>
+                </div>
+              )}
               {advice.length > 0 && (
                 <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-ink-900 py-1 pr-1 pl-3" data-testid="arena-advice">
                   <div className="min-w-0 flex-1 text-[13px] leading-snug">
