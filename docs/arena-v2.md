@@ -705,8 +705,37 @@ pacing and feel are under "Watch it (v2.3)" in section 11. The rules (sections 3
 three places only: a Hold order, an engineer's breach on any adjacent cell (it lifts a mine there,
 or sweeps), and Reset Turn.
 
-**Touch and camera** (`apps/web/src/arena/ArenaScreen.tsx`, `stage.ts`)
-<!-- A: filled in on merge -->
+**Touch and camera** (`camera-math.ts`, `gestures.ts`, `peek.tsx`, `probe.ts`; `stage.ts`)
+- The ground stays under the fingers. When a second finger lands, the ground under both is pinned,
+  and every move solves the camera's focus, heading and distance (tilt held) by least squares so the
+  pinned ground stays under them; one-finger drag, the wheel and double-tap zoom pin it too. The
+  camera's projection lives in one pure module (`camera-math.ts`, HUD offset included) that both the
+  solve and the drawn view use. Past the zoom or field limits the ground slides under the fingers
+  rather than the map jumping. Measured error, after the twist and pinch catch up: 0.000 px in the
+  unit tests over zooms 4.5 to 80, four headings, tilts 28 to 82 degrees, five screens, four HUD
+  bands and hilly ground; 0.01 px at most in the browser at 375, 393 and 440 pt (the gate is 4 px).
+- Thresholds and locks (`gestures.ts`, a pure state machine): a twist starts after 12 degrees, a
+  pinch after 5%, and the dead zone is then caught up at twice the finger's rate, so nothing jumps.
+  Two fingers side by side moving up or down together tilt, locked for that gesture. A second finger
+  cancels a tap or long-press; more than 10 pt of travel or a 480 ms hold is never a tap; only a clean
+  tap gives an order (pointer cancel, lost capture, a hidden page or blur end a gesture with none).
+  While a finger is down nothing else moves the camera: glides stop and the film's follow waits.
+- North chip: shown when the view is more than 4 degrees off north, its needle pointing north; a tap
+  eases back. A twist that ends within 10 degrees of a quarter turn settles on it.
+- Long-press (480 ms, a ring filling under the finger from 150 ms): on a seen enemy, its reach on the
+  field and a card (type, strength as seen, what you saw hit it, weapons and ranges, armour); on a
+  cell, lines of sight from there for the selected unit (solid where it could fire, dashed where it
+  could only see) with a card, from blue's knowledge only; on your own unit, its full card (crew or
+  men, weapons with range and ammunition, armour by facing, status). Right-click does the same.
+- Tap precision: where a cell draws under 44 pt, a tap snaps to the nearest cell the unit can move to
+  within 22 pt; a second tap on the same spot steps through an air and ground stack; a pin 78 px tall
+  marks where the move ends, above the thumb.
+- Thumb layout: the footer is 231 pt with the unit card (27% of an 852 pt screen); Fire and Move are
+  52 pt tall, Undo 56 pt, End Turn 24 pt clear of Fire. The Left-Handed setting moves the camera
+  buttons, End Turn and Undo to the left and puts the main button of each pair on the left. The
+  framed unit stays above the bottom card.
+- Synthetic multi-touch (`tests/e2e/touch.ts`, CDP) proves the logic in Chromium, not the feel on iOS
+  glass; `docs/device-testing.md` lists what to check on a phone.
 
 **Reading the field** (`packages/arena/src/v2/insight.ts`, drawn by `apps/web/src/arena/overlays.ts`)
 - Every answer below is computed from blue's picture only (`observeBlue`; see the last part),

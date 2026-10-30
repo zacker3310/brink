@@ -90,6 +90,14 @@ Run each item on the floor device; tick it and write down what you saw.
   units while the camera is still moving.
 - [ ] **Interrupted gestures:** start a pinch and lift one finger, start a drag and bring in a second
   finger, drag off the screen's edge, and pull down Control Center mid-gesture.
+- [ ] **The ground under the fingers:** put two fingers on two landmarks (a house corner, a tank)
+  and pinch, twist and drag; the landmarks should stay under the fingertips throughout (the gate is
+  4 CSS px; Chromium measures 0.01). Note any lag behind the fingers, and whether a small twist or
+  pinch starts at all (dead zones: 12 degrees, 5%).
+- [ ] **Taps and presses:** tap a unit and a cell while zoomed out (cells under 44 pt snap to the
+  nearest legal cell within 22 pt); long-press an enemy, a cell and your own unit (480 ms, the ring
+  from 150 ms); check no long-press becomes an order and no drag becomes a tap. Try it left-handed.
+- [ ] **Haptics:** Fire and End Turn should tick (Safari 17.4 and up, Haptics on); off, no tick.
 - [ ] **Memory pressure and recovery:** with a battle open, open the Camera and record 30 s of 4K
   video, open a few heavy web pages in other tabs, then return. Note whether the context was lost
   (the overlay says Context Lost, the screen says Restoring the Battlefield), whether the page

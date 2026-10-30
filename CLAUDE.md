@@ -24,7 +24,8 @@ Run these, do not guess them. Healthy output is shown so a wrong result is obvio
 | lint | `pnpm lint` | turbo `N successful, N total` |
 | types | `pnpm typecheck` | turbo `N successful, N total` |
 | soak | `pnpm test:soak` | `endings {...} rejected AI orders 0`, `rejected AI actions 0`, `2 passed` |
-| e2e | `pnpm test:e2e` | every spec `passed`, the 4 frame-time probes `skipped` (`ARENA_PERF=1` runs them) |
+| matrix | `pnpm test:matrix` | `GENUINE FAILURES` all 0, `rejected AI actions 0`, `1 passed` |
+| e2e | `pnpm test:e2e` | every spec `passed`; skipped: the 4 frame-time probes (`ARENA_PERF=1`) and the ten-battle leak run (`ARENA_STABILITY=1`) |
 | build | `pnpm build` | `apps/web/dist/index.html` written |
 | run | `pnpm dev` | Vite on http://localhost:5173 |
 

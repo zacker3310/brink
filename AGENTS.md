@@ -15,11 +15,14 @@ Run from the repo root. Node 22+, pnpm 10.
 | all checks | `pnpm check` (typecheck, lint, unit tests) |
 | unit tests | `pnpm test` |
 | soak | `pnpm test:soak` (100 AI matches, `SOAK_MATCHES=20` for a quick run; 60 battle setups at each of three difficulties, `ARENA_SOAK=20`) |
+| battle matrix | `pnpm test:matrix` (24 seeded battles to their end across every dimension, `ARENA_MATRIX=60` for more; failing seeds go to `tests/soak/arena-failing-seeds.json` and run first next time) |
 | e2e | `pnpm test:e2e` (builds the web app, serves it on :4173, runs Chromium) |
 | build | `pnpm build` (web bundle in `apps/web/dist`) |
 
 First e2e run on a machine: `pnpm --filter @brink/tests exec playwright install chromium`.
 Arena frame time on an emulated iPhone 13: `ARENA_PERF=1 pnpm test:e2e arena-perf`.
+The ten-battle leak run: `ARENA_STABILITY=1 pnpm test:e2e arena-resilience`. Device numbers come only
+from a real iPhone (`docs/device-testing.md`); a container run measures nothing about one.
 
 ## Architecture decisions
 
@@ -40,6 +43,9 @@ Arena frame time on an emulated iPhone 13: `ARENA_PERF=1 pnpm test:e2e arena-per
   changes it.
 - Determinism and permutation tests must stay green; add a case when you add a phase.
 - The soak tests must report 0 invalid states, 0 rejected AI orders and 0 rejected AI battle actions.
+- The battle matrix must report 0 genuine failures: no crash, broken state or step, forbidden command,
+  refused AI action, endless battle, replay or resume divergence, or fog leak (the film shown a hidden
+  shooter included). It excuses nothing; a defect it finds is fixed, not listed.
 - Never weaken a test to make it pass. A test asserting the wrong thing gets fixed with a comment saying
   why the old assertion was wrong.
 
