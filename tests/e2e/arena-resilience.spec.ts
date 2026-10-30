@@ -229,6 +229,9 @@ test('ten battles in one session leak nothing', async ({ page, context }) => {
     return r.listeners.length;
   };
   await setUp(page);
+  // Every skirmish open already, so the stars each win earns do not change the menu.
+  await page.evaluate(() => localStorage.setItem('brink.career.v1', JSON.stringify({ battles: 0, wins: 0, stars: 99, best: {}, warsWon: [] })));
+  await page.reload();
   await page.getByTestId('menu-skirmish').click();
   let base: { nodes: number; canvases: number; win: number; doc: number } | null = null;
   for (let i = 0; i < 10; i++) {
