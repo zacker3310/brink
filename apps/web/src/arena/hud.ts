@@ -20,6 +20,8 @@ export interface BadgeState {
 }
 
 export type Tone = 'good' | 'bad' | 'plain';
+/** How much a word matters: minor words (Miss, Bounced) are quick and give way; kills hold and pop. */
+export type Weight = 'minor' | 'major' | 'kill';
 
 /** A seen enemy (or where they are expected) off the edge of the screen: an arrow you can tap. */
 export interface EdgePointer {
@@ -49,9 +51,18 @@ interface Callout {
   born: number;
   /** Lift so several words over one unit do not sit on each other. */
   stack: number;
+  weight: Weight;
+  key: string;
+  /** Words of one group over one unit replace each other ("2 Down" then "3 Down"). */
+  group: string;
 }
 
-const LIFE = 1.9;
+/** Seconds a word stays, by weight. */
+const LIFE: Record<Weight, number> = { minor: 1, major: 1.4, kill: 1.8 };
+/** Words on screen at once; past it a minor word gives way, or is not shown. */
+const MAX_WORDS = 4;
+/** How big a word pops as it lands: kills to 180%. */
+const POP: Record<Weight, number> = { minor: 1.1, major: 1.1, kill: 1.8 };
 
 const MARKS: Record<BadgeStatus, string> = {
   none: '',
@@ -72,6 +83,8 @@ export class FieldHud {
   private readonly pointers = new Map<string, { el: HTMLButtonElement; arrow: HTMLElement; count: HTMLElement; last: string }>();
   private callouts: Callout[] = [];
   private clock = 0;
+  /** Reduced motion: words fade in and out where they stand, with no rise or pop. */
+  still = false;
 
   constructor(
     host: HTMLElement,
@@ -182,17 +195,31 @@ export class FieldHud {
       }
   }
 
-  /** Words over a unit or a point, rising and fading. */
-  callout(text: string, tone: Tone, anchor: () => { x: number; y: number } | null, key = ''): void {
+  /** Words over a unit or a point, rising and fading; no more than four at once, the minor ones giving way. */
+  callout(text: string, tone: Tone, anchor: () => { x: number; y: number } | null, key = '', weight: Weight = 'major', group = ''): void {
+    const same = group && key ? this.callouts.find((c) => c.key === key && c.group === group) : undefined;
+    if (same) {
+      same.el.textContent = text;
+      same.el.dataset.tone = tone;
+      same.born = this.clock;
+      return;
+    }
+    if (this.callouts.length >= MAX_WORDS) {
+      const give = this.callouts.find((c) => c.weight === 'minor') ?? (weight === 'minor' ? undefined : (this.callouts.find((c) => c.weight === 'major') ?? this.callouts[0]));
+      if (!give) return;
+      give.el.remove();
+      this.callouts.splice(this.callouts.indexOf(give), 1);
+    }
     const el = document.createElement('div');
     el.className = 'arena-callout';
     el.dataset.tone = tone;
+    el.dataset.weight = weight;
     el.textContent = text;
     el.setAttribute('data-testid', 'arena-callout');
     this.el.appendChild(el);
-    const stack = key ? this.callouts.filter((c) => c.el.dataset.key === key && this.clock - c.born < 0.6).length : 0;
+    const stack = key ? this.callouts.filter((c) => c.key === key && this.clock - c.born < 0.6).length : 0;
     if (key) el.dataset.key = key;
-    this.callouts.push({ el, anchor, born: this.clock, stack });
+    this.callouts.push({ el, anchor, born: this.clock, stack, weight, key, group });
   }
 
   /** A label pinned to a place on the ground; null removes it. */
@@ -222,7 +249,8 @@ export class FieldHud {
     this.clock += dt;
     this.callouts = this.callouts.filter((c) => {
       const age = this.clock - c.born;
-      if (age >= LIFE) {
+      const life = LIFE[c.weight];
+      if (age >= life) {
         c.el.remove();
         return false;
       }
@@ -231,10 +259,13 @@ export class FieldHud {
         c.el.style.display = 'none';
         return true;
       }
-      const rise = 18 + 26 * Math.min(1, age / 0.5) + c.stack * 24;
-      const pop = age < 0.12 ? 0.7 + (age / 0.12) * 0.4 : age < 0.24 ? 1.1 - ((age - 0.12) / 0.12) * 0.1 : 1;
+      // Up and in with a pop (kills to 180%, then settling), or held still and faded in.
+      const peak = POP[c.weight];
+      const rise = 18 + (this.still ? 0 : 26 * Math.min(1, age / 0.5)) + c.stack * 24;
+      const pop = this.still ? 1 : age < 0.12 ? 0.7 + (age / 0.12) * (peak - 0.7) : age < 0.3 ? peak - ((age - 0.12) / 0.18) * (peak - 1) : 1;
+      const fade = Math.min(this.still ? Math.min(1, age / 0.15) : 1, age > life - 0.35 ? (life - age) / 0.35 : 1);
       c.el.style.display = '';
-      c.el.style.opacity = String(age > LIFE - 0.5 ? (LIFE - age) / 0.5 : 1);
+      c.el.style.opacity = fade.toFixed(3);
       c.el.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y - rise)}px) translate(-50%, -100%) scale(${pop.toFixed(3)})`;
       return true;
     });

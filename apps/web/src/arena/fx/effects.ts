@@ -160,6 +160,8 @@ interface Projectile {
 const MAX_PROJECTILES = 48;
 const MAX_DELAYED = 64;
 const MAX_FLASHES = 16;
+/** A light flash this strong or more is a bright flash (an autocannon's muzzle and up; a machine gun's is not). */
+const BRIGHT_FLASH = 5;
 const MAX_CANDIDATES = 48;
 
 function bezier(out: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, t: number): THREE.Vector3 {
@@ -190,6 +192,8 @@ export class Effects {
   private readonly st = new SmokeTpl();
   private readonly gt = new GlowTpl();
   private readonly lights: THREE.PointLight[] = [];
+  /** When the last bright flash went off (ms, real time). */
+  private brightAt = -Infinity;
   private readonly ctx: FrameCtx;
   private clock = 0;
   private lastDt = 1 / 60;
@@ -423,6 +427,12 @@ export class Effects {
 
   private flash(x: number, y: number, z: number, intensity: number, decay: number, range: number): void {
     if (this.lights.length === 0) return;
+    // Bright flashes no more than three a second, in real time whatever the film's speed (WCAG 2.3.1).
+    if (intensity >= BRIGHT_FLASH) {
+      const now = performance.now();
+      if (now - this.brightAt < 1000 / 3) return;
+      this.brightAt = now;
+    }
     const i = this.flashNext;
     this.flashNext = (i + 1) % MAX_FLASHES;
     this.fX[i] = x;
