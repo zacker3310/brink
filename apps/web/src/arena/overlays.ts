@@ -289,6 +289,11 @@ export class InsightLayer {
     return this.placeLabels;
   }
 
+  /** Something is moving (scouted dots shrinking away): a frame on demand should keep coming. */
+  get animating(): boolean {
+    return this.fading.size > 0;
+  }
+
   /** What it shows, for tests. */
   counts(): { threat: number; threatOf: number; watch: number; air: number; suspected: number; likely: number; glyph: string | null; ghosts: number; expected: number } {
     const k = this.keys as { air?: readonly AirRing[]; watch?: readonly WatchArea[]; likely?: string };
