@@ -14,6 +14,7 @@ import {
   endTurn,
   fireInfo,
   fitMen,
+  isFlying,
   pickConditions,
   RANKS,
   reachable,
@@ -49,6 +50,8 @@ import type { BattleRequest } from './battle';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
 import { BattleStage, type Overlay } from './stage';
 import { classOf, health } from './units';
+import { Gestures, HOLD_MS, HOLD_SHOW_MS, OFF_NORTH, SMALL_CELL, SNAP_REACH, stackPick, type Gesture, type PointerInput, type TapMark } from './gestures';
+import { EnemyCard, SightCard, sightFrom, UnitSheet } from './peek';
 
 // One battle, fought in turns: a brief, the fight, the verdict. On your turn tap a unit, tap a lit
 // cell to move it, tap a ringed enemy to see the odds, Fire to shoot; the unit card has the rest
@@ -170,7 +173,7 @@ function adviceText(b: Battle, me: Unit, plan: Action[], known: Set<string>): st
 }
 
 /** A move being looked at: how far, into what, what it could hit from there, and who could hit it. */
-function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me: Unit; at: Point; dash: boolean; known: Set<string>; onCancel: () => void; onMove: () => void }) {
+function MoveCard({ b, me, at, dash, known, left, onCancel, onMove }: { b: Battle; me: Unit; at: Point; dash: boolean; known: Set<string>; left: boolean; onCancel: () => void; onMove: () => void }) {
   const steps = Math.max(Math.abs(at.x - me.x), Math.abs(at.y - me.y));
   const cell = b.map.cells[at.y * b.map.w + at.x] ?? 0;
   const place = PLACE[cell];
@@ -194,7 +197,7 @@ function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me:
       .map((x) => `${typeOf(x.u.type).short} ${x.info.chance}%`)
       .join(', ');
   return (
-    <div className="mb-2 rounded-xl bg-ink-900 p-3" data-testid="move-card">
+    <div className="mb-3 rounded-xl bg-ink-900 p-3" data-testid="move-card">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[16px] font-bold">
           {dash ? 'Dash' : 'Move'} {steps} {steps === 1 ? 'cell' : 'cells'}
@@ -202,7 +205,7 @@ function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me:
         </span>
         <span className="shrink-0 text-[13px] font-semibold text-muted">{cover ? 'Cover' : 'In the open'}</span>
       </div>
-      <dl className="mt-1.5 space-y-1 text-[14px] leading-snug">
+      <dl className="mt-1 space-y-0.5 text-[14px] leading-snug">
         <div className="flex gap-2">
           <dt className="w-[92px] shrink-0 text-muted">From there</dt>
           <dd className="min-w-0" data-testid="move-shots">{dash ? 'A dash ends its turn: no shot' : shots.length ? list(shots) : 'Nothing you know of in sight'}</dd>
@@ -212,11 +215,11 @@ function MoveCard({ b, me, at, dash, known, onCancel, onMove }: { b: Battle; me:
           <dd className="min-w-0" data-testid="move-threats">{threats.length ? list(threats) : 'None you know of'}</dd>
         </div>
       </dl>
-      <div className="mt-2.5 flex gap-2">
-        <button type="button" className="v-btn v-btn-secondary h-11 flex-1 text-[15px]" onClick={onCancel} data-testid="move-cancel">
+      <div className={`mt-2 flex gap-2 ${left ? 'flex-row-reverse' : ''}`}>
+        <button type="button" className="v-btn v-btn-secondary h-[52px] flex-1 text-[15px]" onClick={onCancel} data-testid="move-cancel">
           Cancel
         </button>
-        <button type="button" className="v-btn v-btn-primary h-11 flex-[1.6] text-[15px] font-semibold" onClick={onMove} data-testid="arena-move">
+        <button type="button" className="v-btn v-btn-primary h-[52px] flex-[1.6] text-[16px] font-semibold" onClick={onMove} data-testid="arena-move">
           {dash ? 'Dash' : 'Move'}
         </button>
       </div>
@@ -376,6 +379,7 @@ function Brief({ req, onDifficulty, onFight, onQuick, onBack }: { req: BattleReq
           <li>Each unit moves, then acts. Tap a unit, tap inside its outline to move, tap a red badge for the odds.</li>
           <li>Hit them in the side or rear: their front armour is far thicker. Smoke hides you for a turn.</li>
           <li>Pinch or use the plus and minus buttons to zoom; the target button brings the camera back to your unit, the map button shows the whole field.</li>
+          <li>Hold a finger on a unit for its card, or on a cell to see what your unit could see and hit from there.</li>
           {s.abilities.length > 0 && <li>From your research: {s.abilities.map((a) => ABILITIES[a].name).join(', ')}.</li>}
         </ul>
         <div className="mt-auto flex flex-col gap-2 pt-6 pb-4">
@@ -466,6 +470,16 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const [danger, setDanger] = useState(false);
   /** One enemy's reach (a long-press on it), or null. */
   const [reachOf, setReachOf] = useState<string | null>(null);
+  /** A long-press card in the footer: a seen enemy, or the view from a cell for the selected unit. */
+  const [peek, setPeek] = useState<{ kind: 'enemy'; id: string } | { kind: 'sight'; at: Point } | null>(null);
+  /** A long-press on a unit of yours opens its full card. */
+  const [sheet, setSheet] = useState<string | null>(null);
+  /** The ring that fills under a finger held still. */
+  const [ring, setRing] = useState<Point | null>(null);
+  /** The view is turned off north: the north chip shows, its needle turned by the frame loop. */
+  const [rotated, setRotated] = useState(false);
+  const needleRef = useRef<SVGGElement>(null);
+  const cameraRef = useRef<HTMLDivElement>(null);
   /** The enemy's turn (or the opening) is playing: orders wait for it. Your own film never blocks you. */
   const [waiting, setWaiting] = useState(true);
   const waitingRef = useRef(true);
@@ -555,6 +569,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     let raf = 0;
     let ended = 0;
     let wasBusy = true;
+    let turned = false;
+    let needleEl: SVGGElement | null = null;
+    let needleDeg = Number.NaN;
     const el = host.current!;
     const battle = createBattle(req.setup);
     battleRef.current = battle;
@@ -586,12 +603,25 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           console.warn('battle frame failed; the film is put right', e);
           stage.recover();
         }
-        // Odds labels ride over their targets as the camera moves.
+        // Odds labels ride over their targets as the camera moves, the move pin over its cell.
         const box = el.getBoundingClientRect();
         for (const n of labelsRef.current?.children ?? []) {
           const [x, y] = (n as HTMLElement).dataset.at!.split(',').map(Number);
-          const at = stage.toScreen(x!, y!, 0.7);
+          const at = stage.toScreen(x!, y!, Number((n as HTMLElement).dataset.h ?? 0.7));
           (n as HTMLElement).style.transform = `translate(${at.x - box.left}px, ${at.y - box.top}px) translate(-50%, -100%)`;
+        }
+        // The north chip shows while the view is turned off north, its needle pointing north.
+        const heading = stage.heading;
+        if (Math.abs(heading) > OFF_NORTH !== turned) {
+          turned = !turned;
+          setRotated(turned);
+        }
+        const needle = needleRef.current;
+        const deg = Math.round((heading * 180) / Math.PI);
+        if (needle && (needle !== needleEl || deg !== needleDeg)) {
+          needleEl = needle;
+          needleDeg = deg;
+          needle.setAttribute('transform', `rotate(${deg} 12 12)`);
         }
         const b = stage.busy;
         if (!b && waitingRef.current) {
@@ -695,6 +725,29 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   // What a good commander would do with this unit, from your side's picture only.
   const advice = useMemo(() => (b && me && myTurn && !me.acted ? advise(b, me.id) : []), [b, me?.id, me?.x, me?.y, me?.moved, me?.acted, myTurn, b?.events.length]);
   const adviceMove = advice.find((a): a is Extract<Action, { type: 'move' }> => a.type === 'move');
+  // A long-press on a cell: what the selected unit could see and hit from there, drawn as lines.
+  const sight = useMemo(() => (b && me && myTurn && peek?.kind === 'sight' ? sightFrom(b, me, peek.at, visible) : null), [b, me, myTurn, peek, visible, me?.x, me?.y, me?.moved]);
+  useEffect(() => {
+    const at = peek?.kind === 'sight' && sight ? peek.at : null;
+    stageRef.current?.setProbe(at, (sight ?? []).filter((r) => r.sees || r.shot).map((r) => ({ id: r.u.id, shot: !!r.shot })));
+  }, [sight]);
+  // Arrows at the edge keep clear of the camera buttons, on whichever side they stand.
+  useEffect(() => {
+    const col = cameraRef.current;
+    if (!col) return;
+    const put = () => {
+      const r = col.getBoundingClientRect();
+      const h = host.current?.getBoundingClientRect();
+      if (h) stageRef.current?.setControls({ left: r.left - h.left, top: r.top - h.top, right: r.right - h.left, bottom: r.bottom - h.top });
+    };
+    put();
+    const ro = new ResizeObserver(put);
+    ro.observe(col);
+    return () => ro.disconnect();
+  }, [ready, settings.leftHanded, settings.quality]);
+  const peekUnit = peek?.kind === 'enemy' && b ? b.units.find((u) => u.id === peek.id && u.alive && visible.has(u.id)) : undefined;
+  const peeking = !!peekUnit || (peek?.kind === 'sight' && !!sight && !!me);
+  const sheetUnit = sheet && b ? b.units.find((u) => u.id === sheet && u.alive) : undefined;
 
   // Keep the 3D overlay in step with the selection.
   useEffect(() => {
@@ -793,8 +846,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     refresh();
   };
 
-  /** Act on a tapped cell; false when the tap did nothing (so a second one zooms). */
-  const tapCell = (p: Point): boolean => {
+  /** Act on a tapped cell (or on `unit` in it); false when the tap did nothing (so a second one zooms). */
+  const tapCell = (p: Point, unit?: Unit): boolean => {
     if (!b || !myTurn) return false;
     if (mode.kind === 'ability') {
       doAct({ type: 'ability', id: mode.id, at: p });
@@ -804,7 +857,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       setCard({ kind: 'support', asset: mode.asset, at: p });
       return true;
     }
-    const there = unitAt(b, p.x, p.y) ?? unitAt(b, p.x, p.y, true);
+    const there = unit ?? unitAt(b, p.x, p.y) ?? unitAt(b, p.x, p.y, true);
     if (mode.kind === 'face' && me) {
       doAct({ type: 'face', unit: me.id, facing: Math.atan2(p.y - me.y, p.x - me.x) });
       return true;
@@ -848,25 +901,68 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     return false;
   };
 
+  /** The last tap on the field and the unit it took, for stepping through a stack. */
+  const lastTap = useRef<TapMark | null>(null);
+  /** A ground unit your side knows of stands there (a hidden one never counts: that would give it away). */
+  const knownAt = (p: Point) => !!b && b.units.some((u) => u.alive && !u.carrier && u.x === p.x && u.y === p.y && !isFlying(typeOf(u.type)) && (u.side === 'blue' || visible.has(u.id)));
+  /** A cell the selected unit can move to now (dashing, if Dash is on). */
+  const movable = (p: Point) => !!b && !!me && !!(dash ? dashReach : reach)?.cost.has(p.y * b.map.w + p.x) && !knownAt(p) && (p.x !== me.x || p.y !== me.y);
+  /** Units your side knows of in the same cell as `u`, ground first: a helicopter over a tank. */
+  const stackOf = (u: Unit) => (b ? b.units.filter((v) => v.alive && !v.carrier && v.x === u.x && v.y === u.y && (v.side === 'blue' || visible.has(v.id))).sort((p, q) => Number(isFlying(typeOf(p.type))) - Number(isFlying(typeOf(q.type))) || p.id.localeCompare(q.id)) : [u]);
+
+  /** Where cells draw under 44 points, the cell it can move to nearest a tap, within 22 points; else null. */
+  const snapCell = (stage: BattleStage, c: Point, x: number, y: number): Point | null => {
+    if (!b) return null;
+    const a = stage.toScreen(c.x, c.y);
+    const e = stage.toScreen(Math.min(b.map.w - 1, c.x + 1), c.y);
+    const s = stage.toScreen(c.x, Math.min(b.map.h - 1, c.y + 1));
+    const size = Math.min(Math.hypot(e.x - a.x, e.y - a.y) || Infinity, Math.hypot(s.x - a.x, s.y - a.y) || Infinity);
+    if (size >= SMALL_CELL) return null;
+    const r = Math.ceil(SNAP_REACH / Math.max(4, size)) + 1;
+    let best: Point | null = null;
+    let bestD = SNAP_REACH;
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        const p = { x: c.x + dx, y: c.y + dy };
+        if (p.x < 0 || p.y < 0 || p.x >= b.map.w || p.y >= b.map.h || !movable(p)) continue;
+        const q = stage.toScreen(p.x, p.y);
+        const d = Math.hypot(q.x - x, q.y - y);
+        if (d <= bestD) {
+          bestD = d;
+          best = p;
+        }
+      }
+    return best;
+  };
+
   /**
    * A tap on the field. Badges and larger-than-life models stand above their cells, so a tap near
    * one counts for that unit: an enemy you can shoot, else a move into the lit area, else a unit of
-   * yours. A second tap that does nothing, close to the first, zooms in there.
+   * yours. Where cells draw small, a tap just off one it can move to takes that cell. A second tap
+   * on the same spot steps through a stack; a second tap that does nothing zooms in there.
    */
   const tapAt = (x: number, y: number) => {
     const stage = stageRef.current;
     if (!stage || !b) return;
-    // A tap ends a long-press look at one enemy's reach.
+    // A tap puts away a long-press card, and the enemy's reach it showed.
     if (reachOf) setReachOf(null);
+    if (peek) setPeek(null);
+    const now = performance.now();
     const c = stage.pick(x, y);
     const near = stage.unitNear(x, y, 30);
-    const nearUnit = near ? b.units.find((u) => u.id === near) : undefined;
+    const found = near ? b.units.find((u) => u.id === near) : undefined;
+    const pick = found ? stackPick(stackOf(found).map((u) => u.id), found.id, { x, y, t: now }, lastTap.current) : null;
+    const nearUnit = pick ? b.units.find((u) => u.id === pick) : undefined;
+    lastTap.current = { x, y, t: now, unit: nearUnit?.id ?? null };
     let done = false;
-    if (nearUnit && nearUnit.side === 'red' && targets.some((t) => t.unit.id === nearUnit.id) && mode.kind === 'none') done = tapCell(nearUnit);
-    else if (c && me && myTurn && mode.kind === 'none' && (dash ? dashReach : reach)?.cost.has(c.y * b.map.w + c.x) && !unitAt(b, c.x, c.y) && (c.x !== me.x || c.y !== me.y)) done = tapCell(c);
-    else if (nearUnit && nearUnit.side === 'blue' && mode.kind === 'none') done = tapCell(nearUnit);
-    else if (c) done = tapCell(c);
-    const now = performance.now();
+    if (nearUnit && nearUnit.side === 'red' && targets.some((t) => t.unit.id === nearUnit.id) && mode.kind === 'none') done = tapCell(nearUnit, nearUnit);
+    else if (c && me && myTurn && mode.kind === 'none' && movable(c)) done = tapCell(c);
+    else if (nearUnit && nearUnit.side === 'blue' && mode.kind === 'none') done = tapCell(nearUnit, nearUnit);
+    else {
+      const snap = c && me && myTurn && mode.kind === 'none' ? snapCell(stage, c, x, y) : null;
+      if (snap) done = tapCell(snap);
+      else if (c) done = tapCell(c);
+    }
     const last = lastNoop.current;
     if (!done && last && now - last.t < 380 && Math.hypot(x - last.x, y - last.y) < 40) {
       stage.zoomBy(0.55, { x, y });
@@ -878,53 +974,95 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
 
 
-  // One finger (or the mouse) drags the board, two pinch to zoom, twist to turn and slide to tilt;
-  // right-drag orbits with a mouse. A press that does not move is a tap.
-  const pointers = useRef(new Map<number, { x: number; y: number; x0: number; y0: number; moved: boolean; button: number }>());
-  const pinch = useRef<{ d: number; a: number; my: number } | null>(null);
-  const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: false, button: e.button });
-    if (pointers.current.size === 2) {
-      const [p, q] = [...pointers.current.values()];
-      pinch.current = { d: Math.hypot(p!.x - q!.x, p!.y - q!.y), a: Math.atan2(q!.y - p!.y, q!.x - p!.x), my: (p!.y + q!.y) / 2 };
-      for (const v of pointers.current.values()) v.moved = true;
-    }
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
+  /**
+   * A long-press (or a right-click): a seen enemy shows its card and its reach, a unit of yours its
+   * full card, a cell what the selected unit could see and hit from there. Nothing is ordered.
+   */
+  const pressAt = (x: number, y: number) => {
     const stage = stageRef.current;
-    const p = pointers.current.get(e.pointerId);
-    if (stage && p) {
-      const dx = e.clientX - p.x;
-      const dy = e.clientY - p.y;
-      p.x = e.clientX;
-      p.y = e.clientY;
-      if (!p.moved && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > 9) p.moved = true;
-      if (pointers.current.size === 2 && pinch.current) {
-        const [m, n] = [...pointers.current.values()];
-        const d = Math.hypot(m!.x - n!.x, m!.y - n!.y);
-        const a = Math.atan2(n!.y - m!.y, n!.x - m!.x);
-        const my = (m!.y + n!.y) / 2;
-        if (pinch.current.d > 0 && d > 0) stage.zoomBy(pinch.current.d / d, { x: (m!.x + n!.x) / 2, y: my });
-        // The map turns with the fingers (it used to turn against them).
-        stage.twistBy(Math.atan2(Math.sin(a - pinch.current.a), Math.cos(a - pinch.current.a)));
-        stage.orbitBy(0, (my - pinch.current.my) * 0.004);
-        pinch.current = { d, a, my };
-      } else if (p.moved && (p.button === 2 || e.shiftKey)) stage.orbitBy(-dx * 0.006, dy * 0.004);
-      else if (p.moved) stage.panBy(dx, dy);
-    }
-    if (e.pointerType === 'mouse' && !p) {
-      const c = stage?.pick(e.clientX, e.clientY) ?? null;
-      if (c?.x !== hover?.x || c?.y !== hover?.y) setHover(c);
+    if (!stage || !b) return;
+    const id = stage.unitNear(x, y, 30);
+    const u = id ? b.units.find((v) => v.id === id) : undefined;
+    if (u?.side === 'red' && visible.has(u.id)) {
+      const again = reachOf === u.id;
+      setReachOf(again ? null : u.id);
+      setPeek(again ? null : { kind: 'enemy', id: u.id });
+    } else if (u?.side === 'blue') setSheet(u.id);
+    else {
+      const c = stage.pick(x, y);
+      if (c && me && myTurn) setPeek({ kind: 'sight', at: c });
     }
   };
-  const onPointerUp = (e: React.PointerEvent) => {
-    const p = pointers.current.get(e.pointerId);
-    pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinch.current = null;
-    if (!p || p.moved || p.button === 2) return;
-    tapAt(e.clientX, e.clientY);
+
+  // Pointers go through the gesture state machine (gestures.ts): one finger drags the ground under
+  // it, two pinch, twist and drag it or tilt, right-drag orbits with a mouse; a still press is a
+  // tap, a held one a long-press. Only a clean tap gives orders. The timers and page listeners call
+  // in from older renders, so what the gestures ask for is done through refs.
+  const gestures = useRef(new Gestures());
+  const holdTimers = useRef<number[]>([]);
+  const handlers = useRef({ tap: tapAt, press: pressAt });
+  handlers.current = { tap: tapAt, press: pressAt };
+  const run = (out: readonly Gesture[]) => {
+    const stage = stageRef.current;
+    for (const g of out) {
+      if (g.kind === 'grab') stage?.hold(true);
+      else if (g.kind === 'release') {
+        for (const t of holdTimers.current) clearTimeout(t);
+        holdTimers.current = [];
+        stage?.hold(false);
+        if (g.twisted) stage?.settleHeading();
+      } else if (g.kind === 'pin') stage?.pin(g.points);
+      else if (g.kind === 'drag') stage?.drag(g.points, g, g.delta);
+      else if (g.kind === 'tilt') stage?.tiltBy(g.dy * 0.004);
+      else if (g.kind === 'orbit') stage?.orbitBy(-g.dx * 0.006, g.dy * 0.004);
+      else if (g.kind === 'ring') setRing(g.at);
+      else if (g.kind === 'press') handlers.current.press(g.at.x, g.at.y);
+      else if (g.kind === 'tap') handlers.current.tap(g.at.x, g.at.y);
+      else if (g.kind === 'hover') {
+        const c = stage?.pick(g.at.x, g.at.y) ?? null;
+        setHover((h) => (c?.x === h?.x && c?.y === h?.y ? h : c));
+      }
+    }
   };
+  // Presses are timed by when the finger touched and lifted (the events' own stamps), not by when a
+  // busy page got round to them: a quick tap is a tap however long a frame took.
+  const pointer = (e: React.PointerEvent): PointerInput => ({
+    id: e.pointerId,
+    x: e.clientX,
+    y: e.clientY,
+    t: e.timeStamp || performance.now(),
+    button: e.button,
+    buttons: e.buttons,
+    kind: e.pointerType === 'mouse' ? 'mouse' : e.pointerType === 'pen' ? 'pen' : 'touch',
+    primary: e.isPrimary,
+    shift: e.shiftKey,
+  });
+  const onPointerDown = (e: React.PointerEvent) => {
+    // Buttons on the field (the arrows at the edge) take their own taps.
+    if ((e.target as Element).closest('button')) return;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    for (const t of holdTimers.current) clearTimeout(t);
+    // The hold acts on the next frame, after any lift already waiting has been handled.
+    const tick = () => requestAnimationFrame(() => run(gestures.current.tick(performance.now())));
+    holdTimers.current = [window.setTimeout(tick, HOLD_SHOW_MS + 5), window.setTimeout(tick, HOLD_MS + 5)];
+    run(gestures.current.pointerDown(pointer(e)));
+  };
+  const onPointerMove = (e: React.PointerEvent) => run(gestures.current.pointerMove(pointer(e)));
+  const onPointerUp = (e: React.PointerEvent) => run(gestures.current.pointerUp(pointer(e)));
+  // Cancelled, or captured away: the press ends and is never a tap.
+  const onPointerCancel = (e: React.PointerEvent) => run(gestures.current.pointerCancel(e.pointerId));
+  // The page hidden or left mid-gesture: everything in hand ends, nothing is ordered.
+  useEffect(() => {
+    const cut = () => run(gestures.current.reset());
+    const hidden = () => document.hidden && cut();
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('blur', cut);
+    return () => {
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('blur', cut);
+      for (const t of holdTimers.current) clearTimeout(t);
+    };
+  }, []);
   const onWheel = (e: React.WheelEvent) => stageRef.current?.zoomBy(Math.exp(e.deltaY * 0.0012), { x: e.clientX, y: e.clientY });
 
   const finishTurn = (auto = false) => {
@@ -1030,10 +1168,43 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const ranked = [...actions].sort((p, q) => p.pri - q.pri);
   const shownActions = more ? ranked : ranked.filter((a, i) => i < 3 || a.pressed);
   const hiddenActions = ranked.length - shownActions.length;
+  // Fire support and research belong to the side, not the unit: with the unit card up they ride at
+  // the end of its row, so the card stays under a third of the screen.
+  const sideChips =
+    b && myTurn
+      ? [
+          ...b.support
+            .filter((s) => s.side === 'blue')
+            .map((s) => (
+              <button key={s.id} type="button" disabled={s.missions <= 0} onClick={() => setMode(mode.kind === 'support' ? { kind: 'none' } : { kind: 'support', asset: s.id })} aria-pressed={mode.kind === 'support'} className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${mode.kind === 'support' && mode.asset === s.id ? 'bg-white text-black' : 'bg-ink-800'}`} data-testid={`support-${s.id}`}>
+                {s.id === 'himars' ? 'HIMARS' : 'Tornado-G'} {s.missions}
+              </button>
+            )),
+          ...(Object.keys(b.abilities) as AbilityId[])
+            .filter((id) => !ABILITIES[id].passive)
+            .map((id) => {
+              const def = ABILITIES[id];
+              const usable = b.abilities[id] === 'ready' && (!def.needsUnit || (!!me && whyNot(b, { type: 'ability', id, unit: me.id }) === null));
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={!usable}
+                  onClick={() => (def.targeted ? setMode(mode.kind === 'ability' && mode.id === id ? { kind: 'none' } : { kind: 'ability', id }) : doAct({ type: 'ability', id, ...(me ? { unit: me.id } : {}) }))}
+                  className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${mode.kind === 'ability' && mode.id === id ? 'bg-white text-black' : 'bg-ink-800'}`}
+                  data-testid={`ability-${id}`}
+                  title={def.text}
+                >
+                  {def.name}
+                </button>
+              );
+            }),
+        ]
+      : [];
 
   return (
     <div className="absolute inset-0 bg-ink-950" data-testid="arena">
-      <div ref={host} className="absolute inset-0" onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onPointerMove={onPointerMove} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()} />
+      <div ref={host} className="absolute inset-0" onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} onLostPointerCapture={onPointerCancel} onPointerMove={onPointerMove} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()} />
       {!ready && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="text-[15px] font-semibold text-muted">Deploying…</span>
@@ -1045,6 +1216,15 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             {l.chance}%
           </div>
         ))}
+        {card?.kind === 'move' && me && myTurn && (
+          // The move's end, marked tall enough to stand clear of the thumb that chose it.
+          <div data-at={`${card.at.x},${card.at.y}`} data-h="0" className="arena-pin" data-testid="move-pin" aria-hidden>
+            <span className="arena-pin-head">
+              <UnitGlyph unitClass={classOf(typeOf(me.type).role)} color="#0b1220" className="h-4 w-6" />
+            </span>
+            <span className="arena-pin-stem" />
+          </div>
+        )}
       </div>
 
       <header ref={headerRef} className="vercel safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-10" data-testid="arena-header">
@@ -1130,8 +1310,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       )}
 
       {ready && (
-        <div className="safe-top safe-x pointer-events-none absolute top-0 right-0 z-10" data-testid="arena-camera">
-          <div className="pointer-events-auto mt-[132px] mr-2 flex flex-col gap-2">
+        <div className={`safe-top safe-x pointer-events-none absolute top-0 z-10 ${settings.leftHanded ? 'left-0' : 'right-0'}`} data-testid="arena-camera">
+          <div ref={cameraRef} className={`pointer-events-auto mt-[132px] flex flex-col gap-2 ${settings.leftHanded ? 'ml-2' : 'mr-2'}`}>
             <CamButton label="Zoom In" testid="cam-in" onClick={() => stageRef.current?.zoomBy(0.65)}>
               <path d="M12 5v14M5 12h14" />
             </CamButton>
@@ -1155,6 +1335,14 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             <CamButton label={danger ? 'Hide Danger Area' : 'Danger Area'} testid="cam-danger" pressed={danger} onClick={() => setDanger(!danger)}>
               <path d="M12 3.5 21 19H3Z M12 9.5v4.5M12 16.6v.1" />
             </CamButton>
+            {rotated && (
+              <CamButton label="North Up" testid="cam-north" onClick={() => stageRef.current?.northUp()}>
+                <g ref={needleRef}>
+                  <path d="M12 3 16 12H8Z" fill="currentColor" />
+                  <path d="M8 12h8l-4 9Z" />
+                </g>
+              </CamButton>
+            )}
           </div>
         </div>
       )}
@@ -1169,19 +1357,31 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
       <footer ref={footerRef} className="vercel safe-bottom safe-x absolute inset-x-0 bottom-0 z-10" data-testid="arena-footer">
         <div className="mx-2 mb-1.5 rounded-2xl bg-black/85 p-2 backdrop-blur">
-          {card?.kind === 'move' && b && me && (
+          {peekUnit && b && (
+            <EnemyCard
+              b={b}
+              u={peekUnit}
+              onClose={() => {
+                setPeek(null);
+                setReachOf(null);
+              }}
+            />
+          )}
+          {peek?.kind === 'sight' && sight && b && me && <SightCard b={b} me={me} at={peek.at} rows={sight} onClose={() => setPeek(null)} />}
+          {!peeking && card?.kind === 'move' && b && me && (
             <MoveCard
               b={b}
               me={me}
               at={card.at}
               dash={card.dash}
               known={visible}
+              left={settings.leftHanded}
               onCancel={() => setCard(null)}
               onMove={() => doAct({ type: 'move', unit: me.id, to: card.at, ...(card.dash ? { dash: true } : {}) })}
             />
           )}
-          {card && card.kind !== 'move' && b && (
-            <div className="mb-2 rounded-xl bg-ink-900 p-3" data-testid="shot-card">
+          {!peeking && card && card.kind !== 'move' && b && (
+            <div className="mb-3 rounded-xl bg-ink-900 p-3" data-testid="shot-card">
               {card.kind === 'fire' && me ? (
                 <ShotCard b={b} shooter={me} target={b.units.find((u) => u.id === card.target)!} weapon={card.weapon} visible={visible} onWeapon={(w) => setCard({ ...card, weapon: w })} />
               ) : card.kind === 'strike' && me && indirect ? (
@@ -1195,13 +1395,13 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                   <p className="text-[13px] text-muted">{card.asset === 'himars' ? 'One guided rocket: on the cell when it is watched. Everything around it is hit too.' : 'Forty rockets over five by five cells.'}</p>
                 </div>
               ) : null}
-              <div className="mt-2 flex gap-2">
-                <button type="button" className="v-btn v-btn-secondary h-11 flex-1 text-[15px]" onClick={() => setCard(null)}>
+              <div className={`mt-2 flex gap-2 ${settings.leftHanded ? 'flex-row-reverse' : ''}`}>
+                <button type="button" className="v-btn v-btn-secondary h-[52px] flex-1 text-[15px]" onClick={() => setCard(null)}>
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="v-btn v-btn-primary h-11 flex-[1.6] text-[15px] font-semibold"
+                  className="v-btn v-btn-primary h-[52px] flex-[1.6] text-[16px] font-semibold"
                   data-testid="arena-fire"
                   onClick={() => {
                     if (card.kind === 'fire' && me) doAct({ type: 'fire', unit: me.id, target: card.target, weapon: card.weapon }, false);
@@ -1215,20 +1415,20 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             </div>
           )}
 
-          {!card && me && myTurn && (
+          {!peeking && !card && me && myTurn && (
             <div className="mb-2" data-testid="arena-unit">
               <div className="flex items-baseline gap-2 px-1">
-                <div className="min-w-0 flex-1 truncate text-[15px] font-bold">
+                <div className="min-w-0 flex-1 truncate text-[15px] leading-tight font-bold">
                   {typeOf(me.type).name}
                   {me.rank > 0 && <span className="ml-1.5 text-[12px] font-semibold text-muted">{RANKS[me.rank]!.name}</span>}
                 </div>
               </div>
-              <div className="truncate px-1 text-[13px] text-muted">
+              <div className="truncate px-1 text-[13px] leading-tight text-muted">
                 {me.name} · {statusLine(me)}
                 {!me.acted && !indirect ? (targets.length ? ` · ${targets.length} in sight` : ' · nothing in sight') : ''}
               </div>
               {advice.length > 0 && (
-                <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-ink-900 py-1 pr-1 pl-3" data-testid="arena-advice">
+                <div className="mt-1 flex items-center gap-2 rounded-xl bg-ink-900 py-0.5 pr-0.5 pl-3" data-testid="arena-advice">
                   <div className="min-w-0 flex-1 text-[13px] leading-snug">
                     <span className="font-semibold">Advice </span>
                     <span className="text-muted">{adviceText(b, me, advice, visible)}</span>
@@ -1238,7 +1438,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                   </button>
                 </div>
               )}
-              <div className={`mt-1.5 flex gap-1.5 pb-0.5 ${more ? 'flex-wrap' : 'overflow-x-auto'}`}>
+              <div className={`mt-1 flex gap-1.5 ${more ? 'flex-wrap' : 'overflow-x-auto'}`}>
                 {shownActions.map((a) => (
                   <button key={a.id} type="button" disabled={!a.ok} onClick={a.on} aria-pressed={a.pressed} className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${a.pressed ? 'bg-white text-black' : 'bg-ink-800 text-text'}`} data-testid={`arena-${a.id}`}>
                     {a.label}
@@ -1249,49 +1449,21 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                     {more ? 'Less' : `More ${hiddenActions}`}
                   </button>
                 )}
+                {sideChips}
               </div>
             </div>
           )}
 
-          {b && myTurn && !card && (Object.keys(b.abilities).some((id) => !ABILITIES[id as AbilityId].passive) || b.support.some((s) => s.side === 'blue')) && (
-            <div className="mb-2 flex gap-1.5 overflow-x-auto">
-              {b.support
-                .filter((s) => s.side === 'blue')
-                .map((s) => (
-                  <button key={s.id} type="button" disabled={s.missions <= 0} onClick={() => setMode(mode.kind === 'support' ? { kind: 'none' } : { kind: 'support', asset: s.id })} aria-pressed={mode.kind === 'support'} className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${mode.kind === 'support' && mode.asset === s.id ? 'bg-white text-black' : 'bg-ink-800'}`} data-testid={`support-${s.id}`}>
-                    {s.id === 'himars' ? 'HIMARS' : 'Tornado-G'} {s.missions}
-                  </button>
-                ))}
-              {(Object.keys(b.abilities) as AbilityId[])
-                .filter((id) => !ABILITIES[id].passive)
-                .map((id) => {
-                  const def = ABILITIES[id];
-                  const usable = b.abilities[id] === 'ready' && (!def.needsUnit || (!!me && whyNot(b, { type: 'ability', id, unit: me.id }) === null));
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      disabled={!usable}
-                      onClick={() => (def.targeted ? setMode(mode.kind === 'ability' && mode.id === id ? { kind: 'none' } : { kind: 'ability', id }) : doAct({ type: 'ability', id, ...(me ? { unit: me.id } : {}) }))}
-                      className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${mode.kind === 'ability' && mode.id === id ? 'bg-white text-black' : 'bg-ink-800'}`}
-                      data-testid={`ability-${id}`}
-                      title={def.text}
-                    >
-                      {def.name}
-                    </button>
-                  );
-                })}
-            </div>
-          )}
+          {!peeking && !card && !(me && myTurn) && sideChips.length > 0 && <div className="mb-2 flex gap-1.5 overflow-x-auto">{sideChips}</div>}
 
-          <div className="flex items-end gap-2">
+          <div className={`flex items-end gap-2 ${settings.leftHanded ? 'flex-row-reverse' : ''}`}>
             <div className="flex min-w-0 flex-1 items-end gap-3 overflow-x-auto" data-testid="arena-units">
               {formations.map((f) => {
                 const units = blue.filter((u) => u.formation === f.id);
                 if (!units.length) return null;
                 return (
                   <div key={f.id} className="shrink-0">
-                    <div className="mb-0.5 max-w-[240px] truncate px-0.5 text-[11px] font-semibold text-muted">{f.name}</div>
+                    {formations.length > 1 && <div className="mb-0.5 max-w-[240px] truncate px-0.5 text-[11px] font-semibold text-muted">{f.name}</div>}
                     <div className="flex gap-1">
                       {units.map((u) => (
                         <Tile
@@ -1312,7 +1484,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               })}
             </div>
             {myTurn && undoRef.current && (
-              <button type="button" onClick={undo} className="v-btn v-btn-secondary h-[58px] shrink-0 px-3 text-[15px] font-semibold" data-testid="arena-undo" aria-label={`Undo the last move of ${b?.units.find((u) => u.id === undoRef.current?.unit)?.name ?? 'your unit'}`}>
+              <button type="button" onClick={undo} className="v-btn v-btn-secondary h-14 min-w-14 shrink-0 px-3 text-[15px] font-semibold" data-testid="arena-undo" aria-label={`Undo the last move of ${b?.units.find((u) => u.id === undoRef.current?.unit)?.name ?? 'your unit'}`}>
                 Undo
               </button>
             )}
@@ -1353,6 +1525,14 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             </div>
           </div>
         </div>
+      )}
+
+      {sheetUnit && b && <UnitSheet b={b} u={sheetUnit} status={statusLine(sheetUnit)} onClose={() => setSheet(null)} />}
+      {ring && (
+        <svg className="arena-hold" style={{ left: ring.x, top: ring.y }} viewBox="0 0 72 72" aria-hidden data-testid="arena-hold">
+          <circle cx="36" cy="36" r="30" className="arena-hold-track" />
+          <circle cx="36" cy="36" r="30" className="arena-hold-fill" />
+        </svg>
       )}
 
       {menu && (
@@ -1415,6 +1595,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                   ['tips', 'Tips', 'A word when the board shows a mistake'],
                   ['haptics', 'Haptics', 'A tick on Fire and End Turn'],
                   ['perfOverlay', 'Show Frame Time', 'For measuring on your phone'],
+                  ['leftHanded', 'Left-Handed', 'Camera buttons and End Turn on the left'],
                 ] as const
               ).map(([k, label, sub]) => (
                 <li key={k}>

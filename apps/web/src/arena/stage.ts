@@ -8,6 +8,9 @@ import { buildWorld, thermalMaterialFor, type World } from './world';
 import type { Library } from './assets';
 import { FieldHud, type BadgeState, type EdgePointer, type Tone } from './hud';
 import { badgeStatus, classOf, health } from './units';
+import { quarterNear, type Pt } from './gestures';
+import { aim, hitGround, pose, solve as solveView, type CameraView } from './camera-math';
+import { SightProbe } from './probe';
 
 // The battle drawn in three.js: the world (ground, buildings, weather, light), the units (built in
 // code; soldiers drawn one by one), the effects and the sound, all driven by the engine's event log
@@ -169,6 +172,17 @@ export class BattleStage {
   private wantDist = PLAY_DIST;
   /** The planning view to return to from the whole-field view. */
   private before: { x: number; z: number; dist: number; tilt: number; yaw: number } | null = null;
+  /** Fingers are on the field: nothing but them moves the camera until they lift. */
+  private held = false;
+  /** Ground pinned under the fingers, kept under them by the solve. */
+  private pins: THREE.Vector3[] = [];
+  /** A camera the solve poses and projects through; never drawn. */
+  private readonly solveCam = new THREE.PerspectiveCamera();
+  private readonly groundAt = (x: number, z: number) => this.ground(x, z);
+  /** Where the camera buttons stand on the host (CSS pixels): arrows at the edge keep clear of them. */
+  private controls: { left: number; top: number; right: number; bottom: number } | null = null;
+  /** Lines of sight from a cell (a long-press on the field). */
+  private readonly probe = new SightProbe(this.scene);
   private shake = 0;
   /** Film steps that threw (each is skipped; the film never stops on one). */
   private faults = 0;
@@ -428,14 +442,8 @@ export class BattleStage {
     // HUD bars: the point the camera looks at moves toward the camera so the focus rises above the
     // screen's middle when the bottom bar is the taller, and the other way round. Exact for flat
     // ground: the focus is seen `delta` above the view axis, which puts it at that band's middle.
-    const half = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const delta = Math.atan((this.hud[1] - this.hud[0]) * half);
-    const h = Math.sin(this.tilt) * this.dist;
-    const r = Math.cos(this.tilt) * this.dist;
-    const s = h / Math.tan(Math.max(0.05, this.tilt - delta)) - r;
-    const fx = this.focus.x + Math.sin(this.yaw) * s;
-    const fz = this.focus.z + Math.cos(this.yaw) * s;
-    const gy = this.ground(this.focus.x, this.focus.z);
+    // The model is camera-math.ts's, shared with the gestures' solve.
+    const { lx: fx, lz: fz, gy, h, r } = aim(this.view(), this.camera.fov, this.groundAt);
     this.camera.position.set(fx + Math.sin(this.yaw) * r, gy + h, fz + Math.cos(this.yaw) * r);
     if (this.shake > 0) this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake));
     this.camera.lookAt(fx, gy, fz);
@@ -450,8 +458,11 @@ export class BattleStage {
     this.yaw = lerpAngle(this.yaw, this.wantYaw, k);
     this.tilt += (this.wantTilt - this.tilt) * k;
     this.dist += (this.wantDist - this.dist) * k;
-    this.hud[0] += (this.wantHud[0] - this.hud[0]) * k;
-    this.hud[1] += (this.wantHud[1] - this.hud[1]) * k;
+    // The framing waits for fingers to lift: the ground they hold stays under them.
+    if (!this.held) {
+      this.hud[0] += (this.wantHud[0] - this.hud[0]) * k;
+      this.hud[1] += (this.wantHud[1] - this.hud[1]) * k;
+    }
     if (this.cam) {
       // An action cam: low and close, then back to the planning view.
       const c = this.cam;
@@ -491,17 +502,118 @@ export class BattleStage {
   zoomBy(factor: number, at?: { x: number; y: number }): void {
     const next = Math.max(MIN_DIST, Math.min(this.maxDist, this.wantDist * factor));
     if (at) {
-      const p = this.groundPoint(at.x, at.y);
-      if (p) {
-        const k = 1 - next / this.wantDist;
-        this.wantFocus.x += (p.x - this.wantFocus.x) * k;
-        this.wantFocus.z += (p.z - this.wantFocus.z) * k;
-      }
+      const p = this.groundUnder(at);
+      this.wantFocus.copy(this.focus);
+      this.wantYaw = this.yaw;
       this.wantDist = next;
       this.dist = next;
-      this.focus.copy(this.wantFocus);
+      if (p) this.solve([p], [at], false, false);
     } else this.wantDist = next;
     this.before = null;
+  }
+
+  /** The camera as camera-math.ts describes it, where it is now. */
+  private view(): CameraView {
+    return { fx: this.focus.x, fz: this.focus.z, yaw: this.yaw, tilt: this.tilt, dist: this.dist, hud: this.hud };
+  }
+
+  /** The canvas on the page, for screen points in client pixels. */
+  private canvasBox(): { left: number; top: number; width: number; height: number } {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width || 1, height: r.height || 1 };
+  }
+
+  /**
+   * The ground under a screen point (client pixels) as the camera stands in its numbers now, which
+   * pointer events can move ahead of the last frame drawn.
+   */
+  private groundUnder(at: Pt): THREE.Vector3 | null {
+    const box = this.canvasBox();
+    this.solveCam.copy(this.camera, false);
+    pose(this.solveCam, this.view(), this.groundAt);
+    return hitGround(this.solveCam, { x: at.x - box.left, y: at.y - box.top }, box, this.groundAt, Math.max(400, this.dist * 4));
+  }
+
+  /**
+   * Fingers on the field: the camera stops where it is (any glide is cancelled), and nothing but
+   * the fingers moves it until they lift (the film's camera waits).
+   */
+  hold(on: boolean): void {
+    this.held = on;
+    if (!on) return;
+    this.wantFocus.copy(this.focus);
+    this.wantYaw = this.yaw;
+    this.wantTilt = this.tilt;
+    this.wantDist = this.dist;
+  }
+
+  /** Pin the ground under these screen points (client pixels); false when one of them misses the field. */
+  pin(points: readonly Pt[]): boolean {
+    const pins = points.map((p) => this.groundUnder(p));
+    this.pins = pins.every((p) => p !== null) ? (pins as THREE.Vector3[]) : [];
+    return this.pins.length === points.length;
+  }
+
+  /**
+   * Move the camera so the pinned ground lies under these screen points (one per pin): it pans
+   * always, and turns and zooms only where `free` lets it; the tilt is held. With both free, two
+   * pinned points stay under two fingers. A one-finger drag whose ground could not be pinned (the
+   * finger over the sky) pans by `delta` instead.
+   */
+  drag(points: readonly Pt[], free: { turn?: boolean; zoom?: boolean } = {}, delta?: Pt): void {
+    if (this.pins.length && points.length === this.pins.length) this.solve(this.pins, points, !!free.turn, !!free.zoom);
+    else if (points.length === 1 && delta) this.panBy(delta.x, delta.y);
+  }
+
+  /**
+   * The focus (and, when free, the heading and distance) that put each world point under its screen
+   * point (client pixels), solved by camera-math.ts from where the camera is now, and taken at once.
+   */
+  private solve(pins: readonly THREE.Vector3[], to: readonly Pt[], turn: boolean, zoom: boolean): void {
+    const box = this.canvasBox();
+    this.solveCam.copy(this.camera, false);
+    const v = solveView(
+      this.solveCam,
+      this.view(),
+      pins,
+      to.map((p) => ({ x: p.x - box.left, y: p.y - box.top })),
+      { turn, zoom },
+      { minDist: MIN_DIST, maxDist: this.maxDist, w: W, h: H },
+      this.groundAt,
+      box,
+    );
+    this.focus.set(v.fx, 0, v.fz);
+    this.wantFocus.copy(this.focus);
+    if (turn) this.yaw = this.wantYaw = wrap(v.yaw);
+    if (zoom) this.dist = this.wantDist = v.dist;
+    this.before = null;
+  }
+
+  /** Tilt at once (radians, positive looks more straight down): two fingers sliding up or down. */
+  tiltBy(radians: number): void {
+    this.wantTilt = Math.max(THREE.MathUtils.degToRad(28), Math.min(THREE.MathUtils.degToRad(82), this.wantTilt + radians));
+    this.tilt = this.wantTilt;
+  }
+
+  /** A twist has ended: within 10 degrees of a quarter turn, the view settles on it. */
+  settleHeading(): void {
+    const q = quarterNear(this.wantYaw);
+    if (q !== null) this.wantYaw = q;
+  }
+
+  /** Ease back to north-up: the attack runs up the screen. */
+  northUp(): void {
+    this.wantYaw = 0;
+  }
+
+  /** How far the view is turned off north as drawn (radians, clockwise positive). */
+  get heading(): number {
+    return wrap(this.yaw);
+  }
+
+  /** Where the camera buttons stand on the host (CSS pixels), so arrows at the edge keep clear of them. */
+  setControls(box: { left: number; top: number; right: number; bottom: number } | null): void {
+    this.controls = box;
   }
 
   /** The camera has arrived where it was going (nothing on screen will shift under a tap). */
@@ -564,6 +676,7 @@ export class BattleStage {
 
   /** Centre on a cell at the playing distance (the unit you are working with). */
   recenter(cell: Point): void {
+    if (this.held) return;
     this.wantFocus.set(cell.x + 0.5, 0, cell.y + 0.5);
     if (this.wantDist > PLAY_DIST * 1.5 || this.wantDist < MIN_DIST * 1.5) this.wantDist = PLAY_DIST;
     if (this.before) {
@@ -574,6 +687,7 @@ export class BattleStage {
 
   /** Bring a point into view if it is near the edge or off screen; `centre` always centres it. */
   follow(x: number, z: number, centre = false): void {
+    if (this.held) return;
     const p = new THREE.Vector3(x, this.ground(x, z), z).project(this.camera);
     const top = 1 - this.hud[0] * 2;
     const bottom = -1 + this.hud[1] * 2;
@@ -587,30 +701,8 @@ export class BattleStage {
 
   /** Where a screen point meets the ground (world units), or null off the field. */
   groundPoint(clientX: number, clientY: number): THREE.Vector3 | null {
-    const r = this.renderer.domElement.getBoundingClientRect();
-    const ndc = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
-    this.ray.setFromCamera(ndc, this.camera);
-    // March along the ray to the heightfield.
-    const o = this.ray.ray.origin;
-    const d = this.ray.ray.direction;
-    let prev = 0;
-    const far = Math.max(400, this.dist * 4);
-    for (let s = 0; s < far; s += 0.25) {
-      const y = o.y + d.y * s;
-      if (y <= this.ground(o.x + d.x * s, o.z + d.z * s)) {
-        // Refine between the last two samples.
-        let lo = prev;
-        let hi = s;
-        for (let i = 0; i < 8; i++) {
-          const m = (lo + hi) / 2;
-          if (o.y + d.y * m <= this.ground(o.x + d.x * m, o.z + d.z * m)) hi = m;
-          else lo = m;
-        }
-        return new THREE.Vector3(o.x + d.x * hi, o.y + d.y * hi, o.z + d.z * hi);
-      }
-      prev = s;
-    }
-    return null;
+    const box = this.canvasBox();
+    return hitGround(this.camera, { x: clientX - box.left, y: clientY - box.top }, box, this.groundAt, Math.max(400, this.dist * 4));
   }
 
   /** The cell under a screen point, or null off the field. */
@@ -665,6 +757,25 @@ export class BattleStage {
     const w = this.host.clientWidth;
     const h = this.host.clientHeight;
     return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h };
+  }
+
+  // --- Sight from a cell (long-press) ----------------------------------------------------------------
+
+  /**
+   * Lines of sight from a cell to enemies on show: solid to those the selected unit could hit from
+   * there, dashed to those it could only see. Null hides them.
+   */
+  setProbe(cell: Point | null, lines: readonly { id: string; shot: boolean }[]): void {
+    if (!cell) {
+      this.probe.set(null, []);
+      return;
+    }
+    const from = this.worldOf(cell, 0.45);
+    const to = lines.flatMap((l) => {
+      const v = this.views.get(l.id);
+      return v && v.holder.visible && v.alive ? [{ to: this.centreOf(v), shot: l.shot }] : [];
+    });
+    this.probe.set(from, to);
   }
 
   // --- Overlay -------------------------------------------------------------------------------------
@@ -888,8 +999,14 @@ export class BattleStage {
       const k = Math.min(Math.abs((dx > 0 ? right - cx : left - cx) / (dx || 1e-6)), Math.abs((dy > 0 ? bottom - cy : top - cy) / (dy || 1e-6)));
       let px = cx + dx * k;
       let py = cy + dy * k;
-      // Keep clear of the camera buttons down the right edge.
-      if (px > w - 70 && py < this.hud[0] * h + 260) px = w - 76;
+      // Keep clear of the camera buttons (down the right edge, or the left for the left hand).
+      const c = this.controls;
+      if (!c) {
+        if (px > w - 70 && py < this.hud[0] * h + 260) px = w - 76;
+      } else if (py > c.top - 24 && py < c.bottom + 24) {
+        if (c.left > w / 2 && px > c.left - 24) px = c.left - 24;
+        else if (c.left <= w / 2 && px < c.right + 24) px = c.right + 24;
+      }
       px = Math.max(left, Math.min(right, px));
       py = Math.max(top, Math.min(bottom, py));
       out.push({ id, label, x: px, y: py, angle: Math.atan2(dy, dx), d: Math.hypot(x - this.focus.x, z - this.focus.z) });
@@ -1641,6 +1758,7 @@ export class BattleStage {
   }
 
   dispose(): void {
+    this.probe.dispose();
     this.hudLayer.dispose();
     this.audio.dispose();
     this.fx.dispose();

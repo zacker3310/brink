@@ -940,3 +940,59 @@ aside[data-testid^='panel-'] section:first-of-type > header {
 .arena-pointer-count:empty {
   display: none;
 }
+/* A finger held still on the field: the ring fills until the long-press (gestures.ts, HOLD_MS). */
+.arena-hold {
+  position: fixed;
+  z-index: 30;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  pointer-events: none;
+  transform: rotate(-90deg);
+}
+.arena-hold circle {
+  fill: none;
+  stroke-width: 5;
+}
+.arena-hold-track {
+  stroke: rgba(0, 0, 0, 0.45);
+}
+.arena-hold-fill {
+  stroke: #ffffff;
+  stroke-linecap: round;
+  stroke-dasharray: 189;
+  stroke-dashoffset: 189;
+  animation: arena-hold-fill 330ms linear forwards;
+}
+@keyframes arena-hold-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+/* Where a move ends, stood on its cell and tall enough to clear the thumb that chose it. */
+.arena-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-200px, -200px);
+}
+.arena-pin-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+.arena-pin-stem {
+  width: 3px;
+  height: 44px;
+  border-radius: 2px;
+  background: #ffffff;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+}
