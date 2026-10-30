@@ -8,3 +8,4 @@ export * from './sight';
 export * from './combat';
 export * from './engine';
 export * from './ai';
+export * from './report';

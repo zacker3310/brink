@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decide, rejectedActions } from './ai';
 import { fireInfo, penChance, usableWeapons } from './combat';
-import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, retreat, strikeInfo, undoable, UNDO_SAFE, unitById } from './engine';
+import { act, arenaResult, autoBattle, autoTurn, canAct, createBattle, endTurn, reachable, retreat, strikeInfo, undoable, UNDO_SAFE, unitById, whyNot } from './engine';
 import { bare, BATTLES, copy, EAST, NORTH, put, setup, SOUTH, spec, unit, weapon } from './fixture.test-util';
 import { typeOf } from './roster';
 import { canSee, lineOfSight, visibleTo } from './sight';
@@ -534,6 +534,48 @@ describe('undo', () => {
   it('every kind of event is classed, and the ones that roll or reveal are unsafe', () => {
     for (const k of ['fire', 'intercept', 'impact', 'casualties', 'suppressed', 'destroyed', 'boom', 'mine', 'spotted', 'lost', 'turn', 'end'] as const) expect(UNDO_SAFE[k], k).toBe(false);
     for (const k of ['move', 'face', 'embark', 'dismount'] as const) expect(UNDO_SAFE[k], k).toBe(true);
+  });
+});
+
+describe('hold', () => {
+  it('marks a unit done for the turn and nothing else: no roll, no event, safe to take back', () => {
+    const b = bare(['m1a2', 'squad_w'], ['t90m']);
+    const tank = put(unit(b, 'm1a2'), 15, 44, NORTH);
+    const squad = put(unit(b, 'squad_w'), 10, 44);
+    put(unit(b, 't90m', 'red'), 3, 0, SOUTH);
+    const before = copy(b);
+    expect(whyNot(b, { type: 'hold', unit: tank.id })).toBeNull();
+    expect(act(b, { type: 'hold', unit: tank.id })).toBe(true);
+    expect(tank).toMatchObject({ acted: true, moved: false, overwatch: false, hunker: false, x: 15, y: 44, facing: NORTH });
+    expect(b.events).toHaveLength(before.events.length);
+    expect(b.stream).toBe(before.stream);
+    expect(undoable(before, b)).toBe(true);
+    // Done: it cannot hold, move or turn again this turn; the others still can.
+    expect(whyNot(b, { type: 'hold', unit: tank.id })).toBe('Done this turn');
+    expect(canAct(b, { type: 'move', unit: tank.id, to: { x: 15, y: 42 } })).toBe(false);
+    expect(canAct(b, { type: 'face', unit: tank.id, facing: EAST })).toBe(false);
+    // A unit that has moved can still hold.
+    expect(act(b, { type: 'move', unit: squad.id, to: { x: 10, y: 42 } })).toBe(true);
+    const moved = copy(b);
+    expect(act(b, { type: 'hold', unit: squad.id })).toBe(true);
+    expect(undoable(moved, b)).toBe(true);
+    // Its next turn it is ready again.
+    endTurn(b);
+    expect(b.turn).toBe('blue');
+    expect(tank.acted).toBe(false);
+  });
+
+  it('only for a unit of the side whose turn it is, on the field', () => {
+    const b = bare(['m2a3', 'squad_w'], ['t90m']);
+    const ifv = put(unit(b, 'm2a3'), 15, 44, NORTH);
+    const rider = put(unit(b, 'squad_w'), 16, 44);
+    const them = put(unit(b, 't90m', 'red'), 3, 0, SOUTH);
+    expect(whyNot(b, { type: 'hold', unit: them.id })).toBe('Not your unit');
+    expect(act(b, { type: 'embark', unit: rider.id, carrier: ifv.id })).toBe(true);
+    expect(whyNot(b, { type: 'hold', unit: rider.id })).toBe('Aboard a carrier');
+    expect(whyNot(b, { type: 'hold', unit: ifv.id })).toBeNull();
+    b.turn = 'red';
+    expect(whyNot(b, { type: 'hold', unit: ifv.id }, 'blue')).toBe('Not your turn');
   });
 });
 
