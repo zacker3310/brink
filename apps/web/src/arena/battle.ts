@@ -1,6 +1,6 @@
 import type { ArenaBattle, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
-import { abilitiesFor, ARSENAL_OF, rankOf, type ArenaResult, type ArenaSetup, type SiteKind, type UnitSpec } from '@brink/arena';
+import { abilitiesFor, ARSENAL_OF, rankOf, type ArenaResult, type ArenaSetup, type Battle, type BattleEvent, type SiteKind, type UnitSpec } from '@brink/arena';
 
 // A battle request: the stack you sent at a hex and the enemies you can see there, set up as an
 // arena fight. Each formation becomes a detachment of a company (docs/arena-v2.md, section 5).
@@ -14,6 +14,10 @@ export interface BattleRequest {
   title: string;
   /** Skirmish practice: no war map behind it. */
   skirmish?: boolean;
+  /** The war-map turn and nation it was ordered on (a saved battle is matched against them). */
+  campaign?: { turn: number; nation: string };
+  /** A saved battle to pick up where it was, instead of a new one, and what it logged that was never shown (arena/resume.ts). */
+  resume?: { battle: Battle; unplayed: BattleEvent[] };
 }
 
 const BASE_SKILL = { easy: 0.18, normal: 0.38, hard: 0.58 } as const;

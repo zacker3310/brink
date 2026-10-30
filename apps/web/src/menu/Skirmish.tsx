@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { readCareer } from '../arena/career';
-import { typeOf, type Role } from '@brink/arena';
+import { clearResume, readResume, resumeRequest } from '../arena/resume';
+import { ROUND_LIMIT, typeOf, type Role } from '@brink/arena';
 import type { UnitClass } from '@brink/contracts';
 import { SKIRMISHES, skirmishRequest } from '../arena/skirmish';
 import { ScreenHeader } from '../chrome';
@@ -32,6 +33,14 @@ function classOf(role: Role): UnitClass {
 }
 
 const TIME = { dawn: 'dawn', day: 'day', dusk: 'dusk', night: 'night' } as const;
+
+/** "9:04 PM" today, else the day as well. */
+function savedWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString() ? `at ${time}` : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+}
 const BIOME = { temperate: 'Temperate', steppe: 'Steppe', desert: 'Desert', winter: 'Winter', urban: 'City' } as const;
 
 export function Skirmish({ onBack }: { onBack: () => void }) {
@@ -40,10 +49,38 @@ export function Skirmish({ onBack }: { onBack: () => void }) {
   useGame((s) => s.battle);
   const career = readCareer();
   const [attempt, setAttempt] = useState(0);
+  // A battle the page was closed in the middle of (saved at every order and turn: arena/resume.ts).
+  const [, setAbandoned] = useState(0);
+  const saved = readResume('skirmish');
   return (
     <main className="safe-top safe-bottom flex min-h-full flex-col" data-testid="skirmish">
       <ScreenHeader kicker="Practice" title="Skirmish" onBack={onBack} />
       <div className="mx-auto w-full max-w-2xl p-4">
+        {saved && (
+          <section className="mb-4 rounded-xl border border-line bg-ink-900 p-3" data-testid="skirmish-saved">
+            <div className="text-[12px] font-semibold text-muted">Battle in Progress</div>
+            <div className="font-display text-lg font-bold uppercase">{saved.request.title}</div>
+            <p className="text-[13px] text-muted">
+              Round {saved.round} of {ROUND_LIMIT}, saved {savedWhen(saved.savedAt)}. Starting another battle replaces it.
+            </p>
+            <div className="mt-2.5 flex gap-2">
+              <button type="button" onClick={() => fight(resumeRequest(saved))} className="v-btn v-btn-primary h-11 flex-1 text-[15px] font-semibold" data-testid="skirmish-resume">
+                Resume Battle
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearResume('skirmish');
+                  setAbandoned((n) => n + 1);
+                }}
+                className="v-btn v-btn-secondary h-11 px-4 text-[15px]"
+                data-testid="skirmish-abandon"
+              >
+                Abandon
+              </button>
+            </div>
+          </section>
+        )}
         <dl className="grid grid-cols-4 gap-2 text-center">
           {(
             [
