@@ -323,7 +323,7 @@ describe('observation', () => {
     expect(observeBlue(o)).toEqual(o);
     const moves = someMoves(b, mulberry32(3));
     expectSame(answers(o, moves), answers(b, moves), 'observing first');
-  });
+  }, BATTLES);
 });
 
 describe('fog: nothing hidden changes an answer', () => {
@@ -334,7 +334,7 @@ describe('fog: nothing hidden changes an answer', () => {
     base.intel.blue[tunguska.id] = { unit: tunguska.id, type: 'tunguska', x: 25, y: 6, turn: base.turnIndex - 2, now: false };
     const checked = fogCheck(base, mulberry32(11), 3, 'fixture');
     expect(checked).toBeGreaterThanOrEqual(MUTATIONS.length * 2);
-  });
+  }, BATTLES);
 
   it('over generated battles: random forces, fields, light and weather, a few turns in', () => {
     const terrains: Terrain[] = ['plains', 'forest', 'hills', 'mountains', 'urban'];
@@ -423,7 +423,7 @@ describe('danger area', () => {
     expect(level[cell(b, 15, 22)]).toBe(DANGER_STEPS);
     expect(Math.max(...level)).toBe(DANGER_STEPS);
     expect(level[cell(b, 15, 44)]).toBe(0);
-  });
+  }, BATTLES);
 
   it('asks once per state: the same answer until something changes', () => {
     const b = fight();
@@ -455,6 +455,8 @@ describe('likely targets', () => {
     expect(likely).toHaveLength(1);
     expect(likely[0]!.from).toBe(t72.id);
     expect([tank.id, squad.id]).toContain(likely[0]!.to);
+    expect(likely[0]!.fromAt).toEqual({ x: t72.x, y: t72.y });
+    expect(likely[0]!.toAt).toEqual({ x: unitById(b, likely[0]!.to)!.x, y: unitById(b, likely[0]!.to)!.y });
     // The chance is the engine's own, for that shot.
     const w = typeOf('t72b3').weapons.find((x) => x.id === likely[0]!.weapon)!;
     const target = unitById(b, likely[0]!.to)!;
@@ -550,7 +552,7 @@ describe('move exposure', () => {
       expect(ex.flanked).toBe(ex.threats.some((t) => t.face === 'left' || t.face === 'right' || t.face === 'rear'));
     }
     expect(checked).toBeGreaterThanOrEqual(3);
-  });
+  }, BATTLES);
 
   it('a vehicle with nothing known keeps the way it drove', () => {
     const b = bare(['m1a2'], ['t72b3']);

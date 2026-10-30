@@ -261,6 +261,9 @@ export function dangerArea(b: Battle): number[] {
 export interface LikelyShot {
   from: string;
   to: string;
+  /** Where the shooter and its target stand. */
+  fromAt: Point;
+  toAt: Point;
   /** Percent, as the shot card would show it to them. */
   chance: number;
   weapon: string;
@@ -289,7 +292,7 @@ export function likelyTargets(b: Battle): LikelyShot[] {
         const value = shotValue(obs, info, u) * (ad && isFlying(typeOf(u.type)) ? 3 : 1);
         if (value > bestValue) {
           bestValue = value;
-          best = { from: e.id, to: u.id, chance: info.chance, weapon: info.weapon.id };
+          best = { from: e.id, to: u.id, fromAt: { x: e.x, y: e.y }, toAt: { x: u.x, y: u.y }, chance: info.chance, weapon: info.weapon.id };
         }
       }
       if (best) out.push(best);
