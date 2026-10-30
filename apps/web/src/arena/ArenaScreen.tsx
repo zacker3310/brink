@@ -4,16 +4,13 @@ import {
   airThreats,
   BREAK_AT,
   DIFFICULTY,
-  act,
   advise,
   arenaResult,
-  autoTurn,
   bestFire,
   buildForce,
   CAPTURE_ROUNDS,
   createBattle,
   dangerArea,
-  endTurn,
   enemyReach,
   fireInfo,
   fitMen,
@@ -33,6 +30,7 @@ import {
   ROUND_LIMIT,
   scoutedEmpty,
   strikeInfo,
+  submit,
   suppLevel,
   supportChance,
   typeOf,
@@ -954,8 +952,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     if (!b || !actions.length) return false;
     const snap = copyBattle(b);
     let done = 0;
+    // Every order goes through the command log, so the battle is its setup plus these commands.
     for (const a of actions) {
-      if (!act(b, a)) break;
+      if (!submit(b, { type: 'act', action: a })) break;
       done++;
     }
     if (!done) return false;
@@ -1173,8 +1172,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     setMode({ kind: 'none' });
     setDash(false);
     setBanner('Enemy Turn');
-    if (auto) autoTurn(b);
-    else endTurn(b);
+    submit(b, { type: auto ? 'auto' : 'end' });
     flush();
   };
 
@@ -1805,7 +1803,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               type="button"
               onClick={() => {
                 setMenu(false);
-                if (b) retreat(b);
+                if (b) submit(b, { type: 'retreat' });
                 flush();
               }}
               className="v-btn v-btn-secondary mt-2 h-12 text-[15px] font-semibold"
