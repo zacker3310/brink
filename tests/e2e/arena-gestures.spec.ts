@@ -242,8 +242,11 @@ for (const size of SIZES) {
         await rest(page);
         const R = await movableOnScreen(page);
         expect(R, 'a cell the unit can move to, on screen').not.toBeNull();
+        // The second finger on the glass: to the right of the first, or to its left near the edge.
+        const second = { x: R!.s.x + 110 <= size.width - 20 ? R!.s.x + 110 : R!.s.x - 110, y: R!.s.y };
+        note('second finger', `first at ${R!.s.x.toFixed(0)},${R!.s.y.toFixed(0)}, second at ${second.x.toFixed(0)},${second.y.toFixed(0)}`);
         await f.down(R!.s);
-        await f.down(R!.s, { x: R!.s.x + 110, y: R!.s.y });
+        await f.down(R!.s, second);
         await f.up();
         await frames(page, 4);
         await expect(page.getByTestId('move-card')).toHaveCount(0);

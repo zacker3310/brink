@@ -1418,14 +1418,22 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const onPointerUp = (e: React.PointerEvent) => run(gestures.current.pointerUp(pointer(e)));
   // Cancelled, or captured away: the press ends and is never a tap.
   const onPointerCancel = (e: React.PointerEvent) => run(gestures.current.pointerCancel(e.pointerId));
-  // The page hidden or left mid-gesture: everything in hand ends, nothing is ordered.
+  // The page hidden or left mid-gesture: everything in hand ends, nothing is ordered. A finger
+  // anywhere off the field (a button, a card, a sheet) while one is on it: that one is no tap or
+  // long-press; the field sees only its own pointers, so this listens on the whole page.
   useEffect(() => {
     const cut = () => run(gestures.current.reset());
     const hidden = () => document.hidden && cut();
+    const other = (e: PointerEvent) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (gestures.current.count && (!el || !host.current?.contains(el) || el.closest('button'))) run(gestures.current.elsewhere());
+    };
     document.addEventListener('visibilitychange', hidden);
+    document.addEventListener('pointerdown', other, true);
     window.addEventListener('blur', cut);
     return () => {
       document.removeEventListener('visibilitychange', hidden);
+      document.removeEventListener('pointerdown', other, true);
       window.removeEventListener('blur', cut);
       for (const t of holdTimers.current) clearTimeout(t);
     };
@@ -1628,8 +1636,6 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       data-testid="arena"
       data-palette={settings.palette}
       onPointerDownCapture={(e) => {
-        // A finger off the field (a button, the cards) while one is on it: that one is no tap.
-        if (gestures.current.count && (!host.current?.contains(e.target as Node) || (e.target as Element).closest?.('button'))) run(gestures.current.elsewhere());
         // A tap anywhere skips an action cam; on the field it does nothing else.
         if (stageRef.current?.endActionCam() && host.current?.contains(e.target as Node)) e.stopPropagation();
         // A tap outside the round report puts it away.
