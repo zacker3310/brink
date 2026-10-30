@@ -306,8 +306,8 @@ export function pathTo(reach: Reach, to: number): Point[] {
   return out;
 }
 
-/** The known enemy most worth keeping the front armour toward. */
-function mainThreat(b: Battle, u: Unit): Point | null {
+/** The known enemy most worth keeping the front armour toward (a vehicle turns to it after a move). */
+export function mainThreat(b: Battle, u: Unit): Point | null {
   let best: Point | null = null;
   let score = 0;
   for (const g of Object.values(b.intel[u.side])) {
@@ -895,6 +895,17 @@ function inCover(b: Battle, u: Unit): boolean {
   return false;
 }
 
+/**
+ * Suppression a unit shakes off when its side's turn begins: 20, 10 more in cover, 10 more with its
+ * leader fit, 10 more if it hunkered, 5 per friend next to it (at most 10); vehicles 30.
+ */
+export function suppRecovery(b: Battle, u: Unit): number {
+  if (typeOf(u.type).mobility !== 'foot') return 30;
+  const rec = 20 + (inCover(b, u) ? 10 : 0) + (u.men[0]?.role === 'leader' && u.men[0].state === 'fit' ? 10 : 0) + (u.hunker ? 10 : 0);
+  const friends = b.units.filter((o) => o !== u && o.side === u.side && o.alive && !o.carrier && cheb(o, u) <= 1).length;
+  return rec + Math.min(10, friends * 5);
+}
+
 function beginTurn(b: Battle, side: Side): void {
   b.turn = side;
   b.smoke = b.smoke.filter((s) => s.until > b.turnIndex);
@@ -902,8 +913,8 @@ function beginTurn(b: Battle, side: Side): void {
   b.events.push({ type: 'turn', side, round: b.round });
   for (const u of b.units) {
     if (u.side !== side || !u.alive) continue;
-    const t = typeOf(u.type);
-    const wasHunkered = u.hunker;
+    // Read before the orders clear: a unit that hunkered recovers faster.
+    const rec = suppRecovery(b, u);
     u.moved = false;
     u.acted = false;
     u.dashed = false;
@@ -912,12 +923,6 @@ function beginTurn(b: Battle, side: Side): void {
     u.smoked = false;
     if (u.supp <= 0) continue;
     const before = suppLevel(u.supp);
-    let rec = 30;
-    if (t.mobility === 'foot') {
-      rec = 20 + (inCover(b, u) ? 10 : 0) + (u.men[0]?.role === 'leader' && u.men[0].state === 'fit' ? 10 : 0) + (wasHunkered ? 10 : 0);
-      const friends = b.units.filter((o) => o !== u && o.side === side && o.alive && !o.carrier && cheb(o, u) <= 1).length;
-      rec += Math.min(10, friends * 5);
-    }
     u.supp = Math.max(0, u.supp - rec);
     const after = suppLevel(u.supp);
     if (after !== before) b.events.push({ type: 'suppressed', unit: u.id, level: after, seen: blueSees(b, u) });

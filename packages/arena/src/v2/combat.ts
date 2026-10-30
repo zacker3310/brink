@@ -345,6 +345,9 @@ function droneInfo(b: Battle, shooter: Unit, target: Unit, w: Weapon, from: Poin
   return info;
 }
 
+/** Air-defence guns this many cells (Chebyshev) from a drone's target can knock the drone down. */
+export const INTERCEPT_RANGE = 4;
+
 /**
  * Chance (0..1) the air defence around a target knocks a drone down on its way in. `known`: count
  * only the guns the attacking side knows about (the card and the AI); the roll counts them all.
@@ -353,7 +356,7 @@ export function interceptors(b: Battle, target: Unit, known?: Set<string>): numb
   let miss = 1;
   for (const u of b.units) {
     if (known && !known.has(u.id)) continue;
-    if (u.side === target.side && u.alive && !u.carrier && cheb(u, target) <= 4) {
+    if (u.side === target.side && u.alive && !u.carrier && cheb(u, target) <= INTERCEPT_RANGE) {
       const t = typeOf(u.type);
       if (u.firepowerKill || suppLevel(u.supp) === 'broken') continue;
       if (t.role === 'spaa') miss *= 0.4;
@@ -601,7 +604,7 @@ export function shoot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, ov
   const drone = w.kind === 'fpv' || w.kind === 'loiter';
   // Drones can be shot down on the way in; APS can stop a missile, a rocket or a drone.
   if (drone && roll(b) < interceptors(b, target)) {
-    const gun = b.units.find((u) => u.side === target.side && u.alive && !u.carrier && cheb(u, target) <= 4 && (typeOf(u.type).role === 'spaa' || typeOf(u.type).weapons.some((x) => x.kind === 'autocannon' && x.air === 'yes')));
+    const gun = b.units.find((u) => u.side === target.side && u.alive && !u.carrier && cheb(u, target) <= INTERCEPT_RANGE && (typeOf(u.type).role === 'spaa' || typeOf(u.type).weapons.some((x) => x.kind === 'autocannon' && x.air === 'yes')));
     b.events.push({ type: 'fire', unit: shooter.id, weapon: w.id, kind: w.kind, calibre: w.calibre, from: { x: shooter.x, y: shooter.y }, to: { x: target.x, y: target.y }, target: target.id, hit: false, chance: info.chance, overwatch, seen: blueSees(b, shooter) || blueSees(b, target) });
     b.events.push({ type: 'intercept', unit: shooter.id, by: gun?.id ?? target.id, x: target.x, y: target.y, seen: blueSees(b, target) });
     return;
