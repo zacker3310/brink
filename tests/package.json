@@ -7,6 +7,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint soak e2e",
     "soak": "vitest run --config vitest.soak.config.ts",
+    "matrix": "vitest run --config vitest.matrix.config.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

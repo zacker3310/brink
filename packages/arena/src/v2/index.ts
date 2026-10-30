@@ -9,3 +9,5 @@ export * from './combat';
 export * from './engine';
 export * from './ai';
 export * from './insight';
+export * from './replay';
+export * from './observe';

@@ -1,4 +1,5 @@
 import type { GovernmentId, TechId, Terrain, UnitClass } from '@brink/contracts';
+import type { PlayerCommand } from './replay';
 
 // Arena v2: the shared contract between the rules engine, the level generator, the roster, the AI,
 // the renderer and the war map. Everything here is plain JSON data (docs/arena-v2.md).
@@ -392,6 +393,8 @@ export interface Battle {
   stats: Record<Side, { shots: number; hits: number; kills: number; lost: number }>;
   /** The seeded stream's state (`draw`). */
   stream: number;
+  /** The player's accepted commands in order (`submit` in replay.ts); absent in older saves. */
+  commands?: PlayerCommand[];
 }
 
 // --- Setup and result --------------------------------------------------------------------------------
