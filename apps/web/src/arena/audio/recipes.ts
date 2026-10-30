@@ -1,8 +1,70 @@
 // Weapon reports and impacts, synthesised from physical layers: the bullet's supersonic crack
 // (N-wave), the muzzle blast (shaped noise with a body resonance), the pressure punch of the blast
 // wave (Friedlander), the gun's mechanism, and the tail that rolls back off the terrain.
+//
+// Heavy reports and blasts (tank guns, artillery, rockets, shells and bombs) keep those parts apart as
+// four buffers, so the engine can weigh them by distance: the transient (crack, flash, the front of
+// the blast wave) is lost first with range, the tail rolls on, and a sub-bass thump under the
+// heaviest carries furthest. Mixed 1:1:1 without the sub, they are the single report.
 
-import { Biquad, decay, finish, friedlander, glide, mode, noise, nwave, patter, rand, rumble, samples, sweep, type Rand, type Samples } from './dsp';
+import { Biquad, decay, filter, finish, friedlander, glide, mode, noise, nwave, patter, rand, rumble, samples, sweep, type Rand, type Samples } from './dsp';
+
+/** A heavy sound in parts. Transient, body and tail share one length and one scale; the sub is its own. */
+export interface Layered {
+  transient: Samples;
+  body: Samples;
+  tail: Samples;
+  sub: Samples | null;
+}
+
+/** Three parts of one sound, empty, to add into. */
+function parts(sr: number, len: number): [Samples, Samples, Samples] {
+  return [samples(sr, len), samples(sr, len), samples(sr, len)];
+}
+
+/** Finish parts that make one sound together: the same filters and fade, one scale (the mix's peak). */
+function together(t: Samples, b: Samples, l: Samples, sr: number, sub: Samples | null, peak = 0.9): Layered {
+  const fade = Math.min(t.length, Math.round(sr * 0.004));
+  for (const buf of [t, b, l]) {
+    filter(buf, new Biquad('highpass', sr, 20), new Biquad('highpass', sr, 20));
+    for (let i = 0; i < fade; i++) buf[buf.length - 1 - i]! *= i / fade;
+  }
+  let max = 0;
+  for (let i = 0; i < t.length; i++) max = Math.max(max, Math.abs(t[i]! + b[i]! + l[i]!));
+  const k = max > 0 ? peak / max : 1;
+  for (const buf of [t, b, l]) for (let i = 0; i < buf.length; i++) buf[i]! *= k;
+  return { transient: t, body: b, tail: l, sub };
+}
+
+/** The parts summed back into one buffer (the sub left out), for the single-buffer registry. */
+function mixdown(x: Layered): Samples {
+  const out = new Float32Array(x.body.length);
+  for (let i = 0; i < out.length; i++) out[i] = x.transient[i]! + x.body[i]! + x.tail[i]!;
+  return out;
+}
+
+interface Thump {
+  /** Where the pitch settles, Hz. */
+  hz: number;
+  /** How far above it the first instant starts, as a share of `hz`. */
+  drop: number;
+  /** Decay, ms. */
+  tau: number;
+}
+
+/**
+ * The sub-bass thump under the heaviest: a sine near 40 Hz that drops into place, with its first
+ * harmonics, so a phone's small speaker (which cannot play 40 Hz) still gives the sense of it, and a
+ * soft saturation for weight. On the web on an iPhone it is the only rumble there is.
+ */
+function thump(sr: number, r: Rand, o: Thump): Samples {
+  const len = Math.min(2, (o.tau / 1000) * 6 + 0.05);
+  const out = samples(sr, len);
+  const hz0 = o.hz * (0.97 + r() * 0.06);
+  glide(out, sr, 0, len, (t) => hz0 * (1 + o.drop * Math.exp(-t / 0.035)), (t) => Math.min(1, t / 0.004) * Math.exp(-t / (o.tau / 1000)), [1, 0.55, 0.3, 0.14], 1);
+  for (let i = 0; i < out.length; i++) out[i] = Math.tanh(out[i]! * 1.4);
+  return finish(out, sr);
+}
 
 interface Report {
   /** Buffer length, seconds. */
@@ -167,20 +229,34 @@ const REPORTS: Record<string, Report> = {
 };
 
 function report(p: Report, sr: number, r: Rand): Samples {
-  const out = samples(sr, p.len);
+  const [t, b, l] = reportParts(p, sr, r);
+  for (let i = 0; i < b.length; i++) b[i] = t[i]! + b[i]! + l[i]!;
+  return finish(b, sr);
+}
+
+/** A report's transient (crack, flash, blast wave), body (muzzle blast, modes, mechanism) and tail. */
+function reportParts(p: Report, sr: number, r: Rand): [Samples, Samples, Samples] {
+  const [t, body, tail] = parts(sr, p.len);
   const lead = p.crack?.lead ?? 0;
-  if (p.crack) nwave(out, sr, 0, p.crack.ms * (0.92 + r() * 0.16), p.crack.amp, r);
+  if (p.crack) nwave(t, sr, 0, p.crack.ms * (0.92 + r() * 0.16), p.crack.amp, r);
   const b = p.blast;
   const env = decay(b.attack, b.tau, b.tau2, b.mix2);
   const blastLen = Math.min(p.len - lead, (b.tau2 || b.tau) * 0.006 + 0.05);
-  noise(out, sr, lead, blastLen, env, [new Biquad('bandpass', sr, b.hz * (0.95 + r() * 0.1), b.q)], b.amp * 1.6, r);
-  noise(out, sr, lead, blastLen, env, [new Biquad('lowpass', sr, b.lp, 0.7)], b.amp * 0.6, r);
-  if (b.bright > 0) noise(out, sr, lead, 0.03, decay(0.1, Math.max(1.5, b.tau * 0.12)), [new Biquad('highpass', sr, 2500)], b.bright, r);
-  friedlander(out, sr, lead, p.punch.ms, p.punch.amp);
-  for (const [hz, tau, amp] of p.body) mode(out, sr, lead, hz * (0.97 + r() * 0.06), tau, amp, r, Math.min(4, 2000 / hz));
-  if (p.mech) clank(out, sr, lead + p.mech.at * (0.9 + r() * 0.2), p.mech.hz, p.mech.amp, r);
-  if (p.tail) rumble(out, sr, lead + 0.01, p.tail.len, p.tail.hz, p.tail.amp, p.tail.bumps, r);
-  return finish(out, sr);
+  noise(body, sr, lead, blastLen, env, [new Biquad('bandpass', sr, b.hz * (0.95 + r() * 0.1), b.q)], b.amp * 1.6, r);
+  noise(body, sr, lead, blastLen, env, [new Biquad('lowpass', sr, b.lp, 0.7)], b.amp * 0.6, r);
+  if (b.bright > 0) noise(t, sr, lead, 0.03, decay(0.1, Math.max(1.5, b.tau * 0.12)), [new Biquad('highpass', sr, 2500)], b.bright, r);
+  friedlander(t, sr, lead, p.punch.ms, p.punch.amp);
+  for (const [hz, tau, amp] of p.body) mode(body, sr, lead, hz * (0.97 + r() * 0.06), tau, amp, r, Math.min(4, 2000 / hz));
+  if (p.mech) clank(body, sr, lead + p.mech.at * (0.9 + r() * 0.2), p.mech.hz, p.mech.amp, r);
+  if (p.tail) rumble(tail, sr, lead + 0.01, p.tail.len, p.tail.hz, p.tail.amp, p.tail.bumps, r);
+  return [t, body, tail];
+}
+
+function layeredReport(key: string, sub: Thump | null): (sr: number, r: Rand) => Layered {
+  return (sr, r) => {
+    const [t, b, l] = reportParts(REPORTS[key]!, sr, r);
+    return together(t, b, l, sr, sub ? thump(sr, r, sub) : null);
+  };
 }
 
 /** A metal mechanism: a few inharmonic modes and a short scrape. */
@@ -217,18 +293,22 @@ function missile(sr: number, r: Rand, kind: 'atgm' | 'manpads'): Samples {
   return finish(out, sr);
 }
 
-/** One rocket of a ripple: the ignition crack and a roar tearing away (Hydra 70, S-8; `heavy`: 122 mm). */
-function rocket(sr: number, r: Rand, heavy: boolean): Samples {
-  const len = heavy ? 1.8 : 1.3;
-  const out = samples(sr, len);
-  friedlander(out, sr, 0, heavy ? 2.5 : 1.2, 0.8);
-  noise(out, sr, 0, 0.05, decay(0.1, 8), [new Biquad('highpass', sr, 1500)], 0.7, r);
+/**
+ * One rocket of a ripple: the ignition crack and a roar tearing away (Hydra 70, S-8; `heavy`: 122 mm,
+ * whose roar also rolls back off the ground over a low push under the launch).
+ */
+function rocket(sr: number, r: Rand, heavy: boolean): Layered {
+  const burn = heavy ? 1.8 : 1.3;
+  const [t, b, l] = parts(sr, heavy ? 2.2 : burn);
+  friedlander(t, sr, 0, heavy ? 2.5 : 1.2, 0.8);
+  noise(t, sr, 0, 0.05, decay(0.1, 8), [new Biquad('highpass', sr, 1500)], 0.7, r);
   const tau = heavy ? 0.6 : 0.35;
-  const env = (t: number) => Math.min(1, t / 0.025) * Math.exp(-t / tau);
-  sweep(out, sr, 0.005, len - 0.01, env, (t) => 5000 * Math.exp(-t / 0.35) + 900, 0.6, 1.3, r);
-  noise(out, sr, 0.005, len - 0.01, env, [new Biquad('lowpass', sr, heavy ? 300 : 420, 0.7)], heavy ? 0.9 : 0.7, r);
-  patter(out, sr, 0.01, len * 0.7, (t) => 120 * Math.exp(-t / 0.3), 1500, 5000, 0.15, r);
-  return finish(out, sr);
+  const env = (x: number) => Math.min(1, x / 0.025) * Math.exp(-x / tau);
+  sweep(b, sr, 0.005, burn - 0.01, env, (x) => 5000 * Math.exp(-x / 0.35) + 900, 0.6, 1.3, r);
+  noise(b, sr, 0.005, burn - 0.01, env, [new Biquad('lowpass', sr, heavy ? 300 : 420, 0.7)], heavy ? 0.9 : 0.7, r);
+  patter(b, sr, 0.01, burn * 0.7, (x) => 120 * Math.exp(-x / 0.3), 1500, 5000, 0.15, r);
+  if (heavy) rumble(l, sr, 0.08, 2.1, 240, 0.35, 6, r);
+  return together(t, b, l, sr, heavy ? thump(sr, r, { hz: 48, drop: 0.5, tau: 160 }) : null);
 }
 
 /**
@@ -267,18 +347,40 @@ function whistle(sr: number, r: Rand): Samples {
 
 // --- Impacts ----------------------------------------------------------------------------------
 
-function explosion(sr: number, r: Rand, o: { len: number; punch: number; bright: number; tau: number; tau2: number; hz: number; sub: number; subTau: number; debris: number; tail: number; tailHz: number }): Samples {
-  const out = samples(sr, o.len);
-  friedlander(out, sr, 0, o.punch, 1);
-  noise(out, sr, 0, 0.04, decay(0.1, 4), [new Biquad('highpass', sr, 1800)], o.bright, r);
+interface Blast {
+  len: number;
+  punch: number;
+  bright: number;
+  tau: number;
+  tau2: number;
+  hz: number;
+  sub: number;
+  subTau: number;
+  debris: number;
+  tail: number;
+  tailHz: number;
+}
+
+/** A blast's transient (blast wave, flash), body (fireball, ground mode, debris) and tail. */
+function explosionParts(sr: number, r: Rand, o: Blast): [Samples, Samples, Samples] {
+  const [t, b, l] = parts(sr, o.len);
+  friedlander(t, sr, 0, o.punch, 1);
+  noise(t, sr, 0, 0.04, decay(0.1, 4), [new Biquad('highpass', sr, 1800)], o.bright, r);
   const env = decay(0.6, o.tau, o.tau2, 0.5);
   const blastLen = Math.min(o.len, o.tau2 * 0.006 + 0.05);
-  noise(out, sr, 0, blastLen, env, [new Biquad('bandpass', sr, o.hz, 0.7)], 1.6, r);
-  noise(out, sr, 0, blastLen, env, [new Biquad('lowpass', sr, o.hz * 2.8, 0.7)], 0.7, r);
-  mode(out, sr, 0, o.sub, o.subTau, 0.55, r, 3);
-  if (o.debris > 0) patter(out, sr, 0.2, o.len - 0.3, (t) => o.debris * Math.exp(-t / 0.55), 400, 3200, 0.12, r);
-  rumble(out, sr, 0.03, o.tail, o.tailHz, 0.42, Math.round(o.tail * 3.5), r);
-  return out;
+  noise(b, sr, 0, blastLen, env, [new Biquad('bandpass', sr, o.hz, 0.7)], 1.6, r);
+  noise(b, sr, 0, blastLen, env, [new Biquad('lowpass', sr, o.hz * 2.8, 0.7)], 0.7, r);
+  mode(b, sr, 0, o.sub, o.subTau, 0.55, r, 3);
+  if (o.debris > 0) patter(b, sr, 0.2, o.len - 0.3, (x) => o.debris * Math.exp(-x / 0.55), 400, 3200, 0.12, r);
+  rumble(l, sr, 0.03, o.tail, o.tailHz, 0.42, Math.round(o.tail * 3.5), r);
+  return [t, b, l];
+}
+
+function explosion(o: Blast, sub: Thump | null): (sr: number, r: Rand) => Layered {
+  return (sr, r) => {
+    const [t, b, l] = explosionParts(sr, r, o);
+    return together(t, b, l, sr, sub ? thump(sr, r, sub) : null);
+  };
 }
 
 function keHit(sr: number, r: Rand): Samples {
@@ -307,19 +409,19 @@ function bounce(sr: number, r: Rand): Samples {
   return finish(out, sr);
 }
 
-function cookOff(sr: number, r: Rand): Samples {
-  const out = explosion(sr, r, { len: 4.2, punch: 9, bright: 0.6, tau: 110, tau2: 520, hz: 110, sub: 32, subTau: 380, debris: 70, tail: 3.8, tailHz: 160 });
+function cookOff(sr: number, r: Rand): Layered {
+  const [t, b, l] = explosionParts(sr, r, { len: 4.2, punch: 9, bright: 0.6, tau: 110, tau2: 520, hz: 110, sub: 32, subTau: 380, debris: 70, tail: 3.8, tailHz: 160 });
   // Ammunition cooking off: pops and bangs for a few seconds, over a crackling fire.
   const pops = 7 + Math.floor(r() * 6);
   for (let i = 0; i < pops; i++) {
-    const t = 0.35 + r() * 3.3;
+    const at = 0.35 + r() * 3.3;
     const a = 0.2 + r() * 0.3;
-    friedlander(out, sr, t, 1 + r() * 2, a);
-    noise(out, sr, t, 0.2, decay(0.3, 15 + r() * 25), [new Biquad('bandpass', sr, 400 + r() * 800, 0.8)], a * 1.2, r);
+    friedlander(b, sr, at, 1 + r() * 2, a);
+    noise(b, sr, at, 0.2, decay(0.3, 15 + r() * 25), [new Biquad('bandpass', sr, 400 + r() * 800, 0.8)], a * 1.2, r);
   }
-  patter(out, sr, 0.3, 3.8, () => 80, 800, 4000, 0.06, r);
-  noise(out, sr, 0.2, 4, (t) => Math.min(1, t / 0.6) * 0.3, [new Biquad('lowpass', sr, 260, 0.7)], 0.4, r);
-  return finish(out, sr);
+  patter(l, sr, 0.3, 3.8, () => 80, 800, 4000, 0.06, r);
+  noise(l, sr, 0.2, 4, (x) => Math.min(1, x / 0.6) * 0.3, [new Biquad('lowpass', sr, 260, 0.7)], 0.4, r);
+  return together(t, b, l, sr, thump(sr, r, { hz: 34, drop: 0.7, tau: 420 }));
 }
 
 function collapse(sr: number, r: Rand): Samples {
@@ -362,6 +464,43 @@ export interface SoundDef {
 
 const rep = (key: string, low: boolean, variants: number): SoundDef => ({ make: (sr, r) => report(REPORTS[key]!, sr, r), low, variants });
 
+export interface LayeredDef {
+  make: (sr: number, r: Rand) => Layered;
+  low: boolean;
+  variants: number;
+  /** The sub's level against the rest, at the source (it carries further; see the engine). */
+  sub: number;
+}
+
+/** The thump under a tank gun, and the deeper, longer one under a howitzer or a shell landing. */
+const TANK: Thump = { hz: 42, drop: 0.6, tau: 190 };
+const GUN: Thump = { hz: 36, drop: 0.7, tau: 300 };
+
+/** Tank guns, artillery and rockets, and the blasts at the other end: played in layers. */
+export const LAYERED: Record<string, LayeredDef> = {
+  '100': { make: layeredReport('100', null), low: true, variants: 1, sub: 0 },
+  '105': { make: layeredReport('105', { ...TANK, hz: 46 }), low: true, variants: 1, sub: 0.25 },
+  '120': { make: layeredReport('120', TANK), low: true, variants: 1, sub: 0.4 },
+  '125': { make: layeredReport('125', TANK), low: true, variants: 1, sub: 0.4 },
+  '152': { make: layeredReport('152', GUN), low: true, variants: 1, sub: 0.45 },
+  '155': { make: layeredReport('155', GUN), low: true, variants: 1, sub: 0.45 },
+  mortar: { make: layeredReport('mortar', null), low: true, variants: 1, sub: 0 },
+  rocket: { make: (sr, r) => rocket(sr, r, false), low: false, variants: 2, sub: 0 },
+  rocket122: { make: (sr, r) => rocket(sr, r, true), low: true, variants: 2, sub: 0.2 },
+  he: { make: explosion({ len: 1.9, punch: 3.2, bright: 0.8, tau: 45, tau2: 220, hz: 260, sub: 55, subTau: 160, debris: 60, tail: 1.7, tailHz: 240 }, null), low: true, variants: 2, sub: 0 },
+  shell: { make: explosion({ len: 2.9, punch: 8, bright: 0.5, tau: 80, tau2: 420, hz: 150, sub: 36, subTau: 300, debris: 90, tail: 2.7, tailHz: 190 }, GUN), low: true, variants: 2, sub: 0.4 },
+  rocket_hit: { make: explosion({ len: 1.6, punch: 2.8, bright: 0.8, tau: 40, tau2: 200, hz: 280, sub: 60, subTau: 140, debris: 50, tail: 1.4, tailHz: 260 }, null), low: true, variants: 2, sub: 0 },
+  bomb: { make: explosion({ len: 3.2, punch: 14, bright: 0.4, tau: 120, tau2: 600, hz: 90, sub: 27, subTau: 450, debris: 100, tail: 3, tailHz: 150 }, { hz: 32, drop: 0.8, tau: 450 }), low: true, variants: 1, sub: 0.55 },
+  mine: { make: explosion({ len: 1.8, punch: 4, bright: 0.9, tau: 40, tau2: 200, hz: 220, sub: 60, subTau: 140, debris: 140, tail: 1.4, tailHz: 260 }, null), low: true, variants: 1, sub: 0 },
+  big: { make: cookOff, low: true, variants: 1, sub: 0.45 },
+};
+
+/** A layered sound as one buffer (its parts summed, no sub), for anything that wants it whole. */
+const whole = (key: string): SoundDef => {
+  const def = LAYERED[key]!;
+  return { make: (sr, r) => finish(mixdown(def.make(sr, r)), sr), low: def.low, variants: def.variants };
+};
+
 export const SOUNDS: Record<string, SoundDef> = {
   '5.56': rep('5.56', false, 3),
   '7.62': rep('7.62', false, 3),
@@ -372,36 +511,45 @@ export const SOUNDS: Record<string, SoundDef> = {
   '35': rep('35', false, 2),
   '40': rep('40', false, 2),
   '84': rep('84', true, 1),
-  '100': rep('100', true, 1),
-  '105': rep('105', true, 1),
-  '120': rep('120', true, 1),
-  '125': rep('125', true, 1),
-  '152': rep('152', true, 1),
-  '155': rep('155', true, 1),
-  mortar: rep('mortar', true, 1),
+  '100': whole('100'),
+  '105': whole('105'),
+  '120': whole('120'),
+  '125': whole('125'),
+  '152': whole('152'),
+  '155': whole('155'),
+  mortar: whole('mortar'),
   atgm: { make: (sr, r) => missile(sr, r, 'atgm'), low: false, variants: 1 },
   manpads: { make: (sr, r) => missile(sr, r, 'manpads'), low: false, variants: 1 },
-  rocket: { make: (sr, r) => rocket(sr, r, false), low: false, variants: 2 },
-  rocket122: { make: (sr, r) => rocket(sr, r, true), low: true, variants: 2 },
+  rocket: whole('rocket'),
+  rocket122: whole('rocket122'),
   fpv: { make: (sr, r) => drone(sr, r, false), low: false, variants: 1 },
   loiter: { make: (sr, r) => drone(sr, r, true), low: false, variants: 1 },
   whistle: { make: whistle, low: false, variants: 1 },
   ke_hit: { make: keHit, low: false, variants: 2 },
   bounce: { make: bounce, low: false, variants: 2 },
-  he: { make: (sr, r) => finish(explosion(sr, r, { len: 1.9, punch: 3.2, bright: 0.8, tau: 45, tau2: 220, hz: 260, sub: 55, subTau: 160, debris: 60, tail: 1.7, tailHz: 240 }), sr), low: true, variants: 2 },
-  shell: { make: (sr, r) => finish(explosion(sr, r, { len: 2.9, punch: 8, bright: 0.5, tau: 80, tau2: 420, hz: 150, sub: 36, subTau: 300, debris: 90, tail: 2.7, tailHz: 190 }), sr), low: true, variants: 2 },
-  rocket_hit: { make: (sr, r) => finish(explosion(sr, r, { len: 1.6, punch: 2.8, bright: 0.8, tau: 40, tau2: 200, hz: 280, sub: 60, subTau: 140, debris: 50, tail: 1.4, tailHz: 260 }), sr), low: true, variants: 2 },
-  bomb: { make: (sr, r) => finish(explosion(sr, r, { len: 3.2, punch: 14, bright: 0.4, tau: 120, tau2: 600, hz: 90, sub: 27, subTau: 450, debris: 100, tail: 3, tailHz: 150 }), sr), low: true, variants: 1 },
-  mine: { make: (sr, r) => finish(explosion(sr, r, { len: 1.8, punch: 4, bright: 0.9, tau: 40, tau2: 200, hz: 220, sub: 60, subTau: 140, debris: 140, tail: 1.4, tailHz: 260 }), sr), low: true, variants: 1 },
-  big: { make: cookOff, low: true, variants: 1 },
+  he: whole('he'),
+  shell: whole('shell'),
+  rocket_hit: whole('rocket_hit'),
+  bomb: whole('bomb'),
+  mine: whole('mine'),
+  big: whole('big'),
   building: { make: collapse, low: true, variants: 1 },
   small: { make: smallArmsLanding, low: false, variants: 3 },
 };
 
+function seed(key: string, take: number): Rand {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  return rand((h ^ (take * 0x9e3779b1)) >>> 0);
+}
+
 /** Synthesises one take of a sound. Same key, rate and take: the same samples. */
 export function synth(key: string, sr: number, take: number): Samples {
   const def = SOUNDS[key] ?? SOUNDS['7.62']!;
-  let h = 2166136261;
-  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
-  return def.make(sr, rand((h ^ (take * 0x9e3779b1)) >>> 0));
+  return def.make(sr, seed(key, take));
+}
+
+/** Synthesises one take of a layered sound, all its parts at once. */
+export function synthLayers(key: string, sr: number, take: number): Layered {
+  return LAYERED[key]!.make(sr, seed(key, take));
 }

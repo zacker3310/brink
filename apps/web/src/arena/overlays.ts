@@ -216,9 +216,10 @@ type StrokeKind = 'threat' | 'watch' | 'air' | 'likely' | 'ghost';
 
 export class InsightLayer {
   readonly group = new THREE.Group();
+  /** Friend and foe: the palette's shared, live colours (palette.ts), worn, never copied. */
   private readonly blue: THREE.Color;
   private readonly red: THREE.Color;
-  private readonly redCss: string;
+  private redCss: string;
   /** Untoned: friend and foe colours stay what they are under the scene's tone mapping. */
   private readonly strokeMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
   private readonly tileGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
@@ -240,15 +241,17 @@ export class InsightLayer {
 
   constructor(
     private readonly ground: (x: number, z: number) => number,
-    colours: { blue: number; red: number },
+    colours: { blue: THREE.Color; red: THREE.Color },
     expected: readonly number[],
   ) {
-    this.blue = new THREE.Color(colours.blue);
-    this.red = new THREE.Color(colours.red);
+    this.blue = colours.blue;
+    this.red = colours.red;
     this.redCss = `#${this.red.getHexString(THREE.SRGBColorSpace)}`;
     this.group.name = 'insight';
     const tiles = (color: THREE.Color, opacity: number, order: number) => {
-      const m = new THREE.InstancedMesh(this.tileGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false }), W * H);
+      const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity, depthWrite: false, toneMapped: false });
+      mat.color = color;
+      const m = new THREE.InstancedMesh(this.tileGeo, mat, W * H);
       m.count = 0;
       m.renderOrder = order;
       m.frustumCulled = false;
@@ -261,7 +264,9 @@ export class InsightLayer {
     this.expected = expected;
     if (expected.length) {
       const dot = new THREE.CircleGeometry(0.14, 12).rotateX(-Math.PI / 2);
-      this.dots = new THREE.InstancedMesh(dot, new THREE.MeshBasicMaterial({ color: this.red, transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false }), expected.length);
+      const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false });
+      mat.color = this.red;
+      this.dots = new THREE.InstancedMesh(dot, mat, expected.length);
       this.dots.renderOrder = 1;
       this.dots.frustumCulled = false;
       this.group.add(this.dots);
@@ -282,6 +287,19 @@ export class InsightLayer {
     this.glyph.renderOrder = 6;
     this.glyph.visible = false;
     this.group.add(this.glyph);
+  }
+
+  /**
+   * The palette changed: tiles and dots follow on their own (they wear the shared colours); strokes
+   * carry their colour in their vertices and the glyphs in a texture, so the next `set` draws them again.
+   */
+  repaint(): void {
+    this.redCss = `#${this.red.getHexString(THREE.SRGBColorSpace)}`;
+    const ghosts = this.ghostGlyphs.material as THREE.ShaderMaterial;
+    const old = ghosts.uniforms.map!.value as THREE.Texture;
+    ghosts.uniforms.map!.value = ghostAtlas(this.redCss);
+    old.dispose();
+    this.keys = {};
   }
 
   /** Labels pinned to the ground for the HUD layer: air-defence chances and likely targets. */

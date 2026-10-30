@@ -59,5 +59,7 @@ interface Window {
     } | null;
     /** The film: steps waiting or playing, beats playing, an action cam, its clock, steps that failed. */
     film(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number } | null;
+    /** The field's palette, who wears an outline, and how many hull meshes are drawn. */
+    look(): { palette: 'standard' | 'colourblind'; selected: string | null; target: string | null; hulls: number } | null;
   };
 }
