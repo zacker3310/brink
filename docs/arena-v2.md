@@ -657,9 +657,9 @@ adds difficulty on top of the rules (sections 3 to 6 are unchanged).
   | Hard | -10 | +15 | as built | +0.1 |
 
   Measured with the AI's own planner in your seat over the soak's 60 mixed setups: Easy wins 85%,
-  Normal 58%, Hard 35% (the rules as written win about 44%). A third of those setups attack with a
-  single formation, some with only guns or drones, and run out of rounds whatever the odds; with two
-  formations or more, Easy wins 91%.
+  Normal 60%, Hard 38% in v2.3 (85, 58 and 35 in v2.1; the rules as written win about 44%). A third
+  of those setups attack with a single formation, some with only guns or drones, and run out of
+  rounds whatever the odds; with two formations or more, Easy won 91% in v2.1.
 - Advice: the selected unit shows what a good commander would do with it, in words ("Move 4 cells
   into the trees, then fire at the T-72B3 (64%)") and as a route on the field; Do It plays it. It is
   planned from your side's picture only (`advise` in `ai.ts`), stops at the first action that rolls,

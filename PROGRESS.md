@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-10-29 (arena v2.2). Milestone 1 (first playable).
+Updated 2026-10-30 (arena v2.3). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -248,6 +248,39 @@ Updated 2026-10-29 (arena v2.2). Milestone 1 (first playable).
     profile puts it in native rendering of the closer view, not in the HUD. Measure on a phone.
   - Fixed on the way: the war-map replay undid a pause pressed as it started.
 
+- Arena v2.3, the battle as a phone game (`docs/arena-v2.md` section 13; research in
+  `reports/Mobile tactics battle design.md`, not committed):
+  - Touch and camera: the ground stays under the fingers (a two-finger least-squares solve; 0.01 px
+    worst error in Chromium at three iPhone sizes, gate 4 px), twist and pinch dead zones with no
+    jump, tilt lock, a north chip, long-press cards (enemy, cell sight lines, your unit), tap
+    snapping where cells draw under 44 pt, a move pin above the thumb, a Left-Handed layout.
+  - Reading the field from blue's picture only: Danger Area, one enemy's reach, the facing glyph and
+    flank warning, overwatch footprints, air-defence rings with the rules' chances, likely targets
+    (Easy, Normal), fading ghosts and a scouted-area stipple, suppression in words.
+  - Deciding: an outcome bar on the shot card (12,000 seeded shots, worst gap 1.05 points), a battle
+    log of every roll you saw, Reset Turn (Easy unlimited, Normal once, Hard never), Next and Hold,
+    an End Turn sheet, tips, an after-action grade.
+  - The film: beats overlap and volleys merge, zip mode and hold-to-fast-forward, a severity ladder
+    for hit stop and trauma shake, tuned words, action cams only for brew-ups, the last kill and
+    captures, Motion and Shake settings, flashes held to three a second. Skipped, watched, zipped
+    or shoved about, the battle ends on the same hash.
+  - Look and sound: friend and foe by shape, a colour-blind palette, rim light, outlines, layered
+    heavy reports, a haptic tick (not felt: no iPhone here), one composited HUD layer.
+  - Performance and resilience: render on demand (0 frames drawn a second idle, hidden or with the
+    context lost), shadows only when something moves, an adaptive pixel ratio, lost-context recovery,
+    checked atomic snapshots with resume after a reload, a frame-time overlay; 10 quality switches
+    and 10 battles leave the same uploads, DOM nodes, canvases and listeners.
+  - Verification: every order goes through a command log (`submit`, `replay`, `hashBattle`); one
+    visibility layer (`observe`); `pnpm test:matrix` plays 24 seeded battles to their end and excuses
+    nothing. Found and fixed on the way: a stale AI sight cache, malformed orders accepted, refusals
+    and engineer orders that told of hidden units, Undo greyed by a hidden spotter, the film showing
+    hidden shooters (and blue's picture missing shooters the film showed), the enemy's skill in
+    blue's picture, and a move that could end on a cell its own side held.
+  - Tested: 221 arena and 62 web unit tests; both soaks (Easy 85%, Normal 60%, Hard 38%; rejected
+    AI actions 0); the matrix (0 genuine failures); the full e2e suite (result below when run).
+  - Not measured: anything on a real iPhone (GPU frame time, touch feel on glass, haptics, Safari
+    memory pressure). The checklist is `docs/device-testing.md`.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
@@ -255,6 +288,20 @@ Updated 2026-10-29 (arena v2.2). Milestone 1 (first playable).
 
 - Balance: of 100 soak matches, 38 end by domination, 19 by supremacy, 43 on score at the turn
   limit (median turn 28). Next lever: AI deadlock-breaking (concentration, artillery before assaults).
+- Arena v2.3 defects, by priority (detail in `docs/architecture.md`, Battles):
+  1. Nothing measured on a real iPhone: GPU frame time, gestures on glass, haptics, memory pressure.
+  2. Replay across JavaScript engines is unproven: facings are doubles from `Math.atan2`, and
+     armour facing and range use `Math.sin`, `Math.cos` and `Math.hypot`; integer facings fix it.
+  3. The move outline is reckoned on the truth, so a wreck blue cannot know of shows as a cell a
+     vehicle cannot enter (a rule fix: a move stops short at an obstacle it meets).
+  4. The field draws only the red wrecks of kills blue saw; blue's picture also knows a wreck next
+     to its units, which the field does not draw.
+  5. A rebuild (quality change, lost context) puts the camera back at the opening view.
+  6. A war-map battle resumes only when the same attack is ordered again; the turn's other draft
+     orders are not saved mid-turn.
+  7. The JavaScript heap grows about 65 KB a battle (V8 code and Chrome's timeline entries by the
+     heap diff, not the game's objects); watch it on a device.
+  8. Stack cycling (air over ground) has unit tests only; no skirmish open at first has both.
 - Arena: tested in Chromium (iPhone 13 and 14 Pro emulation, software WebGL, and desktop), not on a
   real iPhone GPU; GPU frame time is unmeasured. Weakest spots: soldiers read as mannequins close up,
   T-80BVM and T-72B3 look alike, close-up paint is too clean, trees and house fronts repeat close up,
@@ -268,7 +315,10 @@ None.
 
 ## Next recommended tasks
 
-1. Play the arena on a real iPhone: GPU frame time per quality, touch feel, audio unlock.
-2. Arena art close up: soldier faces and gear, T-80 turret, paint wear; rotor wash and fireballs.
-3. AI fireteam splits; break all-artillery and all-drone stalemates.
-4. New nations for the later theatres. 5. Shareable end-of-game recap. 6. Haptics and landscape.
+1. Play the arena on a real iPhone through `docs/device-testing.md`: frame time per quality, the
+   ground under the fingers, haptics, audio unlock, memory pressure and resume.
+2. Integer facings and distances in the arena state, then prove replay on Safari's engine too.
+3. A move that meets an unseen obstacle stops short; then the move outline can use blue's picture.
+4. The hex world map overhaul (next by the plan).
+5. Arena art close up: soldier faces and gear, T-80 turret, paint wear; rotor wash and fireballs.
+6. AI fireteam splits; break all-artillery and all-drone stalemates. 7. Landscape.
