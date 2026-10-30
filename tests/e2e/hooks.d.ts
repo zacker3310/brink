@@ -30,5 +30,9 @@ interface Window {
     perf(reset?: boolean): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
     /** What the field overlay shows now: the selected unit, its move and dash cells, its targets. */
     overlay(): { selected: string | null; reach: number; dash: number; targets: number } | null;
+    /** The film's queue, and the camera: focus x y z, its target x y z, distance and target, tilt and target, heading and target. */
+    film(): { steps: number; cam: boolean; clock: number; settled: boolean; faults: number; camera: number[] } | null;
+    /** The cells (y * w + x) the selected unit can be tapped to move to now. */
+    reach(): number[];
   };
 }

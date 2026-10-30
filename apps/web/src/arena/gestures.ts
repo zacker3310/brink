@@ -17,6 +17,8 @@ export const SLOP = 10;
 export const HOLD_MS = 480;
 /** The long-press ring starts filling after this long (ms). */
 export const HOLD_SHOW_MS = 150;
+/** The ring is up at least this long before the long-press, even on a page too slow to tick on time (ms). */
+export const RING_MIN_MS = 120;
 /** A twist starts once the fingers have turned this far together (radians). */
 export const TWIST = (12 * Math.PI) / 180;
 /** A pinch starts once the distance between the fingers has changed by 5% (as a log). */
@@ -224,6 +226,7 @@ export class Gestures {
   /** The press a long-press may still come from. */
   private holdFor: number | null = null;
   private ringOn = false;
+  private ringSince = 0;
 
   /** Pointers down now. */
   get count(): number {
@@ -324,19 +327,27 @@ export class Gestures {
     return out;
   }
 
-  /** Time passes for a finger held still: the ring, then the long-press. */
+  /**
+   * Time passes for a finger held still: the ring, then the long-press once the ring has been up a
+   * moment (so it shows first even when a slow page ticks late). Tick again `RING_MIN_MS` after a ring.
+   */
   tick(t: number): Gesture[] {
     const press = this.holdFor === null ? undefined : this.presses.get(this.holdFor);
     if (!press || press.moved || this.presses.size !== 1) {
       this.holdFor = null;
       return this.ring(null);
     }
-    if (t - press.t0 >= HOLD_MS) {
+    if (t - press.t0 < HOLD_SHOW_MS) return [];
+    if (!this.ringOn) {
+      this.ringSince = t;
+      return this.ring(pt(press));
+    }
+    if (t - press.t0 >= HOLD_MS && t - this.ringSince >= RING_MIN_MS) {
       press.held = true;
       this.holdFor = null;
       return [...this.ring(null), { kind: 'press', at: pt(press) }];
     }
-    return t - press.t0 >= HOLD_SHOW_MS ? this.ring(pt(press)) : [];
+    return [];
   }
 
   private startTwo(): Gesture[] {

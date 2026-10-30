@@ -101,7 +101,7 @@ export function SightCard({ b, me, at, rows, onClose }: { b: Battle; me: Unit; a
         <CloseButton onClose={onClose} />
       </div>
       <p className="mt-1.5 text-[14px] leading-snug" data-testid="sight-summary">
-        {rows.length ? `Sees ${seen.length} of the ${rows.length} ${rows.length === 1 ? 'enemy' : 'enemies'} in sight now; could fire on ${shots}.` : 'None of the enemy is in sight now.'}
+        {rows.length ? `Of the ${rows.length} ${rows.length === 1 ? 'enemy' : 'enemies'} you see now, it would see ${seen.length} and could fire on ${shots}.` : 'No enemy is in sight now.'}
       </p>
       {seen.length > 0 && (
         <ul className="mt-1 space-y-0.5 text-[14px]" data-testid="sight-list">

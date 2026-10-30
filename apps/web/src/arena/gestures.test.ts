@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Gestures, HOLD_MS, HOLD_SHOW_MS, PINCH, quarterNear, SAME_SPOT_MS, SLOP, stackPick, TWIST, TwoFingers, type Gesture, type PointerInput } from './gestures';
+import { Gestures, HOLD_MS, HOLD_SHOW_MS, PINCH, quarterNear, RING_MIN_MS, SAME_SPOT_MS, SLOP, stackPick, TWIST, TwoFingers, type Gesture, type PointerInput } from './gestures';
 
 // The pointer state machine, driven by synthetic pointer sequences: what is a tap, a drag, a
 // long-press, a pinch, a twist and a tilt, and that nothing cut short (a cancel, a lost capture, a
@@ -43,6 +43,16 @@ describe('one finger', () => {
     expect(kinds(g.pointerMove(touch(1, 104, 203, HOLD_MS + 30)))).toEqual([]);
     expect(kinds(g.pointerMove(touch(1, 160, 240, HOLD_MS + 50)))).toEqual(['pin', 'drag']);
     expect(kinds(g.pointerUp(touch(1, 160, 240, HOLD_MS + 90)))).toEqual(['release']);
+  });
+
+  it('on a page too slow to tick on time, the ring still shows a moment before the long-press', () => {
+    const g = new Gestures();
+    g.pointerDown(touch(1, 100, 200, 0));
+    // The first tick comes late, after the hold is due: the ring first, the press a moment later.
+    expect(g.tick(HOLD_MS + 120)).toEqual([{ kind: 'ring', at: { x: 100, y: 200 } }]);
+    expect(g.tick(HOLD_MS + 120)).toEqual([]);
+    expect(g.tick(HOLD_MS + 120 + RING_MIN_MS - 1)).toEqual([]);
+    expect(kinds(g.tick(HOLD_MS + 120 + RING_MIN_MS))).toEqual(['ring', 'press']);
   });
 
   it('a held press that moves past the slop before the hold is a drag: no long-press, no tap', () => {

@@ -50,7 +50,7 @@ import type { BattleRequest } from './battle';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
 import { BattleStage, type Overlay } from './stage';
 import { classOf, health } from './units';
-import { Gestures, HOLD_MS, HOLD_SHOW_MS, OFF_NORTH, SMALL_CELL, SNAP_REACH, stackPick, type Gesture, type PointerInput, type TapMark } from './gestures';
+import { Gestures, HOLD_MS, HOLD_SHOW_MS, OFF_NORTH, RING_MIN_MS, SMALL_CELL, SNAP_REACH, stackPick, type Gesture, type PointerInput, type TapMark } from './gestures';
 import { EnemyCard, SightCard, sightFrom, UnitSheet } from './peek';
 
 // One battle, fought in turns: a brief, the fight, the verdict. On your turn tap a unit, tap a lit
@@ -76,6 +76,8 @@ declare global {
       overlay: () => ReturnType<BattleStage['overlayCounts']> | null;
       /** The film's queue (steps waiting, action cam, clock). */
       film: () => ReturnType<BattleStage['filmState']> | null;
+      /** The cells (y * w + x) the selected unit can be tapped to move to now. */
+      reach: () => number[];
     };
   }
 }
@@ -675,6 +677,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         perf: (reset) => stageRef.current?.perf(reset) ?? null,
         overlay: () => stageRef.current?.overlayCounts() ?? null,
         film: () => stageRef.current?.filmState() ?? null,
+        reach: () => reachNow.current,
       };
     });
     const onResize = () => stageRef.current?.resize();
@@ -731,6 +734,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     const at = peek?.kind === 'sight' && sight ? peek.at : null;
     stageRef.current?.setProbe(at, (sight ?? []).filter((r) => r.sees || r.shot).map((r) => ({ id: r.u.id, shot: !!r.shot })));
   }, [sight]);
+  // The view from a cell belongs to the turn it was asked in.
+  useEffect(() => {
+    if (!myTurn) setPeek((p) => (p?.kind === 'sight' ? null : p));
+  }, [myTurn]);
   // Arrows at the edge keep clear of the camera buttons, on whichever side they stand.
   useEffect(() => {
     const col = cameraRef.current;
@@ -1000,6 +1007,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   // in from older renders, so what the gestures ask for is done through refs.
   const gestures = useRef(new Gestures());
   const holdTimers = useRef<number[]>([]);
+  /** For tests: the cells a tap can move the selected unit to now. */
+  const reachNow = useRef<number[]>([]);
+  const moveCells = b && me && myTurn ? (dash ? dashReach : reach) : null;
+  reachNow.current = moveCells && b ? [...moveCells.cost.keys()].filter((i) => movable({ x: i % b.map.w, y: Math.floor(i / b.map.w) })) : [];
   const handlers = useRef({ tap: tapAt, press: pressAt });
   handlers.current = { tap: tapAt, press: pressAt };
   const run = (out: readonly Gesture[]) => {
@@ -1015,7 +1026,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       else if (g.kind === 'drag') stage?.drag(g.points, g, g.delta);
       else if (g.kind === 'tilt') stage?.tiltBy(g.dy * 0.004);
       else if (g.kind === 'orbit') stage?.orbitBy(-g.dx * 0.006, g.dy * 0.004);
-      else if (g.kind === 'ring') setRing(g.at);
+      else if (g.kind === 'ring') {
+        setRing(g.at);
+        // The long-press follows once the ring has been up a moment.
+        if (g.at) tickIn(RING_MIN_MS + 5);
+      }
       else if (g.kind === 'press') handlers.current.press(g.at.x, g.at.y);
       else if (g.kind === 'tap') handlers.current.tap(g.at.x, g.at.y);
       else if (g.kind === 'hover') {
@@ -1042,11 +1057,13 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     if ((e.target as Element).closest('button')) return;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     for (const t of holdTimers.current) clearTimeout(t);
-    // The hold acts on the next frame, after any lift already waiting has been handled.
-    const tick = () => requestAnimationFrame(() => run(gestures.current.tick(performance.now())));
-    holdTimers.current = [window.setTimeout(tick, HOLD_SHOW_MS + 5), window.setTimeout(tick, HOLD_MS + 5)];
+    holdTimers.current = [];
+    tickIn(HOLD_SHOW_MS + 5);
+    tickIn(HOLD_MS + 5);
     run(gestures.current.pointerDown(pointer(e)));
   };
+  /** Time for a held finger, on the next frame after `ms`: any lift already waiting is handled first. */
+  const tickIn = (ms: number) => holdTimers.current.push(window.setTimeout(() => requestAnimationFrame(() => run(gestures.current.tick(performance.now()))), ms));
   const onPointerMove = (e: React.PointerEvent) => run(gestures.current.pointerMove(pointer(e)));
   const onPointerUp = (e: React.PointerEvent) => run(gestures.current.pointerUp(pointer(e)));
   // Cancelled, or captured away: the press ends and is never a tap.
