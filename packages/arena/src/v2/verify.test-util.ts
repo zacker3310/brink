@@ -236,6 +236,7 @@ const KINDS: readonly (readonly [Action['type'], number])[] = [
   ['breach', 3],
   ['mine', 3],
   ['ability', 3],
+  ['hold', 2],
 ];
 const KIND_TOTAL = KINDS.reduce((s, [, w]) => s + w, 0);
 
@@ -273,6 +274,7 @@ export function randomAction(b: Battle, u: Unit, r: Rng): Action | null {
       return { type: 'face', unit: u.id, facing: (r.next() * 2 - 1) * Math.PI };
     case 'overwatch':
     case 'hunker':
+    case 'hold':
     case 'dismount':
     case 'split':
       return { type: kind, unit: u.id };
