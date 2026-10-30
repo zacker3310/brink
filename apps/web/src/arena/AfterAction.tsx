@@ -1,8 +1,8 @@
-import { ROUND_LIMIT, roundLosses, sideValue, startValue, turningPoint, type Battle } from '@brink/arena';
+import { ROUND_LIMIT, sideValue, startValue, turningPoint, type Battle } from '@brink/arena';
 
 // The after-action grade on the verdict: Speed (rounds used), Power (their strength destroyed, as
-// far as you saw it go), Technique (your own strength kept), and the round that turned the battle,
-// read from the event log.
+// the verdict counts it once the fight is over), Technique (your own strength kept), and the round
+// that turned the battle, read from the events you saw.
 
 type Grade = 'S' | 'A' | 'B' | 'C';
 
@@ -21,9 +21,10 @@ function turning(b: Battle): string {
 export function AfterAction({ battle: b }: { battle: Battle }) {
   const rounds = Math.min(ROUND_LIMIT, b.round);
   const kept = sideValue(b, 'blue') / Math.max(1, startValue(b, 'blue'));
-  const destroyed = roundLosses(b).reduce((s, r) => s + r.red, 0);
+  const destroyed = 1 - sideValue(b, 'red') / Math.max(1, startValue(b, 'red'));
   const rows: [string, Grade, string][] = [
-    ['Speed', grade(-rounds, [-5, -8, -12]), `${rounds} of ${ROUND_LIMIT} rounds`],
+    // Speed counts only a win: losing fast is not quick work.
+    ['Speed', b.ended === 'won' ? grade(-rounds, [-5, -8, -12]) : 'C', `${rounds} of ${ROUND_LIMIT} rounds`],
     ['Power', grade(destroyed, [0.85, 0.6, 0.35]), `${pct(destroyed)}% of theirs destroyed`],
     ['Technique', grade(kept, [0.9, 0.75, 0.5]), `${pct(kept)}% of yours kept`],
   ];
