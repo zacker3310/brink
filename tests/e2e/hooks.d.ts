@@ -37,5 +37,7 @@ interface Window {
       /** Cells shaded by the Danger Area (or one enemy's reach), overwatch footprints, air-defence rings seen and suspected, likely lines, the facing glyph, ghosts drawn, expected-area cells not yet scouted. */
       insight: { threat: number; threatOf: number; watch: number; air: number; suspected: number; likely: number; glyph: string | null; ghosts: number; expected: number };
     } | null;
+    /** The film: steps waiting or playing, beats playing, an action cam, its clock, steps that failed. */
+    film(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number } | null;
   };
 }

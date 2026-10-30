@@ -3,17 +3,19 @@ import { expectedArea, H, W, typeOf, type Battle, type BattleEvent, type Effect,
 import { BattleAudio } from './audio';
 import { Effects } from './fx';
 import { buildModel, buildProjectile, kitFor, paintFor, SoldierCrowd, type UnitModel } from './models3d';
-import { LEVEL, METRE, QUALITY, type ArenaSettings, type Quality } from './quality';
+import { LEVEL, METRE, QUALITY, type ArenaSettings, type Motion, type Quality } from './quality';
 import { buildWorld, thermalMaterialFor, type World } from './world';
 import type { Library } from './assets';
-import { FieldHud, type BadgeState, type EdgePointer, type Tone } from './hud';
+import { FieldHud, type BadgeState, type EdgePointer, type Tone, type Weight } from './hud';
+import { BREW_UP_STOP, HIT_STOP, TRAUMA, beatsOf, keysOf, lastKills, levelWord, rungOf, shakes, type Beat, type FireEvent, type Rung, type Volley } from './film';
 import { badgeStatus, classOf, health } from './units';
 import { InsightLayer, type InsightOverlay } from './overlays';
 
 // The battle drawn in three.js: the world (ground, buildings, weather, light), the units (built in
 // code; soldiers drawn one by one), the effects and the sound, all driven by the engine's event log
-// played back as a film. The film shows only what the player's side saw. The camera is a tactical
-// orbit (pan, pinch, twist, tilt) with short action cams on big hits. Units are drawn larger than
+// played back as a film (beats that touch different units share time; see film.ts). The film shows
+// only what the player's side saw and decides nothing. The camera is a tactical orbit (pan, pinch,
+// twist, tilt) with short action cams on brew-ups, the kill that closes a turn and captures. Units are drawn larger than
 // life so they read on a phone, and a layer of DOM badges and words rides over the field.
 
 /** Vehicles and aircraft are drawn this much larger than life, soldiers more; cells are unchanged. */
@@ -67,6 +69,54 @@ interface Step {
   end?: () => void;
 }
 
+/** One beat of the film on screen: its steps, played in order. */
+interface Clip {
+  steps: Step[];
+  /** Units it shows. */
+  keys: string[];
+  /** Plays alone: what is before it ends first, and nothing after it starts until it ends. */
+  alone: boolean;
+  /** It may bring the camera to itself (zip mode: only when it touches your units). */
+  cam: boolean;
+  /** Where it happens, read as it is about to start (is it on screen?). */
+  where: () => { x: number; z: number } | null;
+  /** Their turn in zip mode: dead time trimmed. */
+  zip: boolean;
+  /** It started while others were playing: it leaves the camera where it is unless it is off screen. */
+  joined: boolean;
+  /** Real seconds its current step has played (a step that will not end is cut). */
+  age: number;
+}
+
+/** How the battle feels to watch: the battle menu's Motion, Shake, Action Cams and Fast Enemy Turns. */
+export interface Feel {
+  motion: Motion;
+  /** Shake strength, 0..100. */
+  shake: number;
+  actionCams: boolean;
+  /** Zip their turn: dead time capped, the camera only for what touches your units. */
+  zip: boolean;
+}
+
+export function feelOf(s: ArenaSettings): Feel {
+  return { motion: s.motion, shake: s.shake, actionCams: s.actionCams, zip: s.fastEnemy };
+}
+
+/** Beats on screen at once, how far ahead the film looks for one that can join them, and the film time between their starts. */
+const AT_ONCE = 3;
+const LOOK_AHEAD = 6;
+const STAGGER = 0.12;
+/** Zip mode: seconds of nothing to see in a row, at most. */
+const DEAD_CAP = 0.6;
+/** Camera trauma drained per second (a hit's shake dies away in about a second). */
+const TRAUMA_DRAIN = 1;
+/** Full trauma turns the view up to 6 degrees (a brew-up's 0.5 is 1.5) and sways it a little, by distance. */
+const SHAKE_TURN = THREE.MathUtils.degToRad(6);
+const SHAKE_SWAY = 0.012;
+/** Smooth noise in -1..1 for the shake: three waves that never line up, not a new random number each frame. */
+const wave = (t: number, seed: number) => (Math.sin(t * 37.7 + seed) + 0.6 * Math.sin(t * 61.3 + seed * 2.3) + 0.3 * Math.sin(t * 91.1 + seed * 4.1)) / 1.9;
+const shares = (a: { keys: string[] }, b: { keys: string[] }) => a.keys.some((k) => b.keys.includes(k));
+
 interface View {
   id: string;
   side: Side;
@@ -104,6 +154,10 @@ interface View {
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const lerpAngle = (a: number, b: number, k: number) => a + wrap(b - a) * k;
 const ease = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+/** Casualties in words: "2 Down, 1 Wounded". */
+function downText(killed: number, wounded: number): string {
+  return [killed ? `${killed} Down` : '', wounded ? `${wounded} Wounded` : ''].filter(Boolean).join(', ');
+}
 /** Grid heading to a three.js yaw for a model that faces +z. */
 const yawOf = (facing: number) => Math.PI / 2 - facing;
 
@@ -143,7 +197,23 @@ export class BattleStage {
   private readonly crowd: SoldierCrowd;
   readonly audio: BattleAudio;
   private readonly views = new Map<string, View>();
-  private readonly steps: Step[] = [];
+  /** The film: beats waiting their turn, and those playing (beats that touch different units share time). */
+  private readonly waiting: Clip[] = [];
+  private readonly playing: Clip[] = [];
+  /** The beat `queue` is filling. */
+  private building: Clip | null = null;
+  /** Whose turn the events being queued belong to (zip mode trims theirs). */
+  private turnSide: Side = 'blue';
+  /** Zip mode: seconds of nothing to see queued since the last thing worth seeing. */
+  private deadRun = 0;
+  /** Film time the last beat started at. */
+  private lastStart = -1;
+  /** What the batch being queued says about itself: the kill that closes each turn, bounces that shook a crew. */
+  private notes: { kills: Set<BattleEvent>; shook: ReturnType<typeof shakes> } = { kills: new Set(), shook: new Map() };
+  /** For the probe: film seconds played while busy, seconds queued, and where each turn began. */
+  private played = 0;
+  private planned = 0;
+  private readonly marks: { side: Side; planned: number; played: number }[] = [];
   private readonly tiles: THREE.InstancedMesh;
   private readonly dashTiles: THREE.InstancedMesh;
   private readonly areaTiles: THREE.InstancedMesh;
@@ -169,12 +239,22 @@ export class BattleStage {
   private wantDist = PLAY_DIST;
   /** The planning view to return to from the whole-field view. */
   private before: { x: number; z: number; dist: number; tilt: number; yaw: number } | null = null;
-  private shake = 0;
+  /** Camera trauma, 0..1: the shake is its square. */
+  private trauma = 0;
+  private shakeClock = 0;
+  /** The last jolt each unit gave: one moment's hits on one unit shake once, by the worst of them. */
+  private readonly jolted = new Map<string, { t: number; add: number }>();
+  /** Seconds of hit stop left: the film and the effects hold still on a heavy hit. */
+  private stop = 0;
+  /** Casualties said over each unit a moment ago, so more add to the same word. */
+  private readonly downs = new Map<string, { killed: number; wounded: number; at: number }>();
+  private feel: Feel;
+  /** Reduced or no motion: the camera cuts to where it is going instead of gliding. */
+  private cuts = false;
+  /** The film's speed on screen (2 for fast enemy turns, 4 while Skip is held): words read in real time. */
+  rate = 1;
   /** Film steps that threw (each is skipped; the film never stops on one). */
   private faults = 0;
-  /** Real seconds the first step has been playing; a step that will not end is cut (never expected). */
-  private stepAge = 0;
-  private stepNow: Step | null = null;
   /** Seconds of slow motion left (a vehicle brewing up). */
   private slow = 0;
   private clock = 0;
@@ -204,6 +284,7 @@ export class BattleStage {
     private readonly opts: StageOptions,
   ) {
     this.preset = QUALITY[opts.quality];
+    this.feel = feelOf(opts.settings);
     this.renderer = new THREE.WebGLRenderer({ antialias: this.preset.antialias, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio));
     this.renderer.shadowMap.enabled = this.preset.shadowMap > 0;
@@ -281,6 +362,7 @@ export class BattleStage {
     const cz = blue.reduce((s, u) => s + u.y + 0.5, 0) / Math.max(1, blue.length);
     this.wantFocus.set(cx, 0, cz - 2);
     this.focus.copy(this.wantFocus);
+    this.setFeel(this.feel);
     this.resize();
   }
 
@@ -418,13 +500,14 @@ export class BattleStage {
     const fz = this.focus.z + Math.cos(this.yaw) * s;
     const gy = this.ground(this.focus.x, this.focus.z);
     this.camera.position.set(fx + Math.sin(this.yaw) * r, gy + h, fz + Math.cos(this.yaw) * r);
-    if (this.shake > 0) this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake));
     this.camera.lookAt(fx, gy, fz);
+    this.shakeCamera();
     this.camera.updateMatrixWorld(true);
   }
 
   private applyCamera(dt: number): void {
-    const k = dt <= 0 ? 1 : 1 - Math.exp(-dt * 6);
+    // Reduced motion: the camera cuts to where it is going.
+    const k = dt <= 0 || this.cuts ? 1 : 1 - Math.exp(-dt * 6);
     this.wantFocus.x = Math.max(0, Math.min(W, this.wantFocus.x));
     this.wantFocus.z = Math.max(0, Math.min(H, this.wantFocus.z));
     this.focus.lerp(this.wantFocus, k);
@@ -445,6 +528,7 @@ export class BattleStage {
       const planAt = plan.clone().add(look.multiplyScalar(this.dist));
       this.camera.position.lerpVectors(plan, c.from, ease(blend));
       this.camera.lookAt(planAt.lerp(c.at, ease(blend)));
+      this.shakeCamera();
       this.camera.updateMatrixWorld(true);
       return;
     }
@@ -650,11 +734,20 @@ export class BattleStage {
 
   // --- Overlay -------------------------------------------------------------------------------------
 
-  /** The film's queue, for tests: steps waiting, whether an action cam runs, the clock. */
-  filmState(): { steps: number; cam: boolean; clock: number; settled: boolean; faults: number; camera: number[] } {
+  /**
+   * The film's queue, for tests: steps waiting or playing, beats playing, whether an action cam runs,
+   * the clock, the shake now; for measuring, film seconds played while busy, seconds queued, and where
+   * turns began.
+   */
+  filmState(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number; marks: { side: Side; planned: number; played: number }[] } {
     const r = (v: number) => Math.round(v * 1000) / 1000;
     return {
-      steps: this.steps.length,
+      steps: [...this.playing, ...this.waiting].reduce((n, c) => n + c.steps.length, 0),
+      beats: this.playing.length,
+      shake: r(this.shakeNow),
+      played: r(this.played),
+      planned: r(this.planned),
+      marks: this.marks.map((m) => ({ ...m, played: r(m.played), planned: r(m.planned) })),
       cam: this.cam !== null,
       clock: this.clock,
       settled: this.settled,
@@ -924,10 +1017,15 @@ export class BattleStage {
     return { x: c.x, y: minY - 4 };
   }
 
-  /** Words over a unit, as the film reaches the moment. */
-  private say(v: View | undefined, text: string, tone: Tone): void {
+  /** Words over a unit, as the film reaches the moment; `group` words over one unit replace each other. */
+  private say(v: View | undefined, text: string, tone: Tone, weight: Weight = 'major', group = ''): void {
     if (!v) return;
-    this.hudLayer.callout(text, tone, () => (v.holder.visible || !v.alive ? this.badgePoint(v) : null), v.id);
+    // Over a unit off the screen a word is not shown (and gives way first).
+    const anchor = () => {
+      const at = v.holder.visible || !v.alive ? this.badgePoint(v) : null;
+      return at && at.x > -40 && at.y > -40 && at.x < this.host.clientWidth + 40 && at.y < this.host.clientHeight + 40 ? at : null;
+    };
+    this.hudLayer.callout(text, tone, anchor, v.id, weight, group);
   }
 
   /** Good news when it happens to them, bad when it happens to us. */
@@ -976,32 +1074,206 @@ export class BattleStage {
   // --- The film ----------------------------------------------------------------------------------
 
   get busy(): boolean {
-    return this.steps.length > 0 || this.cam !== null;
+    return this.waiting.length > 0 || this.playing.length > 0 || this.cam !== null;
+  }
+
+  /** The film or its feel still moves on screen (a beat, an action cam, a shake, a hit stop, slow motion). */
+  get live(): boolean {
+    return this.busy || this.trauma > 0 || this.stop > 0 || this.slow > 0;
+  }
+
+  /** How the battle feels to watch (the battle menu); it applies at once, mid-film too. */
+  setFeel(feel: Feel): void {
+    this.feel = { ...feel, shake: Math.max(0, Math.min(100, Number.isFinite(feel.shake) ? feel.shake : 100)) };
+    const full = feel.motion === 'full';
+    this.cuts = !full;
+    this.hudLayer.still = !full;
+    if (!full) {
+      this.slow = 0;
+      this.cam = null;
+    }
+    if (feel.motion === 'off') this.trauma = 0;
+  }
+
+  /** End an action cam now (a tap anywhere); true when one was playing. */
+  endActionCam(): boolean {
+    if (!this.cam) return false;
+    this.cam = null;
+    return true;
   }
 
   play(events: readonly BattleEvent[]): void {
-    for (const e of events) this.queue(e);
+    this.notes = { kills: lastKills(events), shook: shakes(events) };
+    for (const beat of beatsOf(events)) {
+      const clip = this.clipOf(beat);
+      this.building = clip;
+      try {
+        if (beat.volley) this.queueVolley(beat.volley);
+        else for (const e of beat.events) this.queue(e);
+      } catch (err) {
+        this.fault(err);
+      }
+      this.building = null;
+      if (clip.steps.length) this.waiting.push(clip);
+    }
+  }
+
+  /** A beat as the film plays it: what it touches, whether it plays alone, whether it may move the camera. */
+  private clipOf(beat: Beat): Clip {
+    const head = beat.events[0];
+    if (head?.type === 'turn') this.turnSide = head.side;
+    const zip = this.feel.zip && this.turnSide === 'red';
+    // Zip mode: the camera goes only where your units fire, are fired on, move or are hit.
+    const ours = beat.events.some((e) => e.type !== 'spotted' && e.type !== 'lost' && e.type !== 'radio' && keysOf(e).some((k) => this.views.get(k)?.side === 'blue'));
+    const at = beat.events.find((e) => e.type === 'move' || e.type === 'fire') ?? head;
+    const where = () => {
+      if (at?.type === 'move') {
+        const p = at.path.at(-1)!;
+        return { x: p.x + 0.5, z: p.y + 0.5 };
+      }
+      if (at?.type === 'fire') return { x: at.to.x + 0.5, z: at.to.y + 0.5 };
+      const v = at && 'unit' in at ? this.views.get(at.unit) : undefined;
+      return v ? { x: v.x, z: v.z } : null;
+    };
+    return { steps: [], keys: beat.keys, alone: beat.alone, cam: !zip || ours, where, zip, joined: false, age: 0 };
   }
 
   /** Skip to the end of what is queued (fast-forward). */
   skip(): void {
-    for (let n = 0; n < 5000 && this.steps.length; n++) {
-      const s = this.steps.shift()!;
-      if (!s.started) {
-        s.started = true;
-        this.safely(s.start);
+    for (let n = 0; n < 5000 && (this.playing.length || this.waiting.length); n++) {
+      const c = this.playing[0] ?? this.waiting[0]!;
+      const s = c.steps.shift();
+      if (s) {
+        if (!s.started) {
+          s.started = true;
+          this.safely(s.start);
+        }
+        this.safely(() => s.tick?.(1, 0));
+        this.safely(s.end);
       }
-      this.safely(() => s.tick?.(1, 0));
-      this.safely(s.end);
+      if (!c.steps.length) {
+        const list = this.playing[0] === c ? this.playing : this.waiting;
+        list.splice(list.indexOf(c), 1);
+      }
     }
-    this.steps.length = 0;
+    this.playing.length = 0;
+    this.waiting.length = 0;
     this.cam = null;
     this.slow = 0;
+    this.stop = 0;
+    this.trauma = 0;
     this.hudLayer.clearCallouts();
   }
 
-  private step(dur: number, s: Omit<Step, 'dur' | 't' | 'started'>): void {
-    this.steps.push({ dur: Number.isFinite(dur) && dur > 0 ? dur : 0, t: 0, started: false, ...s });
+  /** Start beats that can play now: the next in line when nothing plays; with others, one that is independent of them. */
+  private admit(): void {
+    if (this.playing.some((p) => p.alone)) return;
+    for (let i = 0; i < this.waiting.length && i < LOOK_AHEAD && this.playing.length < AT_ONCE; i++) {
+      const c = this.waiting[i]!;
+      if (!this.playing.length && i === 0) {
+        this.begin(0);
+        if (c.alone) return;
+        i--;
+        continue;
+      }
+      // Nothing goes past a beat that plays alone, and that beat waits for the rest to end.
+      if (c.alone) return;
+      // Joining beats in progress: no unit in common with them or with any beat still waiting before
+      // it, a moment after the last one came in, and on screen as things stand (or the camera is free).
+      if (this.playing.some((p) => shares(p, c)) || this.waiting.slice(0, i).some((w) => shares(w, c))) continue;
+      if (this.clock - this.lastStart < STAGGER) return;
+      if (c.cam && this.playing.some((p) => p.cam) && !this.inView(c.where())) continue;
+      this.begin(i);
+      i--;
+    }
+  }
+
+  private begin(i: number): void {
+    const [c] = this.waiting.splice(i, 1);
+    if (!c) return;
+    c.joined = this.playing.length > 0;
+    c.age = 0;
+    this.playing.push(c);
+    this.lastStart = this.clock;
+  }
+
+  /**
+   * Play `dt` seconds of the film: every beat on screen moves on together, and a step that ends inside
+   * the frame hands the rest of it to the next, so the film keeps its length at any frame rate.
+   */
+  private run(dt: number, real: number): void {
+    let left = dt;
+    for (let n = 0; n < 512; n++) {
+      this.admit();
+      if (!this.playing.length) break;
+      let span = left;
+      for (const c of this.playing) {
+        const s = c.steps[0];
+        if (s) span = Math.min(span, s.dur - s.t);
+      }
+      span = Math.max(0, span);
+      for (const c of this.playing) {
+        const s = c.steps[0];
+        if (!s) continue;
+        if (!s.started) {
+          s.started = true;
+          this.safely(s.start);
+        }
+        s.t += span;
+        if (span > 0 || s.dur === 0) this.safely(() => s.tick?.(s.dur > 0 ? Math.min(1, s.t / s.dur) : 1, span));
+      }
+      this.played += span;
+      left -= span;
+      let ended = false;
+      for (const c of [...this.playing]) {
+        const s = c.steps[0];
+        if (s && s.t >= s.dur - 1e-6) {
+          c.steps.shift();
+          c.age = 0;
+          this.safely(s.end);
+          ended = true;
+        }
+        if (!c.steps.length) this.playing.splice(this.playing.indexOf(c), 1);
+      }
+      if (!ended && left <= 1e-9) break;
+    }
+    // A step that has played far longer than it should is ended where it stands (never expected).
+    for (const c of [...this.playing]) {
+      c.age += real;
+      const s = c.steps[0];
+      if (!s || c.age <= Math.max(8, s.dur * 3)) continue;
+      this.faults++;
+      c.steps.shift();
+      c.age = 0;
+      this.safely(s.end);
+      if (!c.steps.length) this.playing.splice(this.playing.indexOf(c), 1);
+    }
+  }
+
+  /** A point is on screen between the HUD bars, clear of the edges (where `follow` leaves the camera be). */
+  private inView(p: { x: number; z: number } | null): boolean {
+    if (!p) return true;
+    const s = new THREE.Vector3(p.x, this.ground(p.x, p.z), p.z).project(this.camera);
+    const margin = 0.25;
+    return s.z <= 1 && Math.abs(s.x) <= 1 - margin && s.y <= 1 - this.hud[0] * 2 - margin && s.y >= -1 + this.hud[1] * 2 + margin;
+  }
+
+  /** Bring a beat's action into view: only beats that may move the camera do, and one that joined others centres nothing. */
+  private show(clip: Clip, x: number, z: number, centre = false): void {
+    if (clip.cam) this.follow(x, z, centre && !clip.joined);
+  }
+
+  /** A step of the beat being queued. `dead`: nothing to see (zip mode caps a run of them). */
+  private step(dur: number, s: Omit<Step, 'dur' | 't' | 'started'>, dead = false): void {
+    const clip = this.building;
+    if (!clip) return;
+    let d = Number.isFinite(dur) && dur > 0 ? dur : 0;
+    if (clip.zip && dead) {
+      d = Math.min(d, Math.max(0, DEAD_CAP - this.deadRun));
+      this.deadRun += d;
+    } else if (d > 0) this.deadRun = 0;
+    this.planned += d;
+    clip.steps.push({ dur: d, t: 0, started: false, ...s });
   }
 
   /** Run one moment of a step. A fault is counted and skipped: the film never stops on one. */
@@ -1010,9 +1282,13 @@ export class BattleStage {
     try {
       fn();
     } catch (e) {
-      this.faults++;
-      if (this.faults <= 3) console.warn('battle film: a step failed and was skipped', e);
+      this.fault(e);
     }
+  }
+
+  private fault(e: unknown): void {
+    this.faults++;
+    if (this.faults <= 3) console.warn('battle film: a step failed and was skipped', e);
   }
 
   /** Drop whatever is playing and put every unit where the battle says (after a fault). */
@@ -1043,8 +1319,9 @@ export class BattleStage {
     return new THREE.Vector3(v.x, this.ground(v.x, v.z) + (this.model(v)?.lift ?? 0) + (v.t.mobility === 'foot' ? 0.18 : 0.14 * VEHICLE_SCALE), v.z);
   }
 
+  /** A short cut to the action: catastrophic kills, the kill that closes a turn and captures, with full motion only. */
   private actionCam(at: THREE.Vector3, from?: THREE.Vector3): void {
-    if (!this.opts.settings.actionCams || this.cam) return;
+    if (!this.feel.actionCams || this.feel.motion !== 'full' || this.cam) return;
     const dir = from ? at.clone().sub(from).setY(0).normalize() : new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw)).negate();
     const eye = at.clone().sub(dir.multiplyScalar(3.6)).add(new THREE.Vector3(0, 1.3, 0));
     // Keep the line from the eye to the target clear of ground, trees and buildings: raise the eye
@@ -1063,12 +1340,97 @@ export class BattleStage {
     this.cam = { from: eye, at: at.clone(), t: 0, dur: 1.6 };
   }
 
+  /**
+   * A hit's weight on screen, by its rung on the severity ladder: a beat of hit stop and camera trauma,
+   * less the farther it is from what the camera looks at. One unit's hits in one moment (the shot, the
+   * casualties, the kill) shake once, by the worst of them.
+   */
+  private jolt(rung: Rung, v: View, stop = HIT_STOP[rung]): void {
+    if (!rung) return;
+    this.stop = Math.max(this.stop, stop);
+    this.shakeAt(TRAUMA[rung], v.x, v.z, v.id);
+  }
+
+  private shakeAt(amount: number, x: number, z: number, id: string): void {
+    const d = Math.hypot(x - this.focus.x, z - this.focus.z);
+    const add = amount / (1 + (d / 8) ** 2);
+    const prev = this.jolted.get(id);
+    if (prev && this.clock - prev.t < 0.6) {
+      if (add <= prev.add) return;
+      this.trauma = Math.min(1, this.trauma + add - prev.add);
+      prev.add = add;
+      return;
+    }
+    this.jolted.set(id, { t: this.clock, add });
+    this.trauma = Math.min(1, this.trauma + add);
+  }
+
+  /** How hard the view shakes now, 0..1: trauma squared, by the Shake setting (none with motion off). */
+  private get shakeNow(): number {
+    return this.trauma * this.trauma * (this.feel.motion === 'off' ? 0 : this.feel.shake / 100);
+  }
+
+  /** Trauma shake on top of the resting pose: mostly a small turn of the head, a little sway. */
+  private shakeCamera(): void {
+    const s = this.shakeNow;
+    if (s < 1e-4) return;
+    const t = this.shakeClock;
+    const a = SHAKE_TURN * s;
+    this.camera.rotateY(a * wave(t, 0.7));
+    this.camera.rotateX(a * 0.7 * wave(t, 2.9));
+    this.camera.rotateZ(a * 0.5 * wave(t, 5.3));
+    const m = SHAKE_SWAY * this.dist * s;
+    this.camera.translateX(m * wave(t, 7.1));
+    this.camera.translateY(m * wave(t, 9.4));
+  }
+
+  /** Soldiers fall where they stand: the dead go down, the wounded lie and move. */
+  private fallMen(v: View, killed: number, wounded: number): void {
+    const men = typeOf(v.type).men?.length ?? 1;
+    v.hp = Math.max(0, v.hp - (killed + wounded) / Math.max(1, men));
+    for (const id of [...v.men].reverse()) {
+      if (!killed && !wounded) break;
+      if (killed) {
+        this.crowd.set(id, { pose: 'dead' });
+        killed--;
+      } else {
+        this.crowd.set(id, { pose: 'wounded' });
+        wounded--;
+      }
+      v.men = v.men.filter((m) => m !== id);
+    }
+  }
+
+  /** Casualties in a word; more in the same unit a moment later add to it ("3 Down"). */
+  private sayDown(v: View, killed: number, wounded: number): void {
+    const prev = this.downs.get(v.id);
+    const recent = prev && this.clock - prev.at < 0.8;
+    const k = killed + (recent ? prev.killed : 0);
+    const w = wounded + (recent ? prev.wounded : 0);
+    this.downs.set(v.id, { killed: k, wounded: w, at: this.clock });
+    const text = downText(k, w);
+    if (text) this.say(v, text, this.toneFor(v), 'major', 'down');
+  }
+
   private queue(e: BattleEvent): void {
+    const clip = this.building!;
     const v = 'unit' in e ? this.views.get(e.unit) : undefined;
     switch (e.type) {
-      case 'turn':
-        this.step(0.2, {});
+      case 'turn': {
+        const mark = { side: e.side, planned: this.planned, played: 0 };
+        this.step(
+          0.2,
+          {
+            start: () => {
+              mark.played = this.played;
+              this.marks.push(mark);
+              if (this.marks.length > 64) this.marks.shift();
+            },
+          },
+          true,
+        );
         break;
+      }
       case 'move': {
         if (!v) break;
         if (v.side === 'red' && !e.seen.some(Boolean)) {
@@ -1089,7 +1451,7 @@ export class BattleStage {
         const len = pts.length - 1;
         this.step(per * len + 0.1, {
           start: () => {
-            this.follow(pts.at(-1)!.x, pts.at(-1)!.y);
+            this.show(clip, pts.at(-1)!.x, pts.at(-1)!.y);
             if (foot) this.posePeople(v, e.dash ? 'run' : 'walk', 1);
           },
           tick: (k, dt) => {
@@ -1129,16 +1491,20 @@ export class BattleStage {
       }
       case 'face':
         if (!v) break;
-        this.step(0.25, {
-          tick: (_k, dt) => {
-            v.facing = lerpAngle(v.facing, e.facing, Math.min(1, dt * 10));
-            v.aim = lerpAngle(v.aim, e.facing, Math.min(1, dt * 10));
-            this.place(v);
+        this.step(
+          0.25,
+          {
+            tick: (_k, dt) => {
+              v.facing = lerpAngle(v.facing, e.facing, Math.min(1, dt * 10));
+              v.aim = lerpAngle(v.aim, e.facing, Math.min(1, dt * 10));
+              this.place(v);
+            },
           },
-        });
+          v.side === 'red' && !e.seen,
+        );
         break;
       case 'fire':
-        this.queueFire(e, v);
+        this.queueFire([e]);
         break;
       case 'intercept': {
         const target = this.views.get(e.by);
@@ -1151,106 +1517,120 @@ export class BattleStage {
         });
         break;
       }
-      case 'impact':
+      case 'impact': {
         if (!v) break;
-        this.step(e.pen ? 0.35 : 0.2, {
-          start: () => {
-            if (!e.seen && v.side === 'red') return;
-            const c = this.centreOf(v);
-            if (e.pen && e.effect !== 'none') {
-              if (e.effect === 'catastrophic' || e.effect === 'knocked_out' || e.effect === 'shot_down') v.hp = 0;
-              else v.hp = Math.max(0.1, v.hp - 0.3);
-            }
-            this.say(v, e.pen ? (EFFECT_TEXT[e.effect] ?? 'Penetrated') : e.effect === 'bounce' || e.effect === 'none' ? 'Bounced' : 'Hit', e.pen ? this.toneFor(v) : 'plain');
-            this.fx.hit(c, new THREE.Vector3(0, 1, 0), e.pen ? 'pen' : 'bounce');
-            this.audio.impact(e.pen ? 'ke_hit' : 'bounce', e.x, e.y);
-            v.flash = e.pen ? 1 : 0.5;
-            if (e.pen) this.shake = Math.max(this.shake, 0.06);
+        const shown = e.seen || v.side === 'blue';
+        const shook = e.pen ? undefined : this.notes.shook.get(e);
+        this.step(
+          e.pen ? 0.35 : 0.2,
+          {
+            start: () => {
+              if (!shown) return;
+              const c = this.centreOf(v);
+              if (e.pen && e.effect !== 'none') {
+                if (e.effect === 'catastrophic' || e.effect === 'knocked_out' || e.effect === 'shot_down') v.hp = 0;
+                else v.hp = Math.max(0.1, v.hp - 0.3);
+              }
+              const rung: Rung = shook ? (Math.max(1, rungOf(e.effect, false)) as Rung) : rungOf(e.effect, e.pen);
+              const word = e.pen ? (EFFECT_TEXT[e.effect] ?? 'Penetrated') : e.effect === 'tracks' || e.effect === 'optics' ? EFFECT_TEXT[e.effect]! : shook ? levelWord(shook, true) : 'Bounced';
+              this.say(v, word, rung ? this.toneFor(v) : 'plain', rung >= 3 ? 'kill' : rung >= 2 || e.effect === 'crew' || (shook && shook !== 'suppressed') ? 'major' : 'minor');
+              this.fx.hit(c, new THREE.Vector3(0, 1, 0), e.pen ? 'pen' : 'bounce');
+              this.audio.impact(e.pen ? 'ke_hit' : 'bounce', e.x, e.y);
+              v.flash = e.pen ? 1 : 0.5;
+              this.jolt(rung, v, e.effect === 'catastrophic' || e.effect === 'shot_down' ? BREW_UP_STOP : HIT_STOP[rung]);
+            },
           },
-        });
+          !shown,
+        );
         break;
+      }
       case 'casualties':
         if (!v) break;
         this.now(() => {
-          // The fallen go down where they stand; the wounded lie and move.
-          let killed = e.killed;
-          let wounded = e.wounded;
-          const u = this.battle.units.find((x) => x.id === v.id);
-          const men = typeOf(v.type).men?.length ?? 1;
-          v.hp = Math.max(0, v.hp - (e.killed + e.wounded) / Math.max(1, men));
+          this.fallMen(v, e.killed, e.wounded);
           if (e.seen || v.side === 'blue') {
-            const parts = [e.killed ? `${e.killed} Down` : '', e.wounded ? `${e.wounded} Wounded` : ''].filter(Boolean);
-            if (parts.length) this.say(v, parts.join(', '), this.toneFor(v));
+            this.sayDown(v, e.killed, e.wounded);
+            this.jolt(1, v);
           }
-          for (const id of [...v.men].reverse()) {
-            if (!killed && !wounded) break;
-            if (killed) {
-              this.crowd.set(id, { pose: 'dead' });
-              killed--;
-            } else {
-              this.crowd.set(id, { pose: 'wounded' });
-              wounded--;
-            }
-            v.men = v.men.filter((m) => m !== id);
-          }
-          void u;
         });
         break;
-      case 'suppressed':
+      case 'suppressed': {
         if (!v) break;
+        // A bounce that shook the crew says it itself ("Shaken").
+        const told = this.notes.shook.has(e);
         this.now(() => {
-          if (e.level !== 'steady' && (e.seen || v.side === 'blue')) this.say(v, e.level === 'broken' ? 'Broken' : e.level === 'pinned' ? 'Pinned' : 'Suppressed', this.toneFor(v));
+          if (e.level !== 'steady' && (e.seen || v.side === 'blue') && !told) {
+            this.say(v, levelWord(e.level), this.toneFor(v), e.level === 'suppressed' ? 'minor' : 'major');
+            this.jolt(1, v);
+          }
           if (v.t.mobility === 'foot') this.posePeople(v, e.level === 'pinned' || e.level === 'broken' ? 'prone' : 'kneel');
         });
         break;
+      }
       case 'destroyed': {
         if (!v) break;
         const by = this.lastShooter.get(e.unit);
-        this.step(e.how === 'wiped' || e.how === 'expended' ? 0.1 : 0.7, {
-          start: () => {
-            v.alive = false;
-            v.hp = 0;
-            if (e.how !== 'expended') this.feedKill(v, by, e.how, e.seen);
-            const c = this.centreOf(v);
-            const seen = e.seen || v.side === 'blue';
-            if (v.t.mobility === 'foot') {
-              for (const id of v.men) this.crowd.set(id, { pose: 'dead' });
-              v.men = [];
+        const seen = e.seen || v.side === 'blue';
+        const last = this.notes.kills.has(e);
+        this.step(
+          e.how === 'wiped' || e.how === 'expended' ? 0.1 : 0.7,
+          {
+            start: () => {
+              v.alive = false;
+              v.hp = 0;
+              if (e.how !== 'expended') this.feedKill(v, by, e.how, e.seen);
+              const c = this.centreOf(v);
+              if (v.t.mobility === 'foot') {
+                for (const id of v.men) this.crowd.set(id, { pose: 'dead' });
+                v.men = [];
+                v.ring.visible = false;
+                if (seen && e.how === 'wiped') {
+                  this.say(v, 'Wiped Out', this.toneFor(v), 'kill');
+                  this.jolt(2, v);
+                  if (last) this.actionCam(c);
+                }
+                return;
+              }
+              if (!seen) {
+                v.holder.visible = false;
+                return;
+              }
+              this.setShown(v, true);
               v.ring.visible = false;
-              return;
-            }
-            if (!seen) {
-              v.holder.visible = false;
-              return;
-            }
-            this.setShown(v, true);
-            v.ring.visible = false;
-            if (e.how === 'destroyed' || e.how === 'shot_down') {
-              this.fx.catastrophic(c);
-              this.slow = 0.45;
-              this.fx.burn(v.id, c, v.t.armour && v.t.armour.hf[0] >= 300 ? 1.2 : 0.8);
-              this.audio.impact('big', e.x, e.y);
-              this.shake = Math.max(this.shake, 0.14);
-              this.actionCam(c);
-            }
-            if (e.how === 'shot_down' || e.how === 'landed') v.fall = 0.001;
-            this.wreck(v);
-            this.audio.stop(v.id);
-            this.fx.stopRotorWash(v.id);
+              const brew = e.how === 'destroyed' || e.how === 'shot_down';
+              if (brew) {
+                this.fx.catastrophic(c);
+                // Half a second of slow motion as it goes up, with full motion only.
+                if (this.feel.motion === 'full') this.slow = 0.45;
+                this.fx.burn(v.id, c, v.t.armour && v.t.armour.hf[0] >= 300 ? 1.2 : 0.8);
+                this.audio.impact('big', e.x, e.y);
+                this.jolt(3, v, BREW_UP_STOP);
+              } else if (e.how !== 'expended') this.jolt(3, v);
+              if (brew || last) this.actionCam(c);
+              if (e.how === 'shot_down' || e.how === 'landed') v.fall = 0.001;
+              this.wreck(v);
+              this.audio.stop(v.id);
+              this.fx.stopRotorWash(v.id);
+            },
           },
-        });
+          !seen,
+        );
         break;
       }
       case 'boom':
-        this.step(0.3, {
-          start: () => {
-            const p = this.worldOf({ x: e.x, y: e.y }, 0.02);
-            const kind = e.kind === 'bombs' ? 'bombs' : e.kind === 'rockets' ? 'rockets' : e.kind === 'mine' ? 'mine' : e.kind === 'smoke' ? 'he' : 'shell';
-            this.fx.explosion(p, e.size, kind);
-            this.audio.impact(e.kind === 'bombs' ? 'bombs' : e.kind === 'rockets' ? 'rockets' : e.kind === 'mine' ? 'mine' : 'shell', e.x, e.y);
-            this.shake = Math.max(this.shake, 0.05 * e.size);
+        this.step(
+          0.3,
+          {
+            start: () => {
+              const p = this.worldOf({ x: e.x, y: e.y }, 0.02);
+              const kind = e.kind === 'bombs' ? 'bombs' : e.kind === 'rockets' ? 'rockets' : e.kind === 'mine' ? 'mine' : e.kind === 'smoke' ? 'he' : 'shell';
+              this.fx.explosion(p, e.size, kind);
+              this.audio.impact(e.kind === 'bombs' ? 'bombs' : e.kind === 'rockets' ? 'rockets' : e.kind === 'mine' ? 'mine' : 'shell', e.x, e.y);
+              if (e.seen && e.kind !== 'smoke') this.shakeAt(Math.min(0.4, 0.1 * e.size), e.x + 0.5, e.y + 0.5, `boom:${e.x},${e.y}`);
+            },
           },
-        });
+          !e.seen,
+        );
         break;
       case 'smoke':
         this.now(() => {
@@ -1272,49 +1652,57 @@ export class BattleStage {
         break;
       case 'embark':
         if (!v) break;
-        this.step(0.4, {
-          start: () => this.posePeople(v, 'run', 1),
-          end: () => {
-            v.aboard = true;
-            this.setShown(v, false);
+        this.step(
+          0.4,
+          {
+            start: () => this.posePeople(v, 'run', 1),
+            end: () => {
+              v.aboard = true;
+              this.setShown(v, false);
+            },
           },
-        });
+          !e.seen && v.side === 'red',
+        );
         break;
       case 'dismount': {
         const carrier = this.views.get(e.carrier);
-        this.step(0.5, {
-          start: () => {
-            for (const d of e.units) {
-              const p = this.views.get(d.id);
-              if (!p) continue;
-              p.aboard = false;
-              p.x = (carrier?.x ?? d.x + 0.5);
-              p.z = (carrier?.z ?? d.y + 0.5);
-              p.shown = p.side === 'blue' || e.seen;
-              this.setShown(p, p.shown);
-              this.posePeople(p, 'run', 1);
-            }
+        this.step(
+          0.5,
+          {
+            start: () => {
+              for (const d of e.units) {
+                const p = this.views.get(d.id);
+                if (!p) continue;
+                p.aboard = false;
+                p.x = carrier?.x ?? d.x + 0.5;
+                p.z = carrier?.z ?? d.y + 0.5;
+                p.shown = p.side === 'blue' || e.seen;
+                this.setShown(p, p.shown);
+                this.posePeople(p, 'run', 1);
+              }
+            },
+            tick: (k) => {
+              for (const d of e.units) {
+                const p = this.views.get(d.id);
+                if (!p || !carrier) continue;
+                p.x = carrier.x + (d.x + 0.5 - carrier.x) * k;
+                p.z = carrier.z + (d.y + 0.5 - carrier.z) * k;
+                this.place(p);
+              }
+            },
+            end: () => {
+              for (const d of e.units) {
+                const p = this.views.get(d.id);
+                if (!p) continue;
+                p.x = d.x + 0.5;
+                p.z = d.y + 0.5;
+                this.posePeople(p, 'kneel');
+                this.place(p);
+              }
+            },
           },
-          tick: (k) => {
-            for (const d of e.units) {
-              const p = this.views.get(d.id);
-              if (!p || !carrier) continue;
-              p.x = carrier.x + (d.x + 0.5 - carrier.x) * k;
-              p.z = carrier.z + (d.y + 0.5 - carrier.z) * k;
-              this.place(p);
-            }
-          },
-          end: () => {
-            for (const d of e.units) {
-              const p = this.views.get(d.id);
-              if (!p) continue;
-              p.x = d.x + 0.5;
-              p.z = d.y + 0.5;
-              this.posePeople(p, 'kneel');
-              this.place(p);
-            }
-          },
-        });
+          !e.seen,
+        );
         break;
       }
       case 'split':
@@ -1323,7 +1711,7 @@ export class BattleStage {
         break;
       case 'treat':
       case 'repair':
-        this.step(0.3, {});
+        this.step(0.3, {}, true);
         break;
       case 'mine':
         break;
@@ -1333,7 +1721,7 @@ export class BattleStage {
           this.contact = true;
           const s = this.views.get(e.unit);
           if (!s) return;
-          if (!s.shown) this.say(s, 'Contact', 'plain');
+          if (!s.shown) this.say(s, 'Contact', 'plain', 'minor');
           s.shown = true;
           s.x = e.x + 0.5;
           s.z = e.y + 0.5;
@@ -1356,9 +1744,15 @@ export class BattleStage {
       case 'radio':
         if (e.side === 'blue') this.now(() => this.audio.radio(e.call, { dir: this.direction(e.unit) }));
         break;
-      case 'capture':
-        this.now(() => this.world.setZone(e.rounds / 2));
+      case 'capture': {
+        const zone = this.battle.map.zone;
+        this.now(() => {
+          this.world.setZone(e.rounds / 2);
+          // Taking the ground is worth a look.
+          if (zone) this.actionCam(this.worldOf(zone, 0.3));
+        });
         break;
+      }
       case 'end':
         this.step(0.6, {});
         break;
@@ -1377,42 +1771,56 @@ export class BattleStage {
     return Math.abs(rel) < Math.PI / 4 ? 'front' : Math.abs(rel) > (3 * Math.PI) / 4 ? 'rear' : rel > 0 ? 'right' : 'left';
   }
 
-  private queueFire(e: Extract<BattleEvent, { type: 'fire' }>, v: View | undefined): void {
+  /**
+   * Shots at one target (one, or a small-arms volley from several units): the shooters aim, fire
+   * together and the rounds land. Where everyone is is read as the shot plays, after the moves before it.
+   */
+  private queueFire(fires: FireEvent[]): void {
+    const clip = this.building!;
+    const e = fires[0]!;
     const target = e.target ? this.views.get(e.target) : undefined;
-    if (e.target) this.lastShooter.set(e.target, e.unit);
-    const to = target ? this.centreOf(target) : this.worldOf(e.to, 0.05);
-    if (!e.hit && target) {
-      // A miss goes past: land it a little beyond.
-      to.add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8));
-    }
-    const offMap = !v;
-    const shooterShown = offMap ? false : v!.side === 'blue' || e.seen;
-    const from = v ? this.muzzleOf(v) : this.worldOf(e.from, 8);
-    const want = v ? Math.atan2(e.to.y + 0.5 - v.z, e.to.x + 0.5 - v.x) : 0;
+    for (const f of fires) if (f.target) this.lastShooter.set(f.target, f.unit);
+    const shots = fires.map((f) => {
+      const v = this.views.get(f.unit);
+      return { f, v, shown: !!v && (v.side === 'blue' || f.seen) };
+    });
+    const offMap = !shots[0]!.v;
     const kind = e.kind;
-    const d = from.distanceTo(to);
-    const foot = v?.t.mobility === 'foot';
-    if (v && shooterShown) {
+    const foot = (v: View | undefined) => v?.t.mobility === 'foot';
+    const wantOf = (s: (typeof shots)[number]) => (s.v ? Math.atan2(s.f.to.y + 0.5 - s.v.z, s.f.to.x + 0.5 - s.v.x) : 0);
+    const shown = shots.filter((s) => s.shown && s.v);
+    const lead = shown[0]?.v;
+    if (lead) {
       this.step(0.18, {
         start: () => {
+          const to = target ?? { x: e.to.x + 0.5, z: e.to.y + 0.5 };
           // Frame both when they fit; otherwise watch the target (where the news is).
-          if (Math.hypot(v.x - to.x, v.z - to.z) < 9) this.follow((v.x + to.x) / 2, (v.z + to.z) / 2);
-          else this.follow(to.x, to.z, true);
-          if (foot) this.posePeople(v, 'aim');
-          if (v.side === 'red' && !v.holder.visible) this.setShown(v, true);
+          if (Math.hypot(lead.x - to.x, lead.z - to.z) < 9) this.show(clip, (lead.x + to.x) / 2, (lead.z + to.z) / 2);
+          else this.show(clip, to.x, to.z, true);
+          for (const s of shown) {
+            if (foot(s.v)) this.posePeople(s.v!, 'aim');
+            if (s.v!.side === 'red' && !s.v!.holder.visible) this.setShown(s.v!, true);
+          }
         },
         tick: (_k, dt) => {
-          v.aim = lerpAngle(v.aim, want, Math.min(1, dt * 14));
-          if (foot || v.t.mobility === 'heli' || v.t.mobility === 'drone') v.facing = lerpAngle(v.facing, want, Math.min(1, dt * 10));
-          this.place(v);
+          for (const s of shown) {
+            const v = s.v!;
+            const want = wantOf(s);
+            v.aim = lerpAngle(v.aim, want, Math.min(1, dt * 14));
+            if (foot(v) || v.t.mobility === 'heli' || v.t.mobility === 'drone') v.facing = lerpAngle(v.facing, want, Math.min(1, dt * 10));
+            this.place(v);
+          }
         },
         end: () => {
-          v.aim = want;
-          this.place(v);
+          for (const s of shown) {
+            s.v!.aim = wantOf(s);
+            this.place(s.v!);
+          }
         },
       });
     }
-    const side: Side = v?.side ?? (e.unit.startsWith('support') ? (e.from.y > H / 2 ? 'blue' : 'red') : 'red');
+    const side: Side = shots[0]!.v?.side ?? (e.unit.startsWith('support') ? (e.from.y > H / 2 ? 'blue' : 'red') : 'red');
+    const d = Math.hypot(e.to.x - e.from.x, e.to.y - e.from.y, offMap ? 8 : 0);
     let flight = 0.12;
     if (kind === 'atgm' || kind === 'manpads') flight = Math.min(1.6, 0.35 + d * 0.06);
     else if (kind === 'rocket') flight = Math.min(1.2, 0.2 + d * 0.05);
@@ -1420,40 +1828,95 @@ export class BattleStage {
     else if (kind === 'fpv' || kind === 'loiter') flight = Math.min(2.4, 0.9 + d * 0.07);
     else if (kind === 'cannon') flight = 0.12 + d * 0.006;
     else flight = 0.25;
-    this.step(flight, {
-      start: () => {
-        if (shooterShown && v) {
-          const dir = to.clone().sub(from).normalize();
-          this.fx.muzzle(from, dir, e.calibre);
-          if (foot) this.posePeople(v, 'fire');
-          v.flash = Math.max(v.flash, 0.15);
-        }
-        // Fire from out of sight: show who is taking it.
-        if (!shooterShown && target && target.side === 'blue') this.follow(target.x, target.z, true);
-        if (shooterShown || offMap || (target && target.holder.visible)) this.audio.shot(e.calibre, (v?.x ?? to.x) - 0.5, (v?.z ?? to.z) - 0.5, { night: this.night });
-        const shownTo = target ? target.holder.visible : true;
-        if (!shooterShown && !shownTo && !offMap) return;
-        if (kind === 'atgm' || kind === 'manpads') this.fx.missile(from, to, kind === 'manpads' ? 'manpads' : e.weapon.toLowerCase().includes('hellfire') ? 'hellfire' : 'atgm', flight, { top: !!typeOf(v?.type ?? 'm1a2').weapons.find((w) => w.id === e.weapon)?.top });
-        else if (kind === 'rocket') this.fx.missile(from, to, 'rocket', flight);
-        else if (kind === 'mortar' || kind === 'howitzer') {
-          this.fx.shell(from, to, flight);
-          this.audio.incoming(e.to.x, e.to.y, flight);
-        } else if (kind === 'fpv' || kind === 'loiter') {
-          const model = buildProjectile(e.weapon.includes('switch') || v?.type === 'switchblade' ? 'switchblade' : v?.type === 'lancet' ? 'lancet' : 'fpv');
-          this.fx.drone(from, to, flight, v?.type === 'switchblade' ? 'switchblade' : v?.type === 'lancet' ? 'lancet' : 'fpv', model);
-          this.audio.drone(`d${this.clock}`, 'fpv', e.to.x, e.to.y);
-        } else {
-          const bursts = kind === 'mg' || kind === 'small_arms' ? 5 : kind === 'autocannon' ? 3 : 1;
-          for (let i = 0; i < bursts; i++) this.fx.tracer(from, to.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.25, 0, (Math.random() - 0.5) * 0.25)), e.calibre, side, flight);
-        }
-        if ((kind === 'atgm' || kind === 'fpv' || kind === 'loiter') && e.hit && target && this.opts.settings.actionCams && (target.t.armour?.hf[0] ?? 0) >= 300) this.actionCam(to, from);
+    const hit = fires.some((f) => f.hit);
+    let to = new THREE.Vector3();
+    // Nothing to see: an unseen shooter at an unseen target (zip mode trims it).
+    const dead = !offMap && !shots.some((s) => s.shown) && target?.side !== 'blue' && !fires.some((f) => f.seen);
+    this.step(
+      flight,
+      {
+        start: () => {
+          to = target ? this.centreOf(target) : this.worldOf(e.to, 0.05);
+          // A miss goes past: land it a little beyond.
+          if (!hit && target) to.add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8));
+          const shownTo = target ? target.holder.visible : true;
+          // Fire from out of sight: show who is taking it.
+          if (!shots.some((s) => s.shown) && target && target.side === 'blue') this.show(clip, target.x, target.z, true);
+          for (const s of shots) {
+            const v = s.v;
+            const from = v ? this.muzzleOf(v) : this.worldOf(s.f.from, 8);
+            if (s.shown && v) {
+              this.fx.muzzle(from, to.clone().sub(from).normalize(), s.f.calibre);
+              if (foot(v)) this.posePeople(v, 'fire');
+              v.flash = Math.max(v.flash, 0.15);
+            }
+            if (s.shown || offMap || shownTo) this.audio.shot(s.f.calibre, (v?.x ?? to.x) - 0.5, (v?.z ?? to.z) - 0.5, { night: this.night });
+            if (!s.shown && !shownTo && !offMap) continue;
+            if (kind === 'atgm' || kind === 'manpads') this.fx.missile(from, to, kind === 'manpads' ? 'manpads' : s.f.weapon.toLowerCase().includes('hellfire') ? 'hellfire' : 'atgm', flight, { top: !!typeOf(v?.type ?? 'm1a2').weapons.find((w) => w.id === s.f.weapon)?.top });
+            else if (kind === 'rocket') this.fx.missile(from, to, 'rocket', flight);
+            else if (kind === 'mortar' || kind === 'howitzer') {
+              this.fx.shell(from, to, flight);
+              this.audio.incoming(s.f.to.x, s.f.to.y, flight);
+            } else if (kind === 'fpv' || kind === 'loiter') {
+              const model = buildProjectile(s.f.weapon.includes('switch') || v?.type === 'switchblade' ? 'switchblade' : v?.type === 'lancet' ? 'lancet' : 'fpv');
+              this.fx.drone(from, to, flight, v?.type === 'switchblade' ? 'switchblade' : v?.type === 'lancet' ? 'lancet' : 'fpv', model);
+              this.audio.drone(`d${this.clock}`, 'fpv', s.f.to.x, s.f.to.y);
+            } else {
+              const bursts = kind === 'mg' || kind === 'small_arms' ? 5 : kind === 'autocannon' ? 3 : 1;
+              for (let i = 0; i < bursts; i++) this.fx.tracer(from, to.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.25, 0, (Math.random() - 0.5) * 0.25)), s.f.calibre, side, flight);
+            }
+          }
+        },
+        end: () => {
+          for (const s of shown) if (foot(s.v)) this.posePeople(s.v!, 'aim');
+          if (!hit && !(kind === 'mortar' || kind === 'howitzer')) this.fx.hit(to, new THREE.Vector3(0, 1, 0), 'small');
+          if (!hit && target && target.holder.visible) this.say(target, 'Miss', 'plain', 'minor');
+        },
       },
-      end: () => {
-        if (foot && v) this.posePeople(v, 'aim');
-        if (!e.hit && !(kind === 'mortar' || kind === 'howitzer')) this.fx.hit(to, new THREE.Vector3(0, 1, 0), 'small');
-        if (!e.hit && target && target.holder.visible) this.say(target, 'Miss', 'plain');
-      },
-    });
+      dead,
+    );
+  }
+
+  /** A small-arms volley: the shots together, then what they did to the target in one word, then the rest. */
+  private queueVolley(volley: Volley): void {
+    this.queueFire(volley.fires);
+    const v = this.views.get(volley.target);
+    if (v && volley.hits.length) {
+      const hits = volley.hits;
+      this.now(() => {
+        let killed = 0;
+        let wounded = 0;
+        let level: (typeof hits)[number] | null = null;
+        let seen = v.side === 'blue';
+        let rung: Rung = 0;
+        const effects: string[] = [];
+        for (const h of hits) {
+          if ('seen' in h && h.seen === true) seen = true;
+          if (h.type === 'casualties') {
+            killed += h.killed;
+            wounded += h.wounded;
+            rung = Math.max(rung, 1) as Rung;
+          } else if (h.type === 'suppressed') level = h;
+          else if (h.type === 'impact') {
+            rung = Math.max(rung, rungOf(h.effect, h.pen)) as Rung;
+            const word = h.pen ? (EFFECT_TEXT[h.effect] ?? 'Penetrated') : h.effect === 'tracks' || h.effect === 'optics' ? EFFECT_TEXT[h.effect]! : '';
+            if (word && !effects.includes(word)) effects.push(word);
+            if (seen) this.fx.hit(this.centreOf(v), new THREE.Vector3(0, 1, 0), h.pen ? 'pen' : 'bounce');
+          }
+        }
+        this.fallMen(v, killed, wounded);
+        const lv = level?.type === 'suppressed' && level.level !== 'steady' ? level.level : null;
+        if (v.t.mobility === 'foot' && lv) this.posePeople(v, lv === 'pinned' || lv === 'broken' ? 'prone' : 'kneel');
+        if (!seen) return;
+        const bounced = hits.some((h) => h.type === 'impact' && !h.pen);
+        const parts = [downText(killed, wounded), ...effects, lv ? levelWord(lv, bounced && !killed && !wounded && !effects.length) : ''].filter(Boolean);
+        if (!parts.length && bounced) parts.push('Bounced');
+        if (lv) rung = Math.max(rung, 1) as Rung;
+        if (parts.length) this.say(v, parts.join(', '), rung ? this.toneFor(v) : 'plain', rung >= 3 ? 'kill' : killed || wounded || effects.length || lv === 'pinned' || lv === 'broken' ? 'major' : 'minor');
+        this.jolt(rung, v);
+      });
+    }
+    for (const e of volley.rest) this.queue(e);
   }
 
   /** A line for the kill feed: who got whom, as far as we saw. */
@@ -1523,45 +1986,21 @@ export class BattleStage {
 
   frame(dt: number): void {
     const t0 = performance.now();
-    // A beat of slow motion when something big goes up; the camera still moves at full speed.
+    // `dt` comes at the film's speed (`rate`): presentation only, nothing the battle depends on.
     const real = dt;
+    // Hit stop: the film and the effects hold still for a beat on a heavy hit; the camera does not.
+    if (this.stop > 0) {
+      const held = Math.min(this.stop, dt);
+      this.stop -= held;
+      dt -= held;
+    }
+    // A beat of slow motion when something big goes up; the camera still moves at full speed.
     if (this.slow > 0) {
-      this.slow = Math.max(0, this.slow - dt);
+      this.slow = Math.max(0, this.slow - real);
       dt *= 0.3;
     }
     this.clock += dt;
-    // A step that has played far longer than it should is ended where it stands.
-    const head = this.steps[0] ?? null;
-    if (head !== this.stepNow) {
-      this.stepNow = head;
-      this.stepAge = 0;
-    } else if (head) {
-      this.stepAge += real;
-      if (this.stepAge > Math.max(8, head.dur * 3)) {
-        this.faults++;
-        this.steps.shift();
-        this.safely(head.end);
-        this.stepNow = null;
-      }
-    }
-    // Play the film: one step at a time.
-    let budget = dt;
-    while (this.steps.length && budget >= 0) {
-      const s = this.steps[0]!;
-      if (!s.started) {
-        s.started = true;
-        this.safely(s.start);
-      }
-      const take = Math.min(budget, s.dur - s.t);
-      s.t += take;
-      budget -= take;
-      this.safely(() => s.tick?.(s.dur > 0 ? Math.min(1, s.t / s.dur) : 1, take));
-      if (s.t >= s.dur - 1e-6) {
-        this.steps.shift();
-        this.safely(s.end);
-        if (s.dur > 0) break;
-      } else break;
-    }
+    this.run(dt, real);
     if (this.cam) {
       this.cam.t += dt;
       if (this.cam.t >= this.cam.dur) this.cam = null;
@@ -1605,7 +2044,8 @@ export class BattleStage {
         }
       }
     }
-    this.shake = Math.max(0, this.shake - dt * 0.6);
+    this.trauma = Math.max(0, this.trauma - real * TRAUMA_DRAIN);
+    this.shakeClock += real;
     this.applyCamera(real);
     this.insight.tick(real, { yaw: this.yaw, perPx: (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / Math.max(1, this.host.clientHeight), cinematic: this.cam !== null });
     this.world.update(dt, this.camera);
@@ -1614,7 +2054,8 @@ export class BattleStage {
     this.audio.setListener({ x: this.focus.x - 0.5, y: this.focus.z - 0.5, zoom: Math.min(1, this.dist / this.maxDist) });
     this.audio.update(dt);
     this.renderer.render(this.scene, this.camera);
-    this.updateHud(real);
+    // Words read in real time, whatever speed the film runs at.
+    this.updateHud(real / Math.max(1, this.rate));
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
   }

@@ -57,9 +57,11 @@ import { UnitGlyph } from '../glyphs';
 import { loadLibrary, type Library } from './assets';
 import type { BattleRequest } from './battle';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
-import { BattleStage, type Overlay } from './stage';
+import { BattleStage, feelOf, type Overlay } from './stage';
 import { faceFill, glyphOf, HULL_FACES, HULL_GUN, HULL_TURRET, SHIELD, SHIELD_HALF, warnPath, type FacingGlyph } from './facing';
 import type { InsightOverlay } from './overlays';
+import { roundNews, type RoundNews } from './report';
+import { RoundReport } from './RoundReport';
 import { classOf, health } from './units';
 
 // One battle, fought in turns: a brief, the fight, the verdict. On your turn tap a unit, tap a lit
@@ -88,6 +90,9 @@ declare global {
     };
   }
 }
+
+/** Skip held this long (ms) fast-forwards instead. */
+const HOLD_MS = 300;
 
 const MODE_TEXT = {
   destroy: ['Destroy Them', 'Knock out their company, or break it: they pull back under a third of their strength.'],
@@ -394,14 +399,6 @@ function strengths(b: Battle): { blue: number; red: number } {
   return { blue: Math.max(0, blue), red: Math.max(0, red / start('red')) };
 }
 
-/** Units knocked out (seen) and lost so far. */
-function counts(b: Battle): { killed: number; lost: number } {
-  return {
-    killed: new Set(b.events.filter((e) => e.type === 'destroyed' && e.seen && b.units.find((u) => u.id === e.unit)?.side === 'red').map((e) => (e as { unit: string }).unit)).size,
-    lost: b.units.filter((u) => u.side === 'blue' && !u.alive).length,
-  };
-}
-
 function Strength({ label, value, mark, side }: { label: string; value: number; mark: number; side: 'blue' | 'red' }) {
   return (
     <div className="min-w-0" aria-label={`${label}: ${Math.round(value * 100)}%`}>
@@ -619,9 +616,19 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const [dash, setDash] = useState(false);
   const [menu, setMenu] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
-  /** What happened since your last turn, shown with the round banner. */
-  const [report, setReport] = useState<string | null>(null);
-  const tally0 = useRef({ killed: 0, lost: 0 });
+  /** What happened since your last turn, under the round banner; after a skipped turn it waits for Done. */
+  const [report, setReport] = useState<{ news: RoundNews; sticky: boolean } | null>(null);
+  /** Where in the log the last report ended. */
+  const reportFrom = useRef(0);
+  /** Their turn was skipped: the report it lands on waits for you. */
+  const skipped = useRef(false);
+  /** Skip held down: their turn plays four times as fast until it is let go. */
+  const holdRef = useRef(false);
+  const [holding, setHolding] = useState(false);
+  const holdTimer = useRef(0);
+  /** When Skip went down (the event's own time), and whether the press that ended was a hold, so its click is no skip. */
+  const pressAt = useRef(0);
+  const wasHold = useRef(false);
   const lastSeen = useRef<Set<string> | null>(null);
   /** Last known positions as drawn on your last turn, held through theirs. */
   const ghostsRef = useRef<Overlay['ghosts'] | null>(null);
@@ -717,8 +724,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         const stage = stageRef.current;
         if (!stage) return;
         try {
-          // Their turn at double speed, if you like it brisk (the default).
-          if (!document.hidden) stage.frame(waitingRef.current && fastRef.current ? dt * 2 : dt);
+          // Their turn at double speed if you like it brisk (the default), four times while Skip is held.
+          const rate = waitingRef.current ? (holdRef.current ? 4 : fastRef.current ? 2 : 1) : 1;
+          stage.rate = rate;
+          if (!document.hidden) stage.frame(dt * rate);
         } catch (e) {
           console.warn('battle frame failed; the film is put right', e);
           stage.recover();
@@ -734,6 +743,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         if (!b && waitingRef.current) {
           waitingRef.current = false;
           setWaiting(false);
+          holdRef.current = false;
+          setHolding(false);
         }
         if (!b && pendingFocus.current) {
           const u = battle.units.find((x) => x.id === pendingFocus.current);
@@ -748,11 +759,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           if (!b && !battle.ended && battle.turn === 'blue' && battle.turnIndex !== shownTurn) {
             shownTurn = battle.turnIndex;
             setBanner(`Round ${battle.round} · Your Turn`);
-            const now = counts(battle);
-            const killed = now.killed - tally0.current.killed;
-            const lost = now.lost - tally0.current.lost;
-            tally0.current = now;
-            setReport(battle.round > 1 ? (killed || lost ? [killed ? `${killed} knocked out` : '', lost ? `${lost} lost` : ''].filter(Boolean).join(' · ') : 'No losses either side') : null);
+            // Every loss and change of state since your last turn (theirs as seen), from the log.
+            const news = roundNews(battle, reportFrom.current);
+            reportFrom.current = news.to;
+            setReport(battle.round > 1 ? { news, sticky: skipped.current } : null);
+            skipped.current = false;
           }
         }
         if (battle.ended && !b && !ended) ended = now;
@@ -799,15 +810,15 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   useEffect(() => {
     if (!banner) return;
-    const t = setTimeout(
-      () => {
-        setBanner(null);
-        setReport(null);
-      },
-      report ? 2400 : 1400,
-    );
+    const t = setTimeout(() => setBanner(null), report ? 2400 : 1400);
     return () => clearTimeout(t);
   }, [banner]);
+  // The report stays a moment longer for each line it has; after a skipped turn, until Done.
+  useEffect(() => {
+    if (!report || report.sticky) return;
+    const t = setTimeout(() => setReport(null), Math.min(9000, 2400 + 700 * report.news.rows.length));
+    return () => clearTimeout(t);
+  }, [report]);
 
   const b = battleRef.current;
   // Your turn, even while your own last order is still playing out on screen.
@@ -1110,6 +1121,36 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       s.resync();
       if (thermal) s.setThermal(true);
     }
+    // Motion, shake, action cams and fast enemy turns apply at once.
+    stageRef.current?.setFeel(feelOf(next));
+  };
+
+  /** Skip the film to its end (not the click that ends a hold on Skip). */
+  const skipFilm = () => {
+    if (wasHold.current) {
+      wasHold.current = false;
+      return;
+    }
+    if (waitingRef.current) skipped.current = true;
+    stageRef.current?.skip();
+  };
+  const holdStart = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    pressAt.current = e.timeStamp;
+    wasHold.current = false;
+    window.clearTimeout(holdTimer.current);
+    holdTimer.current = window.setTimeout(() => {
+      holdRef.current = true;
+      setHolding(true);
+    }, HOLD_MS);
+  };
+  // A tap or a hold by the press's own timing, so a busy page that runs the timer late still skips on a tap.
+  const holdEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
+    window.clearTimeout(holdTimer.current);
+    wasHold.current = e.timeStamp - pressAt.current >= HOLD_MS;
+    if (!holdRef.current) return;
+    holdRef.current = false;
+    setHolding(false);
   };
 
   const blue = b?.units.filter((u) => u.side === 'blue') ?? [];
@@ -1172,7 +1213,16 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const hiddenActions = ranked.length - shownActions.length;
 
   return (
-    <div className="absolute inset-0 bg-ink-950" data-testid="arena">
+    <div
+      className="absolute inset-0 bg-ink-950"
+      data-testid="arena"
+      onPointerDownCapture={(e) => {
+        // A tap anywhere skips an action cam; on the field it does nothing else.
+        if (stageRef.current?.endActionCam() && host.current?.contains(e.target as Node)) e.stopPropagation();
+        // A tap outside the round report puts it away.
+        if (report && !(e.target as Element).closest?.('[data-testid="arena-report"]')) setReport(null);
+      }}
+    >
       <div ref={host} className="absolute inset-0" onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onPointerMove={onPointerMove} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()} />
       {!ready && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -1240,20 +1290,34 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         )}
       </header>
 
-      {banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-[22%] z-10 flex flex-col items-center gap-1.5 text-center" data-testid="arena-banner">
-          <span className="rounded-full bg-white px-5 py-2 text-[17px] font-bold text-black shadow-lg">{banner}</span>
-          {report && (
-            <span className="rounded-full bg-black/85 px-4 py-1.5 text-[14px] font-semibold text-white" data-testid="arena-report">
-              {report}
+      {(banner || report) && (
+        <div className="pointer-events-none absolute inset-x-0 top-[22%] z-10 flex flex-col items-center gap-1.5 text-center">
+          {banner && (
+            <span className="rounded-full bg-white px-5 py-2 text-[17px] font-bold text-black shadow-lg" data-testid="arena-banner">
+              {banner}
             </span>
           )}
+          {report && <RoundReport news={report.news} onClose={() => setReport(null)} />}
         </div>
       )}
       {busy && ready && b && !myTurn && !b.ended && (
         <div className="safe-bottom pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center">
-          <button type="button" onClick={() => stageRef.current?.skip()} className="v-btn v-btn-secondary pointer-events-auto mb-[118px] h-11 rounded-full px-5 text-[15px] font-semibold" data-testid="arena-skip">
-            Skip
+          {/* A tap skips their turn; holding it plays the turn four times as fast until let go. */}
+          <button
+            type="button"
+            onClick={skipFilm}
+            onPointerDown={holdStart}
+            onPointerUp={holdEnd}
+            onPointerCancel={holdEnd}
+            onLostPointerCapture={holdEnd}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label="Skip, or hold to fast-forward"
+            aria-pressed={holding}
+            style={{ WebkitTouchCallout: 'none' }}
+            className="v-btn v-btn-secondary pointer-events-auto mb-[118px] h-11 touch-none rounded-full px-5 text-[15px] font-semibold select-none"
+            data-testid="arena-skip"
+          >
+            {holding ? 'Fast-Forward' : 'Skip'}
           </button>
         </div>
       )}
@@ -1530,7 +1594,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               type="button"
               onClick={() => {
                 setMenu(false);
-                stageRef.current?.skip();
+                skipFilm();
               }}
               className="v-btn v-btn-secondary h-12 text-[15px]"
             >
@@ -1562,7 +1626,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 [
                   ['actionCams', 'Action Cams', 'Short close-ups on big hits'],
                   ['radio', 'Radio Calls', 'Your crews call contacts and kills'],
-                  ['fastEnemy', 'Fast Enemy Turns', 'Their turn plays at double speed'],
+                  ['fastEnemy', 'Fast Enemy Turns', 'Double speed, without the waits'],
                   ['endSheet', 'Ask Before Ending Turn', 'When units have not acted'],
                   ['tips', 'Tips', 'A word when the board shows a mistake'],
                   ['haptics', 'Haptics', 'A tick on Fire and End Turn'],

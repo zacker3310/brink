@@ -591,6 +591,32 @@ adds difficulty on top of the rules (sections 3 to 6 are unchanged).
   happened ("2 knocked out · 1 lost").
 - Best Shot on the unit card opens the shot card on its best target, even off screen.
 
+**Watch it (v2.3)**
+- The film is the event log played back; it decides nothing. The log is cut into beats (an action and
+  what came of it: a move and the overwatch shots it drew, a shot and its hits; `apps/web/src/arena/film.ts`).
+  Beats that touch different units share time, up to three at once, coming in 0.12 s apart, as long as
+  a newcomer is on screen or the camera is free; turn changes, splits, merges, captures and the end
+  play alone. Small-arms and machine-gun fire from several units at one target plays as one volley
+  with one word ("3 Down, Pinned"); a shooter's own move before it plays first.
+- Fast Enemy Turns zips their turn: double speed, nothing-to-see time capped at 0.6 s in a row, and
+  the camera goes only to what touches your units (their moves you can see play where they are).
+  Holding Skip plays the turn four times as fast; a tap skips it. Your turn opens on a round report
+  of every loss and change of state since your last turn (yours, and theirs as seen); after a skip it
+  waits for Done.
+- Hits are weighed on a ladder: a bounce, a crew or suppression hit, a mobility or firepower kill, a
+  kill. Each rung holds the film still for 0, 40, 70 or 100 ms (a brew-up 120) and adds 0, 0.15, 0.3
+  or 0.5 camera trauma, less with distance from what the camera looks at. Shake is trauma squared,
+  smooth noise, mostly a turn of the view (full trauma 6 degrees, a brew-up's 1.5) and a little sway,
+  draining in about a second. One unit's hits in one moment shake once, by the worst.
+- Words: minor ones (Miss, Bounced, Shaken, Contact) last 1 s, others 1.4 s, kills 1.8 s and pop to
+  180%. No more than four are on screen; a minor word gives way, or is not shown. A squad's
+  casualties a moment apart add up in one word; a bounce that shakes a crew says "Shaken".
+- Action cams only on a brew-up, the kill that closes a turn and a capture; a tap anywhere ends one.
+- Motion (battle menu, from the system's reduce-motion setting): Full as above; Reduced has no slow
+  motion and no action cams, the camera cuts instead of gliding, and words fade where they stand;
+  Off is Reduced with no shake. The Shake slider scales the shake. Bright light flashes (an
+  autocannon's muzzle and up) are held to three a second in real time at any setting (WCAG 2.3.1).
+
 **Make it easier**
 - Difficulty: Easy (the default for skirmishes), Normal, Hard. War-map battles follow the campaign's
   difficulty; skirmishes have their own choice on the brief, remembered. The table

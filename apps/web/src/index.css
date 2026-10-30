@@ -876,6 +876,15 @@ aside[data-testid^='panel-'] section:first-of-type > header {
   font-size: 14px;
   font-weight: 700;
 }
+/* Minor words (Miss, Bounced) are small; kills are the biggest (and pop as they land). */
+.arena-callout[data-weight='minor'] {
+  font-size: 14px;
+  font-weight: 700;
+}
+.arena-callout[data-weight='kill'] {
+  font-size: 18px;
+  font-weight: 800;
+}
 .arena-place {
   position: absolute;
   top: 0;
