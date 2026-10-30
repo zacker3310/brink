@@ -237,7 +237,7 @@ describe('fog: leaks found (reported defects)', () => {
     expect([free.red, watched.red]).toEqual([0, 1]);
     expect(free.undo).toBe(true);
   });
-  it.fails('a step a hidden enemy sees can be undone as one nobody sees', () => {
+  it('a step a hidden enemy sees can be undone as one nobody sees', () => {
     expect(watchedStep(true).undo).toBe(watchedStep(false).undo);
   });
 

@@ -187,7 +187,7 @@ describe('replay', () => {
     expect(walls(b)).toBeLessThan(start);
     expect(hashBattle(copy(b))).toBe(hashBattle(b));
   }, BATTLES);
-  it.fails('a battle resumed from a save plays on as the one that never stopped, after tracks flatten walls', () => {
+  it('a battle resumed from a save plays on as the one that never stopped, after tracks flatten walls', () => {
     const straight = createBattle(walled);
     for (let t = 0; t < 3; t++) autoTurn(straight);
     const resumed = copy(straight);

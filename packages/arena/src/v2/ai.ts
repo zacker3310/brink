@@ -40,10 +40,15 @@ interface View {
 const gridCache = new WeakMap<Battle, Map<string, Grids>>();
 
 function signature(b: Battle): string {
-  // Terrain changes knock down what blocked sight: count them from the map itself.
-  let open = 0;
-  for (let i = 0; i < b.map.cells.length; i++) open += b.map.cells[i] === BUILDING || b.map.cells[i] === TREES ? 1 : 0;
-  return b.smoke.map((p) => `${p.x},${p.y}`).join(';') + '|' + open;
+  // Everything that can block a line of sight and change in play: every cell's kind (walls flattened,
+  // rock breached, buildings to rubble, trees felled) and storeys, and the smoke. A count of buildings
+  // and trees missed walls and rock, so a battle resumed from a save could see differently.
+  let h = 2166136261;
+  for (let i = 0; i < b.map.cells.length; i++) {
+    h = Math.imul(h ^ b.map.cells[i]!, 16777619);
+    h = Math.imul(h ^ (b.map.storeys[i] ?? 0), 16777619);
+  }
+  return b.smoke.map((p) => `${p.x},${p.y}`).join(';') + '|' + (h >>> 0).toString(36);
 }
 
 function gridsFor(b: Battle, e: Known, sig: string): Grids {
@@ -52,7 +57,7 @@ function gridsFor(b: Battle, e: Known, sig: string): Grids {
     cache = new Map();
     gridCache.set(b, cache);
   }
-  const key = `${e.unit}@${e.x},${e.y}|${sig}`;
+  const key = `${e.unit}:${e.t.id}@${e.x},${e.y}|${sig}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const n = W * H;

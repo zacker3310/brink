@@ -1050,9 +1050,9 @@ export function autoBattle(b: Battle, limit = ROUND_LIMIT + 1): Battle {
  * Which events leave a step safe to take back. Safe: a unit moving (and the walls its tracks flatten),
  * turning, embarking or dismounting, and their radio calls; overwatch and hunker log nothing. Unsafe:
  * anything that rolled or showed the player something (fire, intercept, impact, casualties,
- * suppressed, destroyed, boom, mine, crater, spotted, lost: either side's sightings, since the
- * enemy seeing you tells you where it is), or that did more than move a unit (smoke, split,
- * merge, treat, repair, ability, turn, capture, end).
+ * suppressed, destroyed, boom, mine, crater, and the player's own spotted and lost), or that did
+ * more than move a unit (smoke, split, merge, treat, repair, ability, turn, capture, end). The
+ * enemy's spotted and lost are let through in `undoable`: the player never sees them.
  */
 export const UNDO_SAFE: Record<BattleEvent['type'], boolean> = {
   move: true,
@@ -1101,7 +1101,11 @@ const ghostsOf = (b: Battle) =>
 export function undoable(before: Battle, after: Battle): boolean {
   if (before.ended || after.ended || before.turn !== 'blue' || after.turn !== 'blue' || before.turnIndex !== after.turnIndex) return false;
   if (after.stream !== before.stream || after.events.length < before.events.length) return false;
-  if (after.events.slice(before.events.length).some((e) => !UNDO_SAFE[e.type])) return false;
+  // The enemy spotting or losing one of ours shows nothing to the player (the film never plays red's
+  // sightings) and the snapshot puts red's picture back too, so it does not block the undo: if it did,
+  // a greyed Undo would tell the player that someone unseen had seen the move.
+  const hiddenSighting = (e: BattleEvent) => (e.type === 'spotted' || e.type === 'lost') && e.side === 'red';
+  if (after.events.slice(before.events.length).some((e) => !UNDO_SAFE[e.type] && !hiddenSighting(e))) return false;
   const seen = (b: Battle) => [...visibleTo(b, 'blue')].sort().join();
   if (seen(after) !== seen(before) || ghostsOf(after) !== ghostsOf(before)) return false;
   // A hidden enemy walked into is revealed (the move stops short), even out of sight.
