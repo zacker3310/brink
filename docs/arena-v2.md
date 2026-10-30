@@ -517,6 +517,33 @@ software rasteriser pays for and a phone GPU largely does not. The battle now al
 camera to settle before it reports itself ready, which lengthens the measured opening. It needs a
 measurement on a real iPhone before anything is tuned for it.
 
+**Drawing only when something changes** (`apps/web/src/arena/pacing.ts`). The stage no longer draws
+every animation frame. A scheduler with named states decides: Combat Playback (the film, and two
+seconds after it while buildings slump and trees fall), Camera Transition (and 0.3 s after) and
+Interaction (an order, an overlay or a setting: the frame it asks for) draw every frame; Ambient Animation (only
+smoke, fire, rain or snow, rotors or moving soldiers in view; idle soldiers only in close views)
+draws 30 a second for 15 s after the last of those, then holds the picture; Idle, Suspended (page
+hidden) and Context Lost draw nothing. A battle nobody touches draws zero frames a second. The
+shadow map is drawn only when a shadow caster or the sun's frame round the view moves
+(`shadowMap.autoUpdate` off). Wrecks stop burning when the battle says their fire is out.
+
+**Pixel ratio.** The quality's cap is where it starts and the most it takes (never above the
+device's); a rolling median of real frame intervals steps it down to 1 when frames run long and
+back up when they keep 60 a second, stops climbing after two reversals, and reads a steady 33 ms
+cadence as Low Power Mode, not a slow GPU.
+
+**Crash resilience.** A lost WebGL context stops drawing and the stage is rebuilt from the battle
+when it comes back (or after 3 s, as some iOS never give it back); a replaced stage is disposed
+and its context released at once (`forceContextLoss`), and the stage goes when the battle ends.
+Disposing releases everything its renderer drew, compiled or uploaded, the shared model, paint and
+sky caches included: three.js leaves a dispose listener on each, which would otherwise keep every
+replaced renderer alive (measured: one canvas and its context held per battle before, none after).
+The battle is saved as a versioned, hashed snapshot (`packages/arena/src/v2/snapshot.ts`,
+`ARENA_RULES_VERSION`), written to a spare slot and checked before a pointer moves to it: when it
+opens, after every committed order, at each turn's end, when the page is hidden and when the
+context is lost. A resumed battle is the committed state; its unplayed film is told, never
+replayed. Measuring on a phone, with the Show Frame Time overlay: `docs/device-testing.md`.
+
 ## 9. Migration (nothing is wiped)
 
 - **War-map contract**: `ArenaBattle { target, attackers, defenders, kept, won }` is unchanged.
