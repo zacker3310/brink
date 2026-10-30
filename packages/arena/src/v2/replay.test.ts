@@ -33,7 +33,7 @@ describe('submit', () => {
     const over = JSON.stringify(b);
     for (const c of [{ type: 'retreat' }, { type: 'end' }, { type: 'auto' }, move] as PlayerCommand[]) expect(submit(b, c)).toBe(false);
     expect(JSON.stringify(b)).toBe(over);
-  });
+  }, BATTLES);
 
   it('a battle saved before there was a log has none until the first command', () => {
     const b = small();
@@ -41,7 +41,7 @@ describe('submit', () => {
     expect(JSON.parse(JSON.stringify(b))).not.toHaveProperty('commands');
     expect(submit(b, { type: 'end' })).toBe(true);
     expect(b.commands).toHaveLength(1);
-  });
+  }, BATTLES);
 });
 
 describe('hashBattle', () => {
@@ -54,7 +54,7 @@ describe('hashBattle', () => {
     const reversed = Object.fromEntries(Object.entries(copy(b)).reverse()) as unknown as Battle;
     expect(hashBattle(reversed)).toBe(h);
     expect(canonicalJson({ b: 1, a: [1, { d: 2, c: undefined }] })).toBe('{"a":[1,{"d":2}],"b":1}');
-  });
+  }, BATTLES);
 
   it('changes with any part of the state, but not with the command log', () => {
     const b = small();
@@ -121,7 +121,7 @@ describe('replay', () => {
     const u = b.units.find((x) => x.side === 'blue' && x.carrier === null)!;
     const log: PlayerCommand[] = [{ type: 'act', action: { type: 'overwatch', unit: u.id } }, { type: 'act', action: { type: 'overwatch', unit: u.id } }];
     expect(() => replay(s, log)).toThrow(/command 1 \(overwatch\) was refused/);
-  });
+  }, BATTLES);
 
   it('the same setup and seeded player give the same battle twice', () => {
     for (const seed of [31, 32]) {

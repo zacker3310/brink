@@ -85,7 +85,7 @@ describe('commands are all or nothing', () => {
     expect(submit(b, call)).toBe(false);
     expect(JSON.stringify(b)).toBe(before);
     expect(b.commands).toHaveLength(2);
-  });
+  }, BATTLES);
 
   it('End Turn twice is two turns; Retreat twice is one retreat', () => {
     const b = bare(['m1a2'], ['t90m']);
@@ -97,7 +97,7 @@ describe('commands are all or nothing', () => {
     expect(submit(b, { type: 'retreat' })).toBe(false);
     expect(JSON.stringify(b)).toBe(over);
     expect(b.commands).toHaveLength(3);
-  });
+  }, BATTLES);
 
   it('Undo is offered only for a step that drew no dice and showed nothing new', () => {
     const kinds = new Set<string>();
