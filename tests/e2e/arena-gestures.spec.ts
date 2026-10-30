@@ -82,10 +82,14 @@ const movableOnScreen = (page: Page) =>
       .reach()
       .map((i) => ({ x: i % w, y: Math.floor(i / w) }))
       .sort((p, q) => Math.hypot(p.x - sel.x, p.y - sel.y) - Math.hypot(q.x - sel.x, q.y - sel.y));
+    // Buttons on the field (the edge arrows, the camera column) take touches near them as well as on
+    // them: the browser snaps a finger to a target a few points off (touch adjustment), as iOS does.
+    const buttons = [...document.querySelectorAll('[data-testid="arena"] button')].map((e) => e.getBoundingClientRect()).filter((r) => r.width && r.height);
+    const nearButton = (x: number, y: number) => buttons.some((r) => Math.hypot(Math.max(0, r.left - x, x - r.right), Math.max(0, r.top - y, y - r.bottom)) < 30);
     for (const c of cells) {
       const s = a.toScreen(c.x, c.y);
       if (s.y < top || s.y > bottom || s.x < 30 || s.x > innerWidth - 30) continue;
-      if (document.elementFromPoint(s.x, s.y)?.closest('button')) continue;
+      if (document.elementFromPoint(s.x, s.y)?.closest('button') || nearButton(s.x, s.y)) continue;
       // Clear of every unit's model and the badge over it, which take taps near them.
       if (units.some((p) => Math.hypot(p.x - s.x, p.y - s.y) < 50 || Math.hypot(p.x - s.x, p.y - 45 - s.y) < 55)) continue;
       return { x: c.x, y: c.y, s };
