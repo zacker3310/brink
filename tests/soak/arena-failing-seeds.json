@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "case": 5,
+    "seed": 1005,
+    "failures": [
+      "invalid state: r1:3 and r0:1 share 16,13 in round 2",
+      "invalid state: r1:3 and r0:1 share 16,13 in round 2",
+      "invalid state: r1:3 and r0:1 share 16,13 in round 2",
+      "invalid state: r1:3 and r0:1 share 16,13 in round 2",
+      "invalid state: r1:3 and r0:1 share 16,13 in round 2"
+    ]
+  }
+]

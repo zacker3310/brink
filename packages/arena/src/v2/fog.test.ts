@@ -8,13 +8,13 @@ import { hashBattle } from './replay';
 import { startingLoad, typeOf } from './roster';
 import { cheb, visibleTo } from './sight';
 import { at, TREES, W, type Battle } from './types';
-import { arenaSetup, blueUnits, change, CHANGES, copyBattle, family, knownLeak, leaks, player, playTurn, probe, probeAsk, probeIds, rng, type Change, type Leak } from './verify.test-util';
+import { arenaSetup, blueUnits, change, CHANGES, copyBattle, family, leaks, player, playTurn, probe, probeAsk, probeIds, rng, type Change, type Leak } from './verify.test-util';
 
 // Fog (docs/architecture.md, Battles): everything the player is shown is computed from what blue
 // may know. Take battles at many points, change something blue cannot see (a hidden red unit moved,
 // taken away, added or altered; red mines laid, cleared, moved; red overwatch; red's picture of
 // blue; the dice; what red units in sight carry), and every reading from blue's seat must be the
-// same. Leaks found are reported defects, pinned below with fixtures that reproduce them.
+// same. The leaks this found (fixed) keep their fixtures below, as regression tests.
 
 /** Battles at a few points each: the start of player turns, and the middle of one. Built once. */
 let built: { b: Battle; at: string }[] | null = null;
@@ -48,7 +48,6 @@ function points(): { b: Battle; at: string }[] {
 interface Found extends Leak {
   where: string;
   change: Change;
-  known: string | null;
 }
 
 describe('fog: hidden changes change nothing blue is shown', () => {
@@ -71,13 +70,13 @@ describe('fog: hidden changes change nothing blue is shown', () => {
         const now = probe(c.b, ask, { advice, exclude });
         probes += 2;
         // A unit added or taken away changes their starting company, which the bar is a share of.
-        for (const l of leaks(was, now, c.roster ? new Set(['strength']) : new Set())) found.push({ ...l, where, change: kind, known: knownLeak(l) });
+        for (const l of leaks(was, now, c.roster ? new Set(['strength']) : new Set())) found.push({ ...l, where, change: kind });
       }
     }
   }, BATTLES * 4);
 
   const clean = (families: string[]) => () => {
-    const bad = found.filter((f) => families.includes(family(f.key)) && !f.known);
+    const bad = found.filter((f) => families.includes(family(f.key)));
     expect(bad.slice(0, 3), `${bad.length} leaks`).toEqual([]);
   };
 
@@ -91,13 +90,13 @@ describe('fog: hidden changes change nothing blue is shown', () => {
   it('shot cards on everything in sight, from where it stands and from a cell it could move to', clean(['shot card']));
   it('called fire and off-map rockets on any cell', clean(['called fire', 'off-map fire']));
   it('advice', clean(['advice']));
-  it('Undo, but for the sightings reported below', clean(['undo']));
-  it('why an order would be refused, but for the refusals reported below', () => {
-    const bad = found.filter((f) => family(f.key).startsWith('refusal') && !f.known);
+  it('Undo', clean(['undo']));
+  it('why an order would be refused', () => {
+    const bad = found.filter((f) => family(f.key).startsWith('refusal'));
     expect(bad.slice(0, 3), `${bad.length} leaks`).toEqual([]);
   });
-  it('and nothing else: every leak found is one reported below', () => {
-    const bad = found.filter((f) => !f.known);
+  it('and nothing else: no leak of any kind', () => {
+    const bad = found;
     expect(bad.slice(0, 3), `${bad.length} leaks`).toEqual([]);
   });
 });

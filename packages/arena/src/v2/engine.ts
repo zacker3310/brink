@@ -359,6 +359,9 @@ function moveUnit(b: Battle, u: Unit, to: Point, dash: boolean): void {
     seen = [seen.at(-1)!];
   };
   let heading = u.facing;
+  /** Every cell walked, and the last one no other unit holds: a move cut short ends there. */
+  const trail: Point[] = [path[0]!];
+  let free = 0;
   for (const p of path.slice(1)) {
     // Someone hidden is already there: stop short, in contact.
     const blocker = unitAt(b, p.x, p.y, air);
@@ -366,6 +369,8 @@ function moveUnit(b: Battle, u: Unit, to: Point, dash: boolean): void {
       blocker.revealed = Math.max(blocker.revealed, b.turnIndex);
       break;
     }
+    // Its own side holds the cell: it may pass through, never stop there.
+    const passing = !!blocker;
     const last = walked.at(-1)!;
     heading = Math.atan2(p.y - last.y, p.x - last.x);
     if (t.mobility !== 'foot') {
@@ -383,6 +388,8 @@ function moveUnit(b: Battle, u: Unit, to: Point, dash: boolean): void {
     }
     walked.push(p);
     seen.push(blueSees(b, u));
+    trail.push(p);
+    if (!passing) free = trail.length - 1;
     const i = at(b.map, p.x, p.y);
     if (t.mobility === 'tracked' && b.map.cells[i] === WALL) {
       b.map.cells[i] = OPEN;
@@ -403,8 +410,27 @@ function moveUnit(b: Battle, u: Unit, to: Point, dash: boolean): void {
       }
       break;
     }
-    reactTo(b, u, flush);
+    // Overwatch fires where the mover could stop, not as it passes through its own side's cell.
+    if (!passing) reactTo(b, u, flush);
     if (!u.alive || u.mobilityKill) break;
+  }
+  // Cut short in a cell its own side holds (a mine there, or contact one cell on): it ends in the
+  // last free cell it passed, backing out the way it came.
+  if (u.alive && free < trail.length - 1) {
+    flush();
+    for (const p of trail.slice(free, -1).reverse()) {
+      u.x = p.x;
+      u.y = p.y;
+      for (const id of u.passengers) {
+        const q = unitById(b, id);
+        if (q) {
+          q.x = p.x;
+          q.y = p.y;
+        }
+      }
+      walked.push(p);
+      seen.push(blueSees(b, u));
+    }
   }
   flush();
   if (u.alive) faceThreat(b, u, heading);

@@ -407,6 +407,33 @@ describe('turns', () => {
     expect(legs.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('a unit passes through a cell its own side holds but never stops there: overwatch fires at the next cell', () => {
+    const b = bare(['m1a2', 'squad_w'], ['t90m']);
+    const tank = put(unit(b, 'm1a2'), 15, 40, NORTH);
+    put(unit(b, 'squad_w'), 15, 39, NORTH);
+    const watch = put(unit(b, 't90m', 'red'), 15, 20, SOUTH);
+    watch.overwatch = true;
+    expect(act(b, { type: 'move', unit: tank.id, to: { x: 15, y: 37 } })).toBe(true);
+    const shot = b.events.find((e) => e.type === 'fire');
+    expect(shot, 'the watcher fired').toBeDefined();
+    if (shot?.type === 'fire') expect(shot.to).toEqual({ x: 15, y: 38 });
+    expect([tank.x, tank.y]).not.toEqual([15, 39]);
+  });
+
+  it('a mine under its own infantry stops a tank, which backs out to the last free cell it passed', () => {
+    const b = bare(['m1a2', 'squad_w'], ['t90m']);
+    const tank = put(unit(b, 'm1a2'), 15, 40, NORTH);
+    const squad = put(unit(b, 'squad_w'), 15, 39, NORTH);
+    b.mines.push({ x: 15, y: 39, side: 'red' });
+    expect(act(b, { type: 'move', unit: tank.id, to: { x: 15, y: 38 } })).toBe(true);
+    expect(tank.alive && tank.mobilityKill).toBe(true);
+    expect([tank.x, tank.y]).toEqual([15, 40]);
+    expect([squad.x, squad.y]).toEqual([15, 39]);
+    // The film: in, the blast, back out.
+    const legs = b.events.filter((e) => e.type === 'move');
+    expect(legs.at(-1)).toMatchObject({ unit: tank.id, path: [{ x: 15, y: 39 }, { x: 15, y: 40 }] });
+  });
+
   it('holding the zone two rounds with none of them in it takes it', () => {
     const b = createBattle(setup({ seed: 2, terrain: 'urban', site: 'city', skill: 0, attackers: [spec('a', ['m1a2'])], defenders: [spec('x', ['squad_e'])] }));
     const z = b.map.zone!;

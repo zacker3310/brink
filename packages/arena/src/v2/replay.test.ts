@@ -150,14 +150,11 @@ describe('replay', () => {
     }
   }, BATTLES * 2);
 
-  // Known defect (reported): the AI caches its sight grids per battle object (`gridCache` in ai.ts),
-  // keyed on smoke and the count of building and tree cells. Walls and rocks block lines too and
-  // fall in play (tracks flatten walls, a breach turns rock to rubble), so a battle that never
-  // stopped plans on stale grids while the same battle saved and resumed computes fresh ones. Here
-  // tracks flatten seven wall cells by turn 3, and blue's autopilot moves a tank to 11,31 in the one
-  // and to 10,36 in the other. Replaying a log repeats the same calls, so replays still agree. Should
-  // the AI's choices change and this setup stop diverging, `pnpm test:matrix` reports the defect as
-  // resume-stale-sight with a seed to put here instead.
+  // Found here and fixed: the AI cached its sight grids per battle object keyed on smoke and the
+  // count of building and tree cells, but walls and rocks block lines too and fall in play, so a
+  // battle that never stopped planned on stale grids while its save, resumed, computed fresh ones
+  // (here tracks flatten seven walls by turn 3, and a tank went to 11,31 in one and 10,36 in the
+  // other). The cache now keys on every cell and storey.
   const walled: ArenaSetup = {
     seed: 3,
     terrain: 'mountains',

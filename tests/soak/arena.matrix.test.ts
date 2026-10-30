@@ -9,7 +9,6 @@ import {
   copyPlayer,
   coveringSetup,
   family,
-  knownLeak,
   leaks,
   player,
   playTurn,
@@ -31,9 +30,9 @@ import {
 // planner, random legal orders and orders meant to be refused) and checked for: crashes, broken
 // states and steps, commands accepted that the rules forbid, AI actions the rules refused, battles
 // that do not end by the round limit, replay divergence from the command log, a save that plays on
-// differently from the battle that never stopped, and fog leaks sampled at two points a battle;
-// and it counts the reported defects it meets (among them the film told of a shooter blue cannot see). `ARENA_MATRIX` is the number of battles; failing cases
-// are kept in arena-failing-seeds.json and run first next time.
+// differently from the battle that never stopped, fog leaks sampled at two points a battle, and
+// the film told to show a shooter blue cannot see. `ARENA_MATRIX` is the number of battles; failing
+// cases are kept in arena-failing-seeds.json and run first next time.
 
 // About 10 s of CPU a battle: the default 24 run in about 4 minutes on a quiet machine.
 const SIZE = Number(process.env.ARENA_MATRIX ?? 24);
@@ -63,8 +62,6 @@ interface Result {
   case: number;
   setup: ArenaSetup;
   failures: Partial<Record<Check, string[]>>;
-  /** Reported defects met, by id: counted and listed, not failures. */
-  known: Record<string, string[]>;
   /** Unusual but valid outcomes. */
   unusual: string[];
   ending: string;
@@ -89,14 +86,10 @@ const sightBlockers = (b: Battle) => b.map.cells.filter((c) => c === WALL || c =
 /** One matrix case played and checked. */
 function runCase(n: number): Result {
   const setup = coveringSetup(n, 1000);
-  const r: Result = { case: n, setup, failures: {}, known: {}, unusual: [], ending: 'none', commands: 0, refused: 0, hashes: 0, changes: 0, probes: 0 };
+  const r: Result = { case: n, setup, failures: {}, unusual: [], ending: 'none', commands: 0, refused: 0, hashes: 0, changes: 0, probes: 0 };
   const fail = (k: Check, what: string) => {
     const list = (r.failures[k] ??= []);
     if (list.length < 5) list.push(what);
-  };
-  const known = (id: string, what: string) => {
-    const list = (r.known[id] ??= []);
-    if (list.length < 3) list.push(what);
   };
   try {
     const b = createBattle(setup);
@@ -119,21 +112,19 @@ function runCase(n: number): Result {
     };
     for (let turn = 1; turn <= ROUND_LIMIT + 2 && !b.ended; turn++) {
       if (turn === 3) shadow = { b: copyBattle(b), q: copyPlayer(p), blockers: sightBlockers(b) };
-      if (turn === 2) fog(b, n * 10 + 1, false, r, known, fail);
+      if (turn === 2) fog(b, n * 10 + 1, false, r, fail);
       if (turn === 4) {
         step(5);
-        fog(b, n * 10 + 2, true, r, known, fail);
+        fog(b, n * 10 + 2, true, r, fail);
       }
       const from = b.events.length;
       step();
       played.marks.push({ at: b.commands?.length ?? 0, hash: hashBattle(b) });
-      unseenShooters(b, from, known);
+      unseenShooters(b, from, fail);
       if (shadow) {
         r.hashes++;
         if (hashBattle(shadow.b) !== hashBattle(b)) {
-          // Walls and rocks fall in play and the AI caches its sight grids per battle (reported).
-          if (sightBlockers(b) !== shadow.blockers) known('resume-stale-sight', `case ${n} (seed ${setup.seed}) round ${b.round}`);
-          else fail('resume divergence', `round ${b.round}`);
+          fail('resume divergence', `round ${b.round}${sightBlockers(b) !== shadow.blockers ? ', after walls or rocks fell' : ''}`);
           shadow = null;
         } else if (turn >= 4) shadow = null;
       }
@@ -161,7 +152,7 @@ function runCase(n: number): Result {
 }
 
 /** Fog, sampled at one point: three changes blue cannot see, every reading compared. */
-function fog(b: Battle, seed: number, advice: boolean, r: Result, known: (id: string, what: string) => void, fail: (k: Check, what: string) => void): void {
+function fog(b: Battle, seed: number, advice: boolean, r: Result, fail: (k: Check, what: string) => void): void {
   if (b.ended || b.turn !== 'blue') return;
   const g = rng(seed);
   for (let i = 0; i < 3; i++) {
@@ -175,33 +166,31 @@ function fog(b: Battle, seed: number, advice: boolean, r: Result, known: (id: st
     const now = probe(c.b, ask, { advice: advice && i === 0, exclude });
     r.probes += 2;
     for (const l of leaks(was, now, c.roster ? new Set(['strength']) : new Set())) {
-      const id = knownLeak(l);
       const what = `case ${r.case} (seed ${r.setup.seed}) round ${b.round}, ${kind}: ${family(l.key)} (${l.key})`;
-      if (id) known(id, what);
-      else fail('fog leak', `${what}: ${JSON.stringify(l.was).slice(0, 80)} vs ${JSON.stringify(l.now).slice(0, 80)}`);
+      fail('fog leak', `${what}: ${JSON.stringify(l.was).slice(0, 80)} vs ${JSON.stringify(l.now).slice(0, 80)}`);
     }
   }
 }
 
 /**
- * A red shot the film is told blue saw (`seen`) from a shooter blue neither had in sight (by its
- * own `spotted` and `lost` events) nor sighted after the shot, before the turn was out.
+ * A red shot whose shooter the film is told blue saw (`shooterSeen`) from a shooter blue neither had
+ * in sight (by its own `spotted` and `lost` events) nor sighted after the shot, before the turn was
+ * out: the film would show a unit the rules keep hidden.
  */
-function unseenShooters(b: Battle, from: number, known: (id: string, what: string) => void): void {
+function unseenShooters(b: Battle, from: number, fail: (k: Check, what: string) => void): void {
   const inSight = new Set<string>();
   const red = new Set(b.units.filter((u) => u.side === 'red').map((u) => u.id));
   b.events.forEach((e, i) => {
     if (e.type === 'spotted' && e.side === 'blue') inSight.add(e.unit);
     else if (e.type === 'lost' && e.side === 'blue') inSight.delete(e.unit);
-    if (i < from || e.type !== 'fire' || !e.seen || !red.has(e.unit) || inSight.has(e.unit)) return;
+    if (i < from || e.type !== 'fire' || !e.shooterSeen || !red.has(e.unit) || inSight.has(e.unit)) return;
     for (let j = i + 1; j < b.events.length; j++) {
       const f = b.events[j]!;
       if (f.type === 'turn') break;
       if (f.type === 'spotted' && f.side === 'blue' && f.unit === e.unit) return;
     }
     const u = b.units.find((x) => x.id === e.unit)!;
-    // A `fire` event is `seen` when blue sees either end, and the film then shows the shooter (reported).
-    known('film-unseen-shooter', `${u.id} (${u.type}, ${e.kind}) from ${e.from.x},${e.from.y} at ${e.to.x},${e.to.y} in round ${b.round}`);
+    fail('fog leak', `film shows hidden shooter ${u.id} (${u.type}, ${e.kind}) from ${e.from.x},${e.from.y} at ${e.to.x},${e.to.y} in round ${b.round}`);
   });
 }
 
@@ -239,7 +228,6 @@ describe(`arena matrix (${SIZE} battles)`, () => {
       const hit = results.filter((x) => x.failures[k]?.length);
       genuine.push([k, String(sum((x) => x.failures[k]?.length ?? 0)), String(hit.length), hit[0] ? `case ${hit[0].case}: ${hit[0].failures[k]![0]}` : '']);
     }
-    const ids = [...new Set(results.flatMap((x) => Object.keys(x.known)))].sort();
     const unusual: Record<string, number> = {};
     for (const x of results) for (const u of x.unusual) unusual[u] = (unusual[u] ?? 0) + 1;
     const ms = performance.now() - t0;
@@ -251,9 +239,6 @@ describe(`arena matrix (${SIZE} battles)`, () => {
         '',
         'GENUINE FAILURES',
         pad(genuine),
-        '',
-        'REPORTED DEFECTS MET (known: counted, not failures)',
-        ids.length ? pad([['defect', 'battles', 'example'], ...ids.map((id) => [id, String(results.filter((x) => x.known[id]).length), results.find((x) => x.known[id])!.known[id]![0]!])]) : 'none',
         '',
         'UNUSUAL BUT VALID OUTCOMES',
         Object.keys(unusual).length ? pad([['outcome', 'battles'], ...Object.entries(unusual).sort().map(([k, v]) => [k, String(v)])]) : 'none',

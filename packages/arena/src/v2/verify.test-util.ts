@@ -905,21 +905,6 @@ export function family(key: string): string {
   return ({ reach: 'reach', dash: 'reach', best: 'shot card', from: 'shot card', card: 'shot card', strike: 'called fire', support: 'off-map fire', advice: 'advice' } as Record<string, string>)[head] ?? key;
 }
 
-/**
- * Leaks already reported as defects, by id, or null for a new one. `refusal-names-hidden`: `whyNot`
- * on a fire order says "No shot" for a hidden unit and "No such weapon" for an id nobody has.
- * `refusal-engineer-cell`: `whyNot` on a breach or a mine reads hidden mines and units on the
- * cell next to the engineer. `undo-red-sighting`: a step a hidden enemy sees (or stops seeing)
- * cannot be undone, though blue is shown nothing of it.
- */
-export function knownLeak(l: Leak): string | null {
-  const f = family(l.key);
-  if (f === 'refusal: fire' && new Set([l.was, l.now, 'No shot', 'No such weapon']).size === 2) return 'refusal-names-hidden';
-  if (f === 'refusal: breach' || f === 'refusal: mine') return 'refusal-engineer-cell';
-  if (l.key.startsWith('undo ') && !l.key.endsWith('accepted') && (l.was as UndoRead).redSaw !== (l.now as UndoRead).redSaw) return 'undo-red-sighting';
-  return null;
-}
-
 // --- Changes blue must not see -------------------------------------------------------------------
 
 export const CHANGES = ['move', 'remove', 'add', 'state', 'mine-add', 'mine-remove', 'mine-move', 'overwatch', 'intel', 'dice', 'stores'] as const;
