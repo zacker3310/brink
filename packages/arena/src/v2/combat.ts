@@ -1,7 +1,7 @@
 import { draw } from '../rng';
 import { typeOf } from './roster';
 import { difficultyAim, difficultyDef, RANKS } from './rules';
-import { canSee, cheb, dist, groundAt, heightOf, isFlying, lineOfSight, other, visibleTo } from './sight';
+import { canSee, cheb, dist, groundAt, heightOf, isFlying, lineOfSight, other, updateIntel, visibleTo } from './sight';
 import {
   at,
   BUILDING,
@@ -599,6 +599,10 @@ export function shoot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, ov
   // if it saw it before the shot, or still sees it once the shot has done its work (a unit that saw the
   // flash and died in it reports nothing), so the film never shows more than blue's picture keeps.
   const sawBefore = blueSees(b, shooter);
+  // Blue's picture is brought up to date at the end of a move or an action; a red shooter blue sees as
+  // the shot comes (a unit moving past it, say) goes into it first, so a target the shot kills has
+  // still reported it.
+  if (shooter.side === 'red' && sawBefore && !b.intel.blue[shooter.id]?.now) updateIntel(b);
   const from = b.events.length;
   resolveShot(b, shooter, target, info, overwatch);
   const sees = sawBefore || blueSees(b, shooter);
@@ -606,6 +610,8 @@ export function shoot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, ov
     const e = b.events[i]!;
     if (e.type === 'fire' && e.unit === shooter.id) e.shooterSeen = sees;
   }
+  // Seen by its flash alone: the picture records that sighting now too, as the film shows it.
+  if (shooter.side === 'red' && sees && !b.intel.blue[shooter.id]?.now) updateIntel(b);
 }
 
 function resolveShot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, overwatch: boolean): void {
