@@ -1,33 +1,71 @@
 import { describe, expect, it } from 'vitest';
-import { fireInfo, interceptors } from './combat';
+import { fireInfo } from './combat';
 import { act, autoBattle, createBattle, sideValue, startValue } from './engine';
 import { bare, BATTLES, copy, EAST, NORTH, put, setup, SOUTH, unit, weapon } from './fixture.test-util';
-import { outcomes, rollLog, roundLosses, turningPoint, type Outcome } from './report';
+import { outcomes, outcomeShares, rollLog, roundLosses, turningPoint, type Outcome } from './report';
 import { typeOf } from './roster';
 import { visibleTo } from './sight';
-import { at, W, type Battle, type Unit, type Weapon } from './types';
+import { at, W, type Battle, type BattleEvent, type Unit, type Weapon } from './types';
 
 // The outcome bar, the battle log and the after-action numbers: what the player saw of the dice.
 
-/** Fire the same shot from many streams and count how each one ended, by the events it logged. */
-function trials(b: Battle, me: Unit, them: Unit, w: Weapon, n: number): Record<Outcome, number> {
-  const out: Record<Outcome, number> = { intercepted: 0, miss: 0, stopped: 0, bounce: 0, penetrate: 0, knock_out: 0, hit: 0 };
-  for (let i = 0; i < n; i++) {
-    const c = copy(b);
-    c.stream = Math.imul(i + 1, 2654435761) >>> 0;
-    const from = c.events.length;
-    expect(act(c, { type: 'fire', unit: me.id, target: them.id, weapon: w.id })).toBe(true);
-    const ev = c.events.slice(from);
-    const fire = ev.find((e) => e.type === 'fire')!;
-    const intercept = ev.find((e) => e.type === 'intercept');
-    const impact = ev.find((e) => e.type === 'impact' && e.unit === them.id);
-    if (intercept && !fire.hit) out.intercepted++;
-    else if (!(fire.type === 'fire' && fire.hit)) out.miss++;
-    else if (intercept) out.stopped++;
-    else if (!impact || impact.type !== 'impact') out.hit++;
-    else if (!impact.pen) out.bounce++;
-    else if (impact.effect === 'catastrophic' || impact.effect === 'firepower' || impact.effect === 'mobility') out.knock_out++;
-    else out.penetrate++;
+/** How one shot ended, read from the events it logged. */
+function ended(ev: BattleEvent[], target: string): Outcome {
+  const fire = ev.find((e): e is Extract<BattleEvent, { type: 'fire' }> => e.type === 'fire')!;
+  const intercept = ev.some((e) => e.type === 'intercept');
+  const impact = ev.find((e): e is Extract<BattleEvent, { type: 'impact' }> => e.type === 'impact' && e.unit === target);
+  if (intercept && !fire.hit) return 'intercepted';
+  if (!fire.hit) return 'miss';
+  if (intercept) return 'stopped';
+  if (!impact) return 'hit';
+  if (!impact.pen) return 'bounce';
+  return impact.effect === 'catastrophic' || impact.effect === 'firepower' || impact.effect === 'mobility' ? 'knock_out' : 'penetrate';
+}
+
+interface Shot {
+  name: string;
+  b: Battle;
+  me: Unit;
+  them: Unit;
+  w: Weapon;
+}
+
+/** Shots that between them reach every outcome: armour side and front on, an APS, a drone strike under air defence, troops, a drone. */
+function shots(): Shot[] {
+  const out: Shot[] = [];
+  {
+    const b = bare(['m2a3'], ['t72b3']);
+    const me = put(unit(b, 'm2a3'), 15, 30, NORTH);
+    out.push({ name: 'Bradley TOW at a T-72B3 side on', b, me, them: put(unit(b, 't72b3', 'red'), 15, 22, EAST), w: weapon(me, 'atgm') });
+  }
+  {
+    const b = bare(['m1a2'], ['t90m']);
+    const me = put(unit(b, 'm1a2'), 15, 30, NORTH);
+    out.push({ name: 'Abrams 120 mm at a T-90M front on', b, me, them: put(unit(b, 't90m', 'red'), 15, 20, SOUTH), w: weapon(me, 'cannon') });
+  }
+  {
+    const b = bare(['javelin'], ['cr3']);
+    const me = put(unit(b, 'javelin'), 5, 34);
+    out.push({ name: 'Javelin at a Challenger 3 with Trophy', b, me, them: put(unit(b, 'cr3', 'red'), 5, 24, SOUTH), w: weapon(me, 'atgm') });
+  }
+  {
+    const b = bare(['fpv_w'], ['t90m', 'tunguska']);
+    const me = put(unit(b, 'fpv_w'), 15, 35);
+    const them = put(unit(b, 't90m', 'red'), 15, 22, SOUTH);
+    put(unit(b, 'tunguska', 'red'), 16, 22);
+    // Both in sight, so the card counts the guns the roll does.
+    for (const u of b.units) if (u.side === 'red') u.revealed = 5;
+    out.push({ name: 'FPV drone at a T-90M by a Tunguska', b, me, them, w: weapon(me, 'fpv') });
+  }
+  {
+    const b = bare(['m2a3'], ['squad_e']);
+    const me = put(unit(b, 'm2a3'), 15, 30, NORTH);
+    out.push({ name: 'Bradley 25 mm at a squad in the open', b, me, them: put(unit(b, 'squad_e', 'red'), 15, 24), w: weapon(me, 'autocannon') });
+  }
+  {
+    const b = bare(['m2a3'], ['orlan']);
+    const me = put(unit(b, 'm2a3'), 15, 30, NORTH);
+    out.push({ name: 'Bradley 25 mm at an Orlan drone', b, me, them: put(unit(b, 'orlan', 'red'), 15, 26), w: weapon(me, 'autocannon') });
   }
   return out;
 }
@@ -41,62 +79,55 @@ function shares(b: Battle, me: Unit, them: Unit, w: Weapon) {
 
 describe('outcome bar', () => {
   it('adds up to 100, keeps the hit chance exact, and splits a hit on armour by the card numbers', () => {
-    const b = bare(['m1a2'], ['t90m']);
-    const me = put(unit(b, 'm1a2'), 15, 30, NORTH);
-    const them = put(unit(b, 't90m', 'red'), 15, 20, EAST);
-    const { info, split, pct } = shares(b, me, them, weapon(me, 'cannon'));
-    expect(split.reduce((s, x) => s + x.pct, 0)).toBe(100);
-    expect(pct('miss')).toBe(100 - info.chance);
-    expect(split.map((x) => x.outcome)).toEqual(['miss', 'bounce', 'penetrate', 'knock_out'].filter((o) => pct(o as Outcome) > 0));
-    expect(Math.abs(pct('knock_out') - (info.chance * info.kill!) / 100)).toBeLessThanOrEqual(1);
-    expect(Math.abs(pct('bounce') - (info.chance * (100 - info.pen!)) / 100)).toBeLessThanOrEqual(1);
+    for (const { name, b, me, them, w } of shots()) {
+      const { info, split, pct } = shares(b, me, them, w);
+      expect(split.reduce((s, x) => s + x.pct, 0), name).toBe(100);
+      expect(outcomeShares(info, typeOf(them.type)).reduce((s, x) => s + x.p, 0), name).toBeCloseTo(1, 9);
+      if (!info.intercept) expect(pct('miss'), name).toBe(100 - info.chance);
+      if (info.kill !== undefined) expect(Math.abs(pct('knock_out') - (((100 - (info.intercept ?? 0)) / 100) * info.chance * info.kill) / 100) <= 1, name).toBe(true);
+    }
   });
 
-  it('is the roll: the same shot fired from many streams ends each way about as often as the bar says', () => {
-    const b = bare(['m2a3'], ['t72b3']);
-    const me = put(unit(b, 'm2a3'), 15, 30, NORTH);
-    // Side on to the Bradley's autocannon and missiles: some bounce, some go through, some kill.
-    const them = put(unit(b, 't72b3', 'red'), 15, 22, EAST);
-    const atgm = weapon(me, 'atgm');
-    const { pct } = shares(b, me, them, atgm);
-    const n = 1500;
-    const got = trials(b, me, them, atgm, n);
-    for (const o of ['miss', 'bounce', 'penetrate', 'knock_out'] as const) expect(Math.abs((got[o] / n) * 100 - pct(o)), o).toBeLessThan(4.5);
+  it('is the roll: each shot fired from 2,000 streams ends each way as often as the bar says, at the chance the card shows', () => {
+    const N = 2000;
+    let fired = 0;
+    let worst = { by: 0, at: '' };
+    for (const { name, b, me, them, w } of shots()) {
+      const info = fireInfo(b, me, them, w, me, false, visibleTo(b, 'blue'))!;
+      const want = outcomeShares(info, typeOf(them.type));
+      const got: Partial<Record<Outcome, number>> = {};
+      let hits = 0;
+      let casualties = 0;
+      for (let i = 0; i < N; i++) {
+        const c = copy(b);
+        c.stream = Math.imul(i + 1, 2654435761) >>> 0;
+        const from = c.events.length;
+        expect(act(c, { type: 'fire', unit: me.id, target: them.id, weapon: w.id })).toBe(true);
+        const ev = c.events.slice(from);
+        // The chance rolled is the chance on the card.
+        const fire = ev.find((e) => e.type === 'fire');
+        expect(fire?.type === 'fire' && fire.chance).toBe(info.chance);
+        const o = ended(ev, them.id);
+        got[o] = (got[o] ?? 0) + 1;
+        if (o === 'hit') {
+          hits++;
+          for (const e of ev) if (e.type === 'casualties' && e.unit === them.id) casualties += e.killed + e.wounded;
+        }
+        fired++;
+      }
+      for (const { outcome, p } of want) {
+        const by = Math.abs(((got[outcome] ?? 0) / N) * 100 - p * 100);
+        if (by > worst.by) worst = { by, at: `${name}: ${outcome}` };
+        expect(by, `${name}: ${outcome}`).toBeLessThan(4);
+      }
+      // Nothing happens that the bar does not show.
+      expect(Object.keys(got).every((o) => want.some((x) => x.outcome === o && x.p > 0)), name).toBe(true);
+      // Troops: the casualties on the card are what a hit costs them on average.
+      if (info.casualties !== undefined && typeOf(them.type).mobility === 'foot') expect(Math.abs(casualties / Math.max(1, hits) - info.casualties), name).toBeLessThan(0.2);
+    }
+    // The arena package has no DOM types: reach the console through the global object.
+    (globalThis as unknown as { console: { log: (s: string) => void } }).console.log(`outcome bar against the roll: ${fired} seeded shots, largest deviation ${worst.by.toFixed(2)} points (${worst.at})`);
   }, BATTLES);
-
-  it('troops: a miss or a hit (with its casualties on the card); a drone target: any hit brings it down', () => {
-    const b = bare(['m2a3', 'squad_w'], ['squad_e', 'orlan']);
-    const me = put(unit(b, 'm2a3'), 15, 30, NORTH);
-    const squad = put(unit(b, 'squad_e', 'red'), 15, 24);
-    const { info, split } = shares(b, me, squad, weapon(me, 'autocannon'));
-    expect(split).toEqual([
-      { outcome: 'miss', pct: 100 - info.chance },
-      { outcome: 'hit', pct: info.chance },
-    ]);
-    const drone = put(unit(b, 'orlan', 'red'), 15, 26);
-    const air = shares(b, me, drone, weapon(me, 'autocannon'));
-    expect(air.split.map((x) => x.outcome)).toEqual(['miss', 'hit']);
-  });
-
-  it('a drone strike can be downed on its way in, and an APS stops some missiles', () => {
-    const b = bare(['fpv_w', 'javelin'], ['t90m', 'tunguska', 'cr3']);
-    const team = put(unit(b, 'fpv_w'), 15, 35);
-    const tank = put(unit(b, 't90m', 'red'), 15, 22, SOUTH);
-    put(unit(b, 'tunguska', 'red'), 16, 22);
-    b.intel.blue = {};
-    for (const u of b.units) if (u.side === 'red') u.revealed = 5;
-    const fpv = weapon(team, 'fpv');
-    const drone = shares(b, team, tank, fpv);
-    expect(drone.pct('intercepted')).toBe(Math.round(interceptors(b, tank, visibleTo(b, 'blue')) * 100));
-    expect(drone.split.reduce((s, x) => s + x.pct, 0)).toBe(100);
-    const jav = put(unit(b, 'javelin'), 5, 34);
-    const cr3 = put(unit(b, 'cr3', 'red'), 5, 24, SOUTH);
-    // Javelin is a single missile against Trophy (a Kornet pair gets through).
-    const aps = shares(b, jav, cr3, weapon(jav, 'atgm'));
-    expect(aps.info.aps).toBeGreaterThan(0);
-    expect(aps.pct('stopped')).toBeGreaterThan(0);
-    expect(aps.split.reduce((s, x) => s + x.pct, 0)).toBe(100);
-  });
 });
 
 describe('battle log', () => {
@@ -162,6 +193,31 @@ describe('battle log', () => {
     expect(rollLog(b)[0]).toMatchObject({ side: 'red', shooter: them.id, target: me.id });
     expect(rollLog(b, before)).toEqual([]);
   });
+
+  it('through whole battles: exactly the shots you saw, and nothing from what you did not', () => {
+    let hidden = 0;
+    for (const seed of [3, 8]) {
+      const b = autoBattle(createBattle(setup({ seed, terrain: 'forest', attackers: [{ id: 'f1', cls: 'armor', strength: 1000, name: 'A', color: '#000', rank: 0 }, { id: 'f2', cls: 'artillery', strength: 1000, name: 'B', color: '#000', rank: 0 }], defenders: [{ id: 'e1', cls: 'mechanized', strength: 1000, name: 'C', color: '#000', rank: 0 }, { id: 'e2', cls: 'artillery', strength: 1000, name: 'D', color: '#000', rank: 0 }] })));
+      const log = rollLog(b);
+      const seen = b.events.flatMap((e, i) => (e.type === 'fire' && e.seen ? [i] : []));
+      expect(log.filter((l) => l.kind === 'shot' || l.kind === 'called' || l.kind === 'smoke').map((l) => l.at)).toEqual(seen);
+      for (const l of log) {
+        const fire = b.events[l.at]!;
+        if (fire.type === 'fire') expect([l.chance, l.hit]).toEqual([fire.chance, fire.hit]);
+      }
+      // Scramble every event you did not see: the log does not change.
+      const blind = copy(b);
+      blind.events = blind.events.map((e) => ('seen' in e && (e.seen === false || (Array.isArray(e.seen) && !e.seen.some(Boolean))) ? ({ ...e, unit: 'hidden', target: 'hidden', killed: 99, wounded: 99, effect: 'catastrophic', how: 'destroyed', chance: 1, hit: true }) as unknown as BattleEvent : e));
+      expect(rollLog(blind)).toEqual(log);
+      // A shot from someone you never saw is fire from out of sight: no unit, no weapon.
+      for (const l of log) if (l.shooter === null && l.kind !== 'mine' && l.kind !== 'airstrike') {
+        expect([l.weapon, l.weaponKind]).toEqual([null, null]);
+        hidden++;
+      }
+    }
+    // Their guns fired on you from out of sight at least once.
+    expect(hidden).toBeGreaterThan(0);
+  }, BATTLES);
 });
 
 describe('after action', () => {

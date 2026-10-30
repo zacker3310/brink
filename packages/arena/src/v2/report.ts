@@ -1,5 +1,6 @@
 import type { FireInfo } from './combat';
 import { typeOf } from './roster';
+import { other } from './sight';
 import { H, type Battle, type BattleEvent, type Effect, type Facing, type Side, type UnitStatus, type UnitType, type WeaponKind } from './types';
 
 // What the player saw of the dice: the shot card's outcome bar, the battle log and the after-action
@@ -16,34 +17,49 @@ import { H, type Battle, type BattleEvent, type Effect, type Facing, type Side, 
 export type Outcome = 'intercepted' | 'miss' | 'stopped' | 'bounce' | 'penetrate' | 'knock_out' | 'hit';
 
 /**
- * The share of 100 each outcome takes, from the card's own numbers (so the bar is the roll):
- * miss = 1 - hit; on a hit the APS, then the armour; knock out = hit x kill (kill already counts
- * the penetration and the APS). Whole numbers that add up to 100, largest remainders rounded up;
- * outcomes that cannot happen are left out.
+ * The chance (0..1) of each outcome, from the card's own numbers, in the order the rules roll them
+ * (`shoot` in combat.ts): an air-defence roll for a drone on its way in, then the hit roll at
+ * `chance` (so miss = 1 - hit); on a hit, the APS against a missile, then the armour at `pen`.
+ * `kill` already counts the penetration and the APS, so knock out = hit x kill, and penetrate
+ * without it = hit x (1 - aps) x pen - knock out. Troops and drones: a hit. They add up to 1.
  */
-export function outcomes(info: FireInfo, target: UnitType): { outcome: Outcome; pct: number }[] {
+export function outcomeShares(info: FireInfo, target: UnitType): { outcome: Outcome; p: number }[] {
   const through = 1 - (info.intercept ?? 0) / 100;
   const hit = info.chance / 100;
-  const raw: [Outcome, number][] = [
-    ['intercepted', (info.intercept ?? 0) / 100],
-    ['miss', through * (1 - hit)],
+  const out: { outcome: Outcome; p: number }[] = [
+    { outcome: 'intercepted', p: 1 - through },
+    { outcome: 'miss', p: through * (1 - hit) },
   ];
   if (info.pen !== undefined && target.armour) {
     const aps = (info.aps ?? 0) / 100;
     const pen = info.pen / 100;
     const kill = Math.min((1 - aps) * pen, (info.kill ?? 0) / 100);
-    raw.push(['stopped', through * hit * aps], ['bounce', through * hit * (1 - aps) * (1 - pen)], ['penetrate', through * hit * ((1 - aps) * pen - kill)], ['knock_out', through * hit * kill]);
-  } else raw.push(['hit', through * hit]);
-  const pct = raw.map(([, p]) => Math.max(0, p) * 100);
-  const out = pct.map(Math.floor);
+    out.push(
+      { outcome: 'stopped', p: through * hit * aps },
+      { outcome: 'bounce', p: through * hit * (1 - aps) * (1 - pen) },
+      { outcome: 'penetrate', p: through * hit * ((1 - aps) * pen - kill) },
+      { outcome: 'knock_out', p: through * hit * kill },
+    );
+  } else out.push({ outcome: 'hit', p: through * hit });
+  return out;
+}
+
+/**
+ * The same as whole shares of 100 for the bar: they add up to 100 (largest remainders rounded up),
+ * and outcomes that cannot happen are left out. With no drone in it, miss stays 100 - chance.
+ */
+export function outcomes(info: FireInfo, target: UnitType): { outcome: Outcome; pct: number }[] {
+  const raw = outcomeShares(info, target);
+  const pct = raw.map((x) => Math.max(0, x.p) * 100);
+  const out = pct.map((v) => Math.floor(v + 1e-9));
   let left = 100 - out.reduce((s, v) => s + v, 0);
-  const order = pct.map((p, i) => ({ i, r: p - Math.floor(p) })).sort((p, q) => q.r - p.r || p.i - q.i);
+  const order = pct.map((v, i) => ({ i, r: v - out[i]! })).sort((p, q) => q.r - p.r || p.i - q.i);
   for (const { i, r } of order) {
     if (left <= 0 || r <= 1e-9) break;
     out[i]!++;
     left--;
   }
-  return raw.map(([outcome], i) => ({ outcome, pct: out[i]! })).filter((x) => x.pct > 0);
+  return raw.map((x, i) => ({ outcome: x.outcome, pct: out[i]! })).filter((x) => x.pct > 0);
 }
 
 // --- The battle log ----------------------------------------------------------------------------------
@@ -66,7 +82,8 @@ export interface LogEntry {
   kind: 'shot' | 'called' | 'smoke' | 'mine' | 'airstrike';
   /** Who fired, when blue saw who it was; null for an enemy unseen. Off-map rockets: 'support:himars'. */
   shooter: string | null;
-  weapon: string;
+  /** What it fired, when blue saw who fired (an unseen enemy's shot is fire from out of sight, nothing more). */
+  weapon: string | null;
   weaponKind: WeaponKind | null;
   /** The unit fired at (a shot), or the one that ran onto the mine. */
   target: string | null;
@@ -102,6 +119,7 @@ export function rollLog(b: Battle, upTo = b.events.length): LogEntry[] {
   const named = (id: string, i: number) => side(id) === 'blue' || (spotted.get(id) ?? []).some((s) => s < turnEnd[i]!);
   const out: LogEntry[] = [];
   let round = 1;
+  let turn: Side = 'blue';
   let cur: LogEntry | null = null;
   let mineSide: Side | null = null;
   for (let i = 0; i < events.length; i++) {
@@ -110,21 +128,26 @@ export function rollLog(b: Battle, upTo = b.events.length): LogEntry[] {
     switch (e.type) {
       case 'turn':
         round = e.round;
+        turn = e.side;
         break;
       case 'fire': {
         if (!e.seen) break;
         const support = e.unit.startsWith('support:');
-        const by: Side = support ? (e.from.y > H / 2 ? 'blue' : 'red') : (side(e.unit) ?? 'red');
+        // A squad merged away is no longer listed: its side is the other one from its target's.
+        const target = e.target ? side(e.target) : undefined;
+        const by: Side = support ? (e.from.y > H / 2 ? 'blue' : 'red') : (side(e.unit) ?? (target ? other(target) : turn));
         const called = e.target === null;
         const smoke = called && events[i + 1]?.type === 'smoke';
+        // Who fired, and with what, only when blue saw who it was.
+        const shown = support ? by === 'blue' : named(e.unit, i);
         cur = {
           at: i,
           round,
           side: by,
           kind: smoke ? 'smoke' : called ? 'called' : 'shot',
-          shooter: support ? (by === 'blue' ? e.unit : null) : named(e.unit, i) ? e.unit : null,
-          weapon: e.weapon,
-          weaponKind: e.kind,
+          shooter: shown ? e.unit : null,
+          weapon: shown ? e.weapon : null,
+          weaponKind: shown ? e.kind : null,
           target: e.target,
           chance: e.chance,
           hit: e.hit,
