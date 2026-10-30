@@ -81,16 +81,20 @@ function smoothNormals(g: THREE.BufferGeometry): Float32Array {
   const nor = g.attributes.normal as THREE.BufferAttribute | undefined;
   const n = pos.count;
   const out = new Float32Array(n * 3);
-  const at = new Map<string, number>();
+  const at = new Map<number, number>();
   const sums: number[] = [];
   const slot = new Int32Array(n);
   if (!g.boundingSphere) g.computeBoundingSphere();
   const c = g.boundingSphere?.center ?? new THREE.Vector3();
+  // Points to 1/30000 of the geometry's size, packed into one exact number: a cheap key, made once per
+  // geometry when its unit is first outlined.
+  const scale = 30000 / Math.max(1e-6, g.boundingSphere?.radius ?? 1);
+  const q = (v: number, o: number) => Math.round((v - o) * scale) + 32768;
   for (let i = 0; i < n; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
-    const key = `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`;
+    const key = (q(x, c.x) * 65536 + q(y, c.y)) * 65536 + q(z, c.z);
     let k = at.get(key);
     if (k === undefined) {
       k = sums.length;
@@ -111,7 +115,7 @@ function smoothNormals(g: THREE.BufferGeometry): Float32Array {
     const x = sums[k]!;
     const y = sums[k + 1]!;
     const z = sums[k + 2]!;
-    const l = Math.hypot(x, y, z) || 1;
+    const l = Math.sqrt(x * x + y * y + z * z) || 1;
     out[i * 3] = x / l;
     out[i * 3 + 1] = y / l;
     out[i * 3 + 2] = z / l;
