@@ -1,14 +1,15 @@
 // Battle audio (docs/arena-v2.md, section 7, decision 18): weapon reports by calibre, impacts,
 // engines, rotors and drones placed by distance from the camera, a shared echo, and radio calls.
 // Reuses the game's AudioContext and mute (sfx.ts). Sounds are synthesised once into buffers; a shot
-// is a few nodes. At most MAX_VOICES at once on an iPhone; the quietest gives way.
+// is a few nodes. At most MAX_VOICES at once on an iPhone; the quietest gives way. Tank guns,
+// artillery, rockets and the heavy blasts play in layers weighed by distance (`layers`).
 
 import type { RadioCall } from '@brink/arena/v2';
 import { audio, isMuted } from '../../sfx';
 import { dB, rand, type Rand, type Samples } from './dsp';
 import { crickets, diesel, DIESEL_RPM, rain, rotor as rotorLoop, tracks, white } from './loops';
 import { fetchRadio, RadioDesk, type Direction } from './radio';
-import { SOUNDS, synth } from './recipes';
+import { LAYERED, SOUNDS, synth, synthLayers } from './recipes';
 import { impulse, place, type Listener, type Spot } from './space';
 
 export type { Listener } from './space';
@@ -138,6 +139,8 @@ interface Voice {
   input: GainNode;
   nodes: AudioNode[];
   srcs: AudioScheduledSourceNode[];
+  /** A layered sound's own paths into `input` (transient, tail) and straight to the mix (the sub). */
+  layers?: { transient: GainNode; tail: GainNode; sub: GainNode; lag: number };
   /** Level at the listener, linear. */
   level: number;
   /** When the last part starts, and how fast it dies away (for picking the quietest). */
@@ -197,7 +200,20 @@ interface Buses {
 
 // Synthesised buffers are kept for the page: an AudioBuffer plays in any context.
 const bank = new Map<string, AudioBuffer>();
+const layerBank = new Map<string, { transient: AudioBuffer; body: AudioBuffer; tail: AudioBuffer; sub: AudioBuffer | null }>();
 const irs = new Map<number, AudioBuffer>();
+
+/**
+ * How a layered sound's parts weigh with range (effective cells). The transient is the near field's
+ * (the crack, the flash, the front of the blast wave are gone a few hundred metres out); the tail
+ * grows into most of what you hear far off, and comes a little later; the sub loses level slower
+ * than the rest (`SUB_CARRY` of the direct sound's loss) and skips the air filter and the echo.
+ */
+export function layerWeights(d: number): { transient: number; tail: number; lag: number } {
+  const far = d / (d + 10);
+  return { transient: 1 / (1 + (d / 6) ** 2), tail: 0.7 + 1.1 * far, lag: 0.05 * far };
+}
+const SUB_CARRY = 0.7;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const smooth = (a: number, b: number, v: number) => {
@@ -271,7 +287,8 @@ export class BattleAudio {
     const spot = place(x, y, this.listener, hit.reach, this.night);
     const level = dB(hit.level) * spot.gain;
     if (!this.admit(level, true)) return;
-    const v = this.chain(b, spot, dB(hit.level), hit.slap);
+    const layered = LAYERED[hit.sound];
+    const v = this.chain(b, spot, dB(hit.level), hit.slap, layered?.sub);
     const t0 = b.ctx.currentTime + 0.02 + spot.delay;
     const count = hit.count ?? 1;
     const take = Math.floor(this.r() * 8);
@@ -279,15 +296,11 @@ export class BattleAudio {
     let ends = t0;
     for (let i = 0; i < count; i++) {
       const at = count === 1 ? t0 : t0 + (i === 0 ? 0 : this.r() * (hit.spread ?? 1));
-      const buf = this.buffer(b, hit.sound, take + i);
-      const src = b.ctx.createBufferSource();
-      src.buffer = buf;
-      src.playbackRate.value = count === 1 ? 0.97 + this.r() * 0.06 : 0.88 + this.r() * 0.24;
-      src.connect(v.input);
-      src.start(at);
-      v.srcs.push(src);
+      const rate = count === 1 ? 0.97 + this.r() * 0.06 : 0.88 + this.r() * 0.24;
+      // A ripple or a stick shares one sub and one tail: every landing in full would be mud.
+      const end = layered ? this.layers(b, v, hit.sound, take + i, at, rate, i === 0) : this.one(b, v, hit.sound, take + i, at, rate);
       last = Math.max(last, at);
-      ends = Math.max(ends, at + buf.duration / src.playbackRate.value);
+      ends = Math.max(ends, end);
     }
     this.keep(v, level, last, ends, (ends - last) / 3);
   }
@@ -385,8 +398,11 @@ export class BattleAudio {
       const k = keys.shift();
       const b = this.ready();
       if (!k || !b) return;
-      const variants = SOUNDS[k]?.variants ?? 1;
-      for (let i = 0; i < variants; i++) this.buffer(b, k, i);
+      const variants = (LAYERED[k] ?? SOUNDS[k])?.variants ?? 1;
+      for (let i = 0; i < variants; i++) {
+        if (LAYERED[k]) this.layerBuffers(b, k, i);
+        else this.buffer(b, k, i);
+      }
       setTimeout(step, 30);
     };
     setTimeout(step, 30);
@@ -526,6 +542,56 @@ export class BattleAudio {
     return buf;
   }
 
+  private layerBuffers(b: Buses, key: string, take: number): { transient: AudioBuffer; body: AudioBuffer; tail: AudioBuffer; sub: AudioBuffer | null } {
+    const def = LAYERED[key]!;
+    const t = take % def.variants;
+    const sr = def.low ? Math.min(32000, b.ctx.sampleRate) : b.ctx.sampleRate;
+    const id = `${key}@${sr}#${t}`;
+    let set = layerBank.get(id);
+    if (!set) {
+      const x = synthLayers(key, sr, t);
+      set = { transient: this.toBuffer(b.ctx, x.transient, sr), body: this.toBuffer(b.ctx, x.body, sr), tail: this.toBuffer(b.ctx, x.tail, sr), sub: x.sub ? this.toBuffer(b.ctx, x.sub, sr) : null };
+      layerBank.set(id, set);
+    }
+    return set;
+  }
+
+  /** One buffer into a voice at `at`; returns when it ends. */
+  private one(b: Buses, v: Voice, key: string, take: number, at: number, rate: number): number {
+    const buf = this.buffer(b, key, take);
+    const src = b.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    src.connect(v.input);
+    src.start(at);
+    v.srcs.push(src);
+    return at + buf.duration / rate;
+  }
+
+  /** A layered sound into a voice at `at` (`whole`: with its sub and tail); returns when it ends. */
+  private layers(b: Buses, v: Voice, key: string, take: number, at: number, rate: number, whole: boolean): number {
+    const set = this.layerBuffers(b, key, take);
+    const paths = v.layers!;
+    let ends = at;
+    const play = (buf: AudioBuffer | null, to: AudioNode, t: number) => {
+      if (!buf) return;
+      const src = b.ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      src.connect(to);
+      src.start(t);
+      v.srcs.push(src);
+      ends = Math.max(ends, t + buf.duration / rate);
+    };
+    play(set.transient, paths.transient, at);
+    play(set.body, v.input, at);
+    if (whole) {
+      play(set.tail, paths.tail, at + paths.lag);
+      play(set.sub, paths.sub, at);
+    }
+    return ends;
+  }
+
   private loopBuffer(b: Buses, id: string, make: (sr: number) => Samples): AudioBuffer {
     const sr = b.ctx.sampleRate;
     const key = `${id}@${sr}`;
@@ -547,33 +613,34 @@ export class BattleAudio {
     const spot = place(x, y, this.listener, gun.reach, night);
     const level = dB(gun.level) * spot.gain;
     if (!this.admit(level, steal)) return;
-    const v = this.chain(b, spot, dB(gun.level), gun.slap);
+    const layered = LAYERED[gun.sound];
+    const v = this.chain(b, spot, dB(gun.level), gun.slap, layered?.sub);
     let at = b.ctx.currentTime + 0.02 + spot.delay;
     let ends = at;
     let last = at;
-    const variants = SOUNDS[gun.sound]?.variants ?? 1;
+    const variants = (layered ?? SOUNDS[gun.sound])?.variants ?? 1;
     const take = Math.floor(this.r() * variants);
     for (let i = 0; i < n; i++) {
       const shots = gun.pair ? 2 : 1;
       for (let k = 0; k < shots; k++) {
-        const buf = this.buffer(b, gun.sound, take + i + k);
-        const src = b.ctx.createBufferSource();
-        src.buffer = buf;
-        src.playbackRate.value = 0.97 + this.r() * 0.06;
-        src.connect(v.input);
+        const rate = 0.97 + this.r() * 0.06;
         const t = at + k * (gun.pair ?? 0) * (0.85 + this.r() * 0.3);
-        src.start(t);
-        v.srcs.push(src);
+        // A ripple of rockets shares the first one's sub and tail.
+        const end = layered ? this.layers(b, v, gun.sound, take + i + k, t, rate, i === 0 && k === 0) : this.one(b, v, gun.sound, take + i + k, t, rate);
         last = t;
-        ends = Math.max(ends, t + buf.duration / src.playbackRate.value);
+        ends = Math.max(ends, end);
       }
       at += every * (1 + (this.r() - 0.5) * 2 * gun.jitter);
     }
     this.keep(v, level, last, ends, Math.max(0.05, (ends - last) / 4));
   }
 
-  /** One voice's path: level, air absorption, pan to the dry mix, and sends to the echo. */
-  private chain(b: Buses, spot: Spot, level: number, slap: boolean): Voice {
+  /**
+   * One voice's path: level, air absorption, pan to the dry mix, and sends to the echo. `sub`: a
+   * layered sound, with its sub's level (0 for none): paths for the transient and tail weighed by
+   * range, and the sub straight to the dry mix.
+   */
+  private chain(b: Buses, spot: Spot, level: number, slap: boolean, sub?: number): Voice {
     const c = b.ctx;
     const input = c.createGain();
     input.gain.value = level * spot.gain;
@@ -599,7 +666,22 @@ export class BattleAudio {
       lp.connect(s).connect(b.slap);
       nodes.push(s);
     }
-    return { input, nodes, srcs: [], level: 0, last: 0, tau: 0.1, ends: 0 };
+    const v: Voice = { input, nodes, srcs: [], level: 0, last: 0, tau: 0.1, ends: 0 };
+    if (sub !== undefined) {
+      const w = layerWeights(spot.d);
+      const transient = c.createGain();
+      transient.gain.value = w.transient;
+      transient.connect(input);
+      const tail = c.createGain();
+      tail.gain.value = w.tail;
+      tail.connect(input);
+      const s = c.createGain();
+      s.gain.value = level * sub * Math.max(spot.gain, 1e-4) ** SUB_CARRY;
+      s.connect(b.dry);
+      nodes.push(transient, tail, s);
+      v.layers = { transient, tail, sub: s, lag: w.lag };
+    }
+    return v;
   }
 
   private panner(c: BaseAudioContext, pan: number): StereoPannerNode | null {
@@ -651,8 +733,10 @@ export class BattleAudio {
 
   private kill(v: Voice, now: number): void {
     this.voices = this.voices.filter((x) => x !== v);
-    v.input.gain.cancelScheduledValues(now);
-    v.input.gain.setTargetAtTime(0, now, 0.012);
+    for (const g of v.layers ? [v.input, v.layers.sub] : [v.input]) {
+      g.gain.cancelScheduledValues(now);
+      g.gain.setTargetAtTime(0, now, 0.012);
+    }
     for (const s of v.srcs) {
       try {
         s.stop(now + 0.06);

@@ -26,7 +26,9 @@ export interface Spot {
 }
 
 /** The longest arrival delay, at the far end of the field. */
-export const MAX_DELAY = 0.4;
+export const MAX_DELAY = 0.3;
+/** Nearer than this (cells), flash and bang land together: the delay starts beyond it. */
+const NEAR = 3;
 
 /**
  * `reach`: cells at which the direct sound is 6 dB down; louder weapons carry farther. At night
@@ -42,7 +44,8 @@ export function place(x: number, y: number, l: Listener, reach: number, night = 
   const r = reach * (night ? 1.25 : 1);
   const gain = 1 / (1 + (d / r) ** 1.5);
   const cutoff = Math.min(18000, Math.max(500, 18000 / (1 + d * 0.32)));
-  const delay = Math.min(MAX_DELAY, d * 0.008);
+  // Light before sound: a distant blast arrives late, up to MAX_DELAY at the far end of the field.
+  const delay = Math.min(MAX_DELAY, Math.max(0, d - NEAR) * 0.0075);
   const wet = Math.min(0.75, 0.12 + 0.55 * (d / (d + 18)) + (night ? 0.08 : 0));
   const pan = Math.max(-1, Math.min(1, dx / (d0 + 3))) * 0.9;
   return { d, gain, cutoff, delay, wet, pan };
