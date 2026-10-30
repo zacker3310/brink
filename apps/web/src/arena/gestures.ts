@@ -310,6 +310,17 @@ export class Gestures {
     return out;
   }
 
+  /**
+   * Another finger touched the glass off the field (on a button, say), which the field never sees
+   * go down: nothing down now is a tap or a long-press, as with a second finger on the field.
+   */
+  elsewhere(): Gesture[] {
+    if (!this.presses.size) return [];
+    for (const q of this.presses.values()) q.moved = true;
+    this.holdFor = null;
+    return this.ring(null);
+  }
+
   /** The pointer was cancelled or lost its capture: it ends, and is never a tap. */
   pointerCancel(id: number): Gesture[] {
     return this.presses.has(id) ? this.lift(id) : [];

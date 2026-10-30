@@ -141,6 +141,18 @@ describe('cut short: never a tap', () => {
     expect(kinds(out).filter((k) => k === 'release')).toHaveLength(1);
   });
 
+  it('a finger on a button while one is on the field: the field finger is no tap and no long-press', () => {
+    const g = new Gestures();
+    g.pointerDown(touch(1, 100, 200, 0));
+    expect(g.tick(HOLD_SHOW_MS + 5)).toEqual([{ kind: 'ring', at: { x: 100, y: 200 } }]);
+    expect(g.elsewhere()).toEqual([{ kind: 'ring', at: null }]);
+    expect(g.tick(HOLD_MS + RING_MIN_MS + 5)).toEqual([]);
+    expect(kinds(g.pointerUp(touch(1, 100, 200, 120)))).toEqual(['release']);
+    // With nothing on the field it does nothing, and the next press is a tap as ever.
+    expect(g.elsewhere()).toEqual([]);
+    expect(kinds(play(g, [(x) => x.pointerDown(touch(1, 100, 200, 1000)), (x) => x.pointerUp(touch(1, 100, 200, 1080))]))).toEqual(['grab', 'release', 'tap']);
+  });
+
   it('a second finger stops a pending long-press', () => {
     const g = new Gestures();
     g.pointerDown(touch(1, 100, 300, 0));

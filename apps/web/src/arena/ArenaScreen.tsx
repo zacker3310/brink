@@ -225,7 +225,7 @@ const FOE = 'var(--arena-foe-bar)';
 function FacingIcon({ g }: { g: FacingGlyph }) {
   const warn = g.warn ? warnPath(g.warn, g.kind === 'shield') : null;
   return (
-    <svg viewBox="0 0 100 100" className="h-12 w-12 shrink-0" aria-hidden data-testid="move-glyph" data-kind={g.kind} data-flanked={g.flanked ? 'true' : 'false'}>
+    <svg viewBox="0 0 100 100" className="h-11 w-11 shrink-0" aria-hidden data-testid="move-glyph" data-kind={g.kind} data-flanked={g.flanked ? 'true' : 'false'}>
       {g.kind === 'hull' ? (
         <>
           {(['front', 'rear', 'left', 'right'] as const).map((f) => {
@@ -301,7 +301,7 @@ function MoveCard({ b, me, at, dash, known, left, onCancel, onMove }: { b: Battl
     .map((x) => `${nameOf(b, x.unit)} ${x.chance}%${ex?.vehicle && x.face ? ` ${FACE_WORD[x.face]}` : ''}`)
     .join(', ');
   return (
-    <div className="mb-3 rounded-xl bg-ink-900 p-3" data-testid="move-card">
+    <div className="mb-2 rounded-xl bg-ink-900 p-3" data-testid="move-card">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[16px] font-bold">
           {dash ? 'Dash' : 'Move'} {steps} {steps === 1 ? 'cell' : 'cells'}
@@ -311,9 +311,9 @@ function MoveCard({ b, me, at, dash, known, left, onCancel, onMove }: { b: Battl
           {cover}
         </span>
       </div>
-      <div className="mt-1.5 flex items-start gap-2.5">
+      <div className="mt-1 flex items-start gap-2.5">
         {g && <FacingIcon g={g} />}
-        <dl className="min-w-0 flex-1 space-y-1 text-[14px] leading-snug">
+        <dl className="min-w-0 flex-1 space-y-0.5 text-[14px] leading-snug">
           <div className="flex gap-2">
             <dt className="w-[84px] shrink-0 text-muted">From there</dt>
             <dd className="min-w-0" data-testid="move-shots">{dash ? 'A dash ends its turn: no shot' : shots.length ? list(shots) : 'Nothing you know of in sight'}</dd>
@@ -1233,7 +1233,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     if (r?.cost.has(p.y * b.map.w + p.x) && (p.x !== me.x || p.y !== me.y)) {
       // The first tap shows the route and what the place means; the second (or Move) goes.
       if (card?.kind === 'move' && card.at.x === p.x && card.at.y === p.y) doAct({ type: 'move', unit: me.id, to: p, ...(card.dash ? { dash: true } : {}) });
-      else setCard({ kind: 'move', at: p, dash });
+      else {
+        setCard({ kind: 'move', at: p, dash });
+        previewed.current = tapPoint.current ? { ...tapPoint.current, cell: p } : null;
+      }
       return true;
     }
     setCard(null);
@@ -1242,6 +1245,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   /** The last tap on the field and the unit it took, for stepping through a stack. */
   const lastTap = useRef<TapMark | null>(null);
+  /** Where the tap that opened the move card landed, and its cell; the tap being handled. */
+  const previewed = useRef<{ x: number; y: number; cell: Point } | null>(null);
+  const tapPoint = useRef<{ x: number; y: number } | null>(null);
   /** A ground unit your side knows of stands there (a hidden one never counts: that would give it away). */
   const knownAt = (p: Point) => !!b && b.units.some((u) => u.alive && !u.carrier && u.x === p.x && u.y === p.y && !isFlying(typeOf(u.type)) && (u.side === 'blue' || visible.has(u.id)));
   /** A cell the selected unit can move to now (dashing, if Dash is on). */
@@ -1287,6 +1293,18 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     if (reachOf) setReachOf(null);
     if (peek) setPeek(null);
     const now = performance.now();
+    // A second tap on the spot of the first goes to the cell the first one chose: the card it opened
+    // grows the footer, and the field reframed above it may have slid a little under the finger. Only
+    // a little: if the cell has gone more than a cell's width from that spot, the tap is for what is
+    // under the finger now.
+    const pv = previewed.current;
+    const was = pv ? stage.toScreen(pv.cell.x, pv.cell.y) : null;
+    if (pv && was && card?.kind === 'move' && card.at.x === pv.cell.x && card.at.y === pv.cell.y && Math.hypot(x - pv.x, y - pv.y) <= SNAP_REACH && Math.hypot(was.x - pv.x, was.y - pv.y) <= SMALL_CELL) {
+      previewed.current = null;
+      tapCell(pv.cell);
+      return;
+    }
+    tapPoint.current = { x, y };
     const c = stage.pick(x, y);
     const near = stage.unitNear(x, y, 30);
     const found = near ? b.units.find((u) => u.id === near) : undefined;
@@ -1610,6 +1628,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       data-testid="arena"
       data-palette={settings.palette}
       onPointerDownCapture={(e) => {
+        // A finger off the field (a button, the cards) while one is on it: that one is no tap.
+        if (gestures.current.count && (!host.current?.contains(e.target as Node) || (e.target as Element).closest?.('button'))) run(gestures.current.elsewhere());
         // A tap anywhere skips an action cam; on the field it does nothing else.
         if (stageRef.current?.endActionCam() && host.current?.contains(e.target as Node)) e.stopPropagation();
         // A tap outside the round report puts it away.
