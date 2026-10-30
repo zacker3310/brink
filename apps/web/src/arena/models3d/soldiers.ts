@@ -788,6 +788,19 @@ export class SoldierCrowd {
     this.looksDirty = true;
   }
 
+  /**
+   * Whether a soldier `seen` passes moves visibly: walking, firing, throwing, writhing, turning or
+   * changing pose; with `idle`, any soldier still standing (a weapon sways at rest), for close views.
+   */
+  moving(seen: (x: number, y: number, z: number) => boolean, idle: boolean): boolean {
+    for (const s of this.soldiers) {
+      const turning = Math.abs(Math.atan2(Math.sin(s.want - s.facing), Math.cos(s.want - s.facing))) > 1e-3;
+      const live = s.blend < 1 || turning || s.pose === 'walk' || s.pose === 'run' || s.pose === 'fire' || s.pose === 'throw' || s.pose === 'wounded';
+      if ((live || (idle && s.pose !== 'dead')) && seen(s.x, s.y, s.z)) return true;
+    }
+    return false;
+  }
+
   /** Thermal view: the soldiers' group as warm bodies. */
   heat(): { group: THREE.Object3D; level: number } {
     return { group: this.group, level: 0.85 };

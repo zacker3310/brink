@@ -13,3 +13,4 @@ export * from './replay';
 export * from './observe';
 export * from './report';
 export * from './rewind';
+export * from './snapshot';

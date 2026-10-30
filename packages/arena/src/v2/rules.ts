@@ -4,6 +4,12 @@ import type { AbilityDef, AbilityId, Difficulty, Side } from './types';
 // Ranks and research abilities for the v2 arena. The ids, techs and rank thresholds are v1's
 // (docs/arena-v2.md sections 3.4, 3.10 and 9); the effects are v2's.
 
+/**
+ * The arena's rules version. A saved battle (snapshot.ts) is picked up only under the rules it was
+ * fought by: bump this when a change to the rules or the roster changes what an action does.
+ */
+export const ARENA_RULES_VERSION = 1;
+
 /** Veterancy, read from a formation's experience on the war map. `aim` is the hit bonus (section 3.4). */
 export const RANKS = [
   { name: 'Recruit', from: 0, aim: 0 },

@@ -27,6 +27,7 @@ import { sfx } from './sfx';
 import { battleFor, battleRecord, type BattleRequest } from './arena/battle';
 import type { BattleOutcome } from './arena/ArenaScreen';
 import { recordStars, recordWarWon } from './arena/career';
+import { warRequest, warSaveFor } from './arena/resume';
 import type { Mode } from './planning';
 import type { Response } from './protocol';
 import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type MapStyle, type SlotInfo } from './saves';
@@ -199,6 +200,9 @@ export const useGame = create<State>((set, get) => {
       set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), submitted: null, rejected: [], screen: 'game' });
       // A war won opens the next theatre.
       if (wonCampaign(r.view)) recordWarWon(r.view.scenarioId);
+      // A battle the page was closed in on this turn waits for the same attack (arena/resume.ts).
+      const saved = warSaveFor(r.view);
+      if (saved) get().notify(`${saved.request.title} was saved mid-battle: order the same attack again to pick it up`);
     }
     return true;
   };
@@ -418,7 +422,9 @@ export const useGame = create<State>((set, get) => {
       } else get().issueGroup(orders);
     },
     fight(req) {
-      set({ battle: req, armed: null });
+      const view = get().view;
+      // A war-map attack picks up its battle if the page was closed during it (arena/resume.ts).
+      set({ battle: !req.skirmish && view ? warRequest(req, view.turn, view.self.id) : req, armed: null });
     },
     endBattle(outcome) {
       const req = get().battle;

@@ -62,7 +62,10 @@ import type { BattleRequest } from './battle';
 import { BattleLog } from './BattleLog';
 import { EndTurnSheet, type ResetState } from './EndTurnSheet';
 import { bandOf, OutcomeBar } from './OutcomeBar';
+import { metered } from './pacing';
+import { PerfOverlay } from './PerfOverlay';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
+import { clearResume, saveBattle } from './resume';
 import { BattleStage, feelOf, type Overlay } from './stage';
 import { faceFill, glyphOf, HULL_FACES, HULL_GUN, HULL_TURRET, SHIELD, SHIELD_HALF, warnPath, type FacingGlyph } from './facing';
 import type { InsightOverlay } from './overlays';
@@ -646,7 +649,14 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const [bars, setBars] = useState({ blue: 1, red: 1 });
   const [settings, setSettings] = useState<ArenaSettings>(() => readSettings());
   fastRef.current = settings.fastEnemy;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const [thermal, setThermal] = useState(false);
+  const thermalRef = useRef(thermal);
+  thermalRef.current = thermal;
+  /** The GPU context: fine, lost (a new one is being made), or not to be had (Try Again). */
+  const [gpu, setGpu] = useState<'ok' | 'lost' | 'failed'>('ok');
+  const lostTimer = useRef(0);
   const [overview, setOverview] = useState(false);
   const [feed, setFeed] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'plain' }[]>([]);
   const feedId = useRef(0);
@@ -706,11 +716,47 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   const buildStage = (b: Battle, lib: Library | null, quality: Quality) => {
     const el = host.current!;
+    // The old stage hands its GPU memory back before the new one takes any.
     stageRef.current?.dispose();
-    const s = new BattleStage(el, b, { quality, settings, lib, arsenal, onFeed: pushFeed });
+    stageRef.current = null;
+    const s = new BattleStage(el, b, { quality, settings: settingsRef.current, lib, arsenal, onFeed: pushFeed, onContext: (what) => contextRef.current(what) });
     s.setHud(...hudNow(), true);
     stageRef.current = s;
     return s;
+  };
+
+  /** How much of the log the film has caught up with (a save tells the rest, never replays it). */
+  const shown = useRef(0);
+  /** A new stage from the battle as it stands: no film, nothing replayed, the battle itself untouched. */
+  const rebuild = () => {
+    window.clearTimeout(lostTimer.current);
+    const bb = battleRef.current;
+    if (!bb || !host.current) return;
+    try {
+      const s = buildStage(bb, libRef.current, settingsRef.current.quality);
+      s.restore();
+      if (thermalRef.current) s.setThermal(true);
+      setGpu(s.contextLost ? 'failed' : 'ok');
+    } catch (e) {
+      console.warn('battle view could not be rebuilt', e);
+      stageRef.current?.dispose();
+      stageRef.current = null;
+      setGpu('failed');
+    }
+  };
+  const contextRef = useRef<(what: 'lost' | 'restored') => void>(() => undefined);
+  contextRef.current = (what) => {
+    if (what === 'restored') return rebuild();
+    setGpu('lost');
+    // A page that has lost its GPU may be the next one iOS closes: save the battle as it stands.
+    if (battleRef.current) saveBattle(req, battleRef.current, shown.current);
+    window.clearTimeout(lostTimer.current);
+    // Some iOS versions never give a lost context back: after a moment, make a new one (in view).
+    const retry = () => {
+      if (document.visibilityState === 'visible') contextRef.current('restored');
+      else lostTimer.current = window.setTimeout(retry, 1000);
+    };
+    lostTimer.current = window.setTimeout(retry, 3000);
   };
 
   useEffect(() => {
@@ -719,17 +765,42 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     let ended = 0;
     let wasBusy = true;
     const el = host.current!;
-    const battle = createBattle(req.setup);
+    // A saved battle picks up where it was: its log is not replayed, and nothing in it is committed again.
+    const resumed = req.resume;
+    const battle = resumed ? copyBattle(resumed.battle) : metered(() => createBattle(req.setup));
     battleRef.current = battle;
+    cursor.current = resumed ? battle.events.length : 0;
+    shown.current = battle.events.length;
+    // Resumed: the round report starts from what the screen had not yet shown when it was saved.
+    if (resumed) reportFrom.current = Math.max(0, battle.events.length - resumed.unplayed.length);
+    else saveBattle(req, battle);
+    // The page may be closed while it is away (iOS closes background pages when memory runs short).
+    const keep = () => {
+      if (document.visibilityState === 'hidden' && !battle.ended) saveBattle(req, battle, shown.current);
+    };
+    const leave = () => {
+      if (!battle.ended) saveBattle(req, battle, shown.current);
+    };
+    document.addEventListener('visibilitychange', keep);
+    window.addEventListener('pagehide', leave);
     // The Apache and the props when they load in time; the battle is built in code either way.
     const timeout = new Promise<null>((r) => setTimeout(() => r(null), 15000));
     void Promise.race([loadLibrary().catch(() => null), timeout]).then(async (lib: Library | null) => {
       if (dead) return;
       libRef.current = lib;
-      await buildStage(battle, lib, settings.quality).warm();
+      const first = buildStage(battle, lib, settings.quality);
+      if (resumed) first.restore();
+      await first.warm();
       if (dead) return;
       setReady(true);
-      setBanner('Your Turn');
+      if (resumed) {
+        setBanner(`Round ${battle.round} · Battle Resumed`);
+        // What happened in the part of the turn the screen never showed: told, not replayed.
+        const news = roundNews(battle, reportFrom.current);
+        reportFrom.current = news.to;
+        setReport(news.rows.length ? { news, sticky: true } : null);
+        setBars(strengths(battle));
+      } else setBanner('Your Turn');
       flush();
       let last = performance.now();
       let shownTurn = battle.turnIndex;
@@ -751,14 +822,19 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           console.warn('battle frame failed; the film is put right', e);
           stage.recover();
         }
-        // Odds labels ride over their targets as the camera moves.
-        const box = el.getBoundingClientRect();
-        for (const n of labelsRef.current?.children ?? []) {
-          const [x, y] = (n as HTMLElement).dataset.at!.split(',').map(Number);
-          const at = stage.toScreen(x!, y!, 0.7);
-          (n as HTMLElement).style.transform = `translate(${at.x - box.left}px, ${at.y - box.top}px) translate(-50%, -100%)`;
+        // Odds labels ride over their targets as the camera moves (only a drawn frame moves anything).
+        if (stage.drew) {
+          const d0 = performance.now();
+          const box = el.getBoundingClientRect();
+          for (const n of labelsRef.current?.children ?? []) {
+            const [x, y] = (n as HTMLElement).dataset.at!.split(',').map(Number);
+            const at = stage.toScreen(x!, y!, 0.7);
+            (n as HTMLElement).style.transform = `translate(${at.x - box.left}px, ${at.y - box.top}px) translate(-50%, -100%)`;
+          }
+          stage.noteDom(performance.now() - d0);
         }
         const b = stage.busy;
+        if (!b) shown.current = cursor.current;
         if (!b && waitingRef.current) {
           waitingRef.current = false;
           setWaiting(false);
@@ -788,13 +864,17 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         if (battle.ended && !b && !ended) ended = now;
         if (ended && now - ended > 700) {
           cancelAnimationFrame(raf);
+          clearResume(req.skirmish ? 'skirmish' : 'war');
+          // The verdict covers the field: hand the GPU memory back now.
+          stage.dispose();
+          stageRef.current = null;
           onEnd(arenaResult(battle), battle);
         }
       };
       raf = requestAnimationFrame(frame);
       window.__arena = {
         arena: () => battleRef.current,
-        toScreen: (x, y) => stageRef.current!.toScreen(x, y),
+        toScreen: (x, y) => stageRef.current?.toScreen(x, y) ?? { x: 0, y: 0 },
         ready: () => !!stageRef.current && !stageRef.current.busy && stageRef.current.settled && battle.turn === 'blue' && !battle.ended && drawn.current.myTurn && drawn.current.selected,
         win: () => {
           for (const u of battle.units) if (u.side === 'red') u.alive = false;
@@ -819,7 +899,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     return () => {
       dead = true;
       cancelAnimationFrame(raf);
+      window.clearTimeout(lostTimer.current);
       window.removeEventListener('resize', onResize);
+      document.removeEventListener('visibilitychange', keep);
+      window.removeEventListener('pagehide', leave);
       stageRef.current?.dispose();
       stageRef.current = null;
       delete window.__arena;
@@ -860,7 +943,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   }, [b, me, myTurn, me?.x, me?.y, me?.acted, visible]);
   const indirect = me ? typeOf(me.type).weapons.find((w) => w.indirect) : undefined;
   // What a good commander would do with this unit, from your side's picture only.
-  const advice = useMemo(() => (b && me && myTurn && !me.acted ? advise(b, me.id) : []), [b, me?.id, me?.x, me?.y, me?.moved, me?.acted, myTurn, b?.events.length]);
+  const advice = useMemo(() => (b && me && myTurn && !me.acted ? metered(() => advise(b, me.id)) : []), [b, me?.id, me?.x, me?.y, me?.moved, me?.acted, myTurn, b?.events.length]);
   const adviceMove = advice.find((a): a is Extract<Action, { type: 'move' }> => a.type === 'move');
 
   // One tip at a time from the board (`tips.ts`), each kind once ever: it stays while the board calls for it.
@@ -954,7 +1037,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     let done = 0;
     // Every order goes through the command log, so the battle is its setup plus these commands.
     for (const a of actions) {
-      if (!submit(b, { type: 'act', action: a })) break;
+      if (!metered(() => submit(b, { type: 'act', action: a }))) break;
       done++;
     }
     if (!done) return false;
@@ -966,6 +1049,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     setMode({ kind: 'none' });
     setDash(false);
     flush();
+    // Committed: saved at once, so a closed page neither loses it nor plays it twice.
+    saveBattle(req, b, shown.current);
     if (!keepSelection && unit) nextReady(unit);
     return true;
   };
@@ -980,7 +1065,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     for (const k of Object.keys(rec)) delete rec[k];
     Object.assign(rec, copyBattle(snap));
     cursor.current = b.events.length;
+    shown.current = b.events.length;
     s.resync();
+    // Taken back: saved at once, so a closed page comes back to the battle as it now stands.
+    saveBattle(req, b);
     if (unit) setSelected(unit);
     setCard(null);
     setMode({ kind: 'none' });
@@ -1172,8 +1260,10 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     setMode({ kind: 'none' });
     setDash(false);
     setBanner('Enemy Turn');
-    submit(b, { type: auto ? 'auto' : 'end' });
+    metered(() => submit(b, { type: auto ? 'auto' : 'end' }));
     flush();
+    // The enemy's turn is resolved: this is the start of your next one (its film is told, not replayed, on a resume).
+    saveBattle(req, b, shown.current);
   };
 
   useEffect(() => {
@@ -1196,13 +1286,12 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const changeSettings = (next: ArenaSettings) => {
     setSettings(next);
     writeSettings(next);
+    settingsRef.current = next;
     const bb = battleRef.current;
     if (next.quality !== settings.quality && bb) {
-      // Rebuild the scene at the new quality from the battle as it stands.
+      // Rebuild the scene at the new quality from the battle as it stands (the old one's GPU memory goes first).
       stageRef.current?.skip();
-      const s = buildStage(bb, libRef.current, next.quality);
-      s.resync();
-      if (thermal) s.setThermal(true);
+      rebuild();
     }
     // Motion, shake, action cams and fast enemy turns apply at once.
     stageRef.current?.setFeel(feelOf(next));
@@ -1323,6 +1412,31 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       {!ready && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="text-[15px] font-semibold text-muted">Deploying…</span>
+        </div>
+      )}
+      {ready && settings.perfOverlay && <PerfOverlay stage={() => stageRef.current} />}
+      {gpu !== 'ok' && (
+        <div className="vercel absolute inset-0 z-30 flex items-center justify-center bg-black/80 px-6" role="alert" data-testid="arena-gpu">
+          <div className="w-full max-w-sm rounded-2xl bg-ink-900 p-4 text-center">
+            <div className="text-[17px] font-bold">{gpu === 'lost' ? 'Restoring the Battlefield' : 'The Battlefield Could Not Be Drawn'}</div>
+            <p className="mt-1 text-[14px] text-muted">
+              {gpu === 'lost'
+                ? 'The phone took back its graphics memory. Your battle is safe and comes back as it was.'
+                : req.skirmish
+                  ? 'Your battle is saved. Try again, or reload the page and choose Resume Battle in Skirmish.'
+                  : 'Your battle is saved. Try again, or reload the page, continue the campaign and order the same attack: the battle picks up where it was, though this turn’s other orders are lost.'}
+            </p>
+            {gpu === 'failed' && (
+              <div className="mt-3 flex flex-col gap-2">
+                <button type="button" onClick={rebuild} className="v-btn v-btn-primary h-12 text-[16px] font-semibold" data-testid="arena-gpu-retry">
+                  Try Again
+                </button>
+                <button type="button" onClick={() => location.reload()} className="v-btn v-btn-secondary h-12 text-[15px]" data-testid="arena-gpu-reload">
+                  Reload the Page
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 z-10">
@@ -1891,7 +2005,8 @@ function StrikeCard({ info, smoke }: { info: StrikeInfo | null; smoke: boolean }
 }
 
 export function ArenaScreen({ req: given, onDone }: { req: BattleRequest; onDone: (o: BattleOutcome) => void }) {
-  const [phase, setPhase] = useState<'brief' | 'fight' | 'done'>('brief');
+  // A saved battle goes straight back to the fight.
+  const [phase, setPhase] = useState<'brief' | 'fight' | 'done'>(given.resume ? 'fight' : 'brief');
   const [result, setResult] = useState<{ r: ArenaResult; b: Battle } | null>(null);
   // Skirmishes take the difficulty chosen here (remembered); war-map battles follow the campaign.
   const [chosen, setChosen] = useState<Difficulty>(() => readSettings().difficulty);

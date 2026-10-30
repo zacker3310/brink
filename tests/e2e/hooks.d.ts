@@ -18,6 +18,9 @@ interface Window {
       ended: 'won' | 'lost' | null;
       intel: { blue: Record<string, { now: boolean }> };
       stats: { blue: { shots: number; hits: number; kills: number; lost: number } };
+      turnIndex: number;
+      /** The seeded stream's state. */
+      stream: number;
     } | null;
     /** A cell's centre on screen. */
     toScreen(x: number, y: number): { x: number; y: number };
@@ -27,7 +30,24 @@ interface Window {
     lose(): void;
     /** Frame timing: ms of the game's own work per frame, and what the GPU was asked to draw.
      *  `reset` starts a fresh sample after this read. */
-    perf(reset?: boolean): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
+    perf(reset?: boolean): {
+      p50: number;
+      p95: number;
+      frames: number;
+      calls: number;
+      triangles: number;
+      quality: 'low' | 'balanced' | 'high';
+      /** The render scheduler's state, frames drawn (in all and by state) and not drawn. */
+      state: 'lost' | 'suspended' | 'playback' | 'camera' | 'interaction' | 'ambient' | 'idle';
+      draws: number;
+      kept: number;
+      drawsBy: Record<string, number>;
+      ratio: number;
+      /** What three.js has uploaded: counts, not memory. */
+      geometries: number;
+      textures: number;
+      lost: boolean;
+    } | null;
     /** What the field overlay shows now: the selected unit, its move and dash cells, its targets, and what it shows of the enemy. */
     overlay(): {
       selected: string | null;

@@ -274,6 +274,11 @@ export class FieldHud {
     });
   }
 
+  /** Words are still rising (the field keeps drawing until they fade). */
+  get live(): boolean {
+    return this.callouts.length > 0;
+  }
+
   /** Drop the words still in the air (a skip). */
   clearCallouts(): void {
     for (const c of this.callouts) c.el.remove();

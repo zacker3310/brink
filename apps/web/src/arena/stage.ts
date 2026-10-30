@@ -8,6 +8,7 @@ import { buildWorld, thermalMaterialFor, type World } from './world';
 import type { Library } from './assets';
 import { FieldHud, type BadgeState, type EdgePointer, type Tone, type Weight } from './hud';
 import { BREW_UP_STOP, HIT_STOP, TRAUMA, beatsOf, keysOf, lastKills, levelWord, rungOf, shakes, type Beat, type FireEvent, type Rung, type Volley } from './film';
+import { AFTER_FILM, engineMeter, Meter, NUDGE, Pacer, RatioGovernor, type FrameState, type RatioState, type SceneNeed } from './pacing';
 import { badgeStatus, classOf, health } from './units';
 import { InsightLayer, type InsightOverlay } from './overlays';
 
@@ -26,6 +27,8 @@ const SPREAD = 1.35;
 /** Closest and default camera distances (world units). */
 const MIN_DIST = 3.5;
 const PLAY_DIST = 11.5;
+/** Closer than this, a soldier's weapon swaying at rest shows: idle soldiers count as moving. */
+const SWAY_DIST = 6;
 
 /** What a penetrating hit did, in a word or two. */
 const EFFECT_TEXT: Partial<Record<Effect, string>> = {
@@ -186,6 +189,56 @@ export interface StageOptions {
   arsenal: { blue: 'us' | 'europe' | 'russia' | 'legacy'; red: 'us' | 'europe' | 'russia' | 'legacy' };
   /** A line for the kill feed, as the film shows it. */
   onFeed?: (text: string, tone: Tone) => void;
+  /** The WebGL context was lost (nothing draws) or came back: the stage is rebuilt from the battle. */
+  onContext?: (what: 'lost' | 'restored') => void;
+}
+
+/** A geometry, material or texture, as far as releasing it goes. */
+interface Disposable {
+  dispose(): void;
+  addEventListener(type: 'dispose', fn: (e: { target: unknown }) => void): void;
+  removeEventListener(type: 'dispose', fn: (e: { target: unknown }) => void): void;
+}
+
+/**
+ * What the frame-time overlay and the performance probe read. Times are JavaScript on the main
+ * thread (ms, p50 and p95 of recent frames); GPU time is not measured, and is not this. The memory
+ * counts are what three.js has uploaded (geometries, textures), not process or GPU memory.
+ */
+export interface StagePerf {
+  /** JavaScript per drawn frame, the whole of `frame`. */
+  p50: number;
+  p95: number;
+  frames: number;
+  /** Of that: handing the frame to WebGL (`renderer.render`, the shadow pass included), and the HUD's DOM work. */
+  render50: number;
+  render95: number;
+  dom50: number;
+  dom95: number;
+  /** The battle engine's calls from the screen (orders, turns, advice), outside frames. */
+  engine50: number;
+  engine95: number;
+  /** Frame cadence: real intervals after drawn frames (what the display got). */
+  interval50: number;
+  interval95: number;
+  calls: number;
+  triangles: number;
+  quality: Quality;
+  /** The pixel ratio drawn at, its cap (the quality's, or the device's when lower), and what moves it. */
+  ratio: number;
+  ratioMax: number;
+  device: number;
+  ratioState: RatioState;
+  lowPower: boolean;
+  /** The scheduler's state, frames drawn in each state and in all, frames not drawn, shadow passes. */
+  state: FrameState;
+  drawsBy: Record<FrameState, number>;
+  draws: number;
+  kept: number;
+  shadows: number;
+  geometries: number;
+  textures: number;
+  lost: boolean;
 }
 
 export class BattleStage {
@@ -277,6 +330,43 @@ export class BattleStage {
   private shownLabels = new Set<string>();
   /** Who last fired at each unit, for the kill feed. */
   private readonly lastShooter = new Map<string, string>();
+  /** When to draw (render on demand) and how sharp (the pixel ratio follows the frame rate). */
+  private readonly pacer = new Pacer();
+  private readonly governor: RatioGovernor;
+  /** A pixel ratio to take when a frame is next drawn (a resize clears the canvas). */
+  private nextRatio: number | null = null;
+  /** The last animation frame (ms), whether it drew; real intervals after drawn frames, and the cost of drawing and of the HUD. */
+  private lastTick = 0;
+  private drewLast = false;
+  private readonly intervals = new Meter();
+  private readonly renderMs = new Meter();
+  private readonly domMs = new Meter();
+  /** The shadow map is drawn when something casting a shadow moves, or the sun's frame round the view does. */
+  private shadowsDirty = true;
+  private shadowPasses = 0;
+  private readonly sunAt = new THREE.Vector3(NaN, NaN, NaN);
+  private sunSpan = NaN;
+  /** Every frame, and fresh shadows, until this time (ms): the film and what it leaves settling. */
+  private filmUntil = 0;
+  /** Every frame until this time (ms): the camera has just stopped. */
+  private cameraUntil = 0;
+  /** The camera as last drawn, and now: a move made between frames asks for one. */
+  private readonly camDrawn = new Float64Array(14);
+  private readonly camNow = new Float64Array(14);
+  private readonly frustum = new THREE.Frustum();
+  private readonly viewProj = new THREE.Matrix4();
+  private readonly probe = new THREE.Vector3();
+  /** Rain and snow fall all the time. */
+  private readonly falling: boolean;
+  /** The WebGL context is gone: nothing draws until the stage is rebuilt. The page is hidden. */
+  private lost = false;
+  private suspended = false;
+  private disposed = false;
+  /** The overlay as last drawn, so a screen update that changes nothing asks for no frame. */
+  private overlayKey = '';
+  /** Geometries, materials and textures the renderer has drawn, released with the stage (dispose). */
+  private readonly used = new Set<Disposable>();
+  private releasing = false;
 
   constructor(
     private readonly host: HTMLElement,
@@ -285,20 +375,55 @@ export class BattleStage {
   ) {
     this.preset = QUALITY[opts.quality];
     this.feel = feelOf(opts.settings);
+    // The quality's pixel ratio is where it starts and the most it takes; frames running long bring it down.
+    this.governor = new RatioGovernor(window.devicePixelRatio || 1, this.preset.pixelRatio);
     this.renderer = new THREE.WebGLRenderer({ antialias: this.preset.antialias, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio));
+    this.renderer.setPixelRatio(this.governor.ratio);
     this.renderer.shadowMap.enabled = this.preset.shadowMap > 0;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Drawn when shadow casters move (draw), not on every frame.
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.domElement.setAttribute('data-testid', 'arena-canvas');
-    this.renderer.domElement.style.touchAction = 'none';
+    const canvas = this.renderer.domElement;
+    canvas.setAttribute('data-testid', 'arena-canvas');
+    canvas.style.touchAction = 'none';
     // setSize(..., false) leaves CSS alone: pin it to the host or a 2x screen shows a quarter of the field.
-    Object.assign(this.renderer.domElement.style, { width: '100%', height: '100%', display: 'block' });
-    host.appendChild(this.renderer.domElement);
+    Object.assign(canvas.style, { width: '100%', height: '100%', display: 'block' });
+    canvas.addEventListener('webglcontextlost', this.onLost);
+    canvas.addEventListener('webglcontextrestored', this.onRestored);
+    document.addEventListener('visibilitychange', this.onVisible);
+    host.appendChild(canvas);
+    // Note what is drawn (the shadow pass and the sky's light included) and compiled (hidden things
+    // too), to release it with the stage.
+    const direct = this.renderer.renderBufferDirect.bind(this.renderer);
+    this.renderer.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
+      this.use(geometry as unknown as Disposable);
+      this.useMaterial(material);
+      direct(camera, scene, geometry, material, object, group);
+    };
+    const compile = this.renderer.compile.bind(this.renderer);
+    this.renderer.compile = (scene, camera, target) => {
+      const materials = compile(scene, camera, target);
+      for (const m of materials) this.useMaterial(m);
+      return materials;
+    };
+    // Textures as the renderer takes them up, those in uniforms a shader patch adds (the camo maps) too.
+    const props = this.renderer.properties as unknown as { get: (o: object) => unknown };
+    const get = props.get;
+    props.get = (o) => {
+      if ((o as THREE.Texture).isTexture) this.use(o as unknown as Disposable);
+      return get(o);
+    };
 
     const lib = opts.lib;
     this.world = buildWorld(this.renderer, this.scene, battle.map, battle.conditions, opts.quality, battle.seed, lib ? { hesco: lib.hesco } : undefined);
+    // The sky's light arrives after the first frames: draw again when it does.
+    this.world.ready.then(
+      () => this.invalidate(),
+      () => undefined,
+    );
+    this.falling = battle.conditions.weather === 'rain' || battle.conditions.weather === 'snow';
     const sun = this.world.lights.sun;
     if (this.preset.shadowMap > 0) {
       sun.castShadow = true;
@@ -366,6 +491,194 @@ export class BattleStage {
     this.resize();
   }
 
+  // --- Drawing on demand, and the GPU context ------------------------------------------------------
+
+  /**
+   * Ask for a frame (an interaction): the next one, or every frame for `seconds`. The film, the
+   * camera and what moves on the field ask by themselves (pacing.ts); anything else that changes the
+   * picture (an overlay, a setting, an animation of its own) calls this.
+   */
+  invalidate(seconds = 0): void {
+    this.pacer.nudge(performance.now(), seconds);
+  }
+
+  /** DOM work the screen does for the field each drawn frame (the odds labels), for the overlay. */
+  noteDom(ms: number): void {
+    this.domMs.add(ms);
+  }
+
+  /** The GPU context is gone (lost, or found lost on coming back): the stage needs rebuilding. */
+  get contextLost(): boolean {
+    return this.lost || this.renderer.getContext().isContextLost();
+  }
+
+  /** The last animation frame drew (things that follow the picture, like the odds labels, move then). */
+  get drew(): boolean {
+    return this.drewLast;
+  }
+
+  /**
+   * iOS drops the context under memory pressure or in the background: stop drawing, and say so. The
+   * battle is not touched (it lives with the screen, not the stage), so a new stage takes it up.
+   */
+  private readonly onLost = (e: Event): void => {
+    e.preventDefault();
+    if (this.lost || this.disposed) return;
+    this.lost = true;
+    this.pacer.hold('lost', performance.now());
+    this.opts.onContext?.('lost');
+  };
+
+  private readonly onRestored = (): void => {
+    if (!this.disposed) this.opts.onContext?.('restored');
+  };
+
+  /** Hidden: suspended. Back: a context lost meanwhile (no event comes on some iOS) counts as lost. */
+  private readonly onVisible = (): void => {
+    if (this.disposed || this.lost) return;
+    const now = performance.now();
+    if (document.visibilityState !== 'visible') {
+      this.suspended = true;
+      this.pacer.hold('suspended', now);
+      return;
+    }
+    this.suspended = false;
+    if (this.renderer.getContext().isContextLost()) {
+      this.lost = true;
+      this.pacer.hold('lost', now);
+      this.opts.onContext?.('lost');
+    } else this.pacer.hold(null, now);
+  };
+
+  /** Something disposed by its owner needs no releasing. */
+  private readonly forget = (e: { target: unknown }): void => {
+    const o = e.target as Disposable;
+    this.used.delete(o);
+    o.removeEventListener('dispose', this.forget);
+  };
+
+  private use(o: Disposable): void {
+    // Releasing touches what it releases (three looks textures up to free them): note nothing more.
+    if (this.releasing || this.used.has(o)) return;
+    this.used.add(o);
+    o.addEventListener('dispose', this.forget);
+  }
+
+  /** A material and the textures it holds (its maps, and its uniforms' for a shader). */
+  private useMaterial(m: THREE.Material): void {
+    const d = m as unknown as Disposable;
+    if (this.used.has(d)) return;
+    this.use(d);
+    for (const v of Object.values(m)) if ((v as THREE.Texture | null)?.isTexture) this.use(v as Disposable);
+    const u = (m as THREE.ShaderMaterial).uniforms;
+    if (u) for (const x of Object.values(u)) if ((x?.value as THREE.Texture | null)?.isTexture) this.use(x.value as Disposable);
+  }
+
+  /** The camera's state, written into `out`. */
+  private camState(out: Float64Array): void {
+    out[0] = this.focus.x;
+    out[1] = this.focus.z;
+    out[2] = this.wantFocus.x;
+    out[3] = this.wantFocus.z;
+    out[4] = this.yaw;
+    out[5] = this.wantYaw;
+    out[6] = this.tilt;
+    out[7] = this.wantTilt;
+    out[8] = this.dist;
+    out[9] = this.wantDist;
+    out[10] = this.hud[0];
+    out[11] = this.hud[1];
+    out[12] = this.wantHud[0];
+    out[13] = this.wantHud[1];
+  }
+
+  /**
+   * What the field needs now (pacing.ts): playback while the film or anything it set going plays,
+   * a camera transition while the camera moves, ambient while only smoke, fire, rain, rotors or
+   * soldiers in view stir, else idle.
+   */
+  private want(now: number): SceneNeed {
+    if (this.busy) {
+      this.filmUntil = now + AFTER_FILM * 1000;
+      return 'playback';
+    }
+    if (now < this.filmUntil || this.live || this.fx.busy || this.hudLayer.live) return 'playback';
+    for (const v of this.views.values()) if (v.flash > 0 || (v.fall > 0 && v.fall < 1)) return 'playback';
+    this.camState(this.camNow);
+    let moved = false;
+    for (let i = 0; i < this.camNow.length; i++) if (this.camNow[i] !== this.camDrawn[i]) moved = true;
+    if (moved || !this.settled) {
+      this.cameraUntil = now + NUDGE * 1000;
+      return 'camera';
+    }
+    if (now < this.cameraUntil) return 'camera';
+    if (this.falling || this.fx.stats().particles > 0) return 'ambient';
+    // Rotors and soldiers only count where they can be seen.
+    this.viewProj.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.viewProj);
+    const p = this.probe;
+    for (const v of this.views.values()) {
+      if (!v.alive || v.wreck || !v.holder.visible || !this.model(v)?.rotors.length) continue;
+      if (this.frustum.containsPoint(p.set(v.x, this.ground(v.x, v.z) + 0.5, v.z))) {
+        // Blades turning cast turning shadows.
+        this.shadowsDirty = true;
+        return 'ambient';
+      }
+    }
+    if (this.crowd.moving((x, y, z) => this.frustum.containsPoint(p.set(x, y + 0.2, z)), this.dist < SWAY_DIST)) return 'ambient';
+    return 'idle';
+  }
+
+  /**
+   * Render on demand: whether this animation frame steps and draws the field (pacing.ts), and by how
+   * many seconds. Real frame intervals after drawn frames drive the pixel ratio.
+   */
+  private pace(dt: number): number | null {
+    const now = performance.now();
+    if (this.drewLast) {
+      const ms = now - this.lastTick;
+      this.intervals.add(ms);
+      const r = this.governor.add(ms);
+      if (r !== null) this.nextRatio = r;
+    }
+    this.lastTick = now;
+    const step = this.pacer.tick(now, dt, this.want(now));
+    this.drewLast = step !== null;
+    if (step === null) {
+      // Sound runs on whether or not the picture changes.
+      this.audio.update(dt);
+      return null;
+    }
+    if (this.nextRatio !== null) {
+      this.renderer.setPixelRatio(this.nextRatio);
+      this.nextRatio = null;
+    }
+    return step;
+  }
+
+  /**
+   * Draw the field. The shadow map is redrawn only when shadow casters moved (the film and its
+   * aftermath, a unit placed, removed or swapped for its other detail, turning rotors) or the light
+   * did (the sun's frame follows the view).
+   */
+  private draw(): void {
+    const t0 = performance.now();
+    const sun = this.world.lights.sun;
+    if (sun.castShadow) {
+      const span = sun.shadow.camera.right;
+      if (this.shadowsDirty || t0 < this.filmUntil || !sun.position.equals(this.sunAt) || span !== this.sunSpan) {
+        this.renderer.shadowMap.needsUpdate = true;
+        this.shadowsDirty = false;
+        this.sunAt.copy(sun.position);
+        this.sunSpan = span;
+        this.shadowPasses++;
+      }
+    }
+    this.renderer.render(this.scene, this.camera);
+    this.camState(this.camDrawn);
+    this.renderMs.add(performance.now() - t0);
+  }
+
   // --- Units -------------------------------------------------------------------------------------
 
   private paint(side: Side) {
@@ -416,6 +729,7 @@ export class BattleStage {
   /** Swap a vehicle between its full and simple model by distance from the camera focus. */
   private setLod(v: View, lod: 0 | 1): void {
     if (v.lod === lod || v.t.mobility === 'foot' || v.wreck) return;
+    this.shadowsDirty = true;
     const old = this.model(v);
     if (!v.models[lod]) v.models[lod] = this.makeModel(v.type, v.side, lod);
     if (old) v.holder.remove(old.root);
@@ -470,10 +784,15 @@ export class BattleStage {
   resize(): void {
     const w = this.host.clientWidth || 1;
     const h = this.host.clientHeight || 1;
+    // A new screen or a zoom can change the device's ratio, which caps ours.
+    const r = this.governor.setDevice(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    if (r !== this.renderer.getPixelRatio()) this.renderer.setPixelRatio(r);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.applyCamera(0);
+    // A resize clears the canvas.
+    this.invalidate();
   }
 
   /** Far enough to see the whole field between the HUD bars, at the whole-field view's tilt. */
@@ -762,6 +1081,12 @@ export class BattleStage {
   }
 
   setOverlay(o: Overlay): void {
+    // The screen sets the overlay after every update; only a change asks for a frame.
+    const key = JSON.stringify(o);
+    if (key !== this.overlayKey) {
+      this.overlayKey = key;
+      this.invalidate();
+    }
     this.overlay = o;
     const m = new THREE.Matrix4();
     const put = (mesh: THREE.InstancedMesh, cells: number[]) => {
@@ -1041,6 +1366,7 @@ export class BattleStage {
 
   setThermal(on: boolean): void {
     if (this.thermal === on) return;
+    this.invalidate();
     this.thermal = on;
     this.world.setThermal(on);
     this.fx.setThermal(on);
@@ -1103,6 +1429,7 @@ export class BattleStage {
   }
 
   play(events: readonly BattleEvent[]): void {
+    this.invalidate();
     this.notes = { kills: lastKills(events), shook: shakes(events) };
     for (const beat of beatsOf(events)) {
       const clip = this.clipOf(beat);
@@ -1140,6 +1467,8 @@ export class BattleStage {
 
   /** Skip to the end of what is queued (fast-forward). */
   skip(): void {
+    this.invalidate(NUDGE);
+    this.shadowsDirty = true;
     for (let n = 0; n < 5000 && (this.playing.length || this.waiting.length); n++) {
       const c = this.playing[0] ?? this.waiting[0]!;
       const s = c.steps.shift();
@@ -1425,6 +1754,8 @@ export class BattleStage {
               mark.played = this.played;
               this.marks.push(mark);
               if (this.marks.length > 64) this.marks.shift();
+              // A new turn: fires the battle has put out go out on the field too.
+              this.douse();
             },
           },
           true,
@@ -1963,8 +2294,49 @@ export class BattleStage {
     this.world.scorch(Math.floor(v.x), Math.floor(v.z));
   }
 
+  /**
+   * Put a new stage where the battle stands, with no film: after a rebuild (a quality change, a lost
+   * GPU context) or a resumed save. Wrecks you saw stay wrecks, their fires burn on while the battle
+   * says so, smoke screens stand and the capture ring keeps its count.
+   */
+  restore(): void {
+    this.skip();
+    this.resync();
+    const b = this.battle;
+    const seen = new Set(b.events.flatMap((e) => (e.type === 'destroyed' && e.seen ? [e.unit] : [])));
+    for (const w of b.wrecks) {
+      const v = this.views.get(w.unit);
+      if (!v || v.t.mobility === 'foot' || (v.side === 'red' && !seen.has(v.id))) continue;
+      v.alive = false;
+      v.hp = 0;
+      v.ring.visible = false;
+      v.holder.visible = true;
+      if (v.t.mobility === 'heli') {
+        v.fall = 1;
+        this.place(v);
+        v.holder.rotation.z = 0.6;
+      }
+      if (!v.wreck) this.wreck(v);
+      if (w.burning > 0) this.fx.burn(v.id, this.centreOf(v), v.t.armour && v.t.armour.hf[0] >= 300 ? 1.2 : 0.8);
+    }
+    const smoke = b.smoke.filter((s) => s.until > b.turnIndex);
+    if (smoke.length) this.fx.smoke(smoke);
+    if (b.capture > 0) this.world.setZone(b.capture / 2);
+    // Fires and smoke as they would stand by now, not just lit.
+    for (let i = 0; i < 30; i++) this.fx.update(0.1, this.camera);
+    this.shadowsDirty = true;
+    this.invalidate(NUDGE);
+  }
+
+  /** Wrecks the battle says have burnt out stop burning (a fire left alight keeps the field drawing). */
+  private douse(): void {
+    for (const w of this.battle.wrecks) if (w.burning <= 0) this.fx.stopBurn(w.unit);
+  }
+
   /** Re-read units from the battle (after splits, merges and anything the film cannot show). */
   resync(): void {
+    this.invalidate();
+    this.shadowsDirty = true;
     for (const u of this.battle.units) {
       let v = this.views.get(u.id);
       if (!v) {
@@ -1998,6 +2370,11 @@ export class BattleStage {
   // --- Frame ---------------------------------------------------------------------------------------
 
   frame(dt: number): void {
+    if (this.lost || this.suspended || this.disposed) return;
+    // Render on demand: a still picture is not drawn again (pacing.ts).
+    const step = this.pace(dt);
+    if (step === null) return;
+    dt = step;
     const t0 = performance.now();
     // `dt` comes at the film's speed (`rate`): presentation only, nothing the battle depends on.
     const real = dt;
@@ -2066,9 +2443,11 @@ export class BattleStage {
     this.crowd.update(dt);
     this.audio.setListener({ x: this.focus.x - 0.5, y: this.focus.z - 0.5, zoom: Math.min(1, this.dist / this.maxDist) });
     this.audio.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
+    const h0 = performance.now();
     // Words read in real time, whatever speed the film runs at.
     this.updateHud(real / Math.max(1, this.rate));
+    this.domMs.add(performance.now() - h0);
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
   }
@@ -2078,25 +2457,86 @@ export class BattleStage {
     await this.renderer.compileAsync(this.scene, this.camera).catch(() => undefined);
   }
 
-  /** Our own work per frame (ms) and what the GPU was asked to draw, for the performance probe.
-   *  `reset` starts a fresh sample after this read. */
-  perf(reset = false): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: Quality } {
+  /** Our own work per drawn frame (ms), what the GPU was asked to draw, the pixel ratio and how often
+   *  it draws, for the performance probe and the frame-time overlay. `reset` starts a fresh sample after this read. */
+  perf(reset = false): StagePerf {
+    const q = (xs: number[], p: number) => xs[Math.min(xs.length - 1, Math.floor(p * xs.length))] ?? 0;
     const s = [...this.frameMs].sort((a, b) => a - b);
-    if (reset) this.frameMs.length = 0;
-    const q = (p: number) => s[Math.min(s.length - 1, Math.floor(p * s.length))] ?? 0;
-    return { p50: q(0.5), p95: q(0.95), frames: s.length, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, quality: this.opts.quality };
+    const iv = this.intervals;
+    const out: StagePerf = {
+      p50: q(s, 0.5),
+      p95: q(s, 0.95),
+      frames: s.length,
+      render50: this.renderMs.q(0.5),
+      render95: this.renderMs.q(0.95),
+      dom50: this.domMs.q(0.5),
+      dom95: this.domMs.q(0.95),
+      engine50: engineMeter.q(0.5),
+      engine95: engineMeter.q(0.95),
+      interval50: iv.q(0.5),
+      interval95: iv.q(0.95),
+      calls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles,
+      quality: this.opts.quality,
+      ratio: this.renderer.getPixelRatio(),
+      ratioMax: this.governor.max,
+      device: window.devicePixelRatio || 1,
+      ratioState: this.governor.state,
+      lowPower: this.governor.lowPower,
+      state: this.pacer.state,
+      drawsBy: { ...this.pacer.drawsBy },
+      draws: this.pacer.draws,
+      kept: this.pacer.kept,
+      shadows: this.shadowPasses,
+      geometries: this.renderer.info.memory.geometries,
+      textures: this.renderer.info.memory.textures,
+      lost: this.contextLost,
+    };
+    if (reset) {
+      this.frameMs.length = 0;
+      for (const m of [iv, this.renderMs, this.domMs, engineMeter]) m.clear();
+    }
+    return out;
+  }
+
+  /** The last real frame intervals after drawn frames (ms), oldest first, for the overlay's chart. */
+  trace(n = 120): number[] {
+    return this.intervals.recent(n);
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    const canvas = this.renderer.domElement;
+    canvas.removeEventListener('webglcontextlost', this.onLost);
+    canvas.removeEventListener('webglcontextrestored', this.onRestored);
+    document.removeEventListener('visibilitychange', this.onVisible);
     this.insight.dispose();
     this.hudLayer.dispose();
     this.audio.dispose();
     this.fx.dispose();
     this.crowd.dispose();
+    // Release what the renderer drew or compiled, and whatever is still in the scene or the models.
+    // Shared geometries, materials and textures (the model caches, the loaded library, the sky)
+    // keep a dispose listener from every renderer that used them, and through it that whole
+    // renderer: releasing them drops it. The next renderer uploads them again.
+    const sweep = (root: THREE.Object3D) =>
+      root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.geometry) this.use(m.geometry as unknown as Disposable);
+        for (const mat of Array.isArray(m.material) ? m.material : m.material ? [m.material] : []) this.useMaterial(mat);
+      });
+    sweep(this.scene);
+    for (const v of this.views.values()) for (const m of v.models) if (m) sweep(m.root);
+    for (const mat of this.saved.values()) for (const x of Array.isArray(mat) ? mat : [mat]) this.useMaterial(x);
     this.world.dispose();
     for (const v of this.views.values()) for (const m of v.models) m?.dispose();
+    this.releasing = true;
+    for (const o of [...this.used]) o.dispose();
     this.renderer.dispose();
-    this.renderer.domElement.remove();
+    // Give the GPU memory back now, not when the canvas is collected: iOS counts it against the page.
+    if (!this.renderer.getContext().isContextLost()) this.renderer.forceContextLoss();
+    canvas.remove();
   }
 }
 
