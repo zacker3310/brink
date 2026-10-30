@@ -91,6 +91,39 @@ the arena. Detail: `docs/arena.md`.
 Multiplayer (PeerJS rooms, hotseat) was removed in favour of hand-fought battles. `GameSession` still
 takes several human seats, and loading an old multi-human save hands the other seats to the AI.
 
+### The battle's three layers
+
+The simulation owns the truth, the visibility layer owns what is disclosed, the renderer owns how it
+looks, and none does another's job.
+
+| Layer | Where | Invariant | Tested in |
+|---|---|---|---|
+| Simulation | `packages/arena/src/v2` (`act`, `endTurn`, `autoTurn`, `retreat`; `submit` and `replay` in `replay.ts`) | A battle is a pure function of its setup, its seed, the rules version (`Battle.version` and the code) and the player's command log. It never reads the clock, `Math.random` or the renderer; its dice come only from `Battle.stream` through `draw()`, and the AI chooses with hash noise, so the log holds only the player's commands. A refused command changes nothing; an accepted one is logged once. | `replay.test.ts` (replay to the same hash at every turn across company shapes, terrain, sites, biomes, times, weather and difficulty; the same battle twice; a JSON save carried on; the clock and `Math.random` trapped), `invariants.test.ts` (all or nothing, duplicates, Undo against the stream and the sight picture), the matrix |
+| Visibility | `observe(b, side)` in `observe.ts`; `advise` plans on its own copy of the same picture | Everything shown to a side is computed from what it may know: its own units, enemies in sight, its own last known positions, its own mines, the map, smoke and wrecks. `observe` returns that as a `Battle` with a constant stream and no film, and every reader the player uses (sight, reach, shot cards, called fire, advice, the strength bar, Undo) answers the same on it as on the truth. | `fog.test.ts` (eleven kinds of hidden change at many points; the observation is enough), the matrix (fog sampled twice a battle) |
+| Presentation | `apps/web/src/arena` (the film plays `Battle.events`) | The film reads events and never resolves combat: an order is settled when `act` returns, so skipping the film, or playing none (every test runs headless), changes nothing. It shows what the events say blue saw (`seen`). | the engine tests and the matrix, all headless, to the same hashes |
+
+`hashBattle(b)` is a stable 16-character hash of everything a battle holds but its command log (two
+FNV-1a lanes over canonical JSON, the war engine's scheme); a battle and its JSON round trip hash the
+same. `replay(setup, commands)` rebuilds a battle from the setup it was created from (the battle does
+not keep it) and throws at a command the rebuilt battle refuses. Battles saved before the log have no
+`commands` and play on as before.
+
+`pnpm test:matrix` (`ARENA_MATRIX` battles, 24 by default) plays seeded battles to their end across
+every dimension and checks crashes, broken states and steps, forbidden commands accepted, refused AI
+actions, battles that do not end, replay and resume divergence and sampled fog leaks; failing cases go
+to `tests/soak/arena-failing-seeds.json` and run first next time. Its table separates genuine failures
+from reported defects it meets and from unusual but valid outcomes (a retreat, a battle held to the
+round limit, no contact all battle).
+
+Reported and pinned (each an `it.fails` with a fixture, until fixed): the AI's sight-grid cache keys
+on smoke and the count of buildings and trees, but walls and rocks fall in play too, so a battle that
+never stopped can plan on stale grids where its save, resumed, does not; `act` accepts an order of no
+known kind, a NaN facing and fire aimed between cells (`submit` refuses them); `whyNot` tells a hidden
+unit's id from one nobody has, and an engineer's breach and mine orders find hidden mines and units
+next to it; Undo greys out when a hidden enemy sees the step; the shot card tells whether a seen
+tank's active protection is spent; and a `fire` event is `seen` when blue sees only its target, so the
+film shows a shooter the rules keep hidden.
+
 ## Rejected alternatives
 
 - A tick per movement point: forces every unit onto one speed grid. The event clock handles mixed speeds.

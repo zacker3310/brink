@@ -3,7 +3,7 @@ import { act, autoBattle, autoTurn, createBattle, endTurn } from './engine';
 import { bare, BATTLES, copy, NORTH, put, setup, spec, unit } from './fixture.test-util';
 import { canonicalJson, hashBattle, replay, submit, type PlayerCommand } from './replay';
 import { arenaSetup, copyPlayer, coveringSetups, play, playTurn, player, replayDiverges, type Played } from './verify.test-util';
-import type { ArenaSetup, Battle } from './types';
+import { WALL, type ArenaSetup, type Battle } from './types';
 
 // The command log and replay (docs/architecture.md, Battles): a battle is a pure function of its
 // setup and the player's accepted commands. The enemy's turns and Let Crews Play are the AI's, which
@@ -155,30 +155,40 @@ describe('replay', () => {
   // fall in play (tracks flatten walls, a breach turns rock to rubble), so a battle that never
   // stopped plans on stale grids while the same battle saved and resumed computes fresh ones. Here
   // tracks flatten seven wall cells by turn 3, and blue's autopilot moves a tank to 11,31 in the one
-  // and to 10,36 in the other. Replaying a log repeats the same calls, so replays still agree.
+  // and to 10,36 in the other. Replaying a log repeats the same calls, so replays still agree. Should
+  // the AI's choices change and this setup stop diverging, `pnpm test:matrix` reports the defect as
+  // resume-stale-sight with a seed to put here instead.
+  const walled: ArenaSetup = {
+    seed: 3,
+    terrain: 'mountains',
+    river: true,
+    site: null,
+    attackers: [
+      { id: 'b0', cls: 'armor', strength: 746, name: 'b0', color: '#888888', rank: 1 },
+      { id: 'b1', cls: 'armor', strength: 955, name: 'b1', color: '#888888', rank: 1 },
+      { id: 'b2', cls: 'mechanized', strength: 722, name: 'b2', color: '#888888', rank: 0 },
+    ],
+    defenders: [
+      { id: 'r0', cls: 'armor', strength: 759, name: 'r0', color: '#888888', rank: 0 },
+      { id: 'r1', cls: 'mechanized', strength: 924, name: 'r1', color: '#888888', rank: 0 },
+    ],
+    arsenal: { blue: 'legacy', red: 'us' },
+    skill: 0.5178601946216077,
+    difficulty: 'normal',
+    abilities: ['armor', 'repair'],
+    theatre: 'varn-delta',
+    biome: 'desert',
+  };
+  const walls = (b: Battle) => b.map.cells.filter((c) => c === WALL).length;
+  it('fixture: by turn 3 tracks have flattened walls, and the save is the battle', () => {
+    const b = createBattle(walled);
+    const start = walls(b);
+    for (let t = 0; t < 3; t++) autoTurn(b);
+    expect(walls(b)).toBeLessThan(start);
+    expect(hashBattle(copy(b))).toBe(hashBattle(b));
+  }, BATTLES);
   it.fails('a battle resumed from a save plays on as the one that never stopped, after tracks flatten walls', () => {
-    const s: ArenaSetup = {
-      seed: 3,
-      terrain: 'mountains',
-      river: true,
-      site: null,
-      attackers: [
-        { id: 'b0', cls: 'armor', strength: 746, name: 'b0', color: '#888888', rank: 1 },
-        { id: 'b1', cls: 'armor', strength: 955, name: 'b1', color: '#888888', rank: 1 },
-        { id: 'b2', cls: 'mechanized', strength: 722, name: 'b2', color: '#888888', rank: 0 },
-      ],
-      defenders: [
-        { id: 'r0', cls: 'armor', strength: 759, name: 'r0', color: '#888888', rank: 0 },
-        { id: 'r1', cls: 'mechanized', strength: 924, name: 'r1', color: '#888888', rank: 0 },
-      ],
-      arsenal: { blue: 'legacy', red: 'us' },
-      skill: 0.5178601946216077,
-      difficulty: 'normal',
-      abilities: ['armor', 'repair'],
-      theatre: 'varn-delta',
-      biome: 'desert',
-    };
-    const straight = createBattle(s);
+    const straight = createBattle(walled);
     for (let t = 0; t < 3; t++) autoTurn(straight);
     const resumed = copy(straight);
     autoTurn(straight);
@@ -208,7 +218,9 @@ describe('the AI needs no log', () => {
     expect(b.ended).not.toBeNull();
   }, BATTLES);
 
-  it('its turn from a state is the same wherever the state came from: the battle, its copy, its replay', () => {
+  // Where no wall or rock has fallen (see the cache defect above): the AI's turn from a state needs
+  // nothing but the state, whether the state is the battle, a copy of it or its replay.
+  it('its turn from a state is the same on the battle, a copy of it and its replay', () => {
     const s = arenaSetup(12, { mix: 'roster', terrain: 'hills' });
     const p = play(s, 12, { turns: 3 });
     if (p.b.ended) return;

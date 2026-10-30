@@ -92,6 +92,10 @@ describe('fog: hidden changes change nothing blue is shown', () => {
     const bad = found.filter((f) => family(f.key).startsWith('refusal') && !f.known);
     expect(bad.slice(0, 3), `${bad.length} leaks`).toEqual([]);
   });
+  it('and nothing else: every leak found is one reported below', () => {
+    const bad = found.filter((f) => !f.known);
+    expect(bad.slice(0, 3), `${bad.length} leaks`).toEqual([]);
+  });
 });
 
 describe('fog: the observation', () => {

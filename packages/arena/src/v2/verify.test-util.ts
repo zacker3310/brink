@@ -2,7 +2,7 @@ import type { Terrain, UnitClass } from '@brink/contracts';
 import { draw } from '../rng';
 import { advise, decide, enemyArea } from './ai';
 import { bestFire, fireInfo, fitMen, usableWeapons, type FireInfo } from './combat';
-import { act, createBattle, reachable, strikeInfo, supportChance, undoable, unitById, unitValue, whyNot } from './engine';
+import { act, createBattle, reachable, strikeInfo, supportChance, undoable, unitValue, whyNot } from './engine';
 import { passable } from './map';
 import { observe } from './observe';
 import { hashBattle, submit, type PlayerCommand } from './replay';
@@ -1150,12 +1150,11 @@ export function change(b: Battle, kind: Change, r: Rng): Changed | null {
   return null;
 }
 
-/** Hidden ids a probe should name (the changed unit), so `whyNot` is asked about them. */
+/** Hidden ids a probe should name (the changed unit and one other out of sight), so `whyNot` is asked about them. */
 export const probeIds = (b: Battle, c: Changed): string[] => {
   const ids = c.unit ? [c.unit] : [];
-  const any = b.units.find((u) => u.side === 'red' && !visibleTo(b, 'blue').has(u.id));
+  const seen = visibleTo(b, 'blue');
+  const any = b.units.find((u) => u.side === 'red' && !seen.has(u.id));
   if (any && !ids.includes(any.id)) ids.push(any.id);
   return ids;
 };
-
-export { unitById };
