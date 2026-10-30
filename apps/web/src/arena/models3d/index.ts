@@ -7,6 +7,8 @@ import { newDraft, type Draft } from './draft';
 import { LINKS_PER_REPEAT, blurMaterial, paintMaterial, trackMaterial, type Paint, type Scheme, type TrackKind } from './paint';
 import { BUILDERS, SCHEME_OF } from './roster';
 import { wrapApache } from './apache';
+import { addRim } from './rim';
+import { disposeOutlines, stencilled } from './outline';
 
 // Arena v2 unit models, built in code from each designation's real dimensions and silhouette.
 // Geometry is cached per type and level of detail; each unit gets its own materials (hit flash,
@@ -17,6 +19,8 @@ export { paintFor } from './paint';
 export { isFoot, kitFor, DIMS, type SoldierKit } from './dims';
 export { buildProjectile } from './projectiles';
 export { SoldierCrowd, type Pose } from './soldiers';
+export { rimOff, setRimLight } from './rim';
+export { setOutline, setOutlineView, stencilled, type OutlineRole } from './outline';
 
 export interface UnitModel {
   /** Nose to +z, sits on y = 0, centred, real size x METRE. */
@@ -198,8 +202,19 @@ function blurDriver(disc: THREE.Mesh, rotor: THREE.Object3D, axis: 'y' | 'x', ma
 /**
  * A unit's model. `apache`: the loaded AH-64 GLTF (public/art/models/heli.glb), wrapped in place of
  * the coded one when given. Foot units return an empty model: their soldiers are a `SoldierCrowd`.
+ * `side`: the rim light in that side's colour, and the stencil mark that keeps outlines to its edge.
  */
-export function buildModel(type: TypeId, opts: { paint: Paint; lod: 0 | 1; apache?: GLTF }): UnitModel {
+export function buildModel(type: TypeId, opts: { paint: Paint; lod: 0 | 1; apache?: GLTF; side?: 'blue' | 'red' }): UnitModel {
+  const m = assemble(type, opts);
+  if (opts.side)
+    for (const mat of m.paint) {
+      addRim(mat, opts.side);
+      stencilled(mat);
+    }
+  return m;
+}
+
+function assemble(type: TypeId, opts: { paint: Paint; lod: 0 | 1; apache?: GLTF }): UnitModel {
   if (type === 'ah64e' && opts.apache) return wrapApache(opts.apache, opts.lod);
   const scheme = SCHEME_OF[type] ?? opts.paint;
   const t = template(type, opts.lod, scheme);
@@ -252,6 +267,7 @@ export function buildModel(type: TypeId, opts: { paint: Paint; lod: 0 | 1; apach
       const bm = blurMaterial(r.blurTint);
       mats.push(bm);
       const disc = new THREE.Mesh(r.disc, bm);
+      disc.name = 'blur';
       disc.renderOrder = 2;
       spin.add(disc);
       blurDriver(disc, spin, r.axis, bm);
@@ -317,6 +333,7 @@ export function disposeModels(): void {
     for (const h of t.heat) h.geo.dispose();
   }
   cache.clear();
+  disposeOutlines();
 }
 
 /** Types with a vehicle or aircraft model (foot units are soldiers). */

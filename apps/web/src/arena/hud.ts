@@ -6,6 +6,13 @@ import type { BadgeStatus } from './units';
 // loop): a badge over each unit you can see (its pictogram, its strength, what it is doing) that
 // stays the same size at every zoom, words that rise over a target when a shot lands, and labels
 // pinned to places on the ground (the objective, where the enemy is expected).
+//
+// Friend and foe differ by shape as well as colour (APP-6): yours are rounded, theirs angled; the
+// colours come from CSS variables that follow the palette setting. The layer is one composited
+// layer (will-change on it, not on each badge), badges off the screen are hidden rather than moved,
+// and badges that sit mostly on top of each other merge into one with a count. A battle has about
+// 20 to 35 badges, which the DOM handles well; past 50 to 100 labels a WebGL atlas (one instanced
+// quad per badge, drawn with the field) would be worth the work.
 
 export interface BadgeState {
   id: string;
@@ -37,6 +44,7 @@ interface Badge {
   el: HTMLDivElement;
   bar: HTMLElement;
   mark: HTMLElement;
+  count: HTMLElement;
   key: string;
   /** What was last written, so a frame that changes nothing writes nothing (no style work). */
   last: string;
@@ -52,6 +60,15 @@ interface Callout {
 }
 
 const LIFE = 1.9;
+
+/**
+ * Badge sizes in CSS pixels (as index.css draws them), and how much of a badge must lie under one in
+ * front for the two to merge: full badges only when stacked (a helicopter over a squad), the small
+ * ones of the zoomed-out view as soon as they crowd.
+ */
+const BOX = { full: { w: 58, h: 20, merge: 0.5 }, compact: { w: 24, h: 16, merge: 0.2 } };
+/** A badge or label this far off the layer is hidden, not moved. */
+const MARGIN = 48;
 
 const MARKS: Record<BadgeStatus, string> = {
   none: '',
@@ -72,6 +89,12 @@ export class FieldHud {
   private readonly pointers = new Map<string, { el: HTMLButtonElement; arrow: HTMLElement; count: HTMLElement; last: string }>();
   private callouts: Callout[] = [];
   private clock = 0;
+  /** The layer's size in CSS pixels, from the stage's resize (never read from the page in the frame). */
+  private size = { w: Infinity, h: Infinity };
+  /** Reused every frame: who leads a merged badge, and how many it stands for. */
+  private readonly order: BadgeState[] = [];
+  private readonly leaders: BadgeState[] = [];
+  private readonly counts = new Map<string, number>();
 
   constructor(
     host: HTMLElement,
@@ -83,8 +106,53 @@ export class FieldHud {
     host.appendChild(this.el);
   }
 
-  /** Place every badge; units not in the list are hidden. */
+  /** The layer's size changed (the stage's resize). */
+  resize(w: number, h: number): void {
+    this.size = { w, h };
+  }
+
+  private onLayer(at: { x: number; y: number } | null): at is { x: number; y: number } {
+    return !!at && at.x > -MARGIN && at.x < this.size.w + MARGIN && at.y > -MARGIN && at.y < this.size.h + MARGIN;
+  }
+
+  /**
+   * Which badges lead and how many each stands for. In front first (lower on the screen), the
+   * selected unit before all; a badge mostly under one already kept on the same side joins it.
+   * Friend and foe never merge.
+   */
+  private merge(states: readonly BadgeState[], compact: boolean): void {
+    const box = compact ? BOX.compact : BOX.full;
+    const order = this.order;
+    const leaders = this.leaders;
+    order.length = 0;
+    leaders.length = 0;
+    this.counts.clear();
+    for (const s of states) if (this.onLayer(s.at)) order.push(s);
+    order.sort((a, b) => +b.selected - +a.selected || b.at!.y - a.at!.y || (a.id < b.id ? -1 : 1));
+    for (const s of order) {
+      let host: BadgeState | undefined;
+      for (const l of leaders) {
+        if (l.side !== s.side) continue;
+        const ox = 1 - Math.abs(l.at!.x - s.at!.x) / box.w;
+        const oy = 1 - Math.abs(l.at!.y - s.at!.y) / box.h;
+        if (ox > 0 && oy > 0 && ox * oy > box.merge) {
+          host = l;
+          break;
+        }
+      }
+      if (host) {
+        this.counts.set(host.id, (this.counts.get(host.id) ?? 1) + 1);
+        this.counts.set(s.id, 0);
+      } else {
+        leaders.push(s);
+        this.counts.set(s.id, 1);
+      }
+    }
+  }
+
+  /** Place every badge; units not in the list, off the screen or merged into another are hidden. */
   setBadges(states: readonly BadgeState[], compact: boolean): void {
+    this.merge(states, compact);
     const live = new Set<string>();
     for (const s of states) {
       live.add(s.id);
@@ -98,30 +166,36 @@ export class FieldHud {
         el.setAttribute('data-testid', `badge-${s.id}`);
         const glyph = document.createElement('span');
         glyph.className = 'arena-badge-glyph';
-        glyph.innerHTML = pictogramSvg(s.cls, s.side === 'blue' ? '#0b1220' : '#ffffff');
+        // The badge's ink, so a palette change recolours it from the stylesheet.
+        glyph.innerHTML = pictogramSvg(s.cls, 'currentColor');
         const mark = document.createElement('span');
         mark.className = 'arena-badge-mark';
         const bar = document.createElement('i');
         const track = document.createElement('span');
         track.className = 'arena-badge-bar';
         track.appendChild(bar);
-        el.append(glyph, mark, track);
+        const count = document.createElement('span');
+        count.className = 'arena-badge-count';
+        el.append(glyph, mark, track, count);
         this.el.appendChild(el);
-        b = { el, bar, mark, key, last: '' };
+        b = { el, bar, mark, count, key, last: '' };
         this.badges.set(s.id, b);
       }
+      const n = this.counts.get(s.id) ?? 0;
       const x = s.at ? Math.round(s.at.x) : 0;
       const y = s.at ? Math.round(s.at.y) : 0;
       const hp = Math.round(Math.max(0, Math.min(1, s.hp)) * 100);
-      const now = s.at ? `${x},${y},${hp},${s.status},${+s.done}${+s.selected}${+compact}` : 'hidden';
+      const now = n > 0 ? `${x},${y},${hp},${s.status},${+s.done}${+s.selected}${+compact},${n}` : 'hidden';
       if (now === b.last) continue;
       const was = b.last;
       b.last = now;
-      if (!s.at) {
+      if (n === 0) {
         b.el.style.display = 'none';
         continue;
       }
       if (was === 'hidden' || was === '') b.el.style.display = '';
+      const c = n > 1 ? String(n) : '';
+      if (b.count.textContent !== c) b.count.textContent = c;
       b.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
       b.bar.style.width = `${hp}%`;
       if (b.mark.dataset.status !== s.status) {
@@ -211,11 +285,12 @@ export class FieldHud {
       this.labels.set(id, el);
     }
     if (el.textContent !== text) el.textContent = text;
-    const now = at ? `${Math.round(at.x)},${Math.round(at.y)}` : 'hidden';
+    const on = this.onLayer(at);
+    const now = on ? `${Math.round(at.x)},${Math.round(at.y)}` : 'hidden';
     if (el.dataset.last === now) return;
     el.dataset.last = now;
-    el.style.display = at ? '' : 'none';
-    if (at) el.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px) translate(-50%, -50%)`;
+    el.style.display = on ? '' : 'none';
+    if (on) el.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px) translate(-50%, -50%)`;
   }
 
   update(dt: number): void {

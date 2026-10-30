@@ -46,6 +46,7 @@ import {
 import { UnitGlyph } from '../glyphs';
 import { loadLibrary, type Library } from './assets';
 import type { BattleRequest } from './battle';
+import { HapticTick } from './haptics';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
 import { BattleStage, type Overlay } from './stage';
 import { classOf, health } from './units';
@@ -73,6 +74,8 @@ declare global {
       overlay: () => ReturnType<BattleStage['overlayCounts']> | null;
       /** The film's queue (steps waiting, action cam, clock). */
       film: () => ReturnType<BattleStage['filmState']> | null;
+      /** The field's palette and outlines. */
+      look: () => ReturnType<BattleStage['lookState']> | null;
     };
   }
 }
@@ -283,7 +286,7 @@ function Strength({ label, value, mark, side }: { label: string; value: number; 
         <span className="text-white tabular-nums">{Math.round(value * 100)}%</span>
       </div>
       <div className="relative mt-0.5 h-1.5 rounded-full bg-white/15">
-        <div className={`h-full rounded-full transition-[width] duration-500 ${side === 'blue' ? 'bg-[#9cc6ee]' : 'bg-[#e0705e]'}`} style={{ width: `${Math.min(100, value * 100)}%` }} />
+        <div className={`h-full rounded-full transition-[width] duration-500 ${side === 'blue' ? 'arena-bar-blue' : 'arena-bar-red'}`} style={{ width: `${Math.min(100, value * 100)}%` }} />
         <div className="absolute -top-0.5 h-2.5 w-0.5 rounded bg-white" style={{ left: `${mark * 100}%` }} title={side === 'blue' ? 'You break here' : 'They pull back here'} />
       </div>
     </div>
@@ -555,7 +558,6 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     let raf = 0;
     let ended = 0;
     let wasBusy = true;
-    const el = host.current!;
     const battle = createBattle(req.setup);
     battleRef.current = battle;
     // The Apache and the props when they load in time; the battle is built in code either way.
@@ -586,12 +588,18 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           console.warn('battle frame failed; the film is put right', e);
           stage.recover();
         }
-        // Odds labels ride over their targets as the camera moves.
-        const box = el.getBoundingClientRect();
+        // Odds labels ride over their targets, just above the badge, as the camera moves: on the
+        // field's own layer (the same box as the host), written only when they move, with no layout
+        // read in the frame.
         for (const n of labelsRef.current?.children ?? []) {
-          const [x, y] = (n as HTMLElement).dataset.at!.split(',').map(Number);
-          const at = stage.toScreen(x!, y!, 0.7);
-          (n as HTMLElement).style.transform = `translate(${at.x - box.left}px, ${at.y - box.top}px) translate(-50%, -100%)`;
+          const l = n as HTMLElement;
+          const [x, y] = l.dataset.at!.split(',').map(Number);
+          const at = stage.oddsPoint(l.dataset.unit!) ?? stage.layerPoint(x!, y!, 0.7);
+          const t = at ? `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px) translate(-50%, -100%)` : 'hidden';
+          if (l.dataset.t === t) continue;
+          l.dataset.t = t;
+          l.style.visibility = at ? '' : 'hidden';
+          if (at) l.style.transform = t;
         }
         const b = stage.busy;
         if (!b && waitingRef.current) {
@@ -645,6 +653,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         perf: (reset) => stageRef.current?.perf(reset) ?? null,
         overlay: () => stageRef.current?.overlayCounts() ?? null,
         film: () => stageRef.current?.filmState() ?? null,
+        look: () => stageRef.current?.lookState() ?? null,
       };
     });
     const onResize = () => stageRef.current?.resize();
@@ -943,6 +952,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     flush();
   };
 
+  // The selected unit and the target in the shot card wear an outline on the field.
+  useEffect(() => stageRef.current?.setOutline(myTurn ? selected : null, myTurn && card?.kind === 'fire' ? card.target : null), [ready, myTurn, selected, card]);
+
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -963,6 +975,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const changeSettings = (next: ArenaSettings) => {
     setSettings(next);
     writeSettings(next);
+    if (next.palette !== settings.palette) stageRef.current?.setPalette(next.palette);
     const bb = battleRef.current;
     if (next.quality !== settings.quality && bb) {
       // Rebuild the scene at the new quality from the battle as it stands.
@@ -970,6 +983,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       const s = buildStage(bb, libRef.current, next.quality);
       s.resync();
       if (thermal) s.setThermal(true);
+      s.setOutline(myTurn ? selected : null, myTurn && card?.kind === 'fire' ? card.target : null);
     }
   };
 
@@ -1032,7 +1046,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const hiddenActions = ranked.length - shownActions.length;
 
   return (
-    <div className="absolute inset-0 bg-ink-950" data-testid="arena">
+    <div className="absolute inset-0 bg-ink-950" data-testid="arena" data-palette={settings.palette}>
       <div ref={host} className="absolute inset-0" onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onPointerMove={onPointerMove} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()} />
       {!ready && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -1041,7 +1055,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       )}
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 z-10">
         {labels.map((l) => (
-          <div key={l.id} data-at={`${l.x},${l.y}`} className={`absolute top-0 left-0 rounded-md px-1.5 py-0.5 text-[13px] font-bold tabular-nums shadow ${card?.kind === 'fire' && card.target === l.id ? 'bg-white text-black' : 'bg-black/85 text-white'}`} data-testid={`odds-${l.id}`}>
+          <div key={l.id} data-at={`${l.x},${l.y}`} data-unit={l.id} className={`arena-odds absolute top-0 left-0 rounded-md px-1.5 pt-0.5 pb-1 text-[13px] font-bold tabular-nums ${card?.kind === 'fire' && card.target === l.id ? 'bg-white text-black' : 'bg-black/85 text-white'}`} data-testid={`odds-${l.id}`}>
             {l.chance}%
           </div>
         ))}
@@ -1121,7 +1135,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         <div className="safe-top pointer-events-none absolute inset-x-0 top-0 z-10" data-testid="arena-feed">
           <div className="mt-[124px] flex flex-col items-center gap-1 px-4">
             {feed.map((f) => (
-              <div key={f.id} className={`feed-in max-w-full truncate rounded-full bg-black/85 px-3.5 py-1.5 text-[14px] font-semibold ${f.tone === 'bad' ? 'text-[#ffb4a8]' : 'text-white'}`}>
+              <div key={f.id} data-tone={f.tone} className={`arena-tone feed-in max-w-full truncate rounded-full bg-black/85 px-3.5 py-1.5 text-[14px] font-semibold ${f.tone === 'bad' ? 'text-[#ffb4a8]' : 'text-white'}`}>
                 {f.text}
               </div>
             ))}
@@ -1201,7 +1215,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 </button>
                 <button
                   type="button"
-                  className="v-btn v-btn-primary h-11 flex-[1.6] text-[15px] font-semibold"
+                  className="v-btn v-btn-primary relative h-11 flex-[1.6] text-[15px] font-semibold"
                   data-testid="arena-fire"
                   onClick={() => {
                     if (card.kind === 'fire' && me) doAct({ type: 'fire', unit: me.id, target: card.target, weapon: card.weapon }, false);
@@ -1210,6 +1224,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                   }}
                 >
                   Fire
+                  <HapticTick on={settings.haptics} />
                 </button>
               </div>
             </div>
@@ -1316,7 +1331,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 Undo
               </button>
             )}
-            <button type="button" disabled={!myTurn} onClick={() => (readyCount > 0 ? setConfirmEnd(true) : finishTurn())} className={`v-btn h-[58px] shrink-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">
+            <button type="button" disabled={!myTurn} onClick={() => (readyCount > 0 ? setConfirmEnd(true) : finishTurn())} className={`v-btn relative h-[58px] shrink-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">
               {waiting && ready ? 'Enemy Turn' : readyCount ? (
                 <>
                   End Turn
@@ -1326,6 +1341,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               ) : (
                 'End Turn'
               )}
+              <HapticTick on={settings.haptics && myTurn} />
             </button>
           </div>
         </div>

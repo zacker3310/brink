@@ -774,12 +774,34 @@ aside[data-testid^='panel-'] section:first-of-type > header {
 }
 
 /* Battle field layer: unit badges, words over targets, place labels (apps/web/src/arena/hud.ts).
-   Badges carry the APP-6 affiliation: friendly light blue, hostile red. */
+   Badges carry the APP-6 affiliation by shape and colour: friendly rounded, hostile angled. */
+/* Friend and foe in the battle (APP-6 affiliation, not decoration). The battle's root sets
+   data-palette; the colour-blind pair is Okabe-Ito blue and orange. Fills carry their ink at 4.5:1
+   or better. The 3D field follows the same setting through arena/palette.ts. */
+:root {
+  --arena-friend: #9cc6ee;
+  --arena-friend-ink: #0b1220;
+  --arena-friend-bar: #9cc6ee;
+  --arena-foe: #c8473a;
+  --arena-foe-ink: #ffffff;
+  --arena-foe-bar: #e0705e;
+}
+[data-palette='colourblind'] {
+  --arena-friend: #0072b2;
+  --arena-friend-ink: #ffffff;
+  --arena-friend-bar: #56b4e9;
+  --arena-foe: #e69f00;
+  --arena-foe-ink: #000000;
+  --arena-foe-bar: #e69f00;
+}
+/* One composited layer for every badge, arrow and label (each badge as its own layer costs a GPU
+   texture apiece on a phone). */
 .arena-hud {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  will-change: transform;
 }
 .arena-badge {
   position: absolute;
@@ -791,14 +813,67 @@ aside[data-testid^='panel-'] section:first-of-type > header {
   height: 20px;
   padding: 0 5px 0 4px;
   border-radius: 6px;
-  background: #9cc6ee;
-  color: #0b1220;
+  background: var(--arena-friend);
+  color: var(--arena-friend-ink);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
-  will-change: transform;
 }
+/* Hostile: an angled frame, pointed at both ends (the APP-6 diamond, stretched to fit a badge),
+   drawn under the content with a dark keyline where the friendly badge has its shadow. */
 .arena-badge[data-side='red'] {
-  background: #c8473a;
-  color: #ffffff;
+  padding: 0 9px 0 8px;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--arena-foe-ink);
+}
+.arena-badge[data-side='red']::before,
+.arena-badge[data-side='red']::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 7px 100%, 0 50%);
+}
+.arena-badge[data-side='red']::before {
+  inset: -1.5px -2px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.arena-badge[data-side='red']::after {
+  inset: 0;
+  background: var(--arena-foe);
+}
+.arena-badge.is-compact[data-side='red'] {
+  padding: 0 6px;
+}
+.arena-badge.is-compact[data-side='red']::before,
+.arena-badge.is-compact[data-side='red']::after {
+  clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 5px 100%, 0 50%);
+}
+/* Badges merged into this one (crowded, zoomed out). */
+.arena-badge-count {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.arena-badge-count:empty {
+  display: none;
+}
+.arena-badge.is-compact .arena-badge-count {
+  top: -8px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
 }
 .arena-badge-glyph {
   display: inline-flex;
@@ -872,6 +947,27 @@ aside[data-testid^='panel-'] section:first-of-type > header {
 .arena-callout[data-tone='bad'] {
   color: #ffb4a8;
 }
+/* Gains and losses carry a sign, not only a colour: up when it happened to them, down when to you. */
+.arena-callout[data-tone='good']::before,
+.arena-callout[data-tone='bad']::before,
+.arena-tone[data-tone='good']::before,
+.arena-tone[data-tone='bad']::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 8px;
+  margin-right: 6px;
+  vertical-align: 1px;
+  background: currentColor;
+}
+.arena-callout[data-tone='good']::before,
+.arena-tone[data-tone='good']::before {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.arena-callout[data-tone='bad']::before,
+.arena-tone[data-tone='bad']::before {
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
 .arena-callout[data-tone='plain'] {
   font-size: 14px;
   font-weight: 700;
@@ -907,13 +1003,21 @@ aside[data-testid^='panel-'] section:first-of-type > header {
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: 999px;
-  background: #c8473a;
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  color: var(--arena-foe-ink);
   pointer-events: auto;
 }
+/* A hostile diamond inside the 44 pt target, so the arrow says "enemy" by shape too. */
+.arena-pointer::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 5px;
+  background: var(--arena-foe);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transform: rotate(45deg);
+}
 .arena-pointer-arrow {
+  position: relative;
   display: inline-flex;
   width: 20px;
   height: 20px;
@@ -924,8 +1028,8 @@ aside[data-testid^='panel-'] section:first-of-type > header {
 }
 .arena-pointer-count {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -2px;
+  right: -2px;
   min-width: 20px;
   height: 20px;
   padding: 0 5px;
@@ -939,4 +1043,23 @@ aside[data-testid^='panel-'] section:first-of-type > header {
 }
 .arena-pointer-count:empty {
   display: none;
+}
+/* Odds over a target: a hostile tab under the number, in the foe colour. */
+.arena-odds {
+  box-shadow:
+    inset 0 -3px 0 var(--arena-foe),
+    0 1px 3px rgba(0, 0, 0, 0.55);
+}
+/* The strength bars. */
+.arena-bar-blue {
+  background: var(--arena-friend-bar);
+}
+.arena-bar-red {
+  background: var(--arena-foe-bar);
+}
+/* The label laid over Fire and End Turn for the haptic tick (arena/haptics.tsx). */
+.arena-tick {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
 }

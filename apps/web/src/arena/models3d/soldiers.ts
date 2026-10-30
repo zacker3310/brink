@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { METRE } from '../quality';
 import type { SoldierKit } from './dims';
 import { convex, creaseNormals, cyl, lathe, loft, superellipse, type V3 } from './kit';
+import { HULL_ORDER, hullColor, hullOf, SOLDIER_HULL, stencilled, type OutlineRole } from './outline';
+import { RIM_TERM, rimUniforms } from './rim';
 
 // Soldiers as articulated figures, every body part one instanced mesh for the whole battle (head and
 // helmet, torso with plate carrier, pack, upper and lower arms, upper and lower legs, and a mesh per
@@ -319,7 +321,7 @@ vec3 emr(vec3 p) {
 `;
 
 const FRAG_COLOUR = /* glsl */ `
-  float east = vLook.x;
+  float east = mod(vLook.x, 2.0);
   int s = int(vSlot + 0.5);
   vec3 col;
   vec3 camo = east > 0.5 ? emr(vLocal) : ocp(vLocal);
@@ -336,9 +338,17 @@ const FRAG_COLOUR = /* glsl */ `
   diffuseColor.rgb *= col;
 `;
 
+/** look.x is east (0, 1) plus twice the side (0 none, 1 blue, 2 red): the side picks the rim's colour. */
+const FRAG_RIM = /* glsl */ `
+  float team = floor(vLook.x * 0.5 + 0.25);
+  if (team > 0.5) outgoingLight += (team > 1.5 ? rimRed : rimBlue) * (rimStrength * ${RIM_TERM});
+  #include <opaque_fragment>`;
+
 function soldierMaterial(): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 });
+  const rim = rimUniforms();
   m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, rim);
     sh.vertexShader = VERT + sh.vertexShader.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
@@ -347,10 +357,10 @@ function soldierMaterial(): THREE.MeshStandardMaterial {
       vLook = look;
       vLocal = position;`,
     );
-    sh.fragmentShader = FRAG + sh.fragmentShader.replace('#include <map_fragment>', FRAG_COLOUR);
+    sh.fragmentShader = 'uniform vec3 rimBlue;\nuniform vec3 rimRed;\nuniform float rimStrength;\n' + FRAG + sh.fragmentShader.replace('#include <map_fragment>', FRAG_COLOUR).replace('#include <opaque_fragment>', FRAG_RIM);
   };
-  m.customProgramCacheKey = () => 'brink-soldier-1';
-  return m;
+  m.customProgramCacheKey = () => 'brink-soldier-2';
+  return stencilled(m);
 }
 
 /** Shadow pass: hide the unused weapon variants there too. */
@@ -653,6 +663,8 @@ function segment(from: THREE.Vector3, to: THREE.Vector3, hint: THREE.Vector3, ou
 interface Soldier {
   id: string;
   east: boolean;
+  /** 0 no side, 1 blue, 2 red: the rim light's colour. */
+  team: number;
   kit: KitDef;
   x: number;
   y: number;
@@ -690,6 +702,9 @@ export class SoldierCrowd {
   private readonly depth = depthMaterial();
   private readonly tris: Record<PartName, number>;
   private looksDirty = true;
+  /** Soldiers wearing an outline (the selected squad, the target), and the hull meshes drawing it. */
+  private readonly outlined = new Map<string, OutlineRole>();
+  private readonly hulls = new Map<PartName, THREE.InstancedMesh>();
   private readonly sa = new Float32Array(P.size);
   private readonly sb = new Float32Array(P.size);
 
@@ -734,7 +749,7 @@ export class SoldierCrowd {
   }
 
   /** `facing` is a yaw like Object3D.rotation.y: 0 faces +z. Position in world units. */
-  add(id: string, faction: 'west' | 'east', kit: SoldierKit, x: number, z: number, facing: number): void {
+  add(id: string, faction: 'west' | 'east', kit: SoldierKit, x: number, z: number, facing: number, side?: 'blue' | 'red'): void {
     if (this.byId.has(id) || this.soldiers.length >= this.max) return;
     let h = 2166136261;
     for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
@@ -742,6 +757,7 @@ export class SoldierCrowd {
     const s: Soldier = {
       id,
       east: faction === 'east',
+      team: side === 'blue' ? 1 : side === 'red' ? 2 : 0,
       kit: KITS[kit],
       x,
       y: 0,
@@ -817,9 +833,10 @@ export class SoldierCrowd {
     const look = (name: PartName, idx: number, s: Soldier, variant: number) => {
       if (!this.looksDirty && name !== 'tube' && name !== 'heavy') return;
       const attr = this.meshes.get(name)!.geometry.attributes.look as THREE.InstancedBufferAttribute;
-      attr.setXYZW(idx, s.east ? 1 : 0, s.shade, s.skin, variant);
+      attr.setXYZW(idx, (s.east ? 1 : 0) + 2 * s.team, s.shade, s.skin, variant);
       attr.needsUpdate = true;
     };
+    const hullCounts = this.outlined.size ? new Map<PartName, number>() : null;
     const put = (name: PartName, m: THREE.Matrix4, s: Soldier, variant = 0) => {
       const mesh = this.meshes.get(name)!;
       const i = counts.get(name)!;
@@ -827,6 +844,8 @@ export class SoldierCrowd {
       mesh.setMatrixAt(i, part);
       look(name, i, s, variant);
       counts.set(name, i + 1);
+      const role = hullCounts && this.outlined.get(s.id);
+      if (role) this.hullAt(name, hullCounts!, part, variant, role);
     };
 
     for (const s of this.soldiers) {
@@ -900,7 +919,61 @@ export class SoldierCrowd {
       mesh.instanceMatrix.needsUpdate = true;
       mesh.visible = mesh.count > 0;
     }
+    for (const [name, hull] of this.hulls) {
+      hull.count = hullCounts?.get(name) ?? 0;
+      hull.visible = hull.count > 0;
+      if (hull.count) {
+        hull.instanceMatrix.needsUpdate = true;
+        hull.geometry.attributes.look!.needsUpdate = true;
+        if (hull.instanceColor) hull.instanceColor.needsUpdate = true;
+      }
+    }
     this.looksDirty = false;
+  }
+
+  /** Outline these soldiers (a squad) in a role's colour, or take theirs off (null). */
+  outline(ids: readonly string[], role: OutlineRole | null): void {
+    for (const id of ids) {
+      if (role) this.outlined.set(id, role);
+      else this.outlined.delete(id);
+    }
+    if (role && !this.hulls.size) this.buildHulls();
+  }
+
+  /** One hull mesh per part, sharing the part's buffers, for up to a few squads at once. */
+  private buildHulls(): void {
+    const room = 24;
+    for (const [name, mesh] of this.meshes) {
+      const per = name === 'uarm' || name === 'larm' || name === 'uleg' || name === 'lleg' ? 2 : 1;
+      // The part's buffers and smoothed normals, with looks of its own (only the weapon variant is read).
+      const base = hullOf(mesh.geometry, ['vari']);
+      const g = new THREE.BufferGeometry();
+      for (const [k, attr] of Object.entries(base.attributes)) g.setAttribute(k, attr);
+      g.setIndex(base.index);
+      g.setAttribute('look', new THREE.InstancedBufferAttribute(new Float32Array(room * per * 4), 4));
+      const hull = new THREE.InstancedMesh(g, SOLDIER_HULL, room * per);
+      hull.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      hull.setColorAt(0, hullColor('selected'));
+      hull.count = 0;
+      hull.visible = false;
+      hull.frustumCulled = false;
+      hull.name = 'outline';
+      hull.renderOrder = HULL_ORDER;
+      this.hulls.set(name, hull);
+      this.group.add(hull);
+    }
+  }
+
+  private hullAt(name: PartName, counts: Map<PartName, number>, m: THREE.Matrix4, variant: number, role: OutlineRole): void {
+    const hull = this.hulls.get(name);
+    if (!hull) return;
+    const i = counts.get(name) ?? 0;
+    if (i >= hull.instanceMatrix.count) return;
+    hull.setMatrixAt(i, m);
+    (hull.geometry.attributes.look as THREE.InstancedBufferAttribute).setW(i, variant);
+    // One material for both roles: the colour rides on the instance (the target's follows the palette).
+    hull.setColorAt(i, hullColor(role));
+    counts.set(name, i + 1);
   }
 
   dispose(): void {
@@ -910,6 +983,10 @@ export class SoldierCrowd {
     }
     this.material.dispose();
     this.depth.dispose();
+    for (const h of this.hulls.values()) {
+      h.geometry.dispose();
+      h.dispose();
+    }
     this.group.removeFromParent();
   }
 }

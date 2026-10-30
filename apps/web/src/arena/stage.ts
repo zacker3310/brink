@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { H, W, typeOf, type Battle, type BattleEvent, type Effect, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
 import { BattleAudio } from './audio';
 import { Effects } from './fx';
-import { buildModel, buildProjectile, kitFor, paintFor, SoldierCrowd, type UnitModel } from './models3d';
-import { LEVEL, METRE, QUALITY, type ArenaSettings, type Quality } from './quality';
+import { buildModel, buildProjectile, kitFor, paintFor, rimOff, setOutline, setOutlineView, setRimLight, SoldierCrowd, stencilled, type OutlineRole, type UnitModel } from './models3d';
+import { palette, setPalette, teamColor, teamMaterial } from './palette';
+import { LEVEL, METRE, QUALITY, type ArenaSettings, type Palette, type Quality } from './quality';
 import { buildWorld, thermalMaterialFor, type World } from './world';
 import type { Library } from './assets';
 import { FieldHud, type BadgeState, type EdgePointer, type Tone } from './hud';
@@ -111,8 +112,10 @@ const yawOf = (facing: number) => Math.PI / 2 - facing;
 /** Main rotor blades and rpm, for the blade slap. */
 const ROTOR: Partial<Record<TypeId, [number, number]>> = { ah64e: [4, 289], ka52: [3, 257], mi35: [5, 240], ah6: [6, 475], uh60: [4, 258], mi8: [5, 192] };
 
-const BLUE_RING = 0x7fb2e5;
-const RED_RING = 0xe0705e;
+/** Friend and foe in the field: shared colours that follow the palette setting (palette.ts). Wear them
+ *  with `teamMaterial(side, ...)` or by assigning `material.color = BLUE_RING`, never by copying. */
+const BLUE_RING = teamColor('blue');
+const RED_RING = teamColor('red');
 
 /** Where each soldier of a unit stands in its cell: a loose wedge facing its heading. */
 function slot(i: number, n: number, facing: number, spread: number): [number, number] {
@@ -196,6 +199,11 @@ export class BattleStage {
   private contact = false;
   /** Who last fired at each unit, for the kill feed. */
   private readonly lastShooter = new Map<string, string>();
+  /** The host's size in CSS pixels, read on resize only (never in the frame). */
+  private size = { w: 1, h: 1 };
+  /** The selected unit and the target in the shot card, outlined. */
+  private outlined: [string | null, string | null] = [null, null];
+  private readonly scratch = new THREE.Vector3();
 
   constructor(
     private readonly host: HTMLElement,
@@ -203,7 +211,10 @@ export class BattleStage {
     private readonly opts: StageOptions,
   ) {
     this.preset = QUALITY[opts.quality];
-    this.renderer = new THREE.WebGLRenderer({ antialias: this.preset.antialias, powerPreference: 'high-performance' });
+    setPalette(opts.settings.palette);
+    setRimLight(battle.conditions.time);
+    // A stencil keeps the selection outline to the unit's edge (models3d/outline.ts).
+    this.renderer = new THREE.WebGLRenderer({ antialias: this.preset.antialias, powerPreference: 'high-performance', stencil: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio));
     this.renderer.shadowMap.enabled = this.preset.shadowMap > 0;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -232,8 +243,10 @@ export class BattleStage {
     this.audio.ambience(battle.conditions.biome, battle.conditions.weather);
 
     const tileGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-    const tile = (color: number, opacity: number, n: number) => {
-      const m = new THREE.InstancedMesh(tileGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }), n);
+    const tile = (color: THREE.Color, opacity: number, n: number) => {
+      const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity, depthWrite: false });
+      mat.color = color;
+      const m = new THREE.InstancedMesh(tileGeo, mat, n);
       m.count = 0;
       m.renderOrder = 2;
       m.frustumCulled = false;
@@ -244,13 +257,13 @@ export class BattleStage {
     this.dashTiles = tile(BLUE_RING, 0.1, W * H);
     this.areaTiles = tile(RED_RING, 0.55, 49);
     const ringGeo = new THREE.RingGeometry(0.42, 0.5, 40).rotateX(-Math.PI / 2);
-    this.targetRings = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.95, depthWrite: false }), 40);
+    this.targetRings = new THREE.InstancedMesh(ringGeo, teamMaterial('red', { transparent: true, opacity: 0.95, depthWrite: false }), 40);
     this.targetRings.count = 0;
     this.targetRings.renderOrder = 3;
     this.targetRings.frustumCulled = false;
     this.scene.add(this.targetRings);
     const ghostGeo = new THREE.RingGeometry(0.28, 0.34, 4, 1).rotateX(-Math.PI / 2).rotateY(Math.PI / 4);
-    this.ghostMarks = new THREE.InstancedMesh(ghostGeo, new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.6, depthWrite: false }), 64);
+    this.ghostMarks = new THREE.InstancedMesh(ghostGeo, teamMaterial('red', { transparent: true, opacity: 0.6, depthWrite: false }), 64);
     this.ghostMarks.count = 0;
     this.ghostMarks.renderOrder = 3;
     this.ghostMarks.frustumCulled = false;
@@ -272,8 +285,8 @@ export class BattleStage {
       const r = Math.max(3, Math.min(9, Math.max(...spawn.map((p) => Math.hypot(p.x + 0.5 - ax, p.y + 0.5 - az))) * 0.8));
       this.enemyAt = { x: ax, z: az, r };
       this.enemyMark = new THREE.Group();
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.12, r, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.75, depthWrite: false, depthTest: false }));
-      const fill = new THREE.Mesh(new THREE.CircleGeometry(r, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: RED_RING, transparent: true, opacity: 0.1, depthWrite: false, depthTest: false }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.12, r, 96).rotateX(-Math.PI / 2), teamMaterial('red', { transparent: true, opacity: 0.75, depthWrite: false, depthTest: false }));
+      const fill = new THREE.Mesh(new THREE.CircleGeometry(r, 96).rotateX(-Math.PI / 2), teamMaterial('red', { transparent: true, opacity: 0.1, depthWrite: false, depthTest: false }));
       ring.renderOrder = fill.renderOrder = 2;
       this.enemyMark.add(fill, ring);
       this.enemyMark.position.set(ax, this.ground(ax, az) + 0.3, az);
@@ -315,7 +328,7 @@ export class BattleStage {
     const holder = new THREE.Group();
     this.scene.add(holder);
     const big = t.mobility !== 'foot';
-    const ring = new THREE.Mesh(new THREE.RingGeometry(big ? 0.6 : 0.42, big ? 0.66 : 0.48, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: u.side === 'blue' ? BLUE_RING : RED_RING, transparent: true, opacity: 0.55, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(big ? 0.6 : 0.42, big ? 0.66 : 0.48, 40).rotateX(-Math.PI / 2), teamMaterial(u.side, { transparent: true, opacity: 0.55, depthWrite: false }));
     ring.position.y = 0.03;
     ring.renderOrder = 1;
     holder.add(ring);
@@ -326,7 +339,7 @@ export class BattleStage {
         if (m.state === 'dead') return;
         const id = `${u.id}#${i}`;
         const [ox, oz] = slot(i, u.men.length, u.facing, SPREAD);
-        this.crowd.add(id, faction, kitFor(u.type, m.role), v.x + ox, v.z + oz, yawOf(u.facing));
+        this.crowd.add(id, faction, kitFor(u.type, m.role), v.x + ox, v.z + oz, yawOf(u.facing), u.side);
         v.men.push(id);
       });
     } else {
@@ -341,7 +354,7 @@ export class BattleStage {
   }
 
   private makeModel(type: TypeId, side: Side, lod: 0 | 1): UnitModel {
-    const m = buildModel(type, { paint: this.paint(side), lod, ...(this.opts.lib && type === 'ah64e' ? { apache: this.opts.lib.heli } : {}) });
+    const m = buildModel(type, { paint: this.paint(side), lod, side, ...(this.opts.lib && type === 'ah64e' ? { apache: this.opts.lib.heli } : {}) });
     m.root.scale.multiplyScalar(VEHICLE_SCALE);
     return m;
   }
@@ -359,6 +372,7 @@ export class BattleStage {
     v.lod = lod;
     v.holder.add(v.models[lod]!.root);
     if (this.thermal) this.thermalUnit(v, true);
+    this.outlineView(v);
   }
 
   private setShown(v: View, on: boolean): void {
@@ -407,6 +421,9 @@ export class BattleStage {
   resize(): void {
     const w = this.host.clientWidth || 1;
     const h = this.host.clientHeight || 1;
+    this.size = { w, h };
+    this.hudLayer.resize(w, h);
+    setOutlineView(w, h);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -658,13 +675,59 @@ export class BattleStage {
     return this.toScreen(v.x - 0.5, v.z - 0.5, this.headOf(v));
   }
 
-  /** A world point on the HUD layer (CSS pixels from the canvas corner), or null behind the camera. */
+  /** A world point on the HUD layer (CSS pixels from the canvas corner), or null behind the camera.
+   *  The size is the one cached on resize: no layout is read in the frame. */
   private onLayer(x: number, y: number, z: number): { x: number; y: number } | null {
-    const p = new THREE.Vector3(x, y, z).project(this.camera);
+    const p = this.scratch.set(x, y, z).project(this.camera);
     if (p.z > 1 || p.z < -1) return null;
-    const w = this.host.clientWidth;
-    const h = this.host.clientHeight;
-    return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h };
+    return { x: ((p.x + 1) / 2) * this.size.w, y: ((1 - p.y) / 2) * this.size.h };
+  }
+
+  /** A cell's centre `h` above the ground on the HUD layer, or null behind the camera. */
+  layerPoint(x: number, y: number, h = 0): { x: number; y: number } | null {
+    return this.onLayer(x + 0.5, this.ground(x + 0.5, y + 0.5) + h, y + 0.5);
+  }
+
+  /** Where a unit's odds label sits on the HUD layer: just above its badge, or null when not drawn. */
+  oddsPoint(id: string): { x: number; y: number } | null {
+    const v = this.views.get(id);
+    if (!v || !v.alive || !v.holder.visible) return null;
+    const p = this.badgePoint(v);
+    return p ? { x: p.x, y: p.y - (this.zoom > 0.55 ? 16 : 20) - 3 } : null;
+  }
+
+  // --- Palette and outline ---------------------------------------------------------------------------
+
+  /** Friend and foe colours for the field (the DOM layers follow `data-palette` on their own). */
+  setPalette(p: Palette): void {
+    setPalette(p);
+  }
+
+  /** Outline the selected unit and the target in the shot card (null for none). */
+  setOutline(selected: string | null, target: string | null): void {
+    const was = this.outlined;
+    this.outlined = [selected, target];
+    for (const id of new Set([...was, selected, target])) {
+      const v = id ? this.views.get(id) : undefined;
+      if (v) this.outlineView(v);
+    }
+  }
+
+  /** What the field wears now, for tests: the palette, who is outlined, and the hull meshes drawn. */
+  lookState(): { palette: Palette; selected: string | null; target: string | null; hulls: number } {
+    let hulls = 0;
+    this.scene.traverseVisible((o) => {
+      if (o.name !== 'outline') return;
+      const inst = o as THREE.InstancedMesh;
+      if (!inst.isInstancedMesh || inst.count > 0) hulls++;
+    });
+    return { palette: palette(), selected: this.outlined[0], target: this.outlined[1], hulls };
+  }
+
+  private outlineView(v: View): void {
+    const role: OutlineRole | null = v.id === this.outlined[0] ? 'selected' : v.id === this.outlined[1] ? 'target' : null;
+    for (const m of v.models) if (m) setOutline(m.root, m === this.model(v) ? role : null);
+    if (v.men.length) this.crowd.outline(v.men, role);
   }
 
   // --- Overlay -------------------------------------------------------------------------------------
@@ -865,8 +928,7 @@ export class BattleStage {
    * expected), as arrows clamped inside the band between the HUD bars.
    */
   private edgePointers(): EdgePointer[] {
-    const w = this.host.clientWidth;
-    const h = this.host.clientHeight;
+    const { w, h } = this.size;
     const top = this.hud[0] * h + 34;
     const bottom = (1 - this.hud[1]) * h - 34;
     const left = 30;
@@ -875,7 +937,7 @@ export class BattleStage {
     const cy = (top + bottom) / 2;
     const out: (EdgePointer & { d: number })[] = [];
     const consider = (id: string, label: string, x: number, y: number, z: number) => {
-      const p = new THREE.Vector3(x, y, z).project(this.camera);
+      const p = this.scratch.set(x, y, z).project(this.camera);
       let sx = ((p.x + 1) / 2) * w;
       let sy = ((1 - p.y) / 2) * h;
       if (p.z > 1) {
@@ -965,12 +1027,13 @@ export class BattleStage {
     }
     m.root.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
+      // The outline keeps its own material in the thermal view.
+      if (!mesh.isMesh || o.name === 'outline') return;
       if (on) {
         if (!this.saved.has(mesh)) this.saved.set(mesh, mesh.material);
         let level = v.wreck ? 0.8 : 0.45;
         for (let p: THREE.Object3D | null = mesh; p; p = p.parent) if (hot.has(p)) level = Math.max(level, hot.get(p)!);
-        mesh.material = thermalMaterialFor(level);
+        mesh.material = stencilled(thermalMaterialFor(level));
       } else if (this.saved.has(mesh)) {
         mesh.material = this.saved.get(mesh)!;
         this.saved.delete(mesh);
@@ -1487,6 +1550,7 @@ export class BattleStage {
     v.wreck = true;
     const m = this.model(v);
     if (!m) return;
+    rimOff(m.paint);
     for (const mat of m.paint) {
       const s = mat as THREE.MeshStandardMaterial;
       if (s.color) s.color.multiplyScalar(0.28);
@@ -1508,9 +1572,10 @@ export class BattleStage {
         const fit = live.filter(({ m }) => m.state === 'fit').map(({ i }) => `${u.id}#${i}`);
         // Soldiers that left this unit (a split) move to the other half.
         for (const id of v.men) if (!fit.includes(id)) this.crowd.remove(id);
-        for (const id of fit) if (!v.men.includes(id)) this.crowd.add(id, v.t.faction, kitFor(u.type, u.men[Number(id.split('#')[1])]!.role), v.x, v.z, yawOf(v.facing));
+        for (const id of fit) if (!v.men.includes(id)) this.crowd.add(id, v.t.faction, kitFor(u.type, u.men[Number(id.split('#')[1])]!.role), v.x, v.z, yawOf(v.facing), u.side);
         v.men = fit;
         v.type = u.type;
+        this.outlineView(v);
       }
       v.x = u.x + 0.5;
       v.z = u.y + 0.5;

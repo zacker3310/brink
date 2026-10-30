@@ -30,5 +30,7 @@ interface Window {
     perf(reset?: boolean): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
     /** What the field overlay shows now: the selected unit, its move and dash cells, its targets. */
     overlay(): { selected: string | null; reach: number; dash: number; targets: number } | null;
+    /** The field's palette, who wears an outline, and how many hull meshes are drawn. */
+    look(): { palette: 'standard' | 'colourblind'; selected: string | null; target: string | null; hulls: number } | null;
   };
 }
