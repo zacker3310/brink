@@ -639,16 +639,6 @@ export class BattleStage {
     this.wantTilt = Math.max(THREE.MathUtils.degToRad(28), Math.min(THREE.MathUtils.degToRad(82), this.wantTilt + tilt));
   }
 
-  /**
-   * Turn the view with two fingers: the map turns the way the fingers turn (as in Apple Maps), and at
-   * once, so it stays under them. `radians` is the fingers' turn on screen, clockwise positive.
-   */
-  twistBy(radians: number): void {
-    this.wantYaw = wrap(this.wantYaw + radians);
-    this.yaw = this.wantYaw;
-    this.before = null;
-  }
-
   /** The whole field from above, or (on) back to where the player was; returns whether it is on. */
   toggleOverview(): boolean {
     if (this.before) {
