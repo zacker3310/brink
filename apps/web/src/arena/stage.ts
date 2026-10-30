@@ -1782,7 +1782,8 @@ export class BattleStage {
     for (const f of fires) if (f.target) this.lastShooter.set(f.target, f.unit);
     const shots = fires.map((f) => {
       const v = this.views.get(f.unit);
-      return { f, v, shown: !!v && (v.side === 'blue' || f.seen) };
+      // The shooter is shown only when blue sees it (the shot itself may be seen from the target's end).
+      return { f, v, shown: !!v && (v.side === 'blue' || f.shooterSeen) };
     });
     const offMap = !shots[0]!.v;
     const kind = e.kind;
@@ -1844,13 +1845,14 @@ export class BattleStage {
           if (!shots.some((s) => s.shown) && target && target.side === 'blue') this.show(clip, target.x, target.z, true);
           for (const s of shots) {
             const v = s.v;
-            const from = v ? this.muzzleOf(v) : this.worldOf(s.f.from, 8);
+            // From a shooter out of sight the round comes in from its direction, not from where it is.
+            const from = v && s.shown ? this.muzzleOf(v) : v ? this.inbound(to, s.f.from, kind) : this.worldOf(s.f.from, 8);
             if (s.shown && v) {
               this.fx.muzzle(from, to.clone().sub(from).normalize(), s.f.calibre);
               if (foot(v)) this.posePeople(v, 'fire');
               v.flash = Math.max(v.flash, 0.15);
             }
-            if (s.shown || offMap || shownTo) this.audio.shot(s.f.calibre, (v?.x ?? to.x) - 0.5, (v?.z ?? to.z) - 0.5, { night: this.night });
+            if (s.shown || offMap || shownTo) this.audio.shot(s.f.calibre, (s.shown && v ? v.x : from.x) - 0.5, (s.shown && v ? v.z : from.z) - 0.5, { night: this.night });
             if (!s.shown && !shownTo && !offMap) continue;
             if (kind === 'atgm' || kind === 'manpads') this.fx.missile(from, to, kind === 'manpads' ? 'manpads' : s.f.weapon.toLowerCase().includes('hellfire') ? 'hellfire' : 'atgm', flight, { top: !!typeOf(v?.type ?? 'm1a2').weapons.find((w) => w.id === s.f.weapon)?.top });
             else if (kind === 'rocket') this.fx.missile(from, to, 'rocket', flight);
@@ -1875,6 +1877,17 @@ export class BattleStage {
       },
       dead,
     );
+  }
+
+  /** Where a round from an unseen shooter first shows: a few cells out toward it, high for a shell. */
+  private inbound(to: THREE.Vector3, from: Point, kind: string): THREE.Vector3 {
+    const dx = from.x + 0.5 - to.x;
+    const dz = from.y + 0.5 - to.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const k = Math.min(d, 5) / d;
+    const x = to.x + dx * k;
+    const z = to.z + dz * k;
+    return new THREE.Vector3(x, this.ground(x, z) + (kind === 'mortar' || kind === 'howitzer' ? 6 : 1.2), z);
   }
 
   /** A small-arms volley: the shots together, then what they did to the target in one word, then the rest. */

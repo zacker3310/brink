@@ -482,7 +482,8 @@ export type BattleEvent =
   | { type: 'turn'; side: Side; round: number }
   | { type: 'move'; unit: string; path: Point[]; seen: boolean[]; dash: boolean }
   | { type: 'face'; unit: string; facing: number; seen: boolean }
-  | { type: 'fire'; unit: string; weapon: string; kind: WeaponKind; calibre: string; from: Point; to: Point; target: string | null; hit: boolean; chance: number; overwatch: boolean; seen: boolean }
+  /** `seen`: blue sees the shot (either end), so the film shows it. `shooterSeen`: blue sees the shooter, so the film may show it and where it fired from. */
+  | { type: 'fire'; unit: string; weapon: string; kind: WeaponKind; calibre: string; from: Point; to: Point; target: string | null; hit: boolean; chance: number; overwatch: boolean; seen: boolean; shooterSeen: boolean }
   | { type: 'intercept'; unit: string; by: string; x: number; y: number; seen: boolean }
   | { type: 'impact'; unit: string; facing: Facing; pen: boolean; effect: Effect; x: number; y: number; seen: boolean }
   | { type: 'casualties'; unit: string; killed: number; wounded: number; x: number; y: number; seen: boolean }

@@ -242,8 +242,9 @@ describe('fog: leaks found (reported defects)', () => {
   });
 
   // A `fire` event is `seen` when blue sees either end of the shot, and it names the shooter and where
-  // it fired from; the film shows the shooter whenever it is `seen` (stage.ts, queueFire). So when a
-  // hidden gun downs the only blue unit with a line to it, the film shows a gun the rules keep hidden.
+  // it fired from. The film used to show the shooter whenever the shot was `seen`, so a hidden gun
+  // downing a drone showed a gun the rules keep hidden. Fire events now say separately whether blue
+  // sees the shooter (`shooterSeen`), and the film shows the shooter only then (stage.ts, queueFire).
   const downed = () => {
     const b = bare(['raven', 'm1a2'], ['tunguska', 't90m']);
     ridge(b);
@@ -261,7 +262,7 @@ describe('fog: leaks found (reported defects)', () => {
       c.stream = s;
       if (act(c, fire, 'red') && !c.units.find((u) => u.id === drone.id)!.alive) {
         const shot = c.events.find((e) => e.type === 'fire' && e.unit === gun.id);
-        return { b: c, gun, hidden, seen: shot?.type === 'fire' && shot.seen };
+        return { b: c, gun, hidden, seen: shot?.type === 'fire' && shot.seen, shooterSeen: shot?.type === 'fire' && shot.shooterSeen };
       }
     }
     throw new Error('no stream state downs the drone');
@@ -272,13 +273,17 @@ describe('fog: leaks found (reported defects)', () => {
     expect(d.seen).toBe(true);
     expect(visibleTo(d.b, 'blue').has(d.gun.id)).toBe(false);
   });
-  it.fails('a shot the film is told blue saw comes from a shooter blue can see', () => {
+  // This first asked that `seen` itself match the shooter's visibility; that would also hide the
+  // shot from the drone's side. The property that matters is that the shooter is flagged as unseen.
+  it('a shot blue saw from the target end does not show its shooter', () => {
     const d = downed();
-    expect(d.seen).toBe(visibleTo(d.b, 'blue').has(d.gun.id));
+    expect(d.shooterSeen).toBe(visibleTo(d.b, 'blue').has(d.gun.id));
+    expect(d.shooterSeen).toBe(false);
   });
 
-  // The shot card shows a seen tank's active protection only while it has charges, so it tells how
-  // many interceptions it has spent even when the player saw none of them.
+  // The shot card shows a seen tank's active protection only while it has charges. That is a rule, not
+  // a leak: the launchers sit on the outside of a turret in sight, and the card must show the chance
+  // that is rolled (hiding spent charges would show a chance the roll does not use).
   const javelinOn = (charges: number) => {
     const b = bare(['javelin'], ['cr3']);
     const team = put(unit(b, 'javelin'), 15, 34);
@@ -290,7 +295,8 @@ describe('fog: leaks found (reported defects)', () => {
     expect(javelinOn(3).seen).toBe(true);
     expect(javelinOn(3).card?.aps).toBeGreaterThan(0);
   });
-  it.fails('the shot card does not tell whether a seen tank’s active protection is spent', () => {
-    expect(javelinOn(0).card?.aps).toBe(javelinOn(3).card?.aps);
+  it('the shot card shows a seen tank’s active protection as it stands, spent or not (rule)', () => {
+    expect(javelinOn(3).card?.aps).toBeGreaterThan(0);
+    expect(javelinOn(0).card?.aps ?? 0).toBe(0);
   });
 });

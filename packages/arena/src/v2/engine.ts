@@ -484,12 +484,16 @@ function strike(b: Battle, u: Unit, cell: Point, w: Weapon, smoke: boolean): voi
   if (u.side === 'blue' && b.precision > 0) b.precision--;
   u.aim = Math.atan2(cell.y - u.y, cell.x - u.x);
   u.acted = true;
+  const sawBefore = blueSees(b, u);
   u.revealed = b.turnIndex + 1;
   b.stats[u.side].shots++;
   if (hit) b.stats[u.side].hits++;
-  b.events.push({ type: 'fire', unit: u.id, weapon: w.id, kind: w.kind, calibre: w.calibre, from: { x: u.x, y: u.y }, to: land, target: null, hit, chance: info.chance, overwatch: false, seen: true });
+  const shot = { type: 'fire' as const, unit: u.id, weapon: w.id, kind: w.kind, calibre: w.calibre, from: { x: u.x, y: u.y }, to: land, target: null, hit, chance: info.chance, overwatch: false, seen: true, shooterSeen: sawBefore };
+  b.events.push(shot);
   if (smoke) smokeCells(b, around(land, 1), u.side);
   else blast(b, land, { lethality: w.lethality, pen: w.pen, supp: w.supp, demo: w.demo, radius: w.blast, crater: w.kind === 'howitzer', kind: 'shell' }, u.side);
+  // Shown firing only if blue saw it before, or sees it now the rounds have landed (as its picture will).
+  shot.shooterSeen = sawBefore || blueSees(b, u);
   if (u.side === 'blue') b.events.push({ type: 'radio', side: 'blue', call: smoke ? 'smoke' : 'splash', unit: u.id });
 }
 
@@ -507,7 +511,7 @@ function callSupport(b: Battle, side: Side, id: 'himars' | 'tornado', cell: Poin
   const hit = roll(b) * 100 < chance;
   const land = hit ? cell : scatter(b, cell, 1);
   const from = { x: Math.floor(W / 2), y: side === 'blue' ? H - 1 : 0 };
-  b.events.push({ type: 'fire', unit: `support:${id}`, weapon: id, kind: 'rocket', calibre: id === 'himars' ? '227' : '122', from, to: land, target: null, hit, chance, overwatch: false, seen: true });
+  b.events.push({ type: 'fire', unit: `support:${id}`, weapon: id, kind: 'rocket', calibre: id === 'himars' ? '227' : '122', from, to: land, target: null, hit, chance, overwatch: false, seen: true, shooterSeen: side === 'blue' });
   if (id === 'himars') blast(b, land, { lethality: 4, pen: 300, supp: 50, demo: 80, radius: 1, crater: true, kind: 'rockets' }, side);
   else {
     // A 40-rocket salvo spreads over five by five cells.

@@ -595,6 +595,20 @@ export function troopMultiplier(b: Battle, u: Unit): number {
 
 /** Resolve a direct shot already judged possible: the roll, then what it does. */
 export function shoot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, overwatch: boolean): void {
+  // Firing reveals the shooter, but only to someone with a line to it: blue is told it saw the shooter
+  // if it saw it before the shot, or still sees it once the shot has done its work (a unit that saw the
+  // flash and died in it reports nothing), so the film never shows more than blue's picture keeps.
+  const sawBefore = blueSees(b, shooter);
+  const from = b.events.length;
+  resolveShot(b, shooter, target, info, overwatch);
+  const sees = sawBefore || blueSees(b, shooter);
+  for (let i = from; i < b.events.length; i++) {
+    const e = b.events[i]!;
+    if (e.type === 'fire' && e.unit === shooter.id) e.shooterSeen = sees;
+  }
+}
+
+function resolveShot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, overwatch: boolean): void {
   const w = info.weapon;
   shooter.aim = Math.atan2(target.y - shooter.y, target.x - shooter.x);
   if (w.ammo !== null) shooter.ammo[w.id] = Math.max(0, (shooter.ammo[w.id] ?? 0) - (w.salvo ?? 1));
@@ -605,13 +619,13 @@ export function shoot(b: Battle, shooter: Unit, target: Unit, info: FireInfo, ov
   // Drones can be shot down on the way in; APS can stop a missile, a rocket or a drone.
   if (drone && roll(b) < interceptors(b, target)) {
     const gun = b.units.find((u) => u.side === target.side && u.alive && !u.carrier && cheb(u, target) <= INTERCEPT_RANGE && (typeOf(u.type).role === 'spaa' || typeOf(u.type).weapons.some((x) => x.kind === 'autocannon' && x.air === 'yes')));
-    b.events.push({ type: 'fire', unit: shooter.id, weapon: w.id, kind: w.kind, calibre: w.calibre, from: { x: shooter.x, y: shooter.y }, to: { x: target.x, y: target.y }, target: target.id, hit: false, chance: info.chance, overwatch, seen: blueSees(b, shooter) || blueSees(b, target) });
+    b.events.push({ type: 'fire', unit: shooter.id, weapon: w.id, kind: w.kind, calibre: w.calibre, from: { x: shooter.x, y: shooter.y }, to: { x: target.x, y: target.y }, target: target.id, hit: false, chance: info.chance, overwatch, seen: blueSees(b, shooter) || blueSees(b, target), shooterSeen: blueSees(b, shooter) });
     b.events.push({ type: 'intercept', unit: shooter.id, by: gun?.id ?? target.id, x: target.x, y: target.y, seen: blueSees(b, target) });
     return;
   }
   const hit = roll(b) * 100 < info.chance;
   if (hit) b.stats[shooter.side].hits++;
-  b.events.push({ type: 'fire', unit: shooter.id, weapon: w.id, kind: w.kind, calibre: w.calibre, from: { x: shooter.x, y: shooter.y }, to: { x: target.x, y: target.y }, target: target.id, hit, chance: info.chance, overwatch, seen: blueSees(b, shooter) || blueSees(b, target) });
+  b.events.push({ type: 'fire', unit: shooter.id, weapon: w.id, kind: w.kind, calibre: w.calibre, from: { x: shooter.x, y: shooter.y }, to: { x: target.x, y: target.y }, target: target.id, hit, chance: info.chance, overwatch, seen: blueSees(b, shooter) || blueSees(b, target), shooterSeen: blueSees(b, shooter) });
   if (target.side === 'blue') b.events.push({ type: 'radio', side: 'blue', call: 'taking_fire', unit: target.id });
   const tt = typeOf(target.type);
   const sc = scale(shooter, w);
