@@ -14,16 +14,19 @@ import {
   endTurn,
   fireInfo,
   fitMen,
+  outcomes,
   pickConditions,
   RANKS,
   reachable,
+  recordStep,
+  resetPoint,
+  resetsLeft,
   retreat,
   ROUND_LIMIT,
   strikeInfo,
   suppLevel,
   supportChance,
   typeOf,
-  undoable,
   unitAt,
   usableWeapons,
   unitValue,
@@ -39,15 +42,21 @@ import {
   type FireInfo,
   type Point,
   type Role,
+  type Step,
   type StrikeInfo,
   type Unit,
   type Weapon,
 } from '@brink/arena';
 import { UnitGlyph } from '../glyphs';
+import { AfterAction } from './AfterAction';
 import { loadLibrary, type Library } from './assets';
 import type { BattleRequest } from './battle';
+import { BattleLog } from './BattleLog';
+import { EndTurnSheet, type ResetState } from './EndTurnSheet';
+import { bandOf, OutcomeBar } from './OutcomeBar';
 import { readSettings, writeSettings, type ArenaSettings, type Quality } from './quality';
 import { BattleStage, type Overlay } from './stage';
+import { markTipSeen, pickTip, readSeenTips, type Tip, type TipKind } from './tips';
 import { classOf, health } from './units';
 
 // One battle, fought in turns: a brief, the fight, the verdict. On your turn tap a unit, tap a lit
@@ -429,6 +438,7 @@ function Verdict({ result, req, battle, onDone }: { result: ArenaResult; req: Ba
             </div>
           ))}
         </dl>
+        <AfterAction battle={battle} />
         <ul className="mt-4 w-full divide-y divide-line overflow-hidden rounded-xl bg-ink-900 text-left">
           {req.setup.attackers.map((f) => (
             <li key={f.id} className="flex justify-between px-4 py-2.5 text-[14px]">
@@ -501,6 +511,17 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const lastNoop = useRef<{ t: number; x: number; y: number } | null>(null);
   /** The battle before the last step, while that step can be taken back. */
   const undoRef = useRef<{ snap: Battle; unit: string } | null>(null);
+  /** This turn's steps, each with the battle before it, for Reset Turn (`rewind.ts`). */
+  const stepsRef = useRef<Step[]>([]);
+  /** Resets used this battle (Normal allows one, Hard none). */
+  const resetsUsed = useRef(0);
+  /** The Fire card last fired: a second tap before the screen catches up does nothing. */
+  const fired = useRef<Card>(null);
+  /** The battle log is open. */
+  const [log, setLog] = useState(false);
+  /** The tip on show, and the kinds this device has seen (each comes once, ever). */
+  const [tip, setTip] = useState<Tip | null>(null);
+  const seenTips = useRef<Set<TipKind>>(readSeenTips());
   const refresh = () => setTick((t) => t + 1);
   /** A line in the kill feed under the title, for a few seconds. */
   const pushFeed = (text: string, tone: 'good' | 'bad' | 'plain') => {
@@ -667,7 +688,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         setBanner(null);
         setReport(null);
       },
-      report ? 2400 : 1400,
+      // Long enough to reach its link to the battle log.
+      report ? 4000 : 1400,
     );
     return () => clearTimeout(t);
   }, [banner]);
@@ -695,6 +717,32 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   // What a good commander would do with this unit, from your side's picture only.
   const advice = useMemo(() => (b && me && myTurn && !me.acted ? advise(b, me.id) : []), [b, me?.id, me?.x, me?.y, me?.moved, me?.acted, myTurn, b?.events.length]);
   const adviceMove = advice.find((a): a is Extract<Action, { type: 'move' }> => a.type === 'move');
+
+  // One tip at a time from the board (`tips.ts`), each kind once ever: it stays while the board calls for it.
+  useEffect(() => {
+    if (!b || !myTurn || !settings.tips) {
+      if (tip) setTip(null);
+      return;
+    }
+    const board = {
+      b,
+      me,
+      known: visible,
+      move: card?.kind === 'move' ? { at: card.at, dash: card.dash } : null,
+      strike: card?.kind === 'strike' && indirect ? { at: card.at, smoke: card.smoke, weapon: indirect } : null,
+    };
+    const still = tip ? pickTip(board, (k) => k === tip.kind) : null;
+    if (still) {
+      if (still.text !== tip?.text) setTip(still);
+      return;
+    }
+    const next = pickTip(board, (k) => !seenTips.current.has(k));
+    if (next) {
+      seenTips.current.add(next.kind);
+      markTipSeen(next.kind);
+    }
+    setTip(next);
+  }, [b, myTurn, settings.tips, me?.id, me?.x, me?.y, me?.moved, me?.acted, me?.facing, card, visible]);
 
   // Keep the 3D overlay in step with the selection.
   useEffect(() => {
@@ -764,7 +812,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     if (!done) return false;
     const first = actions[0]!;
     const unit = 'unit' in first && first.unit ? first.unit : null;
-    undoRef.current = unit && undoable(snap, b) ? { snap, unit } : null;
+    stepsRef.current = recordStep(stepsRef.current, snap, b, unit);
+    undoRef.current = unit && stepsRef.current.at(-1)!.safe ? { snap, unit } : null;
     setCard(null);
     setMode({ kind: 'none' });
     setDash(false);
@@ -774,23 +823,58 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   };
   const doAct = (action: Action, keepSelection = true) => perform([action], keepSelection);
 
-  /** Take back the last step: the battle as it was, every unit back where it stood. */
-  const undo = () => {
-    const u = undoRef.current;
+  /** The battle as it was before a step, every unit back where it stood. */
+  const restore = (snap: Battle, unit: string | null) => {
     const s = stageRef.current;
-    if (!u || !b || !s || !myTurn) return;
+    if (!b || !s) return;
     s.skip();
     const rec = b as unknown as Record<string, unknown>;
     for (const k of Object.keys(rec)) delete rec[k];
-    Object.assign(rec, copyBattle(u.snap));
+    Object.assign(rec, copyBattle(snap));
     cursor.current = b.events.length;
     s.resync();
-    undoRef.current = null;
-    setSelected(u.unit);
+    if (unit) setSelected(unit);
     setCard(null);
     setMode({ kind: 'none' });
     setDash(false);
     refresh();
+  };
+
+  /** Take back the last step. */
+  const undo = () => {
+    const u = undoRef.current;
+    if (!u || !b || !myTurn) return;
+    restore(u.snap, u.unit);
+    stepsRef.current = stepsRef.current.slice(0, -1);
+    undoRef.current = null;
+  };
+
+  /** Reset Turn: back over every step since the last one that drew dice or showed something. */
+  const resetTurn = () => {
+    const point = resetPoint(stepsRef.current);
+    if (!b || !myTurn || !point || resetsLeft(b.difficulty, resetsUsed.current) <= 0) return;
+    const i = stepsRef.current.indexOf(point);
+    restore(point.before, point.unit);
+    stepsRef.current = stepsRef.current.slice(0, i);
+    undoRef.current = null;
+    resetsUsed.current++;
+    setConfirmEnd(false);
+    setMenu(false);
+  };
+  /** Whether Reset Turn can go now, and why not (or what it would do). */
+  const resetState = (): ResetState => {
+    const left = b ? resetsLeft(b.difficulty, resetsUsed.current) : 0;
+    const steps = stepsRef.current;
+    const point = resetPoint(steps);
+    const n = point ? steps.length - steps.indexOf(point) : 0;
+    let note: string;
+    if (!myTurn) note = 'Reset Turn waits for your turn.';
+    else if (b?.difficulty === 'hard') note = 'Reset Turn is off on Hard.';
+    else if (left <= 0) note = 'Reset Turn is used: Normal allows one a battle.';
+    else if (!steps.length) note = 'Nothing to reset: no orders yet this turn.';
+    else if (!point) note = 'Nothing to reset: the last order drew dice or showed something new, so it stands.';
+    else note = `Takes back ${n === 1 ? 'the last order' : `the last ${n} orders`}, which drew no dice and showed nothing${b?.difficulty === 'normal' ? ' (once a battle on Normal)' : ''}.`;
+    return { ok: myTurn && !!point && left > 0, note, onReset: resetTurn };
   };
 
   /** Act on a tapped cell; false when the tap did nothing (so a second one zooms). */
@@ -928,11 +1012,13 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
   const onWheel = (e: React.WheelEvent) => stageRef.current?.zoomBy(Math.exp(e.deltaY * 0.0012), { x: e.clientX, y: e.clientY });
 
   const finishTurn = (auto = false) => {
-    if (!b || !myTurn) return;
+    // A second tap before the screen catches up would end the next turn too: the ref is already set.
+    if (!b || !myTurn || waitingRef.current) return;
     setConfirmEnd(false);
     waitingRef.current = true;
     setWaiting(true);
     undoRef.current = null;
+    stepsRef.current = [];
     setSelected(null);
     setCard(null);
     setMode({ kind: 'none' });
@@ -975,6 +1061,18 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
   const blue = b?.units.filter((u) => u.side === 'blue') ?? [];
   const readyCount = blue.filter((u) => u.alive && !u.acted && !u.carrier).length;
+  /** Units of yours on the field, for the Next button's count. */
+  const fieldCount = blue.filter((u) => u.alive && !u.carrier).length;
+  /** The battle log during their turn reads only up to its start: the film has not shown the rest. */
+  const logUpTo = () => {
+    if (!b) return 0;
+    if (!waiting) return b.events.length;
+    for (let i = b.events.length - 1; i >= 0; i--) {
+      const e = b.events[i]!;
+      if (e.type === 'turn' && e.side === 'red') return i;
+    }
+    return b.events.length;
+  };
   const seenCount = visible.size;
   const battleMode = b?.map.mode ?? 'destroy';
   const labels = myTurn ? targets.map((t) => ({ id: t.unit.id, chance: t.info.chance, x: t.unit.x, y: t.unit.y })) : [];
@@ -1005,6 +1103,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
     }
     actions.push({ id: 'overwatch', pri: 2, label: 'Overwatch', on: () => doAct({ type: 'overwatch', unit: me.id }, false), ok: ok({ type: 'overwatch', unit: me.id }) });
     if (t.mobility === 'foot') actions.push({ id: 'hunker', pri: 3, label: 'Hunker', on: () => doAct({ type: 'hunker', unit: me.id }, false), ok: ok({ type: 'hunker', unit: me.id }) });
+    actions.push({ id: 'hold', pri: 6, label: 'Hold', on: () => doAct({ type: 'hold', unit: me.id }, false), ok: ok({ type: 'hold', unit: me.id }) });
     if ((me.smoke.grenades ?? 0) > 0 || (me.smoke.pots ?? 0) > 0) actions.push({ id: 'smoke', pri: 3, label: `Smoke ${me.smoke.grenades ?? me.smoke.pots ?? 0}`, on: () => doAct({ type: 'smoke', unit: me.id }), ok: ok({ type: 'smoke', unit: me.id }) });
     if (me.passengers.length) actions.push({ id: 'dismount', pri: 1, label: 'Dismount', on: () => doAct({ type: 'dismount', unit: me.id }), ok: ok({ type: 'dismount', unit: me.id }) });
     if (t.mobility !== 'foot' && t.mobility !== 'heli' && t.mobility !== 'drone') actions.push({ id: 'face', pri: 5, label: 'Turn', on: () => setMode(mode.kind === 'face' ? { kind: 'none' } : { kind: 'face' }), ok: ok({ type: 'face', unit: me.id, facing: me.facing }), pressed: mode.kind === 'face' });
@@ -1108,6 +1207,11 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               {report}
             </span>
           )}
+          {report && (
+            <button type="button" onClick={() => setLog(true)} className="pointer-events-auto h-11 rounded-full bg-black/85 px-4 text-[14px] font-semibold text-white underline underline-offset-2" data-testid="arena-report-log">
+              Battle Log
+            </button>
+          )}
         </div>
       )}
       {busy && ready && b && !myTurn && !b.ended && (
@@ -1169,6 +1273,17 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
 
       <footer ref={footerRef} className="vercel safe-bottom safe-x absolute inset-x-0 bottom-0 z-10" data-testid="arena-footer">
         <div className="mx-2 mb-1.5 rounded-2xl bg-black/85 p-2 backdrop-blur">
+          {tip && myTurn && settings.tips && (
+            <div className="mb-2 flex items-center gap-2 rounded-xl bg-ink-800 py-1 pr-1 pl-3" role="status" data-testid="arena-tip" data-kind={tip.kind}>
+              <div className="min-w-0 flex-1 text-[13px] leading-snug">
+                <span className="font-semibold">{tip.title}. </span>
+                {tip.text}
+              </div>
+              <button type="button" onClick={() => setTip(null)} className="h-11 shrink-0 rounded-full bg-ink-700 px-3.5 text-[14px] font-semibold" data-testid="arena-tip-dismiss">
+                Dismiss
+              </button>
+            </div>
+          )}
           {card?.kind === 'move' && b && me && (
             <MoveCard
               b={b}
@@ -1204,6 +1319,9 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                   className="v-btn v-btn-primary h-11 flex-[1.6] text-[15px] font-semibold"
                   data-testid="arena-fire"
                   onClick={() => {
+                    // One card, one shot: a second tap before it closes fires nothing.
+                    if (fired.current === card) return;
+                    fired.current = card;
                     if (card.kind === 'fire' && me) doAct({ type: 'fire', unit: me.id, target: card.target, weapon: card.weapon }, false);
                     else if (card.kind === 'strike' && me && indirect) doAct({ type: 'strike', unit: me.id, at: card.at, weapon: indirect.id, smoke: card.smoke }, false);
                     else if (card.kind === 'support') doAct({ type: 'support', asset: card.asset, at: card.at });
@@ -1311,16 +1429,23 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
                 );
               })}
             </div>
+            {ready && (
+              <button type="button" disabled={!myTurn || readyCount === 0} onClick={() => nextReady(selected ?? undefined)} className="v-btn v-btn-secondary h-[58px] shrink-0 flex-col gap-0 px-2.5 text-[15px] leading-tight font-semibold disabled:opacity-40" data-testid="arena-next" aria-label={`Next ready unit: ${readyCount} of ${fieldCount} left`}>
+                Next
+                <span className="text-[12px] font-normal tabular-nums">
+                  {readyCount} of {fieldCount} Left
+                </span>
+              </button>
+            )}
             {myTurn && undoRef.current && (
               <button type="button" onClick={undo} className="v-btn v-btn-secondary h-[58px] shrink-0 px-3 text-[15px] font-semibold" data-testid="arena-undo" aria-label={`Undo the last move of ${b?.units.find((u) => u.id === undoRef.current?.unit)?.name ?? 'your unit'}`}>
                 Undo
               </button>
             )}
-            <button type="button" disabled={!myTurn} onClick={() => (readyCount > 0 ? setConfirmEnd(true) : finishTurn())} className={`v-btn h-[58px] shrink-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">
+            <button type="button" disabled={!myTurn} onClick={() => (readyCount > 0 && settings.endSheet ? setConfirmEnd(true) : finishTurn())} className={`v-btn h-[58px] shrink-0 flex-col gap-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">
               {waiting && ready ? 'Enemy Turn' : readyCount ? (
                 <>
                   End Turn
-                  <br />
                   <span className="text-[12px] font-normal">{readyCount} ready</span>
                 </>
               ) : (
@@ -1331,29 +1456,24 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         </div>
       </footer>
 
-      {confirmEnd && myTurn && (
-        <div className="vercel absolute inset-0 z-20 flex items-end bg-black/60" data-testid="arena-end-confirm" onClick={() => setConfirmEnd(false)}>
-          <div className="safe-bottom safe-x w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-2 mb-2 rounded-2xl bg-ink-900 p-4">
-              <div className="text-[17px] font-bold">
-                {readyCount} {readyCount === 1 ? 'unit has' : 'units have'} not acted
-              </div>
-              <p className="mt-0.5 text-[14px] text-muted">Your crews can take their turns for them, the way the advice would.</p>
-              <div className="mt-3 flex flex-col gap-2">
-                <button type="button" onClick={() => finishTurn(true)} className="v-btn v-btn-primary h-12 text-[16px] font-semibold" data-testid="arena-end-auto">
-                  Crews Act, Then End Turn
-                </button>
-                <button type="button" onClick={() => finishTurn()} className="v-btn v-btn-secondary h-12 text-[15px]" data-testid="arena-end-now">
-                  End Turn Now
-                </button>
-                <button type="button" onClick={() => setConfirmEnd(false)} className="v-btn v-btn-secondary h-12 text-[15px]" data-testid="arena-end-cancel">
-                  Keep Playing
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {confirmEnd && myTurn && b && (
+        <EndTurnSheet
+          b={b}
+          version={`${b.events.length}|${blue.map((u) => `${u.x},${u.y},${u.moved ? 1 : 0}${u.acted ? 1 : 0}${u.alive ? 1 : 0}`).join(';')}`}
+          describe={(u, plan) => adviceText(b, u, plan, visible)}
+          onDo={(u, plan) => {
+            setSelected(u.id);
+            perform(plan, true);
+          }}
+          onHold={(u) => perform([{ type: 'hold', unit: u.id }], true)}
+          onAuto={() => finishTurn(true)}
+          onEnd={() => finishTurn()}
+          onClose={() => setConfirmEnd(false)}
+          reset={resetState()}
+        />
       )}
+
+      {log && b && <BattleLog b={b} upTo={logUpTo()} onClose={() => setLog(false)} />}
 
       {menu && (
         <div className="vercel absolute inset-0 z-20 overflow-y-auto bg-black/90" data-testid="arena-paused">
@@ -1373,6 +1493,30 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               data-testid="arena-auto"
             >
               Let My Crews Play This Turn
+            </button>
+            {(() => {
+              const r = resetState();
+              return (
+                <div>
+                  <button type="button" disabled={!r.ok} onClick={r.onReset} className="v-btn v-btn-secondary h-12 w-full text-[15px] disabled:opacity-40" data-testid="menu-reset">
+                    Reset Turn
+                  </button>
+                  <p className="mt-1 px-1 text-[13px] text-muted" data-testid="menu-reset-note">
+                    {r.note}
+                  </p>
+                </div>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => {
+                setMenu(false);
+                setLog(true);
+              }}
+              className="v-btn v-btn-secondary h-12 text-[15px]"
+              data-testid="menu-log"
+            >
+              Battle Log
             </button>
             <button
               type="button"
@@ -1477,22 +1621,30 @@ function ShotCard({ b, shooter, target, weapon, visible, onWeapon }: { b: Battle
           </div>
           <div className="truncate text-[13px] text-muted">{pick.w.name}</div>
         </div>
-        <div className="text-[36px] leading-none font-bold tabular-nums" data-testid="shot-chance">
-          {info.chance}%
+        <div className="shrink-0 text-right">
+          <div className="text-[36px] leading-none font-bold tabular-nums" data-testid="shot-chance">
+            {info.chance}%
+          </div>
+          <div className="mt-1 text-[13px] leading-none font-bold" data-testid="shot-band">
+            {bandOf(outcomes(info, tt), tt)}
+          </div>
         </div>
       </div>
-      <div className="mt-1.5 text-[14px]">
-        {info.pen !== undefined ? (
+      <OutcomeBar info={info} target={tt} />
+      <div className="mt-1.5 text-[13px]" data-testid="shot-numbers">
+        {tt.mobility === 'drone' ? (
+          'A hit brings it down.'
+        ) : info.pen !== undefined ? (
           <>
-            Penetrate <b className="tabular-nums">{info.pen}%</b> ({info.facing}) · Kill <b className="tabular-nums">{info.kill}%</b>
-            {info.aps ? <> · {tt.aps?.name} stops {info.aps}%</> : null}
+            On a hit: penetrate <b className="tabular-nums">{info.pen}%</b> ({info.facing}), knock out <b className="tabular-nums">{info.kill}%</b>
+            {info.aps ? <>; {tt.aps?.name} stops {info.aps}%</> : null}
           </>
         ) : (
           <>
-            About <b className="tabular-nums">{info.casualties}</b> {info.casualties === 1 ? 'casualty' : 'casualties'} · +{info.supp} suppression
+            On a hit: about <b className="tabular-nums">{info.casualties}</b> {info.casualties === 1 ? 'casualty' : 'casualties'}, +{info.supp} suppression
           </>
         )}
-        {info.intercept ? <> · shot down {info.intercept}%</> : null}
+        {info.intercept ? <>; air defence downs it first {info.intercept}%</> : null}
       </div>
       <div className="mt-1 text-[13px] text-muted">{info.parts.map(([k, v]) => (k === 'Base' ? `Base ${v}` : `${k} ${v > 0 ? '+' : '−'}${Math.abs(v)}`)).join(' · ')}</div>
       {options.length > 1 && (
