@@ -755,13 +755,15 @@ export class BattleStage {
 
   /**
    * The film's queue, for tests: steps waiting or playing, beats playing, whether an action cam runs,
-   * the clock; for measuring, film seconds played while busy, seconds queued, and where turns began.
+   * the clock, the shake now; for measuring, film seconds played while busy, seconds queued, and where
+   * turns began.
    */
-  filmState(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; camera: number[]; played: number; planned: number; marks: { side: Side; planned: number; played: number }[] } {
+  filmState(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number; marks: { side: Side; planned: number; played: number }[] } {
     const r = (v: number) => Math.round(v * 1000) / 1000;
     return {
       steps: [...this.playing, ...this.waiting].reduce((n, c) => n + c.steps.length, 0),
       beats: this.playing.length,
+      shake: r(this.shakeNow),
       played: r(this.played),
       planned: r(this.planned),
       marks: this.marks.map((m) => ({ ...m, played: r(m.played), planned: r(m.planned) })),
@@ -1363,9 +1365,14 @@ export class BattleStage {
     this.trauma = Math.min(1, this.trauma + add);
   }
 
+  /** How hard the view shakes now, 0..1: trauma squared, by the Shake setting (none with motion off). */
+  private get shakeNow(): number {
+    return this.trauma * this.trauma * (this.feel.motion === 'off' ? 0 : this.feel.shake / 100);
+  }
+
   /** Trauma shake on top of the resting pose: mostly a small turn of the head, a little sway. */
   private shakeCamera(): void {
-    const s = this.trauma * this.trauma * (this.feel.motion === 'off' ? 0 : this.feel.shake / 100);
+    const s = this.shakeNow;
     if (s < 1e-4) return;
     const t = this.shakeClock;
     const a = SHAKE_TURN * s;

@@ -30,5 +30,7 @@ interface Window {
     perf(reset?: boolean): { p50: number; p95: number; frames: number; calls: number; triangles: number; quality: 'low' | 'balanced' | 'high' } | null;
     /** What the field overlay shows now: the selected unit, its move and dash cells, its targets. */
     overlay(): { selected: string | null; reach: number; dash: number; targets: number } | null;
+    /** The film: steps waiting or playing, beats playing, an action cam, its clock, steps that failed. */
+    film(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number } | null;
   };
 }
