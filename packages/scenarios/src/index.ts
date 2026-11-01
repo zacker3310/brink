@@ -1,6 +1,7 @@
 import type { WorldState } from '@brink/contracts';
 import { createPacificScenario, MAX_TURNS, PACIFIC_ID, THEATRES } from './pacific';
 
+export * from './crises';
 export * from './pacific';
 
 export interface ScenarioInfo {

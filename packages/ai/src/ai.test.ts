@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPacificScenario } from '@brink/scenarios';
+import { applyCrisis, CRISES, createPacificScenario } from '@brink/scenarios';
 import { hexKey } from '@brink/map';
 import { buildView, lockOrders, previewAssault, resolveTurn, sortedKeys } from '@brink/simulation';
 import { makeWorld, own, setRelation, site, unit } from '../../simulation/src/fixture.test-util';
@@ -157,4 +157,20 @@ describe('AI for minor states', () => {
       expect(o.diplomacy.some((d) => d.target === 'm')).toBe(false);
     }
   });
+});
+
+describe('AI in the Opening Crises', () => {
+  for (const c of CRISES) {
+    it(`${c.id}: plays five turns without a refused order`, () => {
+      let w = createPacificScenario(11);
+      applyCrisis(w, c.id);
+      for (let turn = 0; turn < 5 && !w.victory; turn++) {
+        const subs = sortedKeys(w.nations)
+          .filter((n) => !w.nations[n]!.eliminated)
+          .map((n) => planOrders(buildView(w, n), emptyMemory(), w.seed));
+        expect(lockOrders(w, subs).rejected, `turn ${w.turn}`).toEqual([]);
+        w = resolveTurn(w, subs).world;
+      }
+    });
+  }
 });

@@ -65,6 +65,8 @@ export interface Prefs {
   length?: 'quick' | 'standard' | 'epic';
   difficulty?: 'easy' | 'normal' | 'hard';
   theatre?: string;
+  /** Opening Crisis picked on the setup screen: a crisis id, or 'random' to deal one from the seed. */
+  crisis?: string;
   /** Painted fantasy map (default), clean board-game map, or satellite imagery. */
   mapStyle?: MapStyle;
 }

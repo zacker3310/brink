@@ -99,7 +99,7 @@ interface State {
   /** The last resolved turn, kept so it can be replayed again. */
   lastTurn: { before: NationView; events: GameEvent[] } | null;
 
-  newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty, theatre?: string): Promise<void>;
+  newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty, theatre?: string, crisis?: string): Promise<void>;
   /** Let the staff draft orders for every unit and city still waiting; the player can change any. */
   autoCommand(): Promise<void>;
   /** Load a save. Seats other players held in an old multiplayer save go to the AI. */
@@ -274,8 +274,8 @@ export const useGame = create<State>((set, get) => {
     lastTurn: null,
     armed: null,
 
-    async newGame(nation, seed, maxTurns, difficulty, theatre) {
-      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre }))) {
+    async newGame(nation, seed, maxTurns, difficulty, theatre, crisis) {
+      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre, crisis }))) {
         const capital = Object.values(get().view!.sites).find((s) => s.owner === nation && s.kind === 'capital');
         set({ selectedHex: capital?.key ?? null, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
         get().nextIdle();

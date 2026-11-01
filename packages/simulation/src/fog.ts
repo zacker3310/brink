@@ -257,6 +257,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     totalVictoryPoints: totalVictoryPoints(world),
     victory: world.victory ? { ...world.victory } : null,
     difficulty: world.difficulty ?? 'normal',
+    ...(world.crisis ? { crisis: world.crisis } : {}),
     supremacy: supremacyStanding(world),
   };
 }

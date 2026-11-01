@@ -333,6 +333,8 @@ export interface WorldState {
   victory: VictoryState | null;
   /** Absent in campaigns made before difficulty existed: they play as normal. */
   difficulty?: Difficulty;
+  /** The Opening Crisis the campaign began with (`@brink/scenarios` CRISES), if any. */
+  crisis?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -507,6 +509,8 @@ export interface NationView {
   totalVictoryPoints: number;
   victory: VictoryState | null;
   difficulty: Difficulty;
+  /** The Opening Crisis the campaign began with, if any: public, like the scenario. */
+  crisis?: string;
   /** Each nation's standing toward Supremacy, percent: average share of VP, army and income. */
   supremacy: Record<NationId, number>;
 }

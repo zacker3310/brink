@@ -60,10 +60,16 @@ placed, damage, stability). It is chosen at setup (dealt at random by default, o
 in the world (`world.crisis`), so saves and replays carry it. Each has a difficulty and a
 recommended power. Later beats fire through the world-events system.
 
-The deck: Operation Sombra (China lands in Mexico), Pearl Harbor 2.0, Red Dawn Arctic Edition, The
-Test, Straits of Fire, Korean Collapse, Maple Leaf Down, The Kuril Gambit, Hawaiian Spring, Guam
-Strike, Panama Shut, Dragon and Bear Divorce, Ring of Fire, Cold Peace. Stories and setups: see the
-crisis table in `packages/scenarios/src/crises.ts` once built.
+Built (`packages/scenarios/src/crises.ts`, twelve): Cold Peace, Korean Collapse, Straits of Fire,
+Pearl Harbor 2.0, Red Dawn Arctic Edition, The Test, Operation Sombra, Maple Leaf Down, The Kuril
+Gambit, Dragon and Bear Divorce, Panama Shut, Ring of Fire. Each is a pure edit (relations, seized
+hexes and sites, landed forces, battered garrisons, stability and stockpile) applied after the
+difficulty, so its wars are the story; every power's atlas is refreshed after it. Tests: every crisis
+leaves a legal world, and the AI plays five turns of each without a refused order.
+
+Held back until the engine can carry them: Hawaiian Spring (a minor state created mid-campaign) and
+Guam Strike (the player picks the enemy on turn 1). Crises that need ships (Pearl Harbor, Operation
+Sombra, Panama Shut) get fleets in Phase 3; until then they open with landed troops and damage.
 
 ## Navy (Phases 3 to 5)
 

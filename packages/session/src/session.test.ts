@@ -205,3 +205,17 @@ describe('GameSession', () => {
     expect(easy.view().self.stockpile.credits - start[1]!).toBeGreaterThan(plain.view().self.stockpile.credits - start[0]!);
   });
 });
+
+describe('GameSession with an Opening Crisis', () => {
+  it('opens on the crisis, after the difficulty, and keeps it through a save', () => {
+    const s = GameSession.create(PACIFIC_ID, 5, 'usa', [], { difficulty: 'easy', crisis: 'pearl-harbor' });
+    const v = s.view();
+    expect(v.crisis).toBe('pearl-harbor');
+    expect(v.relations.japan).toBe('war');
+    const loaded = GameSession.fromSave(parseSave(serializeSave(s.toSave('x', '2026-11-01T12:00:00Z'))));
+    expect(loaded.view().crisis).toBe('pearl-harbor');
+  });
+  it('refuses a crisis it does not know', () => {
+    expect(() => GameSession.create(PACIFIC_ID, 5, 'usa', [], { crisis: 'alien-invasion' })).toThrow(/unknown crisis/);
+  });
+});

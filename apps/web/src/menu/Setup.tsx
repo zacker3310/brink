@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY } from '@brink/game-data';
-import { MINORS, NATIONS, THEATRES, createScenario } from '@brink/scenarios';
+import { CRISES, crisisOf, dealCrisis, MINORS, NATIONS, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Kbd, Mark, useKeys } from '../chrome';
@@ -26,7 +26,7 @@ const LENGTHS: [CampaignLength, string][] = [
   ['epic', 'Epic'],
 ];
 
-export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string) => Promise<void> }) {
+export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string, crisis?: string) => Promise<void> }) {
   const wars = readCareer().warsWon.length;
   const [theatreId, setTheatreId] = useState(() => {
     const t = THEATRES.find((x) => x.id === readPrefs().theatre);
@@ -55,6 +55,21 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     writePrefs({ length: l });
   };
 
+  // The Opening Crisis: picked, or dealt from the seed (so a shared seed opens the same way).
+  const [crisisPick, setCrisisPick] = useState<'random' | CrisisId>(() => {
+    const p = readPrefs().crisis;
+    return p && (p === 'random' || crisisOf(p)) ? (p as 'random' | CrisisId) : 'random';
+  });
+  const pickCrisis = (c: 'random' | CrisisId) => {
+    setCrisisPick(c);
+    writePrefs({ crisis: c });
+  };
+  const crisis = crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
+  /** The next crisis in the deck from this one: a fresh deal that never repeats the current one. */
+  const dealAnother = () => {
+    const i = CRISES.findIndex((c) => c.id === crisis.id);
+    pickCrisis(CRISES[(i + 1 + (seed % (CRISES.length - 1))) % CRISES.length]!.id);
+  };
   const world = useMemo(() => createScenario(theatreId, seed), [theatreId, seed]);
   const spec = NATIONS.find((n) => n.id === nation)!;
   const gov = GOVERNMENTS[spec.government];
@@ -74,7 +89,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(nation, seed, turns, difficulty, theatreId);
+      await onBegin(nation, seed, turns, difficulty, theatreId, crisis.id);
     } finally {
       setStarting(false);
     }
@@ -179,6 +194,9 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                 <h1 key={op} className="wr-codename" data-testid="operation">
                   {op}
                 </h1>
+                <p className="wr-crisis-line" data-testid="hero-crisis">
+                  <b>{crisis.name}.</b> {crisis.hook}
+                </p>
                 <p className="wr-meta">
                   <span>Seed {seed}</span>
                   <span>{turns} turns</span>
@@ -343,7 +361,49 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               Mission parameters
             </SectionHead>
 
-            <SubHead first>Difficulty</SubHead>
+            <SubHead first aside={crisisPick === 'random' ? 'dealt from the seed' : 'your pick'}>
+              Opening crisis
+            </SubHead>
+            <div className="wr-crisis" data-testid="crisis-card" data-crisis={crisis.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="wr-crisis-name">{crisis.name}</div>
+                  <div className="wr-crisis-hook">{crisis.hook}</div>
+                </div>
+                <span className="wr-threat shrink-0" data-threat={crisis.threat} aria-label={`Threat ${crisis.threat} of 3`}>
+                  {[1, 2, 3].map((p) => (
+                    <i key={p} data-on={p <= crisis.threat} />
+                  ))}
+                </span>
+              </div>
+              <p className="wr-crisis-story">{crisis.story}</p>
+              <p className="wr-crisis-setup">
+                <b>On turn 1:</b> {crisis.setup}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {crisis.recommended && crisis.recommended !== nation && (
+                  <button type="button" className="wr-chip" onClick={() => pick(crisis.recommended!)} data-testid="crisis-play-as">
+                    Play as {NATIONS.find((n) => n.id === crisis.recommended)!.name}
+                  </button>
+                )}
+                {crisis.recommended === nation && <span className="wr-chip wr-chip-on">Recommended side</span>}
+                <button type="button" className="wr-chip" onClick={dealAnother} data-testid="crisis-deal">
+                  Deal another
+                </button>
+              </div>
+            </div>
+            <div className="wr-crisis-deck" role="radiogroup" aria-label="Opening crisis">
+              <button type="button" role="radio" aria-checked={crisisPick === 'random'} onClick={() => pickCrisis('random')} data-testid="crisis-random">
+                Random
+              </button>
+              {CRISES.map((c) => (
+                <button key={c.id} type="button" role="radio" aria-checked={crisisPick === c.id} onClick={() => pickCrisis(c.id)} data-testid={`crisis-${c.id}`}>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+
+            <SubHead>Difficulty</SubHead>
             <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Difficulty">
               {DIFFICULTIES.map((d) => (
                 <button

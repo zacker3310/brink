@@ -2220,3 +2220,124 @@ aside[data-testid^='panel-'] section:first-of-type > header {
   text-transform: uppercase;
   color: var(--color-faint);
 }
+/* Opening Crisis (Setup): a dossier card for the story, and a scrolling deck of every crisis. */
+.wr-crisis-line {
+  margin-top: 10px;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgb(237 237 237 / 0.82);
+}
+.wr-crisis-line b {
+  font-family: var(--wr-cond);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ff8a7f;
+}
+.wr-crisis {
+  position: relative;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgb(255 90 78 / 0.35);
+  background:
+    linear-gradient(135deg, rgb(255 90 78 / 0.12), transparent 60%),
+    repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.015) 0 6px, transparent 6px 12px),
+    rgb(14 10 10);
+}
+.wr-crisis-name {
+  font-family: var(--wr-cond);
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.wr-crisis-hook {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ff8a7f;
+}
+.wr-crisis-story {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgb(237 237 237 / 0.88);
+}
+.wr-crisis-setup {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgb(255 255 255 / 0.12);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+.wr-crisis-setup b {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.wr-crisis .wr-threat[data-threat='1'] i[data-on='true'] {
+  background: var(--color-good);
+}
+.wr-crisis .wr-threat[data-threat='2'] i[data-on='true'] {
+  background: #f5b942;
+}
+.wr-crisis .wr-threat[data-threat='3'] i[data-on='true'] {
+  background: var(--color-hostile);
+}
+.wr-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  background: rgb(255 255 255 / 0.04);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.wr-chip:hover {
+  border-color: rgb(var(--cmd-rgb) / 0.5);
+}
+.wr-chip-on {
+  border-color: rgb(var(--cmd-rgb) / 0.6);
+  color: var(--gold);
+}
+.wr-crisis-deck {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.wr-crisis-deck::-webkit-scrollbar {
+  display: none;
+}
+.wr-crisis-deck button {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(14 14 14);
+  font-family: var(--wr-cond);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-muted);
+}
+.wr-crisis-deck button[aria-checked='true'] {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgb(var(--cmd-rgb) / 0.08);
+}

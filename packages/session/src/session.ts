@@ -2,7 +2,7 @@ import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationVie
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { emptyMemory, planOrders, updateMemory } from '@brink/ai';
 import { RULESET_VERSION } from '@brink/game-data';
-import { createScenario } from '@brink/scenarios';
+import { applyCrisis, createScenario, type CrisisId, crisisOf } from '@brink/scenarios';
 import { keyDistance } from '@brink/map';
 import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys } from '@brink/simulation';
 
@@ -36,7 +36,7 @@ export class GameSession {
     seed: number,
     playerNation: NationId | null,
     others: readonly NationId[] = [],
-    opts: { maxTurns?: number; difficulty?: Difficulty } = {},
+    opts: { maxTurns?: number; difficulty?: Difficulty; crisis?: string } = {},
   ): GameSession {
     const world = createScenario(scenarioId, seed);
     // Any length from 5 turns to an epic 60; the scenario's own limit is only the default.
@@ -45,6 +45,11 @@ export class GameSession {
     for (const n of humans) if (!world.nations[n]) throw new Error(`no such nation: ${n}`);
     if (new Set(humans).size !== humans.length) throw new Error('a nation can only have one human');
     if (opts.difficulty) applyDifficulty(world, humans, opts.difficulty);
+    // After the difficulty, which sets who is at war on Easy: the crisis's wars are the story.
+    if (opts.crisis) {
+      if (!crisisOf(opts.crisis)) throw new Error(`unknown crisis: ${opts.crisis}`);
+      applyCrisis(world, opts.crisis as CrisisId);
+    }
     const memory: Record<NationId, AiMemory> = {};
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
     return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});

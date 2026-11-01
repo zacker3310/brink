@@ -22,7 +22,7 @@ import { isMuted, setMuted } from './sfx';
 import { useGame, type Tab } from './store';
 import { EventCard } from './UnitPanel';
 import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
-import { shortName } from '@brink/scenarios';
+import { crisisOf, shortName } from '@brink/scenarios';
 import { minorsOf, powersOf, signed } from './ui';
 import { RANKS, rankOf } from '@brink/arena';
 
@@ -676,16 +676,25 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
 function HowToWin({ onClose }: { onClose: () => void }) {
   const view = useGame((s) => s.view)!;
   const goal = nextObjective(view);
+  const crisis = crisisOf(view.crisis);
   const steps: [string, string][] = [
-    ['Take places', `Cities, capitals and the gold objectives are worth victory points. Reach ${view.victoryThreshold} and you win; allies can win together, and a power far ahead in land, army and output wins by supremacy. Otherwise the best standing after turn ${view.maxTurns} wins.${goal ? ` Start with ${goal.site.name}: the amber ring.` : ''}`],
+    ['Take places', `Cities and capitals are worth victory points, the minor states' most of all. Reach ${view.victoryThreshold} and you win; allies can win together, and a power far ahead in land, army and output wins by supremacy. Otherwise the best standing after turn ${view.maxTurns} wins.${goal ? ` Start with ${goal.site.name}: the amber ring.` : ''}`],
     ['Move and attack', 'Tap your tile, then a blue hex to move there. Enemies you can hit are tagged WIN, EVEN or RISKY: attack the WINs.'],
     ['End the turn', 'Everyone moves at once. Watch what happens, read the debrief, go again. Stuck? Tap Plan and your generals give every unit orders.'],
   ];
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-ink-950/70" data-testid="how-to-win">
-      <div className="sheet-in safe-bottom w-full rounded-t-2xl border-t border-line bg-ink-900 px-5 pt-5">
+      <div className="sheet-in safe-bottom max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border-t border-line bg-ink-900 px-5 pt-5">
+        {crisis && (
+          <div className="mb-4 rounded-xl border border-hostile/40 bg-hostile/10 p-3" data-testid="how-to-crisis">
+            <div className="text-[11px] font-semibold tracking-[0.12em] text-hostile uppercase">Opening crisis</div>
+            <div className="font-display text-xl font-extrabold uppercase">{crisis.name}</div>
+            <p className="mt-1 text-[14px] leading-snug text-text/90">{crisis.story}</p>
+            <p className="mt-1.5 text-[13px] leading-snug text-muted">{crisis.setup}</p>
+          </div>
+        )}
         <div className="font-display text-2xl font-extrabold uppercase">How to win</div>
-        {view.difficulty === 'easy' && <p className="mt-1 text-[13px] text-good">Easy: you face one enemy. The others stay at peace with you.</p>}
+        {view.difficulty === 'easy' && !crisis && <p className="mt-1 text-[13px] text-good">Easy: you face one enemy. The others stay at peace with you.</p>}
         <ol className="mt-3 space-y-3">
           {steps.map(([title, text], i) => (
             <li key={title} className="flex gap-3">
