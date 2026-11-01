@@ -370,7 +370,11 @@ for (const size of SIZES) {
         await expect(page.getByTestId('unit-sheet')).toBeVisible({ timeout: 30_000 });
         await f.up();
         await expect(page.getByTestId('unit-sheet')).toContainText('Range');
-        await expect(page.getByTestId('unit-sheet')).toContainText('Turret front');
+        // The sheet is the selected unit's. This used to expect 'Turret front', which assumed the
+        // selected unit is a vehicle; after the steps above it can be a team on foot (a Sniper Team
+        // on the 440 pt run), whose armour row reads 'None'. Every unit's sheet has the armour row.
+        await expect(page.getByTestId('unit-sheet')).toHaveAttribute('data-unit', (await page.evaluate(() => window.__arena!.overlay()!.selected))!);
+        await expect(page.getByTestId('unit-sheet')).toContainText('Armour');
         await audit(page, 'unit sheet');
         await page.getByTestId('peek-close').tap();
         await clear(page);

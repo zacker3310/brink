@@ -176,6 +176,7 @@ export function UnitSheet({ b, u, status, onClose }: { b: Battle; u: Unit; statu
     <div
       className="vercel absolute inset-0 z-20 flex items-end bg-black/60"
       data-testid="unit-sheet"
+      data-unit={u.id}
       onPointerDown={(e) => {
         downOnBackdrop.current = e.target === e.currentTarget;
       }}
