@@ -230,7 +230,7 @@ function planTreaties(view: NationView, plan: Plan, war: NationOrders['diplomacy
   const offered = (kind: string, n: NationId) => view.proposals.some((p) => p.from === self && p.to === n && p.kind === kind);
   const asked = (kind: string, n: NationId) => view.proposals.some((p) => p.from === n && p.to === self && p.kind === kind);
   for (const n of sortedKeys(view.nations)) {
-    if (n === self || view.nations[n]!.eliminated || busy.has(n)) continue;
+    if (n === self || view.nations[n]!.eliminated || view.nations[n]!.minor || busy.has(n)) continue;
     const rel = view.relations[n];
     if (rel === 'war') continue;
     const embargoed = !!treatyIn(view.treaties, 'embargo', self, n, view.turn);
@@ -347,7 +347,8 @@ function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory, spare: re
   }
   const may = (n: NationId) => !spare.includes(n);
   const focus = plan.target?.owner ?? null;
-  const alive = sortedKeys(view.nations).filter((n) => n !== self && !view.nations[n]!.eliminated);
+  // Minor states make no treaties: they are ground to take, not powers to bargain with.
+  const alive = sortedKeys(view.nations).filter((n) => n !== self && !view.nations[n]!.eliminated && !view.nations[n]!.minor);
   const vp = (n: NationId) => view.nations[n]!.victoryPoints;
   const enemies = alive.filter((n) => view.relations[n] === 'war');
   const partners = alive.filter((n) => view.relations[n] === 'peace');
@@ -380,11 +381,34 @@ function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory, spare: re
 }
 
 /**
+ * A minor state's turn: its militia digs in where it stands and never leaves its own ground; it
+ * raises one infantry formation a turn at its capital or a city while it can pay, keeping a reserve.
+ * No diplomacy, no research choices: it is ground to be taken, defended.
+ */
+function planMinor(view: NationView): NationOrders {
+  const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
+  const formations: Record<FormationId, FormationOrder> = {};
+  for (const f of own) formations[f.id] = UNITS[f.unitClass].ground ? { type: 'defend' } : { type: 'hold' };
+  const recruit: RecruitOrder[] = [];
+  const reserve = { credits: 30, energy: 15, materials: 20, food: 20 };
+  const cost = recruitCost(view.self, 'infantry');
+  const left = view.self.stockpile;
+  const queued = view.self.productionQueue.length;
+  const site = sortedKeys(view.sites)
+    .map((id) => view.sites[id]!)
+    .filter((s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city'))
+    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'capital' ? -1 : 1))[0];
+  if (site && queued === 0 && RESOURCES.every((r) => left[r] - cost[r] >= reserve[r])) recruit.push({ siteId: site.id, unitClass: 'infantry' });
+  return { nation: view.self.id, turn: view.turn, formations, recruit, diplomacy: [] };
+}
+
+/**
  * Orders for one nation's turn. Deterministic in (view, memory, seed). The returned orders are
  * legal against the authoritative world by construction: every path runs over terrain the
  * nation has seen, within the formation's allowance.
  */
 export function planOrders(view: NationView, memory: AiMemory, seed: number, opts: { spare?: readonly NationId[] } = {}): NationOrders {
+  if (view.self.minor) return planMinor(view);
   const self = view.self.id;
   const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
   const contacts = recentContacts(view);

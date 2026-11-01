@@ -2212,3 +2212,11 @@ aside[data-testid^='panel-'] section:first-of-type > header {
   background: #ffffff;
   box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
 }
+.wr-front-tag {
+  margin-left: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}

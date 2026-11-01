@@ -52,8 +52,10 @@ export function dossier(world: WorldState, id: NationId): Dossier {
     }
   }
 
+  // The nearest prize: an objective site, else (the Pacific) a minor state's capital this power is after.
   const capital = mine.find((s) => s.kind === 'capital');
-  const objectives = sites.filter((s) => s.kind === 'objective');
+  const wanted = new Set(world.nations[id]!.objectives);
+  const objectives = sites.filter((s) => s.kind === 'objective' || (wanted.has(s.id) && s.owner !== id));
   const toObjective = capital && objectives.length ? Math.min(...objectives.map((o) => keyDistance(capital.key, o.key))) : 0;
 
   const y = grossYields(world, id);
@@ -113,7 +115,7 @@ export const DOCTRINE: Record<GovernmentId, string> = {
 };
 
 const ADJECTIVES = ['Iron', 'Silent', 'Crimson', 'Northern', 'Broken', 'Pale', 'Hollow', 'Burning', 'Last', 'Winter', 'Granite', 'Black', 'Distant', 'Sudden', 'Amber', 'Bitter'];
-const NOUNS = ['Meridian', 'Anvil', 'Lantern', 'Harvest', 'Spear', 'Tempest', 'Bastion', 'Horizon', 'Requiem', 'Gambit', 'Vigil', 'Sabre', 'Tide', 'Crown', 'Ember', 'Rampart'];
+const NOUNS = ['Typhoon', 'Anvil', 'Lantern', 'Harvest', 'Spear', 'Tempest', 'Bastion', 'Horizon', 'Requiem', 'Gambit', 'Vigil', 'Sabre', 'Tide', 'Crown', 'Ember', 'Rampart'];
 
 /** A stable codename for a seed, so a shared seed has a name people remember. */
 export function operationName(seed: number): string {

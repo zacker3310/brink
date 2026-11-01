@@ -1,12 +1,14 @@
 # Brink: game design
 
-The rules as implemented, ruleset `1.6.0`. Numbers come from `packages/game-data`; when this
+The rules as implemented, ruleset `2.0.0`. Numbers come from `packages/game-data`; when this
 document and the code disagree, the code is right and this file is stale.
 
 ## Premise
 
-Four fictional powers fight over the Meridian basin. You lead one; three AIs lead the others. Every
-turn all four write their orders in secret, then one deterministic engine resolves them all at once.
+The United States, Russia, China and Japan fight across the Pacific (docs/pacific.md). You lead one;
+three AIs lead the others, and five minor states (Canada, Mexico, North and South Korea, Taiwan) hold
+their own ground with militias. Every turn all of them write their orders in secret, then one
+deterministic engine resolves them all at once.
 One turn is six hours. You see only what your units and cities can see.
 
 ## The turn
@@ -181,11 +183,13 @@ starting stockpile), Normal (everyone at war from turn 1), Hard (the AI starts w
 AI plays at full strength on every level; Easy and Normal give the human seats a command edge
 (`DIFFICULTY_EDGE`): Easy +70% income, +60% industry, +40% attack, +50% home defence, units 30%
 cheaper; Normal +30% income and industry, +20% attack, +25% home defence, units 15% cheaper.
-Measured with the AI's own planner in the human seat (32 campaigns each, Meridian, 30 turns): Easy
-wins 88% (66% playing only defensively), Normal 56% (13%), Hard 25%. In tactical battles the enemy
+Measured on the retired Meridian theatre (ruleset 1.6.0) with the AI's own planner in the human seat
+(32 campaigns each, 30 turns): Easy wins 88% (66% playing only defensively), Normal 56% (13%), Hard
+25%. Not yet re-measured on the Pacific. In tactical battles the enemy
 also reads less well on Easy (lower skill).
-Theatres: the Meridian, the Highland Front (one war won), the Varn Delta (two wars won). The seed
-fixes the map texture and every roll.
+Theatre: the Pacific, the only one since ruleset 2.0.0 (the Meridian, Highland Front and Varn Delta
+were retired; their saves are refused with a message). The seed fixes the ground texture and every
+roll; coasts, borders and sites never change.
 
 ## AI
 

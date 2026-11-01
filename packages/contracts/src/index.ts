@@ -163,6 +163,11 @@ export interface Nation {
   /** Cumulative strength lost; drives war weariness. */
   warLosses: number;
   eliminated: boolean;
+  /**
+   * A minor state (Canada, Taiwan…): holds its own ground with a militia and is never a player. It
+   * counts for neither last standing, coalitions, supremacy nor the score; its sites are the prize.
+   */
+  minor?: boolean;
   /** A world event awaiting this nation's answer, drawn at the end of `turn`. */
   event?: PendingEvent | null;
   /** A human seat's command edge from the campaign difficulty (`DIFFICULTY_EDGE`). Absent: none. */
@@ -479,6 +484,8 @@ export interface PublicNation {
   government: GovernmentId;
   eliminated: boolean;
   victoryPoints: number;
+  /** A minor state: neutral ground with a militia, never a rival power. */
+  minor?: boolean;
 }
 
 export interface NationView {

@@ -3,6 +3,7 @@ import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Sprite
 import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
+import { mainland } from './mainland';
 import { HEX_SIZE, useCamera } from './camera';
 import { addUnit, affiliationOf, keepScreenSize, setModelZoom, tickModels, type CounterLook } from './counters';
 import { AFFILIATION, FONT_DISPLAY, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
@@ -898,11 +899,13 @@ export function MapView() {
     a.layers.overlay!.addChild(overlay);
 
     // Nation names across their territory, for the zoomed-out political map.
-    const lands = new Map<string, Point[]>();
+    // On each nation's mainland: the average of all its land can fall in the sea between islands.
+    const held = new Map<string, string[]>();
     for (const key of keys) {
       const t = v.tiles[key]!;
-      if (t.owner && t.visibility !== 'unknown') lands.set(t.owner, [...(lands.get(t.owner) ?? []), center(key)]);
+      if (t.owner && t.visibility !== 'unknown') held.set(t.owner, [...(held.get(t.owner) ?? []), key]);
     }
+    const lands = new Map<string, Point[]>([...held].map(([o, ks]) => [o, mainland(ks).map(center)]));
     for (const [owner, pts] of [...lands].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
       const n = v.nations[owner];
       if (!n || pts.length < 3) continue;

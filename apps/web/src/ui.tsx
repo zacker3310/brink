@@ -1,5 +1,19 @@
 import type { ReactNode } from 'react';
-import type { Stockpile } from '@brink/contracts';
+import type { NationView, PublicNation, Stockpile } from '@brink/contracts';
+
+/** The powers in the war, by victory points: minor states are never rivals (docs/pacific.md). */
+export function powersOf(view: NationView): PublicNation[] {
+  return Object.values(view.nations)
+    .filter((n) => !n.minor)
+    .sort((a, b) => b.victoryPoints - a.victoryPoints || (a.id < b.id ? -1 : 1));
+}
+
+/** The minor states: neutral ground with a militia, the prizes of the war. */
+export function minorsOf(view: NationView): PublicNation[] {
+  return Object.values(view.nations)
+    .filter((n) => n.minor)
+    .sort((a, b) => (a.name < b.name ? -1 : 1));
+}
 
 export function Panel({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
   return (

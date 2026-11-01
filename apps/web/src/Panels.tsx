@@ -8,7 +8,8 @@ import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { checkResearchView, diplomacyBlocked, recommendedTech, recruitCostFor, researchPerTurn } from './rules-view';
 import { describeOrder } from './planning';
 import { useGame } from './store';
-import { Button, costText, Meter, Stat, Swatch } from './ui';
+import { shortName } from '@brink/scenarios';
+import { Button, costText, Meter, powersOf, Stat, Swatch } from './ui';
 import { Icon } from './icons';
 import { ABILITIES, type AbilityId } from '@brink/arena';
 
@@ -29,10 +30,10 @@ export function Overview() {
   const draft = useGame((s) => s.draft)!;
   const focusOn = useGame((s) => s.focusOn);
   const nextIdle = useGame((s) => s.nextIdle);
-  const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints || (a.id < b.id ? -1 : 1));
+  const ranked = powersOf(view);
   const objectives = view.self.objectives.map((id) => view.sites[id]).filter((s) => s !== undefined);
   const idle = idleFormations(view, draft.formations).length;
-  const atWar = Object.entries(view.relations).filter(([, r]) => r === 'war').length;
+  const atWar = Object.entries(view.relations).filter(([n, r]) => r === 'war' && !view.nations[n]?.minor).length;
   const threshold = view.victoryThreshold;
   const scale = Math.max(threshold, ...ranked.map((n) => n.victoryPoints)) * 1.08;
   return (
@@ -94,7 +95,7 @@ export function Overview() {
                   <span className="font-semibold">{s.name}</span>
                   <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted">
                     {owner ? <Swatch color={owner.color} /> : null}
-                    {owner ? owner.name.split(' ')[0] : 'unheld'} · {s.victoryPoints} VP
+                    {owner ? shortName(owner.name) : 'unheld'} · {s.victoryPoints} VP
                   </span>
                 </button>
               </li>
@@ -513,9 +514,8 @@ export function Diplomacy() {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
   const setDiplomacy = useGame((s) => s.setDiplomacy);
-  const others = Object.values(view.nations)
-    .filter((n) => n.id !== view.self.id)
-    .sort((a, b) => b.victoryPoints - a.victoryPoints);
+  // Minor states make no treaties: they are ground to take, so they are not listed here.
+  const others = powersOf(view).filter((n) => n.id !== view.self.id);
   const planned = (id: string) => draft.diplomacy.find((d) => d.target === id)?.action ?? null;
   const toggle = (id: string, action: DiplomaticAction) => setDiplomacy(id, planned(id) === action ? null : action);
   const wars = others.filter((n) => !n.eliminated && view.relations[n.id] === 'war').length;

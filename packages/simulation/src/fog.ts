@@ -235,7 +235,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
   const relations: Record<NationId, Relation> = {};
   for (const id of sortedKeys(world.nations)) {
     const n = world.nations[id]!;
-    nations[id] = { id, name: n.name, color: n.color, government: n.government, eliminated: n.eliminated, victoryPoints: vp[id]! };
+    nations[id] = { id, name: n.name, color: n.color, government: n.government, eliminated: n.eliminated, victoryPoints: vp[id]!, ...(n.minor ? { minor: true } : {}) };
     if (id !== nation) relations[id] = relationOf(world.relations, nation, id);
   }
 

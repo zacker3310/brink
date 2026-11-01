@@ -7,7 +7,7 @@
 
 import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
 
-export const RULESET_VERSION = '1.6.0';
+export const RULESET_VERSION = '2.0.0';
 
 export const HOURS_PER_TURN = 6;
 

@@ -1,7 +1,7 @@
 import type { WorldState } from '@brink/contracts';
-import { createMeridianScenario, MERIDIAN_ID, THEATRES } from './meridian';
+import { createPacificScenario, MAX_TURNS, PACIFIC_ID, THEATRES } from './pacific';
 
-export * from './meridian';
+export * from './pacific';
 
 export interface ScenarioInfo {
   id: string;
@@ -13,16 +13,15 @@ export interface ScenarioInfo {
 
 export const SCENARIOS: readonly ScenarioInfo[] = [
   {
-    id: MERIDIAN_ID,
-    name: 'The Meridian Crisis',
-    summary: 'Four states fight over the Meridian basin, its oil, its mines and the free city of Vessa.',
+    id: PACIFIC_ID,
+    name: 'The Pacific',
+    summary: 'The United States, Russia, China and Japan fight across an ocean of islands, with Canada, Mexico, the Koreas and Taiwan caught between them.',
     nations: 4,
-    maxTurns: 30,
+    maxTurns: MAX_TURNS,
   },
 ];
 
-/** Every theatre is the Meridian generator on different ground. */
 export function createScenario(id: string, seed: number): WorldState {
-  if (THEATRES.some((t) => t.id === id)) return createMeridianScenario(seed, id);
+  if (THEATRES.some((t) => t.id === id)) return createPacificScenario(seed);
   throw new Error(`unknown scenario: ${id}`);
 }

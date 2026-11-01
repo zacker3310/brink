@@ -209,7 +209,8 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
     const me = humans[0];
     const home = me ? capital(me) : undefined;
     if (humans.length !== 1 || !me || !home) return;
-    const rivals = sortedKeys(world.nations).filter((n) => n !== me);
+    // Rival powers only: minor states stay at war with everyone, they are ground to take.
+    const rivals = sortedKeys(world.nations).filter((n) => n !== me && !world.nations[n]!.minor);
     const far = (n: NationId) => {
       const k = capital(n);
       return k ? keyDistance(home, k) : Infinity;
@@ -217,6 +218,6 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
     const nearest = [...rivals].sort((a, b) => far(a) - far(b) || (a < b ? -1 : 1))[0];
     for (const n of rivals) if (n !== nearest) world.relations[pairKey(me, n)] = 'peace';
   } else {
-    for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) boost(n);
+    for (const n of sortedKeys(world.nations)) if (!humans.includes(n) && !world.nations[n]!.minor) boost(n);
   }
 }

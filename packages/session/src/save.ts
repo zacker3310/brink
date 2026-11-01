@@ -4,6 +4,9 @@ import { RULESET_VERSION } from '@brink/game-data';
 import { SCENARIOS, THEATRES } from '@brink/scenarios';
 import { hashState } from '@brink/simulation';
 
+/** Theatres the game no longer has (ruleset 2.0.0 replaced them with the Pacific). */
+const RETIRED: readonly string[] = ['meridian-crisis', 'highland-front', 'varn-delta'];
+
 export class SaveError extends Error {}
 
 /** The oldest save version this build can migrate forward. */
@@ -76,6 +79,7 @@ export function parseSave(text: string): SaveFile {
     throw new SaveError(`save uses ruleset ${s.rulesetVersion}, newer than this build (${RULESET_VERSION}); update the game`);
   }
   const known = SCENARIOS.some((sc) => sc.id === s.scenarioId) || THEATRES.some((t) => t.id === s.scenarioId);
+  if (!known && RETIRED.includes(s.scenarioId as string)) throw new SaveError('this campaign was fought in the Meridian, which the Pacific has replaced; start a new campaign');
   if (!known) throw new SaveError(`unknown scenario ${s.scenarioId}`);
   if (!s.world || typeof s.world !== 'object' || s.world.rulesetVersion !== s.rulesetVersion || s.world.scenarioId !== s.scenarioId) throw new SaveError('save world does not match its header');
   if (!s.world.nations || !s.playerNation || !s.world.nations[s.playerNation]) throw new SaveError('save names a player nation that does not exist');

@@ -17,8 +17,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(page.getByTestId('wordmark')).toHaveText('Brink');
   await expect(page.getByTestId('menu-continue')).toHaveCount(0);
   await page.getByTestId('menu-new').click();
-  await page.getByTestId('nation-korva').click();
-  await expect(page.getByTestId('dossier-name')).toHaveText('Korva Directorate');
+  await page.getByTestId('nation-russia').click();
+  await expect(page.getByTestId('dossier-name')).toHaveText('Russia');
   await page.getByTestId('seed').fill('1234');
   // Normal: every rival at war from turn 1, so the first turn has fighting to replay.
   await page.getByTestId('difficulty-normal').click();
@@ -26,7 +26,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
 
   // Building the world takes a few seconds (about 2.6 here, more with other tests running).
   await expect(page.getByTestId('top-bar')).toContainText('BRINK', { timeout: 30_000 });
-  await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
+  await expect(page.getByTestId('top-bar')).toContainText('Russia');
   await expect(page.getByTestId('turn')).toContainText('1 / 20');
   await expect(page.getByTestId('map-canvas')).toBeVisible();
 
@@ -61,7 +61,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
 
   // Choose production in the capital from its city banner.
   await page.keyboard.press('Escape');
-  await page.getByTestId('city-korva-capital').click();
+  await page.getByTestId('city-russia-capital').click();
   await page.getByTestId('build-infantry').click();
   await expect(page.getByTestId('build-infantry')).toHaveAttribute('class', /border-signal/);
   await page.getByTestId('close-city').click();
@@ -72,7 +72,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(page.getByTestId('order-review')).toBeVisible();
   await expect(page.getByTestId('review-orders')).toBeVisible();
   // The infantry chosen in the capital is listed with its cost, and the treasury shows what is left.
-  await expect(page.getByTestId('order-review')).toContainText('Infantry at Korvagrad');
+  await expect(page.getByTestId('order-review')).toContainText('Infantry at Vladivostok');
   await expect(page.getByTestId('review-treasury')).toBeVisible();
   // Back keeps the orders; End Turn again and Commit sends them.
   await page.getByTestId('review-back').click();
@@ -128,10 +128,10 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('save-slot-2').click();
   await expect(page.getByText('Saved to Slot 2')).toBeVisible();
   await page.reload();
-  await expect(page.getByTestId('menu-continue')).toContainText('Korva Directorate · turn 2');
+  await expect(page.getByTestId('menu-continue')).toContainText('Russia · turn 2');
   await page.getByTestId('menu-load').click();
   await page.getByTestId('load-slot-2').click();
-  await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
+  await expect(page.getByTestId('top-bar')).toContainText('Russia');
   await expect(page.getByTestId('turn')).toContainText('2 / 20');
   await page.getByTestId('open-report').click();
   await expect(page.getByTestId('report')).toContainText('Turn 1 resolved');
@@ -142,11 +142,11 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   const download = page.waitForEvent('download');
   await page.getByTestId('save-export').click();
   const file = await download;
-  expect(file.suggestedFilename()).toBe('brink-korva-turn-2.json');
+  expect(file.suggestedFilename()).toBe('brink-russia-turn-2.json');
   await page.getByRole('button', { name: 'Menu' }).click();
   await page.getByTestId('menu-load').click();
   await page.getByTestId('load-file').setInputFiles((await file.path())!);
-  await expect(page.getByTestId('top-bar')).toContainText('Korva Directorate');
+  await expect(page.getByTestId('top-bar')).toContainText('Russia');
   await expect(page.getByTestId('turn')).toContainText('2 / 20');
 
   // Play another turn, then browse back through the report history.

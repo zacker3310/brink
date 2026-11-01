@@ -8,8 +8,8 @@ import { Setup } from './Setup';
 import { Skirmish } from './Skirmish';
 import { Title, type MenuScreen } from './Title';
 
-/** The guided first match: the Commonwealth, on a seed with a clean opening. */
-const TUTORIAL_NATION = 'aster';
+/** The guided first match: the United States, on a seed with a clean opening. */
+const TUTORIAL_NATION = 'usa';
 const TUTORIAL_SEED = 1;
 
 export function Menu() {

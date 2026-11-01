@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { HexKey, NationView } from '@brink/contracts';
 import { hexCorners, hexToPixel, neighborKeys, parseKey, type Point } from '@brink/map';
-import { createScenario, MERIDIAN_ID } from '@brink/scenarios';
+import { createScenario, PACIFIC_ID, shortName } from '@brink/scenarios';
+import { mainland } from '../mainland';
 import { buildView } from '@brink/simulation';
 import { paintTheatre } from '../paint/ground';
 import { MapLife } from '../paint/life';
@@ -22,7 +23,7 @@ function hash(s: string): number {
 
 /**
  * Where the war is burning: edges from a realm into a rival's land or into the no-man's land
- * between realms (on the Meridian most realms are kept apart by unclaimed borderland), sampled
+ * between realms (in the Pacific many realms are kept apart by sea), sampled
  * evenly across the map.
  */
 function frontier(v: NationView): [HexKey, HexKey][] {
@@ -77,7 +78,7 @@ export function TitleScene({ className = '' }: { className?: string }) {
       app.canvas.setAttribute('aria-hidden', 'true');
       const world = new Container();
       app.stage.addChild(world);
-      const v = buildView(createScenario(MERIDIAN_ID, 1), 'aster');
+      const v = buildView(createScenario(PACIFIC_ID, 1), 'usa');
       const keys = Object.keys(v.tiles).sort();
       const painted = paintTheatre(v, keys, SIZE);
       const tex = Texture.from(painted.canvas);
@@ -93,18 +94,20 @@ export function TitleScene({ className = '' }: { className?: string }) {
       for (const [k, n] of frontier(v)) life.addFront(center(k), center(n), hash(n + k));
       for (const [k] of frontier(v).filter((_, i) => i % 3 === 0)) life.addFire(center(k), hash(k));
       // Realm names, engraved: drawn once the typeface is in (Pixi will not redraw unchanged text).
-      const lands = new Map<string, Point[]>();
+      // On each realm's mainland, not the average of its islands (which can fall in the sea).
+      const held = new Map<string, string[]>();
       for (const k of keys) {
         const o = v.tiles[k]!.owner;
-        if (o) lands.set(o, [...(lands.get(o) ?? []), center(k)]);
+        if (o) held.set(o, [...(held.get(o) ?? []), k]);
       }
+      const lands = new Map<string, Point[]>([...held].map(([o, ks]) => [o, mainland(ks).map(center)]));
       const font = document.fonts?.load("700 34px 'Cinzel'") ?? Promise.resolve();
       void Promise.race([font, new Promise((r) => setTimeout(r, 1500))]).then(() => {
       if (dead) return;
       for (const [owner, pts] of lands) {
         const n = v.nations[owner]!;
         const t = new Text({
-          text: n.name.split(' ')[0]!.toUpperCase(),
+          text: shortName(n.name).toUpperCase(),
           resolution: 2,
           style: { fontFamily: "'Cinzel', Georgia, serif", fontSize: 26, fontWeight: '700', fill: 0xf6ecd0, letterSpacing: 8, stroke: { color: 0x1a1208, width: 6, join: 'round' }, dropShadow: { color: hex(n.color), blur: 14, distance: 0, alpha: 0.9 } },
         });

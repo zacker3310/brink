@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY } from '@brink/game-data';
-import { NATIONS, THEATRES, createScenario } from '@brink/scenarios';
+import { MINORS, NATIONS, THEATRES, createScenario } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Kbd, Mark, useKeys } from '../chrome';
@@ -215,7 +215,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                   <Emblem color={n.color} government={n.government} className="h-9 w-9 lg:h-10 lg:w-10" />
                   <span className="min-w-0 flex-1 max-lg:text-center">
                     <span className="wr-nation-name">
-                      <span className="wr-only-phone">{n.name.split(' ')[0]}</span>
+                      <span className="wr-only-phone">{n.short}</span>
                       <span className="wr-only-desk">{n.name}</span>
                     </span>
                     <span className="wr-nation-gov">{g.name}</span>
@@ -248,7 +248,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               </div>
               <blockquote className="wr-doctrine">{DOCTRINE[spec.government]}</blockquote>
               <p className="mt-2 text-[13px] leading-snug text-muted">
-                {gov.summary} Seat of government: <span className="text-text">{spec.capital[2]}</span>.
+                {gov.summary} Theatre command: <span className="text-text">{spec.capital[2]}</span>.
               </p>
 
               <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="National traits">
@@ -318,13 +318,14 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
 
               <SubHead>Contested borders</SubHead>
               <div className="flex flex-wrap gap-1.5 text-[13px]">
-                {info.fronts.length === 0 && <span className="text-faint">None. Every rival is beyond the basin.</span>}
+                {info.fronts.length === 0 && <span className="text-faint">None. Every rival is across the sea.</span>}
                 {info.fronts.map((f) => {
-                  const r = NATIONS.find((n) => n.id === f)!;
+                  const r = [...NATIONS, ...MINORS].find((n) => n.id === f)!;
                   return (
                     <span key={f} className="wr-front" style={{ ['--c' as string]: r.color }}>
                       <Emblem color={r.color} government={r.government} className="h-4.5 w-4.5" />
                       {r.name}
+                      {r.minor && <span className="wr-front-tag">neutral</span>}
                     </span>
                   );
                 })}
@@ -368,8 +369,9 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               ))}
             </div>
 
-            <SubHead>Theatre</SubHead>
-            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Theatre">
+            {/* One theatre today: the picker returns when there is a choice to make. */}
+            {THEATRES.length > 1 && <SubHead>Theatre</SubHead>}
+            <div className={`grid gap-2 sm:grid-cols-3 ${THEATRES.length > 1 ? '' : 'hidden'}`} role="radiogroup" aria-label="Theatre">
               {THEATRES.map((t) => {
                 const locked = t.unlock > wars;
                 return (

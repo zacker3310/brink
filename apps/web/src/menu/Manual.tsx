@@ -72,7 +72,7 @@ export function Manual({ onBack }: { onBack: () => void }) {
               <span className="font-semibold text-signal">Attrition.</span> <span className="text-muted">Lead on victory points when turn {scenario.maxTurns} resolves.</span>
             </li>
           </ul>
-          <p className="mt-3 text-xs text-muted">Capitals are worth the most, then cities, objectives and depots. Vessa, Halden Fields and Corrin Mines start unclaimed.</p>
+          <p className="mt-3 text-xs text-muted">Capitals are worth the most, then cities and depots. Canada, Mexico, the two Koreas and Taiwan are minor states: militias that hold their own cities and never leave home. Taking them is how a power wins.</p>
         </Frame>
 
         <Frame className="enter-2 p-4">

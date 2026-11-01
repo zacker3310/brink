@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { FACILITY_SLOTS, STACK_LIMIT } from '@brink/game-data';
-import { MERIDIAN_ID } from '@brink/scenarios';
+import { PACIFIC_ID } from '@brink/scenarios';
 import { GameSession } from '@brink/session';
 
 const MATCHES = Number(process.env.SOAK_MATCHES ?? 100);
@@ -50,7 +50,7 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
     let rejected = 0;
     const usage = { facilities: 0, treaties: 0 };
     for (let seed = 1; seed <= MATCHES; seed++) {
-      const s = GameSession.create(MERIDIAN_ID, seed, null);
+      const s = GameSession.create(PACIFIC_ID, seed, null);
       let guard = 0;
       while (!s.over) {
         const r = s.advance();

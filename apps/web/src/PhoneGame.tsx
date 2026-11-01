@@ -22,7 +22,8 @@ import { isMuted, setMuted } from './sfx';
 import { useGame, type Tab } from './store';
 import { EventCard } from './UnitPanel';
 import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
-import { signed } from './ui';
+import { shortName } from '@brink/scenarios';
+import { minorsOf, powersOf, signed } from './ui';
 import { RANKS, rankOf } from '@brink/arena';
 
 // The game on a phone: the map edge to edge, a slim status strip under the notch, and everything
@@ -43,7 +44,7 @@ function Hud({ onMenu, onEconomy, onWorld }: { onMenu: () => void; onEconomy: ()
   const ledger = selfLedger(view, report);
   const net = ledger ? netChange(ledger) : null;
   const turn = Math.min(view.turn, view.maxTurns);
-  const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints);
+  const ranked = powersOf(view);
   const rival = ranked.find((n) => n.id !== s.id)!;
   const mine = view.nations[s.id]?.victoryPoints ?? 0;
   const short = ledger?.shortages ?? [];
@@ -605,10 +606,11 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
   );
 }
 
-/** The whole theatre: every nation ranked, with where you stand with it. */
+/** The whole theatre: the powers ranked, with where you stand with each, then the minor states. */
 function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy: () => void }) {
   const view = useGame((s) => s.view)!;
-  const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints);
+  const ranked = powersOf(view);
+  const minors = minorsOf(view);
   const cities = (id: string) => Object.values(view.sites).filter((s) => s.owner === id && (s.kind === 'city' || s.kind === 'capital')).length;
   const tag = (id: string) => (id === view.self.id ? ['You', 'bg-friend text-ink-950'] : view.relations[id] === 'war' ? ['War', 'bg-hostile text-white'] : view.relations[id] === 'alliance' ? ['Ally', 'bg-friend text-ink-950'] : ['Peace', 'bg-good text-ink-950']);
   return (
@@ -630,7 +632,7 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
             <li key={n.id} className="flex items-center gap-2.5">
               <span className="w-4 text-[13px] text-faint">{i + 1}</span>
               <span className="h-4 w-4 shrink-0 rounded" style={{ background: n.color }} />
-              <span className={`min-w-0 flex-1 truncate text-[14px] ${n.id === view.self.id ? 'font-bold' : ''} ${n.eliminated ? 'text-faint line-through' : ''}`}>{n.name}</span>
+              <span className={`min-w-0 flex-1 truncate text-[14px] ${n.id === view.self.id ? 'font-bold' : ''} ${n.eliminated ? 'text-faint line-through' : ''}`}>{shortName(n.name)}</span>
               <span className="text-[12px] text-faint">{cities(n.id)} cities</span>
               <span className="w-14 text-right text-[13px] tabular-nums text-muted" data-testid={`standing-${n.id}`} title="Average share of land, army and output: Supremacy and the score at the turn limit">
                 {view.supremacy[n.id] ?? 0}%
@@ -641,6 +643,23 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
           );
         })}
       </ul>
+      {minors.length > 0 && (
+        <>
+          <div className="mt-3 text-[11px] font-semibold tracking-wide text-faint uppercase">Minor states: militias holding their own cities</div>
+          <ul className="mt-1.5 space-y-1.5" data-testid="minor-states">
+            {minors.map((n) => (
+              <li key={n.id} className="flex items-center gap-2.5">
+                <span className="w-4" />
+                <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: n.color }} />
+                <span className={`min-w-0 flex-1 truncate text-[14px] ${n.eliminated ? 'text-faint line-through' : ''}`}>{n.name}</span>
+                <span className="text-[12px] text-faint">{cities(n.id)} cities</span>
+                <span className="w-12 text-right text-[14px] font-semibold tabular-nums">{n.victoryPoints}</span>
+                <span className={`w-14 rounded-full py-0.5 text-center text-[10px] font-bold uppercase ${n.eliminated ? 'bg-ink-700 text-faint' : 'bg-ink-700 text-muted'}`}>{n.eliminated ? 'Fallen' : 'Neutral'}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <div className="mt-3 flex gap-2 pb-1">
         <button type="button" onClick={onDiplomacy} className="h-11 flex-1 rounded-lg border border-line bg-ink-850 text-[14px] font-semibold">
           Diplomacy

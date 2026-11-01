@@ -198,7 +198,7 @@ language. It sits inside the menus' `.vercel` scope but sets its own type, so di
   parameters, victory figures); the chosen nation's colour (`--nation`) for who you are (roster,
   dossier, order of battle, map focus). Green and red stay gains and losses. Command metal is gold
   (`--cmd-*` tokens on `.wr`), except for a nation whose own colour is in the gold-olive band
-  (`nearGold()`, Drevan today): then it is platinum (`data-command="platinum"`), so who you are and
+  (`nearGold()`, China today): then it is platinum (`data-command="platinum"`), so who you are and
   what you command never read as one colour. The domination line is always white.
 - **Hero**: the theatre map full bleed on a phone, a framed card on a desk, with gold registration
   corners. The codename sits below the map, never over it, in Barlow Condensed 800 with a TOP
@@ -219,7 +219,7 @@ language. It sits inside the menus' `.vercel` scope but sets its own type, so di
 The home screen is a game title screen (`menu/Title.tsx`, `menu/TitleScene.tsx`, `.home*` in
 `index.css`):
 
-- **Backdrop**: the painted Meridian theatre, full screen, at war. Fronts burn along the realm
+- **Backdrop**: the painted Pacific theatre, full screen, at war. Fronts burn along the realm
   borders and the no-man's land between them (`MapLife.addFront`, `addFire`), clouds pass, and the
   camera drifts and breathes over it. In portrait the war is framed in the top third, above the menu.
 - **Title**: BRINK in Cinzel 900 with a gold-on-bronze gradient and a dark keyline, the scenario name

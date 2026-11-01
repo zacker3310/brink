@@ -9,8 +9,9 @@ import { relationOf, sortedKeys } from './rules';
 // turn always resolve the same way: last standing, domination, coalition, supremacy, then the score
 // at the turn limit. The limit guarantees every campaign ends.
 
+/** The powers still in the war. Minor states are never players: they count for no way of winning. */
 function living(world: WorldState): NationId[] {
-  return sortedKeys(world.nations).filter((n) => !world.nations[n]!.eliminated);
+  return sortedKeys(world.nations).filter((n) => !world.nations[n]!.eliminated && !world.nations[n]!.minor);
 }
 
 function share(part: number, total: number): number {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMeridianScenario } from '@brink/scenarios';
+import { createPacificScenario } from '@brink/scenarios';
 import { hexKey } from '@brink/map';
 import { buildView, lockOrders, previewAssault, resolveTurn, sortedKeys } from '@brink/simulation';
 import { makeWorld, own, setRelation, site, unit } from '../../simulation/src/fixture.test-util';
@@ -8,7 +8,7 @@ import { emptyMemory, planOrders, updateMemory } from './index';
 describe('AI', () => {
   it('only ever submits orders the validator accepts, over whole matches', () => {
     for (const seed of [1, 2, 3, 4]) {
-      let w = createMeridianScenario(seed);
+      let w = createPacificScenario(seed);
       for (let turn = 0; turn < 30 && !w.victory; turn++) {
         const subs = sortedKeys(w.nations)
           .filter((n) => !w.nations[n]!.eliminated)
@@ -21,8 +21,8 @@ describe('AI', () => {
   }, 30_000); // whole matches: seconds locally, more on a shared CI runner
 
   it('is deterministic and reads nothing but its own view', () => {
-    const w = createMeridianScenario(5);
-    const view = buildView(w, 'korva');
+    const w = createPacificScenario(5);
+    const view = buildView(w, 'russia');
     const a = planOrders(view, emptyMemory(), 9);
     const b = planOrders(JSON.parse(JSON.stringify(view)), emptyMemory(), 9);
     expect(a).toEqual(b);
@@ -30,8 +30,8 @@ describe('AI', () => {
   });
 
   it('issues movement and recruitment on the first turn', () => {
-    const w = createMeridianScenario(3);
-    const o = planOrders(buildView(w, 'aster'), emptyMemory(), 3);
+    const w = createPacificScenario(3);
+    const o = planOrders(buildView(w, 'usa'), emptyMemory(), 3);
     expect(Object.values(o.formations).some((x) => x.type === 'move' || x.type === 'recon')).toBe(true);
     expect(o.recruit.length).toBeGreaterThan(0);
   });
@@ -115,5 +115,46 @@ describe('AI', () => {
     expect(planOrders(buildView(w, 'a'), emptyMemory(), 1).eventChoice).toBeDefined();
     w.nations.a!.event = null;
     expect(planOrders(buildView(w, 'a'), emptyMemory(), 1).eventChoice).toBeUndefined();
+  });
+});
+
+describe('AI for minor states', () => {
+  /** Powers a and b, minor m with its city at the far corner. */
+  const world = () => {
+    const w = makeWorld(10, 6, ['a', 'b', 'm']);
+    w.nations.m!.minor = true;
+    return w;
+  };
+
+  it('holds its ground: never moves, never strikes out, makes no diplomacy', () => {
+    const w = world();
+    const home = w.sites['m-home']!.key;
+    unit(w, 'm1', 'm', 'infantry', home);
+    unit(w, 'm2', 'm', 'recon', home);
+    unit(w, 'a1', 'a', 'infantry', hexKey(5, 3));
+    const o = planOrders(buildView(w, 'm'), emptyMemory(), 1);
+    expect(Object.values(o.formations).every((x) => x.type === 'defend' || x.type === 'hold')).toBe(true);
+    expect(o.diplomacy).toEqual([]);
+    expect(lockOrders(w, [o]).rejected).toEqual([]);
+  });
+
+  it('raises only militia, at its own cities', () => {
+    const w = world();
+    unit(w, 'm1', 'm', 'infantry', w.sites['m-home']!.key);
+    const o = planOrders(buildView(w, 'm'), emptyMemory(), 1);
+    expect(o.recruit.length).toBeGreaterThan(0);
+    expect(o.recruit.every((r) => r.unitClass === 'infantry' && w.sites[r.siteId]!.owner === 'm')).toBe(true);
+  });
+
+  it('a power never offers a minor state a treaty or declares on it', () => {
+    const w = world();
+    setRelation(w, 'a', 'b', 'peace');
+    setRelation(w, 'a', 'm', 'war');
+    unit(w, 'a1', 'a', 'infantry', w.sites['a-home']!.key);
+    for (const turn of [1, 12, 25]) {
+      w.turn = turn;
+      const o = planOrders(buildView(w, 'a'), emptyMemory(), 1);
+      expect(o.diplomacy.some((d) => d.target === 'm')).toBe(false);
+    }
   });
 });

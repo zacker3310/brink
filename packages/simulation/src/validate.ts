@@ -331,6 +331,8 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
       if (!t || d.target === nation) reject('no such nation');
       else if (perTarget.get(d.target)! > 1) reject(`more than one diplomatic action toward ${t.name}`);
       else if (t.eliminated) reject(`${t.name} has been eliminated`);
+      else if (n.minor) reject('a minor state makes no treaties');
+      else if (t.minor) reject(`${t.name} is a minor state: it makes no treaties`);
       else {
         const why = checkDiplomacy(world, nation, d.target, d.action);
         if (why) reject(why);

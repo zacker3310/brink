@@ -12,12 +12,12 @@ Object.assign(globalThis, {
 });
 
 const skirmish = (): BattleRequest => skirmishRequest(SKIRMISHES[0]!, 0);
-/** A war-map attack: the same shape, no skirmish flag, ordered on turn 4 by Korva. */
+/** A war-map attack: the same shape, no skirmish flag, ordered on turn 4 by Russia. */
 const attack = (): BattleRequest => {
   const { skirmish: _s, ...rest } = skirmish();
   return { ...rest, target: '3,4', orders: { blue: { type: 'attack', target: '3,4' } as never } };
 };
-const view = (turn: number, formations: string[] = ['blue']) => ({ turn, self: { id: 'korva' }, formations: Object.fromEntries(formations.map((f) => [f, {}])) }) as unknown as NationView;
+const view = (turn: number, formations: string[] = ['blue']) => ({ turn, self: { id: 'russia' }, formations: Object.fromEntries(formations.map((f) => [f, {}])) }) as unknown as NationView;
 
 beforeEach(() => data.clear());
 
@@ -62,30 +62,30 @@ describe('saving a battle in progress', () => {
   });
 
   it('picks a war-map battle up only for the same attack on the same turn', () => {
-    const ordered = warRequest(attack(), 4, 'korva');
+    const ordered = warRequest(attack(), 4, 'russia');
     expect(ordered.resume).toBeUndefined();
-    expect(ordered.campaign).toEqual({ turn: 4, nation: 'korva' });
+    expect(ordered.campaign).toEqual({ turn: 4, nation: 'russia' });
     const b = createBattle(ordered.setup);
     endTurn(b);
     saveBattle(ordered, b);
     // The page was closed; the campaign is loaded again and the same attack ordered.
-    const same = warRequest(attack(), 4, 'korva');
+    const same = warRequest(attack(), 4, 'russia');
     expect(same.resume?.battle.units).toEqual(b.units);
     // The same setup built with its keys in another order still matches.
     const shuffled = attack();
     shuffled.setup = Object.fromEntries(Object.entries(shuffled.setup).reverse()) as BattleRequest['setup'];
-    expect(warRequest(shuffled, 4, 'korva').resume).toBeDefined();
+    expect(warRequest(shuffled, 4, 'russia').resume).toBeDefined();
     // Another turn, another nation, another hex or other units: a new battle.
-    expect(warRequest(attack(), 5, 'korva').resume).toBeUndefined();
+    expect(warRequest(attack(), 5, 'russia').resume).toBeUndefined();
     expect(warRequest(attack(), 4, 'vel').resume).toBeUndefined();
-    expect(warRequest({ ...attack(), target: '9,9' }, 4, 'korva').resume).toBeUndefined();
+    expect(warRequest({ ...attack(), target: '9,9' }, 4, 'russia').resume).toBeUndefined();
     const weaker = attack();
     weaker.setup = { ...weaker.setup, defenders: weaker.setup.defenders.map((d) => ({ ...d, strength: 500 })) };
-    expect(warRequest(weaker, 4, 'korva').resume).toBeUndefined();
+    expect(warRequest(weaker, 4, 'russia').resume).toBeUndefined();
   });
 
   it('tells a loaded campaign about its saved battle, and drops one from a turn now past', () => {
-    const ordered = warRequest(attack(), 4, 'korva');
+    const ordered = warRequest(attack(), 4, 'russia');
     saveBattle(ordered, createBattle(ordered.setup));
     expect(warSaveFor(view(4))?.request.title).toBe(ordered.title);
     expect(warSaveFor(view(4, ['other']))).toBeNull();

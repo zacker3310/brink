@@ -28,13 +28,13 @@ export function hexLabel(view: NationView, key: HexKey): string {
   return p ? (p.exact ? p.name : `near ${p.name}`) : `hex ${key}`;
 }
 
-/** Location phrase for a sentence: "at Vessa", "near Vessa", "at hex 3,4". */
+/** Location phrase for a sentence: "at Taipei", "near Taipei", "at hex 3,4". */
 export function atPlace(view: NationView, key: HexKey): string {
   const p = place(view, key);
   return p ? `${p.exact ? 'at' : 'near'} ${p.name}` : `at hex ${key}`;
 }
 
-/** Destination phrase: "to Vessa", "to the Vessa area", "to hex 3,4". */
+/** Destination phrase: "to Taipei", "to the Taipei area", "to hex 3,4". */
 export function toPlace(view: NationView, key: HexKey): string {
   const p = place(view, key);
   return p ? (p.exact ? `to ${p.name}` : `to the ${p.name} area`) : `to hex ${key}`;

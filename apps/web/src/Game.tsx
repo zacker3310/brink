@@ -16,7 +16,7 @@ import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
 import { useGame, type Tab } from './store';
 import { TurnControls, UnitPanel } from './UnitPanel';
-import { Meter, signed, Swatch } from './ui';
+import { Meter, powersOf, signed, Swatch } from './ui';
 import { Icon } from './icons';
 import { sfx } from './sfx';
 
@@ -158,7 +158,7 @@ function TopBar() {
 /** Every nation's victory points as a bar against the outright-win threshold. */
 function VpRace() {
   const view = useGame((s) => s.view)!;
-  const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints || (a.id < b.id ? -1 : 1));
+  const ranked = powersOf(view);
   return (
     <div className="hidden min-w-48 flex-1 flex-col justify-center gap-0.5 border-l border-line px-4 xl:flex" title={`${view.victoryThreshold} VP wins outright`} data-testid="vp-race">
       <div className="font-display flex justify-between text-[9px] tracking-[0.06em] text-faint uppercase">
@@ -304,7 +304,7 @@ export function VictoryOverlay() {
   const reason = VICTORY_HOW[view.victory.reason];
   const won = wonCampaign(view);
   const allies = (view.victory.coalition ?? []).filter((n) => n !== winner.id).map((n) => view.nations[n]!.name);
-  const ranked = Object.values(view.nations).sort((a, b) => b.victoryPoints - a.victoryPoints);
+  const ranked = powersOf(view);
   return (
     <div className="screen-in absolute inset-0 z-20 flex items-center justify-center bg-ink-950/75 backdrop-blur-sm" data-testid="victory" role="status">
       <div className="w-full max-w-md border border-line bg-ink-900 p-6 text-center shadow-2xl" style={{ borderTop: `3px solid ${won ? 'var(--color-good)' : 'var(--color-hostile)'}` }}>

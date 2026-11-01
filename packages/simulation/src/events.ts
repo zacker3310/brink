@@ -31,7 +31,8 @@ export function applyEvent(world: WorldState, nation: NationId, id: WorldEventId
 export function resolveWorldEvents(world: WorldState, orders: Record<NationId, NationOrders>, events: GameEvent[]): void {
   for (const nation of sortedKeys(orders)) {
     const n = world.nations[nation]!;
-    if (n.eliminated) continue;
+    // Minor states have no home front to stir: world events are for the powers.
+    if (n.eliminated || n.minor) continue;
     if (n.event && n.event.turn < world.turn) {
       const choice = orders[nation]!.eventChoice ?? 0;
       applyEvent(world, nation, n.event.id, choice);

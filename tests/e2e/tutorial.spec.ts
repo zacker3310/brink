@@ -15,10 +15,10 @@ test('a first-time player is coached through a real turn', async ({ page }) => {
   await page.goto('./');
   await expect(page.locator('[data-testid^="menu-"]').first()).toHaveAttribute('data-testid', 'menu-tutorial');
   await page.getByTestId('menu-tutorial').click();
-  await expect(page.getByTestId('top-bar')).toContainText('Aster Commonwealth');
+  await expect(page.getByTestId('top-bar')).toContainText('United States');
 
   await at('brief');
-  await expect(coach).toContainText('Aster Commonwealth');
+  await expect(coach).toContainText('United States');
   await page.getByTestId('coach-next').click();
 
   // Move: right-click a reachable hex.
