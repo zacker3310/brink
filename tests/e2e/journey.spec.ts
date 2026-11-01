@@ -20,6 +20,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByTestId('nation-russia').click();
   await expect(page.getByTestId('dossier-name')).toHaveText('Russia');
   await page.getByTestId('seed').fill('1234');
+  // The classic opening, not a dealt crisis: this journey is about the core loop on known ground.
+  await page.getByTestId('crisis-none').click();
   // Normal: every rival at war from turn 1, so the first turn has fighting to replay.
   await page.getByTestId('difficulty-normal').click();
   await page.getByTestId('start-game').click();
@@ -55,7 +57,8 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(armored).toContainText('Defend');
 
   // Jump to the next formation without orders.
-  await expect(page.getByTestId('next-idle')).toContainText('8 of 10 units need orders');
+  // Russia opens with eleven: the ten every power gets, and a garrison for its third city.
+  await expect(page.getByTestId('next-idle')).toContainText('9 of 11 units need orders');
   await page.getByTestId('next-idle').click();
   await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
 

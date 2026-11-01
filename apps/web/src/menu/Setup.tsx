@@ -26,6 +26,17 @@ const LENGTHS: [CampaignLength, string][] = [
   ['epic', 'Epic'],
 ];
 
+/** The classic opening, shown as a card like a crisis: no story edits, the difficulty sets the wars. */
+const CLASSIC = {
+  id: 'classic',
+  name: 'Classic War',
+  hook: 'Everyone against everyone.',
+  story: 'No spark, no story: the four powers are at war from the first hour and the minor states are fair game. The way Brink was first played.',
+  setup: 'Every power is at war with every other (on Easy, with just one of them). Minor states hold their own cities.',
+  threat: 2 as const,
+  recommended: null as NationId | null,
+};
+
 export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string, crisis?: string) => Promise<void> }) {
   const wars = readCareer().warsWon.length;
   const [theatreId, setTheatreId] = useState(() => {
@@ -56,18 +67,19 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   };
 
   // The Opening Crisis: picked, or dealt from the seed (so a shared seed opens the same way).
-  const [crisisPick, setCrisisPick] = useState<'random' | CrisisId>(() => {
+  // 'none' is the classic opening: no crisis, every war set by the difficulty.
+  const [crisisPick, setCrisisPick] = useState<'random' | 'none' | CrisisId>(() => {
     const p = readPrefs().crisis;
-    return p && (p === 'random' || crisisOf(p)) ? (p as 'random' | CrisisId) : 'random';
+    return p && (p === 'random' || p === 'none' || crisisOf(p)) ? (p as 'random' | 'none' | CrisisId) : 'random';
   });
-  const pickCrisis = (c: 'random' | CrisisId) => {
+  const pickCrisis = (c: 'random' | 'none' | CrisisId) => {
     setCrisisPick(c);
     writePrefs({ crisis: c });
   };
-  const crisis = crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
+  const crisis = crisisPick === 'none' ? CLASSIC : crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
   /** The next crisis in the deck from this one: a fresh deal that never repeats the current one. */
   const dealAnother = () => {
-    const i = CRISES.findIndex((c) => c.id === crisis.id);
+    const i = Math.max(0, CRISES.findIndex((c) => c.id === crisis.id));
     pickCrisis(CRISES[(i + 1 + (seed % (CRISES.length - 1))) % CRISES.length]!.id);
   };
   const world = useMemo(() => createScenario(theatreId, seed), [theatreId, seed]);
@@ -89,7 +101,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(nation, seed, turns, difficulty, theatreId, crisis.id);
+      await onBegin(nation, seed, turns, difficulty, theatreId, crisis.id === 'classic' ? undefined : crisis.id);
     } finally {
       setStarting(false);
     }
@@ -361,7 +373,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               Mission parameters
             </SectionHead>
 
-            <SubHead first aside={crisisPick === 'random' ? 'dealt from the seed' : 'your pick'}>
+            <SubHead first aside={crisisPick === 'random' ? 'dealt from the seed' : crisisPick === 'none' ? 'no crisis' : 'your pick'}>
               Opening crisis
             </SubHead>
             <div className="wr-crisis" data-testid="crisis-card" data-crisis={crisis.id}>
@@ -395,6 +407,9 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
             <div className="wr-crisis-deck" role="radiogroup" aria-label="Opening crisis">
               <button type="button" role="radio" aria-checked={crisisPick === 'random'} onClick={() => pickCrisis('random')} data-testid="crisis-random">
                 Random
+              </button>
+              <button type="button" role="radio" aria-checked={crisisPick === 'none'} onClick={() => pickCrisis('none')} data-testid="crisis-none">
+                Classic war
               </button>
               {CRISES.map((c) => (
                 <button key={c.id} type="button" role="radio" aria-checked={crisisPick === c.id} onClick={() => pickCrisis(c.id)} data-testid={`crisis-${c.id}`}>

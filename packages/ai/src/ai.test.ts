@@ -174,3 +174,19 @@ describe('AI in the Opening Crises', () => {
     });
   }
 });
+
+describe('AI completeness', () => {
+  it('gives every formation it has an order, even one with nothing better to do than hold', () => {
+    // Seed 7, Easy, as the United States: the drone company in Seattle is already at the base
+    // nearest its goal, so it has no strike and no rebase; it used to be left without an order.
+    for (const seed of [7, 11, 23]) {
+      const w = createPacificScenario(seed);
+      for (const n of sortedKeys(w.nations)) {
+        const view = buildView(w, n);
+        const o = planOrders(view, emptyMemory(), seed);
+        const missing = Object.keys(view.formations).filter((id) => !o.formations[id]);
+        expect(missing, `seed ${seed} ${n}`).toEqual([]);
+      }
+    }
+  });
+});

@@ -598,6 +598,9 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
 
   const research = chooseResearch(view);
   const budget = planBudget(view);
+  // Anything still without an order holds, said outright: the engine would hold it anyway, and a
+  // player's staff (Plan) then leaves no unit waiting.
+  for (const f of own) orders[f.id] ??= { type: 'hold' };
   const out: NationOrders = {
     nation: self,
     turn: view.turn,

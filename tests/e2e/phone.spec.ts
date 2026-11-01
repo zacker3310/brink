@@ -37,6 +37,8 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
   await expect(page.getByTestId('length-quick')).toHaveAttribute('aria-checked', 'true');
   // A fixed seed: the engine and the staff planner are deterministic, so this is the same war every run.
   await page.getByTestId('seed').fill('7');
+  // The classic opening (one enemy on Easy), not a dealt crisis: a known first war to fight.
+  await page.getByTestId('crisis-none').tap();
   await expect(page.getByTestId('difficulty-easy')).toHaveAttribute('aria-checked', 'true');
   await page.getByTestId('start-game').tap();
   // The three-step brief comes first.
