@@ -161,8 +161,9 @@ clean style, which draws thousands of vector shapes instead of one texture.
 
 ## Console (v3): text screens
 
-The home screen is the exception: it is a game title screen, not a console page (see "Home" below).
-Every other text screen wears `.vercel` on its root: setup, archive, manual, skirmish, the
+The home screen and the campaign briefing are the exceptions: they are game screens, not console
+pages (see "Home" and "Campaign briefing" below). Every other text screen wears `.vercel` on its
+root: archive, manual, skirmish, the
 command sheet and side panels, the report, the order review, the city panel, the battle brief and
 verdict. The class re-points the tokens, so every utility inside follows, and resets display type to
 Geist in sentence case. Menus also wear `.vercel-mono`, where the accent is white; in-game sheets
@@ -187,6 +188,24 @@ Components (`index.css`, `chrome.tsx`):
 
 The CSS is deliberately outside Tailwind's layers so it wins over utilities on the same element. The
 same is true of the `safe-*` padding classes: never put `safe-x` and `px-*` on one element.
+
+## Campaign briefing (v3)
+
+New campaign (`menu/Setup.tsx`, `.wr-*` in `index.css`) is a war-room briefing in the home screen's
+language. It sits inside the menus' `.vercel` scope but sets its own type, so display faces survive.
+
+- **Two accents**: engraved gold for command (the operation codename, the deploy button, selected
+  parameters, victory figures); the chosen nation's colour (`--nation`) for who you are (roster,
+  dossier, order of battle, map focus). Green and red stay gains and losses.
+- **Hero**: the theatre map full bleed on a phone, a framed card on a desk, under the operation
+  codename in gold Barlow Condensed 800 with a TOP SECRET stamp.
+- **Dossier**: the nation name in display caps, doctrine as a pull quote, VP held on a bar against the
+  domination line, posture stats on hairlines, income as bars, order of battle as counter tiles.
+- **Deploy**: a gold button with a hazard edge. On a phone it is docked over the thumb with a fade
+  behind it, portalled to `<body>` because the menus' entrance animation transforms an ancestor and
+  would trap a fixed element inside the scroller.
+- **Layout**: phone is one column (hero, roster, dossier, parameters); a desk is roster | theatre and
+  parameters | sticky dossier.
 
 ## Home (v3)
 

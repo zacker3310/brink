@@ -1,21 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY } from '@brink/game-data';
 import { NATIONS, THEATRES, createScenario } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
-import { Swatch } from '../ui';
-import { Frame, Kbd, Label, ScreenHeader, useKeys } from '../chrome';
+import { Kbd, Mark, useKeys } from '../chrome';
 import { CLASS_ORDER, DOCTRINE, dossier, operationName, randomSeed, traits, VICTORY_SHARE } from './intel';
 import { Emblem, UnitGlyph } from '../glyphs';
 import { MapPreview } from './MapPreview';
 
-const DIFFICULTIES: [Difficulty, string, string][] = [
-  ['easy', 'Easy', 'One enemy, the rest at peace. Big command edge: +70% income, +40% attack, cheaper units.'],
-  ['normal', 'Normal', 'All three rivals at war with you. A fair edge: +30% income, +20% attack.'],
-  ['hard', 'Hard', 'Everyone at war, no edge, and the AI starts richer.'],
+// The campaign briefing: a war-room screen in the title screen's language (engraved gold for
+// command, the nation's colour for who you are). Classes are `.wr-*` in index.css, set outside the
+// Console scope's resets so display type survives.
+
+const DIFFICULTIES: { id: Difficulty; label: string; threat: number; text: string }[] = [
+  { id: 'easy', label: 'Easy', threat: 1, text: 'One enemy, the rest at peace. +70% income, +40% attack, cheaper units.' },
+  { id: 'normal', label: 'Normal', threat: 2, text: 'All three rivals at war with you. +30% income, +20% attack.' },
+  { id: 'hard', label: 'Hard', threat: 3, text: 'Everyone at war, no edge, and the AI starts richer.' },
 ];
 
+const LENGTHS: [CampaignLength, string][] = [
+  ['quick', 'Quick'],
+  ['standard', 'Standard'],
+  ['epic', 'Epic'],
+];
 
 export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string) => Promise<void> }) {
   const wars = readCareer().warsWon.length;
@@ -51,6 +60,8 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const gov = GOVERNMENTS[spec.government];
   const info = useMemo(() => dossier(world, nation), [world, nation]);
   const op = operationName(seed);
+  const diff = DIFFICULTIES.find((d) => d.id === difficulty)!;
+  const desk = useDesk();
 
   const pick = (id: NationId) => {
     setNation(id);
@@ -82,29 +93,97 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     [nation, seed, starting, turns, difficulty, theatreId],
   );
 
-  return (
-    <main className="setup-screen flex min-h-full flex-col max-lg:pb-28" style={{ ['--nation' as string]: spec.color }}>
-      <ScreenHeader
-        kicker="New campaign"
-        title={theatre.name}
-        onBack={onBack}
-        right={
-          <div className="text-right leading-tight">
-            <div className="font-display text-[10px] tracking-[0.06em] text-faint uppercase">Operation</div>
-            <div className="font-mono text-sm font-semibold tracking-wide text-signal uppercase" data-testid="operation">
-              {op}
-            </div>
-          </div>
-        }
-      />
+  const incomes: [string, number][] = [
+    ['Credits', info.income.credits],
+    ['Industry', info.industry],
+    ['Food', info.income.food],
+    ['Materials', info.income.materials],
+    ['Energy', info.income.energy],
+    ['Research', info.research],
+  ];
+  const topIncome = Math.max(1, ...incomes.map(([, v]) => v));
+  const coalition2 = VICTORY.coalitionBase + VICTORY.coalitionPerMember * 2;
+  const coalition3 = VICTORY.coalitionBase + VICTORY.coalitionPerMember * 3;
 
-      <div className="grid flex-1 gap-4 p-4 sm:p-6 lg:grid-cols-[300px_minmax(0,1fr)_360px]">
+  // On a phone the deploy bar is docked to the thumb. It is portalled to <body>: the menu's
+  // entrance animation transforms an ancestor, which would trap a fixed element inside the scroller.
+  const dock = (
+    <div className="wr-dock">
+      <div className="wr-dock-summary lg:hidden">
+        <span className="v-dot" style={{ background: spec.color }} />
+        <b>{spec.name}</b>
+        <span>·</span>
+        <span>{diff.label}</span>
+        <span>·</span>
+        <span>{turns} turns</span>
+      </div>
+      <button type="button" onClick={() => void begin()} disabled={starting} data-testid="start-game" className="wr-deploy">
+        <span className="wr-deploy-hazard" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="wr-deploy-kicker">{starting ? 'Establishing command link' : `Operation ${op}`}</span>
+          <span className="wr-deploy-label">{starting ? 'Deploying…' : 'Begin campaign'}</span>
+        </span>
+        <span className="wr-deploy-arrow" aria-hidden>
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 5l7 7-7 7M12 5l7 7-7 7" />
+          </svg>
+        </span>
+      </button>
+    </div>
+  );
+
+  return (
+    <main className="wr flex min-h-full flex-col" style={{ ['--nation' as string]: spec.color }}>
+      {/* Top bar */}
+      <header className="wr-top safe-x sticky top-0 z-30">
+        <div className="flex h-13 items-center gap-3 px-4 sm:px-6">
+          <button type="button" onClick={onBack} className="wr-back" data-testid="menu-back" aria-label="Back to the title">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M15 5l-7 7 7 7" />
+            </svg>
+            <Mark className="h-4.5 w-4.5" />
+            <span>Brink</span>
+          </button>
+          <span className="wr-crumb">New campaign</span>
+          <span className="ml-auto hidden items-center gap-1.5 text-[11px] text-faint lg:flex">
+            <Kbd>←</Kbd>
+            <Kbd>→</Kbd> nation · <Kbd>R</Kbd> reroll · <Kbd>Enter</Kbd> deploy · <Kbd>Esc</Kbd>
+          </span>
+        </div>
+      </header>
+
+      <div className="wr-grid flex-1 px-4 pb-44 sm:px-6 lg:pb-8">
+        {/* Hero: the theatre under the operation's codename */}
+        <section aria-label="Theatre" className="wr-area-hero enter-1">
+          <div className="wr-hero">
+            <MapPreview world={world} focus={nation} labels forces className="wr-hero-map" />
+            <div className="wr-hero-shade" aria-hidden />
+            <div className="wr-hero-sweep" aria-hidden />
+            <div className="wr-hero-copy">
+              <div className="flex items-center gap-2">
+                <span className="wr-stamp">Top secret</span>
+                <span className="wr-kicker">{theatre.name}</span>
+              </div>
+              <p className="wr-kicker mt-3 opacity-80">Operation</p>
+              <h1 key={op} className="wr-codename" data-testid="operation">
+                {op}
+              </h1>
+              <p className="wr-meta">
+                <span>Seed {seed}</span>
+                <span>{turns} turns</span>
+                <span>{diff.label}</span>
+              </p>
+            </div>
+            <MapLegend />
+          </div>
+        </section>
+
         {/* Roster */}
-        <section aria-labelledby="roster" className="enter-1 flex flex-col gap-2">
-          <Label className="mb-1">
-            <span id="roster">Choose your nation</span>
-          </Label>
-          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-col" role="radiogroup" aria-label="Nation">
+        <section aria-labelledby="roster" className="wr-area-roster enter-2">
+          <SectionHead id="roster" index="01">
+            Choose your nation
+          </SectionHead>
+          <div className="grid grid-cols-4 gap-2 lg:grid-cols-1" role="radiogroup" aria-label="Nation">
             {NATIONS.map((n, i) => {
               const g = GOVERNMENTS[n.government];
               const active = n.id === nation;
@@ -114,275 +193,331 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                   type="button"
                   role="radio"
                   aria-checked={active}
+                  aria-label={n.name}
                   data-testid={`nation-${n.id}`}
+                  data-active={active}
                   onClick={() => pick(n.id)}
-                  className={`nation-card group relative overflow-hidden border p-3 pl-4 text-left transition-all ${
-                    active ? 'border-[color:var(--c)] bg-ink-800' : 'border-line bg-ink-900/70 hover:border-faint hover:bg-ink-850'
-                  }`}
+                  className="wr-nation"
                   style={{ ['--c' as string]: n.color }}
                 >
-                  <span className="absolute inset-y-0 left-0 w-1 transition-all group-hover:w-1.5" style={{ background: n.color }} aria-hidden />
-                  {active && <span className="nation-card-glow" aria-hidden />}
-                  <div className="relative flex items-center gap-2">
-                    <Emblem color={n.color} government={n.government} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-bold">{n.name}</div>
-                      <div className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: n.color }}>
-                        {g.name}
-                      </div>
-                    </div>
-                    <span className="max-lg:hidden">
-                      <Kbd>{i + 1}</Kbd>
+                  <Emblem color={n.color} government={n.government} className="h-9 w-9 lg:h-10 lg:w-10" />
+                  <span className="min-w-0 flex-1 max-lg:text-center">
+                    <span className="wr-nation-name">
+                      <span className="wr-only-phone">{n.name.split(' ')[0]}</span>
+                      <span className="wr-only-desk">{n.name}</span>
                     </span>
-                  </div>
-                  <p className="relative mt-2 text-xs leading-snug text-muted max-sm:hidden">{DOCTRINE[n.government]}</p>
+                    <span className="wr-nation-gov">{g.name}</span>
+                    <span className="wr-nation-doctrine">{DOCTRINE[n.government]}</span>
+                  </span>
+                  <span className="wr-nation-key" aria-hidden>
+                    {i + 1}
+                  </span>
                 </button>
               );
             })}
           </div>
-          <p className="mt-1 hidden gap-1.5 text-[11px] text-faint lg:flex">
-            <Kbd>←</Kbd>
-            <Kbd>→</Kbd> cycle · <Kbd>R</Kbd> new seed · <Kbd>Enter</Kbd> begin
-          </p>
-        </section>
-
-        {/* Theatre */}
-        <section aria-label="Theatre" className="enter-2 flex min-w-0 flex-col gap-3">
-          <Frame className="relative flex-1 overflow-hidden p-2" accent={spec.color}>
-            <div className="font-display pointer-events-none absolute top-3 left-4 z-10 text-[10px] tracking-[0.06em] text-faint uppercase">
-              Theatre map · seed <span className="font-mono text-muted">{seed}</span>
-            </div>
-            <MapPreview world={world} focus={nation} labels forces className="setup-map h-full max-h-[62vh] min-h-[220px] w-full sm:min-h-[280px]" />
-            <div className="scanlines opacity-40" aria-hidden />
-            <MapLegend />
-          </Frame>
-
-          <Frame className="flex flex-wrap items-end gap-x-6 gap-y-3 p-4">
-            <div>
-              <Label>Seed</Label>
-              <div className="mt-1 flex items-center gap-1">
-                <input
-                  type="number"
-                  min={1}
-                  className="w-28 border border-line bg-ink-850 px-2 py-1.5 font-mono text-sm text-text focus:border-signal focus:outline-none"
-                  value={seed}
-                  onChange={(e) => setSeed(Math.max(1, Math.floor(Number(e.target.value))) || 1)}
-                  data-testid="seed"
-                  aria-label="Seed"
-                />
-                <button
-                  type="button"
-                  onClick={() => setSeed(randomSeed())}
-                  className="border border-line bg-ink-800 px-2 py-1.5 text-sm text-muted hover:border-faint hover:text-text"
-                  title="Roll a new seed (R)"
-                  data-testid="seed-reroll"
-                  aria-label="Roll a new seed"
-                >
-                  ⚄
-                </button>
-              </div>
-            </div>
-            <div>
-              <Label>Length</Label>
-              <div className="mt-1 flex" role="radiogroup" aria-label="Campaign length">
-                {(
-                  [
-                    ['quick', 'Quick'],
-                    ['standard', 'Standard'],
-                    ['epic', 'Epic'],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={length === id}
-                    data-testid={`length-${id}`}
-                    onClick={() => pickLength(id)}
-                    className={`border px-3 py-1.5 text-sm ${length === id ? 'border-signal bg-signal/15 text-signal' : 'border-line text-muted hover:text-text'}`}
-                  >
-                    {label} <span className="font-mono text-xs opacity-70">{CAMPAIGN_TURNS[id]}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="w-full">
-              <Label>Theatre</Label>
-              <div className="mt-1 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Theatre">
-                {THEATRES.map((t) => {
-                  const locked = t.unlock > wars;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={theatreId === t.id}
-                      disabled={locked}
-                      data-testid={`theatre-${t.id}`}
-                      onClick={() => pickTheatre(t.id)}
-                      className={`rounded-lg border px-2.5 py-2 text-left disabled:opacity-45 ${theatreId === t.id ? 'border-signal bg-signal/15' : 'border-line hover:border-faint'}`}
-                    >
-                      <div className={`font-display text-sm font-bold uppercase ${theatreId === t.id ? 'text-signal' : ''}`}>{t.name.replace(/^The /, '')}</div>
-                      <div className="text-[11px] leading-snug text-muted">{locked ? `Win ${t.unlock} war${t.unlock === 1 ? '' : 's'} to unlock (${wars}/${t.unlock})` : t.summary}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="w-full">
-              <Label>Difficulty</Label>
-              <div className="mt-1 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Difficulty">
-                {DIFFICULTIES.map(([id, label, text]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={difficulty === id}
-                    data-testid={`difficulty-${id}`}
-                    onClick={() => pickDifficulty(id)}
-                    className={`rounded-lg border px-2.5 py-2 text-left ${difficulty === id ? 'border-signal bg-signal/15' : 'border-line hover:border-faint'}`}
-                  >
-                    <div className={`font-display text-sm font-bold uppercase ${difficulty === id ? 'text-signal' : ''}`}>{label}</div>
-                    <div className="text-[11px] leading-snug text-muted">{text}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="min-w-[220px] flex-1">
-              <Label>Victory</Label>
-              <p className="mt-1 text-xs leading-snug text-muted">
-                <span className="text-text">Domination</span>: hold {VICTORY_SHARE}% of victory points. <span className="text-text">Coalition</span>: with your allies hold{' '}
-                {VICTORY.coalitionBase + VICTORY.coalitionPerMember * 2}% (two) or {VICTORY.coalitionBase + VICTORY.coalitionPerMember * 3}% (three).{' '}
-                <span className="text-text">Supremacy</span>: average {VICTORY.supremacyShare}% of land, army and output from turn {VICTORY.supremacyFromTurn}.{' '}
-                <span className="text-text">Score</span>: the best standing at turn {turns}. Or be the last power standing.
-              </p>
-            </div>
-          </Frame>
         </section>
 
         {/* Dossier */}
-        <section aria-labelledby="dossier" className="enter-3 flex flex-col gap-3">
-          <Frame className="flex-1 p-4" accent={spec.color}>
-            <Label>
-              <span id="dossier">Intelligence dossier</span>
-            </Label>
+        <section aria-labelledby="dossier" className="wr-area-dossier enter-2 flex flex-col gap-3">
+          <div className="wr-panel wr-dossier">
+            <SectionHead id="dossier" index="02">
+              Intelligence dossier
+            </SectionHead>
             <div key={nation} className="dossier-swap">
-              <h2 className="font-display mt-2 text-2xl leading-tight font-black tracking-tight" style={{ color: spec.color }} data-testid="dossier-name">
-                {spec.name}
-              </h2>
-              <p className="text-xs font-semibold tracking-wide text-text/80 uppercase">{gov.name}</p>
-              <p className="mt-1 text-xs text-muted">
+              <div className="flex items-start gap-3">
+                <Emblem color={spec.color} government={spec.government} className="wr-dossier-emblem h-14 w-14" />
+                <div className="min-w-0">
+                  <h2 className="wr-dossier-name" data-testid="dossier-name">
+                    {spec.name}
+                  </h2>
+                  <p className="wr-dossier-gov">{gov.name}</p>
+                </div>
+              </div>
+              <blockquote className="wr-doctrine">{DOCTRINE[spec.government]}</blockquote>
+              <p className="mt-2 text-[13px] leading-snug text-muted">
                 {gov.summary} Seat of government: <span className="text-text">{spec.capital[2]}</span>.
               </p>
 
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="National traits">
                 {traits(gov.modifiers).map((t) => (
-                  <span
-                    key={t.label}
-                    className={`border px-1.5 py-0.5 font-mono text-[11px] ${t.good ? 'border-good/40 bg-good/10 text-good' : 'border-hostile/40 bg-hostile/10 text-hostile'}`}
-                  >
-                    {t.value} <span className="font-sans text-text/70">{t.label}</span>
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <Big label="Territory" value={info.hexes} unit="hex" />
-                <Big label="Cities" value={info.cities} />
-                <Big label="VP held" value={info.victoryPoints} unit={`${info.vpShare}%`} />
-                <Big label="Population" value={`${(info.population / 1000).toFixed(1)}`} unit="M" />
-                <Big label="Stability" value={info.stability} />
-                <Big label="To objective" value={info.toObjective} unit="hex" />
-              </div>
-
-              <Label className="mt-4">Income per turn</Label>
-              <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-xs tabular-nums">
-                <Res label="Credits" v={info.income.credits} />
-                <Res label="Energy" v={info.income.energy} />
-                <Res label="Materials" v={info.income.materials} />
-                <Res label="Food" v={info.income.food} />
-                <Res label="Industry" v={info.industry} />
-                <Res label="Research" v={info.research} />
-              </div>
-
-              <Label className="mt-4">Order of battle · {info.formations} formations</Label>
-              <ul className="mt-1.5 grid grid-cols-3 gap-1.5">
-                {CLASS_ORDER.map((c) => (
-                  <li key={c} className="flex items-center gap-1.5 border border-line/70 bg-ink-850 px-1.5 py-1" title={UNITS[c].name}>
-                    <UnitGlyph unitClass={c} color={spec.color} />
-                    <span className="font-mono text-[10px] text-muted">{UNITS[c].short}</span>
-                    <span className="ml-auto font-mono text-xs font-semibold">×{info.forces[c]}</span>
+                  <li key={t.label} className="wr-trait" data-good={t.good}>
+                    <b>{t.value}</b>
+                    {t.label}
                   </li>
                 ))}
               </ul>
 
-              <Label className="mt-4">Contested borders</Label>
-              <div className="mt-1.5 flex flex-wrap gap-2 text-xs">
+              <SubHead>Strategic posture</SubHead>
+              <div className="wr-vp">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="wr-big">
+                    {info.victoryPoints}
+                    <small>VP</small>
+                  </span>
+                  <span className="text-right text-xs text-muted">
+                    <b className="text-text">{info.vpShare}%</b> held · domination at <b className="wr-gold-text">{VICTORY_SHARE}%</b>
+                  </span>
+                </div>
+                <div className="wr-vp-track" style={{ ['--held' as string]: `${Math.min(100, info.vpShare)}%`, ['--goal' as string]: `${VICTORY_SHARE}%` } as CSSProperties}>
+                  <span className="wr-vp-fill" />
+                  <span className="wr-vp-goal" />
+                </div>
+              </div>
+              <dl className="wr-stats">
+                <Stat label="Territory" value={info.hexes} unit="hex" />
+                <Stat label="Cities" value={info.cities} />
+                <Stat label="Population" value={(info.population / 1000).toFixed(1)} unit="M" />
+                <Stat label="Stability" value={info.stability} meter={info.stability} />
+                <Stat label="To objective" value={info.toObjective} unit="hex" />
+                <Stat label="Formations" value={info.formations} />
+              </dl>
+
+              <SubHead>Income per turn</SubHead>
+              <ul className="wr-income">
+                {incomes.map(([label, v]) => (
+                  <li key={label}>
+                    <span className="text-muted">{label}</span>
+                    <span className="wr-income-bar" aria-hidden>
+                      <span style={{ width: `${Math.round((v * 100) / topIncome)}%` }} />
+                    </span>
+                    <span className="wr-income-v">+{v}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <SubHead aside={`${info.formations} formations`}>Order of battle</SubHead>
+              <ul className="wr-oob">
+                {CLASS_ORDER.map((c) => (
+                  <li key={c} title={UNITS[c].name} data-empty={info.forces[c] === 0}>
+                    <UnitGlyph unitClass={c} color={spec.color} className="h-5 w-7" />
+                    <span className="wr-oob-short">{UNITS[c].short}</span>
+                    <span className="wr-oob-n">{info.forces[c]}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <SubHead>Contested borders</SubHead>
+              <div className="flex flex-wrap gap-1.5 text-[13px]">
                 {info.fronts.length === 0 && <span className="text-faint">None. Every rival is beyond the basin.</span>}
                 {info.fronts.map((f) => {
                   const r = NATIONS.find((n) => n.id === f)!;
                   return (
-                    <span key={f} className="flex items-center gap-1.5 border border-line/70 bg-ink-850 px-1.5 py-0.5">
-                      <Swatch color={r.color} />
+                    <span key={f} className="wr-front" style={{ ['--c' as string]: r.color }}>
+                      <Emblem color={r.color} government={r.government} className="h-4.5 w-4.5" />
                       {r.name}
                     </span>
                   );
                 })}
               </div>
             </div>
-          </Frame>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => void begin()}
-            disabled={starting}
-            data-testid="start-game"
-            className="begin-btn group relative overflow-hidden border border-signal bg-signal px-5 py-4 text-left text-ink-950 shadow-2xl transition-all hover:brightness-110 disabled:opacity-70 max-lg:fixed max-lg:inset-x-3 max-lg:bottom-[max(env(safe-area-inset-bottom),12px)] max-lg:z-30"
-          >
-            <span className="relative z-10 flex items-center justify-between">
-              <span>
-                <span className="font-display block text-[10px] font-bold tracking-[0.1em] uppercase opacity-70">{starting ? 'Establishing command link' : `Operation ${op}`}</span>
-                <span className="font-display block text-lg font-black tracking-wide uppercase">{starting ? 'Deploying…' : 'Begin campaign'}</span>
-              </span>
-              <span className="text-2xl transition-transform group-hover:translate-x-1" aria-hidden>
-                ▸
-              </span>
-            </span>
-          </button>
+          {desk && dock}
+        </section>
+
+        {/* Mission parameters */}
+        <section aria-labelledby="params" className="wr-area-params enter-3 flex flex-col gap-3">
+          <div className="wr-panel">
+            <SectionHead id="params" index="03">
+              Mission parameters
+            </SectionHead>
+
+            <SubHead first>Difficulty</SubHead>
+            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Difficulty">
+              {DIFFICULTIES.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={difficulty === d.id}
+                  data-testid={`difficulty-${d.id}`}
+                  data-threat={d.threat}
+                  onClick={() => pickDifficulty(d.id)}
+                  className="wr-choice"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="wr-choice-title">{d.label}</span>
+                    <span className="wr-threat" aria-label={`Threat ${d.threat} of 3`}>
+                      {[1, 2, 3].map((p) => (
+                        <i key={p} data-on={p <= d.threat} />
+                      ))}
+                    </span>
+                  </span>
+                  <span className="wr-choice-text">{d.text}</span>
+                </button>
+              ))}
+            </div>
+
+            <SubHead>Theatre</SubHead>
+            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Theatre">
+              {THEATRES.map((t) => {
+                const locked = t.unlock > wars;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={theatreId === t.id}
+                    disabled={locked}
+                    data-testid={`theatre-${t.id}`}
+                    onClick={() => pickTheatre(t.id)}
+                    className="wr-choice"
+                  >
+                    <span className="wr-choice-title">
+                      {locked && (
+                        <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                          <rect x="5" y="11" width="14" height="10" rx="2" />
+                          <path d="M8 11V8a4 4 0 018 0v3" />
+                        </svg>
+                      )}
+                      {t.name.replace(/^The /, '')}
+                    </span>
+                    <span className="wr-choice-text">{locked ? `Win ${t.unlock} war${t.unlock === 1 ? '' : 's'} to unlock (${wars}/${t.unlock})` : t.summary}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-1 flex flex-wrap items-end gap-x-6 gap-y-1">
+              <div>
+                <SubHead>Length</SubHead>
+                <div className="wr-seg" role="radiogroup" aria-label="Campaign length">
+                  {LENGTHS.map(([id, label]) => (
+                    <button key={id} type="button" role="radio" aria-checked={length === id} data-testid={`length-${id}`} onClick={() => pickLength(id)}>
+                      {label} <span className="wr-seg-n">{CAMPAIGN_TURNS[id]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <SubHead>Seed</SubHead>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    className="wr-input w-28"
+                    value={seed}
+                    onChange={(e) => setSeed(Math.max(1, Math.floor(Number(e.target.value))) || 1)}
+                    data-testid="seed"
+                    aria-label="Seed"
+                  />
+                  <button type="button" onClick={() => setSeed(randomSeed())} className="wr-icon-btn" title="Roll a new seed (R)" data-testid="seed-reroll" aria-label="Roll a new seed">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+                      <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" />
+                      <circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" />
+                      <circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" />
+                      <circle cx="12" cy="12" r="1.3" fill="currentColor" />
+                      <circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" />
+                      <circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="wr-panel">
+            <SectionHead index="04">Conditions of victory</SectionHead>
+            <ul className="wr-wins">
+              <Win figure={`${VICTORY_SHARE}%`} name="Domination">
+                of all victory points
+              </Win>
+              <Win figure={`${coalition2}/${coalition3}%`} name="Coalition">
+                with two or three allies
+              </Win>
+              <Win figure={`${VICTORY.supremacyShare}%`} name="Supremacy">
+                avg. land, army, output from turn {VICTORY.supremacyFromTurn}
+              </Win>
+              <Win figure={`T${turns}`} name="Score">
+                best standing when time runs out
+              </Win>
+              <Win figure="1" name="Last standing">
+                the only power left
+              </Win>
+            </ul>
+          </div>
         </section>
       </div>
+      {!desk &&
+        createPortal(
+          <div className="vercel vercel-mono wr-dock-host" style={{ ['--nation' as string]: spec.color }}>
+            {dock}
+          </div>,
+          document.body,
+        )}
     </main>
   );
 }
 
-function Big({ label, value, unit }: { label: string; value: number | string; unit?: string }) {
+const DESK = '(min-width: 1024px)';
+
+/** True on a desk-width screen, tracking resizes. */
+function useDesk(): boolean {
+  const [desk, setDesk] = useState(() => window.matchMedia(DESK).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(DESK);
+    const on = () => setDesk(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return desk;
+}
+
+function SectionHead({ children, index, id }: { children: ReactNode; index: string; id?: string }) {
   return (
-    <div className="border border-line/70 bg-ink-850/80 px-2 py-1.5">
-      <div className="font-display text-[9px] tracking-[0.06em] text-faint uppercase">{label}</div>
-      <div className="font-mono text-lg leading-tight font-semibold tabular-nums">
+    <h2 className="wr-section">
+      <span className="wr-section-index">{index}</span>
+      <span id={id}>{children}</span>
+      <span className="wr-section-rule" aria-hidden />
+    </h2>
+  );
+}
+
+function SubHead({ children, aside, first }: { children: ReactNode; aside?: string; first?: boolean }) {
+  return (
+    <h3 className={`wr-sub ${first ? 'mt-0' : ''}`}>
+      <span>{children}</span>
+      {aside && <span className="wr-sub-aside">{aside}</span>}
+    </h3>
+  );
+}
+
+function Stat({ label, value, unit, meter }: { label: string; value: number | string; unit?: string; meter?: number }) {
+  return (
+    <div className="wr-stat">
+      <dt>{label}</dt>
+      <dd>
         {value}
-        {unit && <span className="ml-1 text-[10px] font-normal text-muted">{unit}</span>}
-      </div>
+        {unit && <small>{unit}</small>}
+      </dd>
+      {meter !== undefined && (
+        <span className="wr-stat-meter" aria-hidden>
+          <span style={{ width: `${Math.max(0, Math.min(100, meter))}%` }} />
+        </span>
+      )}
     </div>
   );
 }
 
-function Res({ label, v }: { label: string; v: number }) {
+function Win({ figure, name, children }: { figure: string; name: string; children: ReactNode }) {
   return (
-    <div className="flex justify-between border-b border-line/40 py-0.5">
-      <span className="font-sans text-muted">{label}</span>
-      <span className="text-good">+{v}</span>
-    </div>
+    <li className="wr-win">
+      <span className="wr-win-figure">{figure}</span>
+      <span className="wr-win-name">{name}</span>
+      <span className="wr-win-text">{children}</span>
+    </li>
   );
 }
 
 function MapLegend() {
   return (
-    <div className="pointer-events-none absolute right-3 bottom-3 flex flex-wrap gap-x-3 gap-y-1 border border-line/70 bg-ink-950/80 px-2 py-1 text-[10px] text-muted">
+    <div className="wr-legend" aria-hidden>
       <span>★ capital</span>
       <span>■ city</span>
       <span>◇ depot</span>
-      <span className="text-signal">◎ objective</span>
+      <span className="wr-gold-text">◎ objective</span>
       <span>• formation</span>
     </div>
   );
