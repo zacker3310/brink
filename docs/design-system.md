@@ -194,15 +194,22 @@ same is true of the `safe-*` padding classes: never put `safe-x` and `px-*` on o
 New campaign (`menu/Setup.tsx`, `.wr-*` in `index.css`) is a war-room briefing in the home screen's
 language. It sits inside the menus' `.vercel` scope but sets its own type, so display faces survive.
 
-- **Two accents**: engraved gold for command (the operation codename, the deploy button, selected
+- **Two accents**: engraved metal for command (the operation codename, the deploy button, selected
   parameters, victory figures); the chosen nation's colour (`--nation`) for who you are (roster,
-  dossier, order of battle, map focus). Green and red stay gains and losses.
-- **Hero**: the theatre map full bleed on a phone, a framed card on a desk, under the operation
-  codename in gold Barlow Condensed 800 with a TOP SECRET stamp.
+  dossier, order of battle, map focus). Green and red stay gains and losses. Command metal is gold
+  (`--cmd-*` tokens on `.wr`), except for a nation whose own colour is in the gold-olive band
+  (`nearGold()`, Drevan today): then it is platinum (`data-command="platinum"`), so who you are and
+  what you command never read as one colour. The domination line is always white.
+- **Hero**: the theatre map full bleed on a phone, a framed card on a desk, with gold registration
+  corners. The codename sits below the map, never over it, in Barlow Condensed 800 with a TOP
+  SECRET stamp; the legend sits beside it from 768 px.
+- **No overlaps**: no text or control sits on another. Both bars (top, phone dock) are opaque, so
+  content scrolls under them without showing through. Figures count up when the nation changes
+  (still under reduced motion).
 - **Dossier**: the nation name in display caps, doctrine as a pull quote, VP held on a bar against the
   domination line, posture stats on hairlines, income as bars, order of battle as counter tiles.
-- **Deploy**: a gold button with a hazard edge. On a phone it is docked over the thumb with a fade
-  behind it, portalled to `<body>` because the menus' entrance animation transforms an ancestor and
+- **Deploy**: a metal button with a hazard edge. On a phone it is docked over the thumb on an
+  opaque bar, portalled to `<body>` because the menus' entrance animation transforms an ancestor and
   would trap a fixed element inside the scroller.
 - **Layout**: phone is one column (hero, roster, dossier, parameters); a desk is roster | theatre and
   parameters | sticky dossier.

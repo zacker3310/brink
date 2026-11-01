@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY } from '@brink/game-data';
@@ -62,6 +62,9 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const op = operationName(seed);
   const diff = DIFFICULTIES.find((d) => d.id === difficulty)!;
   const desk = useDesk();
+  // Command marks are gold, unless the nation itself wears gold: then they go platinum, so who you
+  // are and what you command never read as one colour.
+  const command = nearGold(spec.color) ? 'platinum' : 'gold';
 
   const pick = (id: NationId) => {
     setNation(id);
@@ -118,6 +121,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         <span>{turns} turns</span>
       </div>
       <button type="button" onClick={() => void begin()} disabled={starting} data-testid="start-game" className="wr-deploy">
+        <span className="wr-deploy-sheen" aria-hidden />
         <span className="wr-deploy-hazard" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="wr-deploy-kicker">{starting ? 'Establishing command link' : `Operation ${op}`}</span>
@@ -133,7 +137,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   );
 
   return (
-    <main className="wr flex min-h-full flex-col" style={{ ['--nation' as string]: spec.color }}>
+    <main className="wr flex min-h-full flex-col" data-command={command} style={{ ['--nation' as string]: spec.color }}>
       {/* Top bar */}
       <header className="wr-top safe-x sticky top-0 z-30">
         <div className="flex h-13 items-center gap-3 px-4 sm:px-6">
@@ -156,25 +160,33 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
         {/* Hero: the theatre under the operation's codename */}
         <section aria-label="Theatre" className="wr-area-hero enter-1">
           <div className="wr-hero">
-            <MapPreview world={world} focus={nation} labels forces className="wr-hero-map" />
-            <div className="wr-hero-shade" aria-hidden />
-            <div className="wr-hero-sweep" aria-hidden />
-            <div className="wr-hero-copy">
-              <div className="flex items-center gap-2">
-                <span className="wr-stamp">Top secret</span>
-                <span className="wr-kicker">{theatre.name}</span>
-              </div>
-              <p className="wr-kicker mt-3 opacity-80">Operation</p>
-              <h1 key={op} className="wr-codename" data-testid="operation">
-                {op}
-              </h1>
-              <p className="wr-meta">
-                <span>Seed {seed}</span>
-                <span>{turns} turns</span>
-                <span>{diff.label}</span>
-              </p>
+            <div className="wr-hero-stage">
+              <MapPreview world={world} focus={nation} labels forces className="wr-hero-map" />
+              <div className="wr-hero-shade" aria-hidden />
+              <div className="wr-hero-sweep" aria-hidden />
+              <span className="wr-reg tl" aria-hidden />
+              <span className="wr-reg tr" aria-hidden />
+              <span className="wr-reg bl" aria-hidden />
+              <span className="wr-reg br" aria-hidden />
             </div>
-            <MapLegend />
+            <div className="wr-hero-copy">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="wr-stamp">Top secret</span>
+                  <span className="wr-kicker">{theatre.name}</span>
+                </div>
+                <p className="wr-kicker wr-kicker-dim mt-3">Operation</p>
+                <h1 key={op} className="wr-codename" data-testid="operation">
+                  {op}
+                </h1>
+                <p className="wr-meta">
+                  <span>Seed {seed}</span>
+                  <span>{turns} turns</span>
+                  <span>{diff.label}</span>
+                </p>
+              </div>
+              <MapLegend />
+            </div>
           </div>
         </section>
 
@@ -252,22 +264,25 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               <div className="wr-vp">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="wr-big">
-                    {info.victoryPoints}
+                    <Num v={info.victoryPoints} />
                     <small>VP</small>
                   </span>
                   <span className="text-right text-xs text-muted">
-                    <b className="text-text">{info.vpShare}%</b> held · domination at <b className="wr-gold-text">{VICTORY_SHARE}%</b>
+                    <b className="text-text">{info.vpShare}%</b> held · domination at <b className="wr-goal-text">{VICTORY_SHARE}%</b>
                   </span>
                 </div>
                 <div className="wr-vp-track" style={{ ['--held' as string]: `${Math.min(100, info.vpShare)}%`, ['--goal' as string]: `${VICTORY_SHARE}%` } as CSSProperties}>
                   <span className="wr-vp-fill" />
                   <span className="wr-vp-goal" />
+                  <span className="wr-vp-goal-label" aria-hidden>
+                    Win
+                  </span>
                 </div>
               </div>
               <dl className="wr-stats">
                 <Stat label="Territory" value={info.hexes} unit="hex" />
                 <Stat label="Cities" value={info.cities} />
-                <Stat label="Population" value={(info.population / 1000).toFixed(1)} unit="M" />
+                <Stat label="Population" value={info.population / 1000} decimals={1} unit="M" />
                 <Stat label="Stability" value={info.stability} meter={info.stability} />
                 <Stat label="To objective" value={info.toObjective} unit="hex" />
                 <Stat label="Formations" value={info.formations} />
@@ -281,7 +296,9 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                     <span className="wr-income-bar" aria-hidden>
                       <span style={{ width: `${Math.round((v * 100) / topIncome)}%` }} />
                     </span>
-                    <span className="wr-income-v">+{v}</span>
+                    <span className="wr-income-v">
+                      +<Num v={v} />
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -292,7 +309,9 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                   <li key={c} title={UNITS[c].name} data-empty={info.forces[c] === 0}>
                     <UnitGlyph unitClass={c} color={spec.color} className="h-5 w-7" />
                     <span className="wr-oob-short">{UNITS[c].short}</span>
-                    <span className="wr-oob-n">{info.forces[c]}</span>
+                    <span className="wr-oob-n">
+                      <Num v={info.forces[c]} />
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -442,7 +461,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
       </div>
       {!desk &&
         createPortal(
-          <div className="vercel vercel-mono wr-dock-host" style={{ ['--nation' as string]: spec.color }}>
+          <div className="vercel vercel-mono wr-dock-host" data-command={command} style={{ ['--nation' as string]: spec.color }}>
             {dock}
           </div>,
           document.body,
@@ -484,12 +503,12 @@ function SubHead({ children, aside, first }: { children: ReactNode; aside?: stri
   );
 }
 
-function Stat({ label, value, unit, meter }: { label: string; value: number | string; unit?: string; meter?: number }) {
+function Stat({ label, value, unit, meter, decimals = 0 }: { label: string; value: number; unit?: string; meter?: number; decimals?: number }) {
   return (
     <div className="wr-stat">
       <dt>{label}</dt>
       <dd>
-        {value}
+        <Num v={value} decimals={decimals} />
         {unit && <small>{unit}</small>}
       </dd>
       {meter !== undefined && (
@@ -499,6 +518,47 @@ function Stat({ label, value, unit, meter }: { label: string; value: number | st
       )}
     </div>
   );
+}
+
+/** A figure that counts to its value (from wherever it was) when it changes; still under reduced motion. */
+function Num({ v, decimals = 0 }: { v: number; decimals?: number }) {
+  const [shown, setShown] = useState(0);
+  const from = useRef(0);
+  useEffect(() => {
+    const start = from.current;
+    if (start === v || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      from.current = v;
+      setShown(v);
+      return;
+    }
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / 520);
+      const x = start + (v - start) * (1 - (1 - k) ** 3);
+      from.current = x;
+      setShown(x);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [v]);
+  return <>{decimals ? shown.toFixed(decimals) : Math.round(shown)}</>;
+}
+
+/** True for a colour in the gold-to-olive band, where it would read as the command accent. */
+function nearGold(hex: string): boolean {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === 0 || (max - min) / max < 0.3) return false;
+  const d = max - min;
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  const hue = (h * 60 + 360) % 360;
+  return hue >= 34 && hue <= 72;
 }
 
 function Win({ figure, name, children }: { figure: string; name: string; children: ReactNode }) {
