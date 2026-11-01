@@ -7,11 +7,14 @@ self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest', './icons/apple-touch-icon.png'])).then(() => self.skipWaiting()));
 });
 
+// Cache Storage is per origin, not per worker scope. Where Brink shares an origin with other apps
+// (zckr.dev/games/brink/ sits beside the other games), deleting every cache but this one would wipe
+// theirs. Only Brink's own older caches go.
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('brink-') && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
