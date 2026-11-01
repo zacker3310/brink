@@ -104,6 +104,8 @@ declare global {
       look: () => ReturnType<BattleStage['lookState']> | null;
       /** The cells (y * w + x) the selected unit can be tapped to move to now. */
       reach: () => number[];
+      /** The unit a press at this point would take: what a tap or long-press there reads as. */
+      unitAt: (x: number, y: number) => string | null;
     };
   }
 }
@@ -937,6 +939,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         film: () => stageRef.current?.filmState() ?? null,
         look: () => stageRef.current?.lookState() ?? null,
         reach: () => reachNow.current,
+        unitAt: (x, y) => stageRef.current?.unitNear(x, y, 30) ?? null,
       };
     });
     const onResize = () => stageRef.current?.resize();

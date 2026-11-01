@@ -63,5 +63,7 @@ interface Window {
     look(): { palette: 'standard' | 'colourblind'; selected: string | null; target: string | null; hulls: number } | null;
     /** The cells (y * w + x) the selected unit can be tapped to move to now. */
     reach(): number[];
+    /** The unit a press at this point would take. */
+    unitAt(x: number, y: number): string | null;
   };
 }

@@ -1,4 +1,5 @@
 import { bestFire, canSee, RANKS, sightRange, suppLevel, typeOf, usableWeapons, type Battle, type BattleEvent, type Effect, type FireInfo, type Point, type SoldierRole, type Unit, type Weapon } from '@brink/arena';
+import { useRef } from 'react';
 import { health } from './units';
 
 // What a long-press opens: an enemy's card (what your side knows of it), what the selected unit
@@ -146,6 +147,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /** Everything about a unit of yours: its people, every weapon with range and ammunition, its armour by facing, what it can do. */
 export function UnitSheet({ b, u, status, onClose }: { b: Battle; u: Unit; status: string; onClose: () => void }) {
+  // The sheet opens under the finger that long-pressed for it. When that finger lifts, the browser
+  // may send a click to whatever is under it now: the backdrop. Only a press that starts on the
+  // backdrop closes the sheet.
+  const downOnBackdrop = useRef(false);
   const t = typeOf(u.type);
   const usable = new Set(usableWeapons(u).map((w) => w.id));
   const fit = u.men.filter((m) => m.state === 'fit');
@@ -168,7 +173,17 @@ export function UnitSheet({ b, u, status, onClose }: { b: Battle; u: Unit; statu
     'Overwatch: fires on the first enemy that moves in sight',
   ].filter(Boolean);
   return (
-    <div className="vercel absolute inset-0 z-20 flex items-end bg-black/60" data-testid="unit-sheet" onClick={onClose}>
+    <div
+      className="vercel absolute inset-0 z-20 flex items-end bg-black/60"
+      data-testid="unit-sheet"
+      onPointerDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (downOnBackdrop.current && e.target === e.currentTarget) onClose();
+        downOnBackdrop.current = false;
+      }}
+    >
       <div className="safe-bottom safe-x w-full" onClick={(e) => e.stopPropagation()}>
         <div className="mx-2 mb-2 max-h-[82vh] overflow-y-auto rounded-2xl bg-ink-900 p-4" role="dialog" aria-label={t.name}>
           <div className="flex items-start justify-between gap-3">

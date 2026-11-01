@@ -351,12 +351,22 @@ for (const size of SIZES) {
       });
 
       await test.step('#4 a long-press on a unit of yours opens its full card', async () => {
+        // A point that reads as the selected unit and no other: where cells draw small, a neighbour's
+        // model can stand nearer a fixed offset than the unit's own (it was a Sniper Team on an SE).
         const me = await page.evaluate(() => {
           const a = window.__arena!;
-          const u = a.arena()!.units.find((x) => x.id === a.overlay()!.selected)!;
-          return a.toScreen(u.x, u.y);
+          const id = a.overlay()!.selected!;
+          const u = a.arena()!.units.find((x) => x.id === id)!;
+          const c = a.toScreen(u.x, u.y);
+          const offsets: [number, number][] = [[0, -8], [0, 0], [0, -16], [0, -24], [-8, -8], [8, -8], [-12, -16], [12, -16], [0, 8]];
+          for (const [dx, dy] of offsets) {
+            const p = { x: c.x + dx, y: c.y + dy };
+            if (a.unitAt(p.x, p.y) === id) return p;
+          }
+          return null;
         });
-        await f.down({ x: me.x, y: me.y - 8 });
+        expect(me, 'a point on screen that presses the selected unit').not.toBeNull();
+        await f.down(me!);
         await expect(page.getByTestId('unit-sheet')).toBeVisible({ timeout: 30_000 });
         await f.up();
         await expect(page.getByTestId('unit-sheet')).toContainText('Range');
