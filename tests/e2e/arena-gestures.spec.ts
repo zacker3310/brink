@@ -353,12 +353,32 @@ for (const size of SIZES) {
       await test.step('#4 a long-press on a unit of yours opens its full card', async () => {
         // A point that reads as the selected unit and no other: where cells draw small, a neighbour's
         // model can stand nearer a fixed offset than the unit's own (it was a Sniper Team on an SE).
+        // `ready` lets the camera travel a hair, and closing the sight card reframes the field: wait
+        // until the selected unit stands still on screen, or a point picked now is off by the press.
+        await expect
+          .poll(
+            async () => {
+              const at = () =>
+                page.evaluate(() => {
+                  const a = window.__arena!;
+                  const u = a.arena()!.units.find((x) => x.id === a.overlay()!.selected)!;
+                  return a.toScreen(u.x, u.y);
+                });
+              const p = await at();
+              await frames(page, 6);
+              const q = await at();
+              return Math.hypot(p.x - q.x, p.y - q.y) < 0.05;
+            },
+            { timeout: 30_000 },
+          )
+          .toBe(true);
         const me = await page.evaluate(() => {
           const a = window.__arena!;
           const id = a.overlay()!.selected!;
           const u = a.arena()!.units.find((x) => x.id === id)!;
           const c = a.toScreen(u.x, u.y);
-          const offsets: [number, number][] = [[0, -8], [0, 0], [0, -16], [0, -24], [-8, -8], [8, -8], [-12, -16], [12, -16], [0, 8]];
+          // The base first: a unit behind in the same column lifts its badge over the space just above.
+          const offsets: [number, number][] = [[0, 0], [0, 4], [-6, 0], [6, 0], [0, -8], [0, -16], [-8, -8], [8, -8]];
           for (const [dx, dy] of offsets) {
             const p = { x: c.x + dx, y: c.y + dy };
             if (a.unitAt(p.x, p.y) === id) return p;
