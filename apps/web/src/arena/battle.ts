@@ -38,8 +38,9 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
   const fighters = Object.keys(orders)
     .filter((id) => orders[id]!.type === 'attack' && view.formations[id])
     .sort();
+  // Ships in the hex fight at sea, never on the battlefield: a hand-fought battle is for the land forces.
   const enemies = Object.values(view.contacts)
-    .filter((c) => c.key === target && view.relations[c.owner] === 'war')
+    .filter((c) => c.key === target && view.relations[c.owner] === 'war' && !UNITS[c.unitClass].naval)
     .sort((a, b) => (a.formation < b.formation ? -1 : 1));
   if (fighters.length === 0 || enemies.length === 0) return null;
   const tile = view.tiles[target];

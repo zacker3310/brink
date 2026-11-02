@@ -7,7 +7,7 @@
 
 import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
 
-export const RULESET_VERSION = '2.0.0';
+export const RULESET_VERSION = '2.1.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -36,6 +36,11 @@ export const TERRAIN: Record<Terrain, TerrainDef> = {
 
 /** Extra movement points to enter a hex carrying a river. */
 export const RIVER_MOVE_COST = 2;
+/** Movement points for a ship to enter a sea hex or a port. */
+export const NAVAL_MOVE_COST = 2;
+/** Supply route cost per sea hex (a sea lane), and the attack lost storming a beach from a ship. */
+export const SEA_SUPPLY_COST = 1;
+export const AMPHIBIOUS_ASSAULT_PENALTY = 30;
 /** Percent removed from ground assaults into a river hex. */
 export const RIVER_ASSAULT_PENALTY = 20;
 
@@ -54,8 +59,13 @@ export interface UnitDef {
   vision: number;
   /** Uses fuel to move, and loses half its movement without it. */
   motorized: boolean;
-  /** Takes and holds ground. Air does not. */
+  /** Takes and holds ground. Air and ships do not. */
   ground: boolean;
+  /** Moves on water and through ports only. */
+  naval?: boolean;
+  /** Formations it can carry, and of what kind: a transport carries ground units, a carrier air. */
+  capacity?: number;
+  carries?: 'ground' | 'air';
   fuelPerMove: number;
   ammoPerAttack: number;
   cost: Stockpile;
@@ -207,6 +217,73 @@ export const UNITS: Record<UnitClass, UnitDef> = {
     industry: 35,
     upkeep: stock(2, 2, 0, 0),
     supplyDemand: 4,
+  },
+  /** A surface action group: destroyers and cruisers. Strikes ships and the coast two hexes out. */
+  fleet: {
+    name: 'Surface Fleet',
+    short: 'FLT',
+    movement: 12,
+    softAttack: 40,
+    hardAttack: 55,
+    defense: 45,
+    hardness: 80,
+    range: 2,
+    vision: 4,
+    motorized: true,
+    ground: false,
+    naval: true,
+    fuelPerMove: 1,
+    ammoPerAttack: 20,
+    cost: stock(160, 40, 80, 0),
+    industry: 110,
+    upkeep: stock(6, 4, 0, 0),
+    supplyDemand: 8,
+  },
+  /** Amphibious lift: carries two ground formations and lands them on a hostile shore. */
+  transport: {
+    name: 'Amphibious Group',
+    short: 'AMP',
+    movement: 10,
+    softAttack: 0,
+    hardAttack: 0,
+    defense: 15,
+    hardness: 50,
+    range: 0,
+    vision: 2,
+    motorized: true,
+    ground: false,
+    naval: true,
+    capacity: 2,
+    carries: 'ground',
+    fuelPerMove: 1,
+    ammoPerAttack: 0,
+    cost: stock(80, 15, 40, 0),
+    industry: 60,
+    upkeep: stock(3, 2, 0, 0),
+    supplyDemand: 4,
+  },
+  /** A moving airfield: helicopters and drones base on it and strike from wherever it sails. */
+  carrier: {
+    name: 'Carrier Group',
+    short: 'CVN',
+    movement: 10,
+    softAttack: 10,
+    hardAttack: 10,
+    defense: 35,
+    hardness: 75,
+    range: 0,
+    vision: 5,
+    motorized: true,
+    ground: false,
+    naval: true,
+    capacity: 2,
+    carries: 'air',
+    fuelPerMove: 1,
+    ammoPerAttack: 0,
+    cost: stock(220, 60, 120, 0),
+    industry: 160,
+    upkeep: stock(8, 6, 0, 0),
+    supplyDemand: 10,
   },
 };
 

@@ -1,5 +1,5 @@
 import type { Formation, NationId, Terrain } from '@brink/contracts';
-import { RIVER_ASSAULT_PENALTY, RULES, TERRAIN, UNITS } from '@brink/game-data';
+import { AMPHIBIOUS_ASSAULT_PENALTY, RIVER_ASSAULT_PENALTY, RULES, TERRAIN, UNITS } from '@brink/game-data';
 import { clamp, pct, type FullModifiers } from './rules';
 
 // Combat power is integer fixed-point: stat x strength (0..1000) with each modifier applied as
@@ -59,6 +59,8 @@ export function attackerPower(attackers: readonly Formation[], defenders: readon
     let v = condition(a, attackStat(a, hardness) * a.strength);
     v = pct(v, 100 + ctx.attackerMods.attack);
     if (a.unitClass === 'armor' || a.unitClass === 'mechanized') v = pct(v, 100 - terrain.armorPenalty);
+    // Storming a beach from a ship.
+    if (a.aboard) v = pct(v, 100 - AMPHIBIOUS_ASSAULT_PENALTY);
     total += v;
   }
   if (ctx.river) total = pct(total, 100 - RIVER_ASSAULT_PENALTY);
@@ -143,7 +145,8 @@ export function strikeLoss(source: Formation, victim: Formation, ctx: StrikeCont
 export function airDefenseLoss(victims: readonly Formation[], swing: number): number {
   let v = 0;
   for (const d of victims) {
-    if (!UNITS[d.unitClass].ground) continue;
+    // Ground units and ships fire back; aircraft do not shoot each other down here.
+    if (!UNITS[d.unitClass].ground && !UNITS[d.unitClass].naval) continue;
     v += Math.floor((UNITS[d.unitClass].defense * d.strength) / 1000 / 4);
   }
   return pct(v, swing);

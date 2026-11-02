@@ -1,5 +1,5 @@
 import type { GameEvent, HexKey, NationId, NationOrders, Stockpile, SupplyPriority, WorldState } from '@brink/contracts';
-import { RULES, SITE_SUPPLY, TERRAIN, UNITS } from '@brink/game-data';
+import { RULES, SEA_SUPPLY_COST, SITE_SUPPLY, TERRAIN, UNITS } from '@brink/game-data';
 import { neighborKeys } from '@brink/map';
 import { clamp, nationModifiers, pct, relationOf, sortedKeys, zeroStockpile } from './rules';
 
@@ -25,9 +25,12 @@ export function supplyDistances(world: WorldState, nation: NationId): Map<HexKey
     const f = world.formations[id]!;
     if (relationOf(world.relations, nation, f.owner) === 'alliance') held.add(f.key);
   }
-  const permitted = (key: HexKey): boolean => {
+  // Land routes run through own, allied or held ground. Sea lanes leave from a friendly port, cross
+  // any sea no enemy holds, and come ashore anywhere a route may land: islands, ships and beachheads.
+  const permitted = (key: HexKey, from: HexKey): boolean => {
     const t = world.tiles[key];
-    if (!t || t.terrain === 'water' || hostile.has(key)) return false;
+    if (!t || hostile.has(key)) return false;
+    if (t.terrain === 'water') return world.tiles[from]!.terrain === 'water' || world.tiles[from]!.port === true;
     return held.has(key) || (t.owner !== null && relationOf(world.relations, nation, t.owner) === 'alliance');
   };
   const interdicted = (key: HexKey): boolean => neighborKeys(key).some((k) => hostile.has(k));
@@ -47,9 +50,10 @@ export function supplyDistances(world: WorldState, nation: NationId): Map<HexKey
     const [d, key] = frontier.shift()!;
     if (d > (dist.get(key) ?? Infinity)) continue;
     for (const next of neighborKeys(key)) {
-      if (!permitted(next)) continue;
+      if (!permitted(next, key)) continue;
       const t = world.tiles[next]!;
-      const step = Math.max(1, TERRAIN[t.terrain].supplyCost - t.infrastructure) + (interdicted(next) ? RULES.interdictionCost : 0);
+      const base = t.terrain === 'water' ? SEA_SUPPLY_COST : Math.max(1, TERRAIN[t.terrain].supplyCost - t.infrastructure);
+      const step = base + (interdicted(next) ? RULES.interdictionCost : 0);
       const nd = d + step;
       if (nd < (dist.get(next) ?? Infinity)) {
         dist.set(next, nd);

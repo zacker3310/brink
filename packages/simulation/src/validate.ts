@@ -18,7 +18,7 @@ import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, FACILITIES, FACILITY_SLOTS, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
 import { canPropose } from './diplomacy';
-import { enterCost, movementAllowance, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
+import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
 export interface LockedOrders {
   /** One entry per living nation, sorted by nation id. Every own formation has an order. */
@@ -51,15 +51,17 @@ export function checkFormationOrder(world: WorldState, nation: NationId, id: str
     case 'recon':
     case 'withdraw': {
       if (!isStringArray(o.path) || order.path.length === 0) return 'path is empty';
-      if (!def.ground) {
+      if (isAir(f.unitClass)) {
         if (order.type !== 'move') return 'air formations can only rebase';
         if (order.path.length !== 1) return 'air rebase takes a single destination';
         const dest = order.path[0]!;
         const site = world.tiles[dest]?.siteId ? world.sites[world.tiles[dest]!.siteId!] : undefined;
-        if (!site || site.owner !== nation) return 'air formations rebase only to own sites';
+        const deck = carrierAt(world, nation, dest, 'air');
+        if ((!site || site.owner !== nation) && !deck) return 'air formations rebase only to own sites and carriers';
         if (keyDistance(f.key, dest) > AIR_REBASE_RANGE) return 'rebase destination out of range';
         return null;
       }
+      if (isNaval(f.unitClass) && order.type !== 'move') return 'ships can only move';
       const cost = pathCost(world.tiles, f.unitClass, f.key, order.path);
       if (cost === null) return 'path is not contiguous or crosses impassable terrain';
       if (cost > movementAllowance(f)) return 'path exceeds movement allowance';
@@ -70,11 +72,15 @@ export function checkFormationOrder(world: WorldState, nation: NationId, id: str
       if (!isStringArray(o.path)) return 'path is malformed';
       if (f.ammunition < def.ammoPerAttack) return 'not enough ammunition';
       if (def.range > 0) {
+        if (f.aboard && UNITS[f.unitClass].ground) return 'guns cannot fire from the hold';
         if (order.path.length > 0) return 'ranged formations strike from position';
         const d = keyDistance(f.key, order.target);
         if (d < 1 || d > def.range) return 'target out of range';
         return null;
       }
+      if (isNaval(f.unitClass)) return 'this ship does not fight';
+      // From a ship, the only approach is the beach: storm a hex next to the ship.
+      if (f.aboard && order.path.length > 0) return 'an amphibious assault goes straight from the ship';
       const cost = pathCost(world.tiles, f.unitClass, f.key, order.path);
       if (cost === null) return 'approach is not contiguous or crosses impassable terrain';
       if (cost > movementAllowance(f)) return 'approach exceeds movement allowance';
@@ -83,9 +89,27 @@ export function checkFormationOrder(world: WorldState, nation: NationId, id: str
       if (enterCost(world.tiles[order.target], f.unitClass) === null) return 'target hex is impassable';
       return null;
     }
+    case 'embark': {
+      if (typeof o.carrier !== 'string') return 'no carrier named';
+      if (f.aboard) return 'already aboard';
+      const c = world.formations[order.carrier];
+      if (!c || c.owner !== nation) return 'no such ship of yours';
+      if (!alongside(world, f, c)) return 'the ship is not in this hex or lying off this port';
+      const kind = UNITS[c.unitClass].carries;
+      if (!kind || (kind === 'ground') !== def.ground || isNaval(f.unitClass)) return `${UNITS[c.unitClass].name} cannot carry ${def.name}`;
+      if (passengersOf(world, c.id).length >= (UNITS[c.unitClass].capacity ?? 0)) return `${UNITS[c.unitClass].name} is full`;
+      return null;
+    }
     default:
       return 'unknown order type';
   }
+}
+
+/** An own ship in `key` that carries `kind` and has room. */
+export function carrierAt(world: Pick<WorldState, 'formations'>, nation: NationId, key: string, kind: 'ground' | 'air') {
+  return sortedKeys(world.formations)
+    .map((id) => world.formations[id]!)
+    .find((c) => c.owner === nation && c.key === key && UNITS[c.unitClass].carries === kind && passengersOf(world, c.id).length < (UNITS[c.unitClass].capacity ?? 0));
 }
 
 function checkBudget(b: Budget): string | null {
@@ -135,6 +159,7 @@ function lockRecruits(
     else if (site.owner !== nation) reject(`${site.name} is not under your control`);
     else if (site.kind !== 'capital' && site.kind !== 'city') reject(`${site.name} cannot recruit`);
     else if (!UNIT_CLASSES.includes(r.unitClass as UnitClass)) reject('unknown unit class');
+    else if (UNITS[r.unitClass].naval && !world.tiles[site.key]?.port) reject(`${site.name} is not a port`);
     else {
       const cost = recruitCost(n, r.unitClass);
       if (RESOURCES.some((res) => reserved[res] + cost[res] > n.stockpile[res])) {

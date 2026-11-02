@@ -1,7 +1,7 @@
 import type { Formation, GameEvent, NationId, NationOrders, Stockpile, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { FACILITIES, RULES, STACK_LIMIT, UNITS } from '@brink/game-data';
-import { recruitCost, relationOf, zeroStockpile } from './rules';
+import { recruitCost, relationOf, sameLayer, zeroStockpile } from './rules';
 
 export function newFormation(world: WorldState, owner: NationId, unitClass: Formation['unitClass'], key: string, name: string): Formation {
   const id = `f${world.nextId++}`;
@@ -112,7 +112,7 @@ export function resolveProduction(world: WorldState, nation: NationId, orders: N
     if (item.progress < item.required) continue;
     const site = world.sites[item.siteId]!;
     const here = Object.values(world.formations).filter((f) => f.key === site.key);
-    if (here.length >= STACK_LIMIT || here.some((f) => relationOf(world.relations, nation, f.owner) !== 'alliance')) continue;
+    if (here.filter((f) => !f.aboard && sameLayer(f.unitClass, item.unitClass)).length >= STACK_LIMIT || here.some((f) => relationOf(world.relations, nation, f.owner) !== 'alliance')) continue;
     const f = newFormation(world, nation, item.unitClass, site.key, formationName(world, nation, item.unitClass));
     events.push({ kind: 'production', nation, formation: f.id, unitClass: f.unitClass, site: site.id, key: site.key });
     done.push(item.id);

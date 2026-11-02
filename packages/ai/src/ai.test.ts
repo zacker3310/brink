@@ -190,3 +190,27 @@ describe('AI completeness', () => {
     }
   });
 });
+
+describe('AI balance of power', () => {
+  it('when one power runs away, the others settle with each other and turn on it', () => {
+    const w = makeWorld(10, 6, ['a', 'b', 'c']);
+    w.turn = 12;
+    setRelation(w, 'a', 'b', 'war');
+    setRelation(w, 'a', 'c', 'peace');
+    unit(w, 'a1', 'a', 'infantry', w.sites['a-home']!.key);
+    // c leads by a mile: most land, army and output.
+    for (let i = 0; i < 3; i++) unit(w, `c${i}`, 'c', 'armor', w.sites['c-home']!.key);
+    w.sites['c-home']!.victoryPoints = 30;
+    const o = planOrders(buildView(w, 'a'), emptyMemory(), 1);
+    expect(o.diplomacy).toEqual(expect.arrayContaining([{ target: 'c', action: 'declare_war' }, { target: 'b', action: 'propose_peace' }]));
+  });
+
+  it('does not gang up before the war has found its shape, nor on a narrow leader', () => {
+    const w = makeWorld(10, 6, ['a', 'b', 'c']);
+    w.turn = 4;
+    setRelation(w, 'a', 'c', 'peace');
+    for (let i = 0; i < 3; i++) unit(w, `c${i}`, 'c', 'armor', w.sites['c-home']!.key);
+    w.sites['c-home']!.victoryPoints = 30;
+    expect(planOrders(buildView(w, 'a'), emptyMemory(), 1).diplomacy.some((d) => d.target === 'c' && d.action === 'declare_war')).toBe(false);
+  });
+});

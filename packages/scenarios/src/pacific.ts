@@ -1,6 +1,6 @@
 import type { Formation, GovernmentId, HexKey, Nation, NationId, Site, SiteKind, Terrain, Tile, UnitClass, WorldState, Yields } from '@brink/contracts';
 import { RULESET_VERSION } from '@brink/game-data';
-import { hexKey, keyDistance, keyOf, offsetToAxial } from '@brink/map';
+import { hexKey, keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { computeVision, emptyIntel, grossYields, mulberry32, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
 // The Pacific: four real powers (the United States, Russia, China, Japan) around a compressed ocean,
@@ -57,6 +57,10 @@ interface NationSpec {
   depots: Place[];
   /** Added to roughness inside this country: tundra and taiga, mountains, open plains. */
   rough: number;
+  /** The opening navy, at sea off the named port. */
+  navy?: { port: string; ships: UnitClass[] };
+  /** A minor state's militia per city, beyond the one every city has: big countries defend deeper. */
+  militia?: UnitClass[];
 }
 
 /** The four powers a player can lead. */
@@ -67,19 +71,20 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'United States',
     color: '#4f8fe0',
     government: 'commonwealth',
-    capital: [23, 11, 'San Francisco'],
+    capital: [22, 11, 'San Francisco'],
     cities: [
       [23, 8, 'Seattle'],
       [24, 13, 'Los Angeles'],
-      [18, 2, 'Anchorage'],
       [17, 12, 'Honolulu'],
     ],
+    // The far-flung bases: a frontier town in Alaska and two island outposts.
     depots: [
-      [25, 10, 'Nevada Depot'],
+      [18, 2, 'Anchorage'],
       [11, 15, 'Guam'],
       [15, 5, 'Adak'],
     ],
     rough: 10,
+    navy: { port: 'San Francisco', ships: ['fleet', 'transport', 'carrier'] },
   },
   {
     id: 'russia',
@@ -87,7 +92,7 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'Russia',
     color: '#d0543e',
     government: 'directorate',
-    capital: [5, 5, 'Vladivostok'],
+    capital: [6, 5, 'Vladivostok'],
     cities: [
       [6, 3, 'Khabarovsk'],
       [12, 3, 'Petropavlovsk'],
@@ -95,6 +100,7 @@ export const NATIONS: readonly NationSpec[] = [
     ],
     depots: [[9, 4, 'Sakhalin']],
     rough: 30,
+    navy: { port: 'Vladivostok', ships: ['fleet', 'transport'] },
   },
   {
     id: 'china',
@@ -110,6 +116,7 @@ export const NATIONS: readonly NationSpec[] = [
     ],
     depots: [[2, 11, 'Wuhan']],
     rough: -10,
+    navy: { port: 'Shanghai', ships: ['fleet', 'transport', 'carrier'] },
   },
   {
     id: 'japan',
@@ -117,7 +124,7 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'Japan',
     color: '#e8e8ee',
     government: 'federation',
-    capital: [9, 8, 'Tokyo'],
+    capital: [10, 8, 'Tokyo'],
     cities: [
       [8, 9, 'Osaka'],
       [10, 6, 'Sapporo'],
@@ -125,13 +132,14 @@ export const NATIONS: readonly NationSpec[] = [
     ],
     depots: [[9, 7, 'Sendai']],
     rough: 35,
+    navy: { port: 'Tokyo', ships: ['fleet', 'transport', 'transport'] },
   },
 ];
 
 /** The independent states between the powers. */
 export const MINORS: readonly NationSpec[] = [
-  { id: 'canada', short: 'Canada', name: 'Canada', color: '#b9424f', government: 'commonwealth', minor: true, capital: [22, 6, 'Vancouver'], cities: [[26, 4, 'Calgary'], [21, 2, 'Whitehorse']], depots: [], rough: 25 },
-  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, capital: [27, 16, 'Mexico City'], cities: [[23, 14, 'Tijuana'], [25, 15, 'Guadalajara']], depots: [], rough: 30 },
+  { id: 'canada', short: 'Canada', name: 'Canada', color: '#b9424f', government: 'commonwealth', minor: true, militia: ['infantry', 'mechanized'], capital: [22, 6, 'Vancouver'], cities: [[26, 4, 'Calgary'], [21, 2, 'Whitehorse']], depots: [], rough: 25 },
+  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, militia: ['infantry', 'infantry'], capital: [27, 16, 'Mexico City'], cities: [[23, 14, 'Tijuana'], [25, 15, 'Guadalajara']], depots: [], rough: 30 },
   { id: 'nkorea', short: 'N. Korea', name: 'North Korea', color: '#8a5ab8', government: 'directorate', minor: true, capital: [5, 7, 'Pyongyang'], cities: [[6, 6, 'Wonsan']], depots: [], rough: 45 },
   { id: 'skorea', short: 'S. Korea', name: 'South Korea', color: '#3fa7b5', government: 'federation', minor: true, capital: [5, 8, 'Seoul'], cities: [[6, 9, 'Busan']], depots: [], rough: 30 },
   { id: 'taiwan', short: 'Taiwan', name: 'Taiwan', color: '#c97ab0', government: 'federation', minor: true, capital: [6, 13, 'Taipei'], cities: [[6, 14, 'Kaohsiung']], depots: [], rough: 40 },
@@ -145,7 +153,10 @@ export function shortName(name: string): string {
 }
 
 /** Victory points by site name where a place is worth more than its size: what the war is about. */
-const PRIZE: Record<string, number> = { Taipei: 9, Seoul: 8, 'Mexico City': 8, Vancouver: 8, Honolulu: 7, Pyongyang: 6 };
+const PRIZE: Record<string, number> = { Taipei: 9, Seoul: 8, 'Mexico City': 8, Vancouver: 8, Pyongyang: 6 };
+
+/** Island outposts: a runway and a harbour, worth little in themselves; their worth is where they are. */
+const OUTPOSTS = new Set(['Guam', 'Adak']);
 
 const at = (col: number, row: number): HexKey => keyOf(offsetToAxial(col, row));
 
@@ -158,6 +169,8 @@ const SITE_PROFILE: Record<'capital' | 'city' | 'depot', { vp: number; pop: numb
   city: { vp: 5, pop: 900, yields: yields({ credits: 14, energy: 6, materials: 8, food: 9, industry: 16, research: 3 }) },
   depot: { vp: 2, pop: 100, yields: yields({ credits: 2, energy: 4, materials: 4, food: 2, industry: 4 }) },
 };
+
+const OUTPOST_PROFILE = { vp: 1, pop: 40, yields: yields({ credits: 1, energy: 1, materials: 1, food: 1, industry: 1 }) };
 
 /** A minor state's capital and cities: smaller economies, same victory points (they are the prize). */
 const MINOR_PROFILE: Record<'capital' | 'city', { vp: number; pop: number; yields: Yields }> = {
@@ -262,7 +275,13 @@ export function createPacificScenario(seed: number): WorldState {
     const profile = n.minor ? MINOR_PROFILE : SITE_PROFILE;
     placeSite(`${n.id}-capital`, n.capital, 'capital', n.id, profile.capital);
     n.cities.forEach((p, i) => placeSite(`${n.id}-city${i}`, p, 'city', n.id, profile.city));
-    n.depots.forEach((p, i) => placeSite(`${n.id}-depot${i}`, p, 'depot', n.id, SITE_PROFILE.depot));
+    n.depots.forEach((p, i) => placeSite(`${n.id}-depot${i}`, p, 'depot', n.id, OUTPOSTS.has(p[2]) ? OUTPOST_PROFILE : SITE_PROFILE.depot));
+  }
+
+  // Every site on the coast is a port: ships enter it, build there, and supply puts to sea from it.
+  for (const id of sortedKeys(sites)) {
+    const t = tiles[sites[id]!.key]!;
+    if (neighborKeys(t.key).some((k) => tiles[k]?.terrain === 'water')) t.port = true;
   }
 
   const nations: Record<NationId, Nation> = {};
@@ -332,14 +351,38 @@ export function createPacificScenario(seed: number): WorldState {
     for (const [unitClass, place] of STARTING_FORCES) raise(n, unitClass, where[place], counts);
     // Garrisons for the far-flung cities and bases beyond the template's two and one.
     for (let i = 2; i < n.cities.length; i++) raise(n, 'infantry', `${n.id}-city${i}`, counts);
-    for (let i = 1; i < n.depots.length; i++) raise(n, 'infantry', `${n.id}-depot${i}`, counts);
+    // Outpost garrisons: a reinforced company, not a division.
+    for (let i = 1; i < n.depots.length; i++) {
+      raise(n, 'infantry', `${n.id}-depot${i}`, counts);
+      const last = Object.values(world.formations).at(-1)!;
+      if (OUTPOSTS.has(n.depots[i]![2])) last.strength = 500;
+    }
+    if (n.navy) {
+      // At sea off the home port, in the first open sea hexes (sorted, so every seed agrees).
+      const port = Object.values(sites).find((s) => s.name === n.navy!.port)!;
+      if (!tiles[port.key]!.port) throw new Error(`${port.name} is not a port`);
+      const sea = neighborKeys(port.key)
+        .filter((k) => tiles[k]?.terrain === 'water')
+        .sort();
+      n.navy.ships.forEach((c, i) => {
+        const key = sea[i % sea.length]!;
+        const c2 = (counts.get(c) ?? 0) + 1;
+        counts.set(c, c2);
+        const f = newFormation(world, n.id, c, key, `${n.name} ${c2}${['th', 'st', 'nd', 'rd'][c2] ?? 'th'} ${unitClassName(c)}`);
+        f.readiness = 80;
+        f.organization = 70;
+      });
+    }
   }
   for (const n of MINORS) {
     // Militia: infantry in every city, a recon screen at the capital, not yet at full readiness.
     const counts = new Map<UnitClass, number>();
     raise(n, 'infantry', `${n.id}-capital`, counts, 60);
     raise(n, 'recon', `${n.id}-capital`, counts, 60);
-    n.cities.forEach((_, i) => raise(n, 'infantry', `${n.id}-city${i}`, counts, 60));
+    n.cities.forEach((_, i) => {
+      raise(n, 'infantry', `${n.id}-city${i}`, counts, 60);
+      for (const c of n.militia ?? []) raise(n, c, `${n.id}-city${i}`, counts, 60);
+    });
   }
   for (const n of ALL) {
     nations[n.id]!.industrialCapacity = grossYields(world, n.id).industry;
@@ -363,5 +406,5 @@ export function createPacificScenario(seed: number): WorldState {
 }
 
 function unitClassName(c: UnitClass): string {
-  return { infantry: 'Infantry', mechanized: 'Mechanized', armor: 'Armored', artillery: 'Artillery', recon: 'Recon', air: 'Aviation', drone: 'Drone Company' }[c];
+  return { infantry: 'Infantry', mechanized: 'Mechanized', armor: 'Armored', artillery: 'Artillery', recon: 'Recon', air: 'Aviation', drone: 'Drone Company', fleet: 'Fleet', transport: 'Amphibious Group', carrier: 'Carrier Group' }[c];
 }

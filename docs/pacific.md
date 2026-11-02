@@ -71,24 +71,39 @@ Held back until the engine can carry them: Hawaiian Spring (a minor state create
 Guam Strike (the player picks the enemy on turn 1). Crises that need ships (Pearl Harbor, Operation
 Sombra, Panama Shut) get fleets in Phase 3; until then they open with landed troops and damage.
 
-## Navy (Phases 3 to 5)
+## Navy (Phases 3 to 5, built)
 
-Sea hexes become a second layer, the way air already is one.
+Ruleset 2.1.0. Three classes (`packages/game-data` UNITS): **Fleet** (range 2: strikes ships and the
+coast, its fire counts as support for an assault on that hex), **Amphibious Group** (carries two
+ground formations), **Carrier Group** (carries two air wings, which strike from its deck).
 
-- **Classes:** Fleet (surface group: fights ships, bombards the coast), Transport (carries up to two
-  land formations), Carrier (a moving airfield: helicopters and drones may base on it).
-- **Movement:** naval units move only on water and coastal city hexes (ports), through the same
-  clocked movement as land, with their own costs. Land units cannot enter water except aboard a
-  transport.
-- **Landings:** a transport adjacent to land may unload into an empty or enemy hex; an unload into
-  enemy ground is an assault at a heavy penalty (amphibious), which the arena can fight by hand.
-- **Supply at sea:** ships draw supply at a friendly port within range; land units aboard are fed
-  by the transport.
-- **Sea combat:** fleets engage enemy ships in their hex or adjacent; carriers project air strikes.
-- **AI:** builds ships at ports, escorts transports, lands on undefended coasts, never orders a move
-  the validator refuses (soak: 0 rejected orders).
+- **Ports and the sea.** Every coastal site is a port (`Tile.port`). Ships move on water and through
+  ports (`enterCost` for naval classes), on the same simultaneous clock as armies; armies never enter
+  the sea except aboard. Two stacking layers: a hex holds three ships and three of everything else.
+  Ships are built only in ports.
+- **Aboard.** `Formation.aboard` names the ship. Boarding (`{ type: 'embark', carrier }`) happens
+  before anything moves, in the ship's hex or from a port to a ship lying just off it. Passengers ride
+  with the ship, do not count for stacking, are fed by it, and go down with it.
+- **Landings.** A passenger ordered onto land leaves from where its ship lay; an assault from the ship
+  on a hex next to it fights at a 30% penalty (`AMPHIBIOUS_ASSAULT_PENALTY`), and a winner advances
+  ashore. Guns cannot fire from the hold.
+- **Carriers.** Aircraft rebase to an own carrier (it may sail the same turn: they follow it) and
+  strike from wherever it lies.
+- **Sea lanes.** Supply leaves from a friendly port, crosses any sea no enemy holds (cheap per hex),
+  and comes ashore anywhere: islands, ships at sea, passengers and beachheads. An enemy fleet on the
+  lane cuts it.
+- **Combat at sea.** Fleets and aircraft strike ships; ships shoot back at aircraft. Beaten ships in a
+  captured port put out to the nearest open sea, with their passengers, or are lost. Ships never join a
+  hand-fought land battle.
+- **The AI** (`planSea`): armies whose goal is on another landmass march to a port with a transport
+  and board; loaded transports sail for the beach nearest the goal and land, storming it when the odds
+  are good; empty ones go back for more; fleets escort toward the goal's coast; carriers take aircraft
+  on deck. It builds ships in ports, more lift when its war is overseas. Balance of power: from turn 8
+  a power six points of standing ahead of every other becomes everyone's target.
 
-The soak's "no formation on water" invariant becomes "no land formation on water unless aboard".
+Measured (12 AI-only matches, 30 turns): every power boards and lands; Japan lands up to nine times a
+match and takes Busan, Seoul, Wuhan. Winners: United States 9, Russia 3. China and Japan do not yet
+win AI-only matches: the next balance pass.
 
 ## Phases
 
@@ -96,9 +111,9 @@ The soak's "no formation on water" invariant becomes "no land formation on water
 |---|---|---|
 | 1 | The Pacific map, the four powers, the five minors, Meridian removed | Ruleset bump. Old saves of the Meridian are refused with a clear message. Tests, soak and e2e move to the new nations. |
 | 2 | Opening Crises | World edits plus stories; briefing screen deals them. |
-| 3 | Navy core: fleets, transports, ports, sea movement, landings | Crises that need ships use them from here. |
-| 4 | Sea combat and carriers | |
-| 5 | The AI at sea | Soak at 0 rejected orders. |
+| 3 | Navy core: fleets, transports, ports, sea movement, landings | Built. Pearl Harbor, Operation Sombra and Panama Shut now open with fleets. |
+| 4 | Sea combat and carriers | Built. |
+| 5 | The AI at sea | Built; soak at 0 rejected orders. Next: balance (China, Japan). |
 
 ## Touch points (from the inventory)
 

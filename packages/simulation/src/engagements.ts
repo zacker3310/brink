@@ -24,7 +24,7 @@ import {
 } from './combat';
 import { canDetect, type Vision } from './fog';
 import { rollRange } from './rng';
-import { clamp, enterCost, fortressFloor, nationModifiers, relationOf, sortedKeys } from './rules';
+import { clamp, enterCost, fortressFloor, isAir, isNaval, nationModifiers, passengersOf, relationOf, sameLayer, sortedKeys } from './rules';
 
 /** Per-formation effects computed from a snapshot, then committed together. */
 interface Effects {
@@ -75,12 +75,25 @@ function hostilesAt(world: WorldState, nation: NationId, key: HexKey): Formation
     .filter((f) => f.key === key && relationOf(world.relations, nation, f.owner) === 'war');
 }
 
-/** Remove formations at or below the destroyed threshold. */
+/** Remove formations at or below the destroyed threshold, and whoever rode in a ship that went down. */
 export function removeDestroyed(world: WorldState, events: GameEvent[]): void {
   for (const id of sortedKeys(world.formations)) {
     const f = world.formations[id]!;
     if (f.strength <= RULES.destroyedStrength) {
       events.push({ kind: 'destroyed', formation: id, owner: f.owner, unitClass: f.unitClass, at: f.key });
+      delete world.formations[id];
+    }
+  }
+  dropOrphans(world, events);
+}
+
+/** Passengers whose ship is gone go down with it. */
+export function dropOrphans(world: WorldState, events: GameEvent[]): void {
+  for (const id of sortedKeys(world.formations)) {
+    const f = world.formations[id]!;
+    if (f.aboard && !world.formations[f.aboard]) {
+      events.push({ kind: 'destroyed', formation: id, owner: f.owner, unitClass: f.unitClass, at: f.key });
+      world.nations[f.owner]!.warLosses += f.strength;
       delete world.formations[id];
     }
   }
@@ -146,7 +159,7 @@ export function resolveStrikes(
         engaged.add(v.id);
       }
       let sourceLoss = 0;
-      if (!def.ground) {
+      if (isAir(f.unitClass)) {
         sourceLoss = airDefenseLoss(victims, rollRange(100 - RULES.combatSwing, 100 + RULES.combatSwing, seed, world.turn, 'flak', id));
         book.add(id, { strength: sourceLoss });
         support.air.add(supportKey(nation, order.target));
@@ -350,7 +363,7 @@ export function resolveEngagements(
     const alive = list
       .flatMap((c) => c.candidates)
       .map((f) => world.formations[f.id])
-      .filter((f): f is Formation => !!f && UNITS[f.unitClass].ground && enterCost(world.tiles[key], f.unitClass) !== null);
+      .filter((f): f is Formation => !!f && UNITS[f.unitClass].ground && enterCost(world.tiles[key], f.unitClass) !== null && (!f.aboard || areAdjacent(f.key, key)));
     alive.sort((p, q) => q.strength - p.strength || (p.id < q.id ? -1 : 1));
     if (alive[0]) advances.set(key, alive[0].id);
   }
@@ -407,7 +420,8 @@ function fightInArena(
  * elsewhere, so neither nation's retreat has priority.
  */
 export function resolveRetreats(world: WorldState, result: EngagementResult, events: GameEvent[]): void {
-  const retreating = [...result.mustRetreat.keys()].sort();
+  // Passengers go where their ship goes; they do not choose a retreat of their own.
+  const retreating = [...result.mustRetreat.keys()].sort().filter((id) => !world.formations[id]!.aboard);
   const vacating = new Set(retreating.map((id) => world.formations[id]!.key));
   const banned = new Map<FormationId, Set<HexKey>>();
   const chosen = new Map<FormationId, HexKey | null>();
@@ -415,6 +429,12 @@ export function resolveRetreats(world: WorldState, result: EngagementResult, eve
   const candidates = (f: Formation): HexKey[] => {
     const threats = result.mustRetreat.get(f.id)!;
     const ban = banned.get(f.id) ?? new Set();
+    if (isNaval(f.unitClass)) {
+      // Ships put out to open sea: a neighbouring sea hex with no enemy in it.
+      return neighborKeys(f.key)
+        .filter((k) => world.tiles[k]?.terrain === 'water' && !vacating.has(k) && !ban.has(k) && hostilesAt(world, f.owner, k).length === 0)
+        .sort((a, b) => threats.reduce((acc, t) => acc + keyDistance(b, t), 0) - threats.reduce((acc, t) => acc + keyDistance(a, t), 0) || (a < b ? -1 : 1));
+    }
     if (!UNITS[f.unitClass].ground) {
       return sortedKeys(world.sites)
         .map((s) => world.sites[s]!)
@@ -450,7 +470,8 @@ export function resolveRetreats(world: WorldState, result: EngagementResult, eve
       if (to) into.set(to, [...(into.get(to) ?? []), id]);
     }
     for (const [to, ids] of into) {
-      const room = STACK_LIMIT - Object.values(world.formations).filter((o) => o.key === to && !result.mustRetreat.has(o.id)).length;
+      const mover = world.formations[ids[0]!]!;
+      const room = STACK_LIMIT - Object.values(world.formations).filter((o) => o.key === to && !o.aboard && sameLayer(o.unitClass, mover.unitClass) && !result.mustRetreat.has(o.id)).length;
       for (const id of ids.slice(Math.max(0, room))) {
         banned.set(id, new Set([...(banned.get(id) ?? []), to]));
         clash = true;
@@ -485,13 +506,17 @@ export function resolveRetreats(world: WorldState, result: EngagementResult, eve
     f.key = to;
     f.organization = clamp(f.organization - 10, 0, 100);
     f.entrenchment = 0;
+    for (const p of passengersOf(world, id)) p.key = to;
   }
+  dropOrphans(world, events);
 
   for (const key of [...result.advances.keys()].sort()) {
     const f = world.formations[result.advances.get(key)!];
     if (!f) continue;
     const others = Object.values(world.formations).filter((o) => o.key === key);
-    if (others.some((o) => o.owner !== f.owner) || others.length >= STACK_LIMIT) continue;
+    if (others.some((o) => o.owner !== f.owner) || others.filter((o) => !o.aboard && sameLayer(o.unitClass, f.unitClass)).length >= STACK_LIMIT) continue;
+    // Over the beach: a passenger that won the hex leaves its ship.
+    delete f.aboard;
     f.key = key;
     f.entrenchment = 0;
     for (const e of events) if (e.kind === 'engagement' && e.location === key && e.type === 'assault') e.advanced = f.id;

@@ -13,7 +13,7 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { DIFFICULTY_EDGE, FORTRESS_ENTRENCHMENT, GOVERNMENTS, RIVER_MOVE_COST, TECHS, TERRAIN, UNITS, type Modifiers } from '@brink/game-data';
+import { DIFFICULTY_EDGE, FORTRESS_ENTRENCHMENT, GOVERNMENTS, NAVAL_MOVE_COST, RIVER_MOVE_COST, TECHS, TERRAIN, type Modifiers, UNITS } from '@brink/game-data';
 import { areAdjacent } from '@brink/map';
 
 export function sortedKeys<T extends object>(obj: T): (keyof T & string)[] {
@@ -103,11 +103,26 @@ export interface TerrainInfo {
   terrain: Terrain | null;
   river: boolean;
   infrastructure: number;
+  port?: boolean;
 }
 
-/** Movement points for a ground formation to enter `tile`; null when it cannot. */
+/** Ships: move on water and through ports. */
+export function isNaval(unitClass: UnitClass): boolean {
+  return UNITS[unitClass].naval === true;
+}
+
+/** Aircraft and drones: neither hold ground nor sail; they rebase between sites and carriers. */
+export function isAir(unitClass: UnitClass): boolean {
+  return !UNITS[unitClass].ground && !UNITS[unitClass].naval;
+}
+
+/**
+ * Movement points for a formation to enter `tile`; null when it cannot. Ground formations walk
+ * land; ships sail the sea and put in at ports, and never cross other land.
+ */
 export function enterCost(tile: TerrainInfo | undefined, unitClass: UnitClass): number | null {
   if (!tile || tile.terrain === null) return null;
+  if (isNaval(unitClass)) return tile.terrain === 'water' || tile.port ? NAVAL_MOVE_COST : null;
   const def = TERRAIN[tile.terrain];
   if (def.moveCost === null) return null;
   let cost = def.moveCost + (tile.river ? RIVER_MOVE_COST : 0);
@@ -163,4 +178,28 @@ export function fortressFloor(world: WorldState, f: Formation): number {
   const id = world.tiles[f.key]?.siteId;
   const site = id ? world.sites[id] : undefined;
   return site && site.owner === f.owner && site.facilities.includes('fortress') && UNITS[f.unitClass].ground ? FORTRESS_ENTRENCHMENT : 0;
+}
+
+/** Formations riding in `carrier`. */
+export function passengersOf(world: Pick<WorldState, 'formations'>, carrier: string): Formation[] {
+  return sortedKeys(world.formations)
+    .map((id) => world.formations[id]!)
+    .filter((f) => f.aboard === carrier);
+}
+
+/**
+ * Formations in a hex that count against the stacking limit alongside one of class `cls`. Two
+ * layers: ships, and everything else (a harbour holds its garrison and its ships). Those aboard ride free.
+ */
+export function stackAt(world: Pick<WorldState, 'formations'>, key: string, cls: UnitClass): Formation[] {
+  return Object.values(world.formations).filter((f) => f.key === key && !f.aboard && sameLayer(f.unitClass, cls));
+}
+
+/** A formation can board ship `c`: in the same hex, or from a port to a ship lying just offshore. */
+export function alongside(world: { tiles: Record<string, { terrain: Terrain | null; port?: boolean } | undefined> }, f: Pick<Formation, 'key'>, c: Pick<Formation, 'key'>): boolean {
+  return c.key === f.key || (world.tiles[f.key]?.port === true && areAdjacent(f.key, c.key) && world.tiles[c.key]?.terrain === 'water');
+}
+
+export function sameLayer(a: UnitClass, b: UnitClass): boolean {
+  return isNaval(a) === isNaval(b);
 }

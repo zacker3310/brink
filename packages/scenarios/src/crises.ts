@@ -1,6 +1,6 @@
 import type { HexKey, NationId, Relation, UnitClass, WorldState } from '@brink/contracts';
-import { STACK_LIMIT } from '@brink/game-data';
-import { keyOf, offsetToAxial } from '@brink/map';
+import { STACK_LIMIT, UNITS } from '@brink/game-data';
+import { keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { computeVision, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
 // Opening Crises (docs/pacific.md): a story and a deterministic edit of the turn-1 Pacific world.
@@ -96,6 +96,35 @@ function batter(w: WorldState, owner: NationId, keys: readonly HexKey[], percent
   }
 }
 
+/** Ships put to sea in the open water off a site, never sharing a sea hex with another nation. */
+function afloat(w: WorldState, owner: NationId, near: string, classes: readonly UnitClass[], name: string): void {
+  const s = site(w, near);
+  const sea = neighborKeys(s.key)
+    .filter((k) => w.tiles[k]?.terrain === 'water')
+    .sort();
+  for (const c of classes) {
+    const key = sea.find((k) => {
+      const here = Object.values(w.formations).filter((f) => f.key === k && !f.aboard);
+      return here.every((f) => f.owner === owner) && here.length < STACK_LIMIT;
+    });
+    if (!key) return;
+    const f = newFormation(w, owner, c, key, `${w.nations[owner]!.name} ${name}`);
+    f.readiness = 80;
+    f.organization = 70;
+  }
+}
+
+/** Every ship of `owner` down to a share of its strength (a fleet caught in harbour). */
+function batterNavy(w: WorldState, owner: NationId, percent: number): void {
+  for (const id of sortedKeys(w.formations)) {
+    const f = w.formations[id]!;
+    if (f.owner === owner && UNITS[f.unitClass].naval) {
+      f.strength = Math.max(1, Math.floor((f.strength * percent) / 100));
+      f.organization = Math.floor((f.organization * percent) / 100);
+    }
+  }
+}
+
 function shake(w: WorldState, n: NationId, stability: number, stockPercent = 100): void {
   const nation = w.nations[n]!;
   nation.stability = Math.max(0, Math.min(100, nation.stability + stability));
@@ -155,13 +184,15 @@ export const CRISES: readonly Crisis[] = [
     name: 'Pearl Harbor 2.0',
     hook: 'Hypersonics over Honolulu.',
     story: 'A nationalist coalition takes Tokyo after an acquittal in Okinawa. Forty minutes later the first missiles hit Pearl. The Pacific Fleet is a burning ring and Guam is cut off.',
-    setup: 'Japan and the United States are at war. Honolulu’s garrison is cut to a third and American morale is shaken. Russia and China watch.',
+    setup: 'Japan and the United States are at war. A Japanese strike group lies off Honolulu, its garrison is cut to a third, the US fleet is crippled and morale shaken. Russia and China watch.',
     threat: 3,
     recommended: 'usa',
     apply: (w) => {
       calm(w);
       relate(w, 'japan', 'usa', 'war');
       batter(w, 'usa', [site(w, 'Honolulu').key, site(w, 'Guam').key], 33);
+      batterNavy(w, 'usa', 40);
+      afloat(w, 'japan', 'Honolulu', ['fleet', 'carrier'], 'Strike Group');
       shake(w, 'usa', -15);
       shake(w, 'japan', 10);
     },
@@ -207,7 +238,7 @@ export const CRISES: readonly Crisis[] = [
     name: 'Operation Sombra',
     hook: 'The PLA lands in Mexico.',
     story: 'A cartel war topples Mexico City. Beijing answers a humanitarian request from a junta nobody recognises: two divisions land at Tijuana and destroyers sit off the coast. Washington wakes to a hostile army a day from San Diego.',
-    setup: 'China holds Tijuana with an expeditionary corps and is at war with the United States. Mexico’s militia is broken.',
+    setup: 'China holds Tijuana with an expeditionary corps, its fleet offshore, and is at war with the United States. Mexico’s militia is broken.',
     threat: 3,
     recommended: 'usa',
     apply: (w) => {
@@ -216,6 +247,7 @@ export const CRISES: readonly Crisis[] = [
       const k = site(w, 'Tijuana').key;
       seize(w, k, 'china');
       land(w, 'china', k, ['infantry', 'armor', 'infantry'], 'Expeditionary Corps');
+      afloat(w, 'china', 'Tijuana', ['fleet', 'transport'], 'Task Force Sombra');
       batter(
         w,
         'mexico',
@@ -284,7 +316,7 @@ export const CRISES: readonly Crisis[] = [
     name: 'Panama Shut',
     hook: 'A ship runs aground. On purpose.',
     story: 'A container ship grounds in the Panama Canal and the Atlantic fleet is locked out. Then Moscow and Beijing announce a mutual defence pact, and Mexico closes its airspace.',
-    setup: 'Russia and China are allies, at war with the United States. American reserves are cut by a third.',
+    setup: 'Russia and China are allies, at war with the United States. American reserves are cut by a third and its Pacific fleet is under strength.',
     threat: 3,
     recommended: 'usa',
     apply: (w) => {
@@ -293,6 +325,7 @@ export const CRISES: readonly Crisis[] = [
       relate(w, 'china', 'usa', 'war');
       relate(w, 'russia', 'usa', 'war');
       shake(w, 'usa', -5, 66);
+      batterNavy(w, 'usa', 60);
     },
   },
   {

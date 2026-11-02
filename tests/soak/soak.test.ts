@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { FACILITY_SLOTS, STACK_LIMIT } from '@brink/game-data';
+import { FACILITY_SLOTS, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { GameSession } from '@brink/session';
 
@@ -15,6 +15,7 @@ function invariants(w: WorldState): string[] {
     if (n.stability < 0 || n.stability > 100) bad.push(`${n.id} stability ${n.stability}`);
   }
   const perHex = new Map<string, string[]>();
+  const stacked = new Map<string, number>();
   for (const f of Object.values(w.formations)) {
     if (!w.tiles[f.key]) bad.push(`${f.id} off map`);
     if (w.nations[f.owner]?.eliminated) bad.push(`${f.id} belongs to an eliminated nation`);
@@ -22,15 +23,25 @@ function invariants(w: WorldState): string[] {
       if (!Number.isInteger(v) || v < 0 || v > 100) bad.push(`${f.id} stat out of range`);
     }
     if (f.strength <= 0 || f.strength > 1000) bad.push(`${f.id} strength ${f.strength}`);
-    if (w.tiles[f.key]?.terrain === 'water') bad.push(`${f.id} in water`);
+    // At sea: ships, and whoever rides in one, in that ship's own hex. Nothing else.
+    if (w.tiles[f.key]?.terrain === 'water' && !UNITS[f.unitClass].naval && !f.aboard) bad.push(`${f.id} in water`);
+    if (f.aboard && (!w.formations[f.aboard] || w.formations[f.aboard]!.key !== f.key)) bad.push(`${f.id} aboard a ship that is not there`);
+    if (f.aboard && UNITS[w.formations[f.aboard]?.unitClass ?? 'infantry'].carries !== (UNITS[f.unitClass].ground ? 'ground' : 'air')) bad.push(`${f.id} aboard the wrong kind of ship`);
     perHex.set(f.key, [...(perHex.get(f.key) ?? []), f.owner]);
+    // Two stacking layers: ships, and everything else.
+    if (!f.aboard) stacked.set(`${f.key}|${UNITS[f.unitClass].naval ? 'sea' : 'land'}`, (stacked.get(`${f.key}|${UNITS[f.unitClass].naval ? 'sea' : 'land'}`) ?? 0) + 1);
+  }
+  for (const c of Object.values(w.formations)) {
+    const n = Object.values(w.formations).filter((f) => f.aboard === c.id).length;
+    if (n > (UNITS[c.unitClass].capacity ?? 0)) bad.push(`${c.id} carries ${n}`);
   }
   for (const [key, owners] of perHex) {
     const distinct = new Set(owners);
     for (const a of distinct) for (const b of distinct) {
       if (a < b && w.relations[`${a}|${b}`] === 'war') bad.push(`enemies ${a} and ${b} share ${key}`);
     }
-    if (owners.length > STACK_LIMIT) bad.push(`${owners.length} formations in ${key}`);
+    // Passengers ride free; what stands in the hex is held to the limit.
+    for (const layer of ['sea', 'land']) if ((stacked.get(`${key}|${layer}`) ?? 0) > STACK_LIMIT) bad.push(`${stacked.get(`${key}|${layer}`)} ${layer} formations in ${key}`);
   }
   for (const s of Object.values(w.sites)) if (w.tiles[s.key]!.owner !== s.owner) bad.push(`site ${s.id} owner differs from its hex`);
   for (const s of Object.values(w.sites)) {

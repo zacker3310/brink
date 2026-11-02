@@ -27,7 +27,8 @@ export function resolveTerritory(world: WorldState, events: GameEvent[]): void {
   const occupants = new Map<HexKey, Set<NationId>>();
   for (const id of sortedKeys(world.formations)) {
     const f = world.formations[id]!;
-    if (!UNITS[f.unitClass].ground) continue;
+    // Ground formations take ground; passengers at sea take nothing until they land.
+    if (!UNITS[f.unitClass].ground || f.aboard) continue;
     occupants.set(f.key, new Set([...(occupants.get(f.key) ?? []), f.owner]));
   }
 

@@ -1,7 +1,7 @@
 import type { Formation, FormationId, GameEvent, HexKey, NationId, NationOrders, WorldState } from '@brink/contracts';
 import { STACK_LIMIT, UNITS } from '@brink/game-data';
 import { neighborKeys } from '@brink/map';
-import { enterCost, movementAllowance, relationOf, sortedKeys } from './rules';
+import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, relationOf, sortedKeys, stackAt } from './rules';
 
 type Halt = 'enemy' | 'contact' | 'contested' | 'stacking';
 
@@ -50,6 +50,32 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
   const moved = new Set<FormationId>();
   const movers: Mover[] = [];
   const rel = (a: NationId, b: NationId) => relationOf(world.relations, a, b);
+  // Where every formation stood when the phase began: a rebase to a carrier finds it by this.
+  const startKey = new Map(sortedKeys(world.formations).map((id) => [id, world.formations[id]!.key]));
+
+  // Boarding comes first, before anything moves: a ship that sails this turn takes them along.
+  // Within a nation, by id, while there is room; nothing between nations depends on the order.
+  for (const nation of sortedKeys(orders)) {
+    for (const id of sortedKeys(orders[nation]!.formations)) {
+      const order = orders[nation]!.formations[id]!;
+      const f = world.formations[id];
+      if (!f || order.type !== 'embark') continue;
+      const c = world.formations[order.carrier];
+      if (!c || c.owner !== f.owner || f.aboard || !alongside(world, f, c)) continue;
+      if (passengersOf(world, c.id).length >= (UNITS[c.unitClass].capacity ?? 0)) continue;
+      f.aboard = c.id;
+      f.key = c.key;
+      events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [], halted: null });
+    }
+  }
+  // Going ashore: a passenger ordered onto land leaves its ship from where the ship lay.
+  for (const nation of sortedKeys(orders)) {
+    for (const id of sortedKeys(orders[nation]!.formations)) {
+      const order = orders[nation]!.formations[id]!;
+      const f = world.formations[id];
+      if (f?.aboard && UNITS[f.unitClass].ground && (order.type === 'move' || order.type === 'recon' || order.type === 'withdraw')) delete f.aboard;
+    }
+  }
 
   for (const nation of sortedKeys(orders)) {
     for (const id of sortedKeys(orders[nation]!.formations)) {
@@ -58,10 +84,11 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
       if (!f) continue;
       const path = pathOf(order);
       if (path.length === 0) continue;
-      if (!UNITS[f.unitClass].ground) {
+      if (isAir(f.unitClass)) {
         // Air rebases at the end of the phase; it does not contest ground.
         continue;
       }
+      if (f.aboard) continue;
       if (order.type === 'attack' && UNITS[f.unitClass].range > 0) continue;
       const allowance = movementAllowance(f);
       const steps: HexKey[] = [];
@@ -105,14 +132,14 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
       if (!m.halted) m.halted = why;
     };
 
-    // Head-on swaps between enemies: neither passes; they meet.
+    // Head-on swaps between enemies: neither passes; armies meet, ships turn away.
     for (const m of group) {
       for (const n of group) {
         if (m.f.id >= n.f.id || rel(m.f.owner, n.f.owner) !== 'war') continue;
         if (target(m) === n.f.key && target(n) === m.f.key) {
           halt(m, 'enemy');
           halt(n, 'enemy');
-          meetings.push([m.f.id, n.f.id]);
+          if (!isNaval(m.f.unitClass) && !isNaval(n.f.unitClass)) meetings.push([m.f.id, n.f.id]);
         }
       }
     }
@@ -141,10 +168,14 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
     // ranks one nation above another.
     for (const [key, list] of entering) {
       const ok = list.filter((m) => !m.halted).sort((a, b) => (a.f.id < b.f.id ? -1 : 1));
-      let count = (at.get(key) ?? []).length;
+      // Passengers ride free: only what stands in the hex counts against the limit.
+      // Two layers, ships and everything else, each held to the limit.
+      const count = { sea: 0, land: 0 };
+      for (const o of at.get(key) ?? []) if (!o.aboard) count[isNaval(o.unitClass) ? 'sea' : 'land']++;
       for (const m of ok) {
-        if (count >= STACK_LIMIT) halt(m, 'stacking');
-        else count++;
+        const layer = isNaval(m.f.unitClass) ? 'sea' : 'land';
+        if (count[layer] >= STACK_LIMIT) halt(m, 'stacking');
+        else count[layer]++;
       }
     }
 
@@ -155,6 +186,7 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
       }
       const k = target(m);
       m.f.key = k;
+      for (const p of passengersOf(world, m.f.id)) p.key = k;
       m.f.fuel = Math.max(0, m.f.fuel - UNITS[m.f.unitClass].fuelPerMove);
       m.f.entrenchment = 0;
       m.traveled.push(k);
@@ -165,13 +197,17 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
 
     // Contact: entering a hex next to the enemy ends the move, judged after the instant
     // so both sides of a new contact see each other.
+    // Armies are stopped by armies, fleets by fleets; passengers at sea stop nobody.
     const after = new Map<HexKey, NationId[]>();
+    const afloat = new Map<HexKey, NationId[]>();
     for (const id of sortedKeys(world.formations)) {
       const o = world.formations[id]!;
+      if (o.aboard) continue;
       if (UNITS[o.unitClass].ground) after.set(o.key, [...(after.get(o.key) ?? []), o.owner]);
+      else if (isNaval(o.unitClass)) afloat.set(o.key, [...(afloat.get(o.key) ?? []), o.owner]);
     }
     const hostileNear = (f: Formation) =>
-      neighborKeys(f.key).some((k) => (after.get(k) ?? []).some((owner) => rel(f.owner, owner) === 'war'));
+      neighborKeys(f.key).some((k) => ((isNaval(f.unitClass) ? afloat : after).get(k) ?? []).some((owner) => rel(f.owner, owner) === 'war'));
     for (const m of group) {
       if (m.done || m.halted || m.ignoresContact) continue;
       if (hostileNear(m.f)) {
@@ -197,16 +233,28 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
     for (const id of sortedKeys(orders[nation]!.formations)) {
       const order = orders[nation]!.formations[id]!;
       const f = world.formations[id];
-      if (!f || UNITS[f.unitClass].ground || order.type !== 'move') continue;
+      if (!f || !isAir(f.unitClass) || order.type !== 'move') continue;
       const dest = order.path[0]!;
+      // A carrier that lay in that hex when the turn began: the aircraft follow it to where it sailed.
+      const deck = sortedKeys(world.formations)
+        .map((cid) => world.formations[cid]!)
+        .find((c) => c.id !== f.aboard && c.owner === f.owner && UNITS[c.unitClass].carries === 'air' && startKey.get(c.id) === dest && passengersOf(world, c.id).length < (UNITS[c.unitClass].capacity ?? 0));
+      if (deck) {
+        f.key = deck.key;
+        f.aboard = deck.id;
+        moved.add(id);
+        events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [deck.key], halted: null });
+        continue;
+      }
       const siteId = world.tiles[dest]?.siteId;
-      const there = Object.values(world.formations).filter((o) => o.key === dest);
+      const there = stackAt(world, dest, f.unitClass);
       const room = there.length < STACK_LIMIT;
       // The base may have been overrun during movement.
-      const overrun = there.some((o) => rel(f.owner, o.owner) !== 'alliance');
+      const overrun = Object.values(world.formations).some((o) => o.key === dest && rel(f.owner, o.owner) !== 'alliance');
       if (overrun) events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [], halted: 'enemy' });
       else if (!room) events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [], halted: 'stacking' });
       else if (siteId && world.sites[siteId]!.owner === f.owner) {
+        delete f.aboard;
         f.key = dest;
         moved.add(id);
         events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [dest], halted: null });

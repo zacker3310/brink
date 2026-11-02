@@ -136,7 +136,7 @@ export function settleEconomy(
     f.lastOrder = order(f.id);
     if (shortages.includes('food')) f.morale = clamp(f.morale - 5, 0, 100);
     if (shortages.includes('credits')) f.readiness = clamp(f.readiness - 5, 0, 100);
-    if (!moved.has(f.id) && UNITS[f.unitClass].ground) {
+    if (!moved.has(f.id) && UNITS[f.unitClass].ground && !f.aboard) {
       f.entrenchment = clamp(f.entrenchment + (f.lastOrder === 'defend' ? 20 : 10), 0, 100);
     }
     f.entrenchment = Math.max(f.entrenchment, fortressFloor(world, f));

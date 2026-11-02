@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STACK_LIMIT } from '@brink/game-data';
+import { STACK_LIMIT, UNITS } from '@brink/game-data';
 import { buildView, hashState, pairKey, relationOf, sortedKeys } from '@brink/simulation';
 import type { WorldState } from '@brink/contracts';
 import { applyCrisis, CRISES, crisisOf, dealCrisis } from './crises';
@@ -12,8 +12,10 @@ export function legal(w: WorldState): string[] {
   for (const id of sortedKeys(w.formations)) {
     const f = w.formations[id]!;
     if (!w.tiles[f.key]) out.push(`${id} off the map`);
-    else if (w.tiles[f.key]!.terrain === 'water') out.push(`${id} at sea`);
-    perHex.set(f.key, [...(perHex.get(f.key) ?? []), f.owner]);
+    // At sea: only ships, and whoever rides in one (in the ship's own hex).
+    else if (w.tiles[f.key]!.terrain === 'water' && !UNITS[f.unitClass].naval && !f.aboard) out.push(`${id} at sea`);
+    if (f.aboard && w.formations[f.aboard]?.key !== f.key) out.push(`${id} is not with its ship`);
+    if (!f.aboard && !UNITS[f.unitClass].naval) perHex.set(f.key, [...(perHex.get(f.key) ?? []), f.owner]);
   }
   for (const [key, owners] of perHex) {
     if (owners.length > STACK_LIMIT) out.push(`${key} holds ${owners.length}`);

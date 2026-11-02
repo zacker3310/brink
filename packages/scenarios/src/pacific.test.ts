@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { UNIT_CLASSES } from '@brink/contracts';
+import { UNITS } from '@brink/game-data';
 import { findPath, offsetToAxial, keyOf } from '@brink/map';
 import { enterCost, sortedKeys } from '@brink/simulation';
 import { createPacificScenario, MINORS, NATIONS, PACIFIC_ID } from './pacific';
@@ -25,7 +26,9 @@ describe('The Pacific', () => {
       expect(s.filter((x) => x.kind === 'city').length, n.id).toBeGreaterThanOrEqual(3);
       expect(s.filter((x) => x.kind === 'depot').length, n.id).toBeGreaterThanOrEqual(1);
       const classes = new Set(Object.values(w.formations).filter((f) => f.owner === n.id).map((f) => f.unitClass));
-      for (const c of UNIT_CLASSES) expect(classes.has(c), `${n.id} ${c}`).toBe(true);
+      // Every land and air class; the navy differs by power (below).
+      for (const c of UNIT_CLASSES.filter((x) => !UNITS[x].naval)) expect(classes.has(c), `${n.id} ${c}`).toBe(true);
+      expect(classes.has('fleet') && classes.has('transport'), `${n.id} navy`).toBe(true);
     }
   });
 
@@ -34,7 +37,8 @@ describe('The Pacific', () => {
       expect(w.nations[m.id]!.minor).toBe(true);
       expect(sitesOf(m.id).filter((x) => x.kind === 'capital')).toHaveLength(1);
       const classes = new Set(Object.values(w.formations).filter((f) => f.owner === m.id).map((f) => f.unitClass));
-      expect([...classes].sort()).toEqual(['infantry', 'recon']);
+      // Militia: infantry, a recon screen, and in the big countries mechanized; never armour, air or ships.
+      for (const c of classes) expect(['infantry', 'mechanized', 'recon'], `${m.id} ${c}`).toContain(c);
     }
     for (const n of NATIONS) for (const m of MINORS) expect(w.relations[[n.id, m.id].sort().join('|')]).toBe('war');
     expect(w.relations[['canada', 'mexico'].sort().join('|')]).toBe('peace');
@@ -54,6 +58,18 @@ describe('The Pacific', () => {
     expect(findPath(key('Seoul'), key('Beijing'), cost)).not.toBeNull();
     expect(findPath(key('Anchorage'), key('Vancouver'), cost)).not.toBeNull();
     expect(w.tiles[keyOf(offsetToAxial(15, 0))]!.terrain).toBe('water'); // the Bering Strait
+  });
+
+  it('opens with each power\'s navy at sea off a home port, and every coastal site a port', () => {
+    const navy = (n: string) => Object.values(w.formations).filter((f) => f.owner === n && UNITS[f.unitClass].naval).map((f) => f.unitClass).sort();
+    expect(navy('usa')).toEqual(['carrier', 'fleet', 'transport']);
+    expect(navy('china')).toEqual(['carrier', 'fleet', 'transport']);
+    expect(navy('japan')).toEqual(['fleet', 'transport', 'transport']);
+    expect(navy('russia')).toEqual(['fleet', 'transport']);
+    for (const f of Object.values(w.formations)) if (UNITS[f.unitClass].naval) expect(w.tiles[f.key]!.terrain).toBe('water');
+    const port = (name: string) => w.tiles[Object.values(w.sites).find((s) => s.name === name)!.key]!.port;
+    expect([port('San Francisco'), port('Tokyo'), port('Vladivostok'), port('Shanghai'), port('Honolulu')]).toEqual([true, true, true, true, true]);
+    expect(port('Calgary')).toBeFalsy();
   });
 
   it('changes only the ground with the seed, never the coasts, borders or sites', () => {

@@ -338,11 +338,13 @@ describe('forces', () => {
   });
 
   it('makes a company of 10 to 16 for 1 to 6 formations, at least 2 each and 70% from the formations', () => {
+    // Every class that fights on land: ships never join a land battle (their templates are empty).
+    const LAND = UNIT_CLASSES.filter((c) => TEMPLATES.us[c].length > 0);
     for (const blue of ARSENALS)
       for (let f = 1; f <= 6; f++)
-        for (let offset = 0; offset < UNIT_CLASSES.length; offset++) {
-          const attackers = Array.from({ length: f }, (_, k) => spec(`a${k}`, UNIT_CLASSES[(k + offset) % UNIT_CLASSES.length]!));
-          const defenders = Array.from({ length: f }, (_, k) => spec(`d${k}`, UNIT_CLASSES[(k * 3 + offset) % UNIT_CLASSES.length]!));
+        for (let offset = 0; offset < LAND.length; offset++) {
+          const attackers = Array.from({ length: f }, (_, k) => spec(`a${k}`, LAND[(k + offset) % LAND.length]!));
+          const defenders = Array.from({ length: f }, (_, k) => spec(`d${k}`, LAND[(k * 3 + offset) % LAND.length]!));
           const s = setup({ attackers, defenders, arsenal: { blue, red: blue === 'us' ? 'legacy' : 'russia' }, site: 'objective' });
           for (const side of ['blue', 'red'] as Side[]) {
             const specs = side === 'blue' ? attackers : defenders;

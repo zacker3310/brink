@@ -1,11 +1,14 @@
 import type { GovernmentId, UnitClass } from '@brink/contracts';
+import { UNITS } from '@brink/game-data';
 import { unitImage } from './art';
 import { pictogramSvg } from './design/pictograms';
 
 // Small SVG marks shared by the menus and the game screen.
 
 /** The top-down render of a unit class, as the map draws it. */
-export function ModelPortrait({ unitClass, className = 'h-10 w-10' }: { unitClass: UnitClass; color?: string; className?: string }) {
+export function ModelPortrait({ unitClass, color = '#ededed', className = 'h-10 w-10' }: { unitClass: UnitClass; color?: string; className?: string }) {
+  // Ships have no rendered model yet: their pictogram stands in, upright.
+  if (UNITS[unitClass].naval) return <UnitGlyph unitClass={unitClass} color={color} className={className.replace('-rotate-90', '')} />;
   return <img src={unitImage(unitClass)} alt="" draggable={false} className={`shrink-0 object-contain ${className}`} />;
 }
 

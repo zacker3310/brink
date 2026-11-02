@@ -7,7 +7,7 @@ import { ModelPortrait, UnitGlyph } from './glyphs';
 import { Icon } from './icons';
 import { describeEffect, hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
-import { describeOrder, type Mode } from './planning';
+import { boardOrders, describeOrder, type Mode } from './planning';
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
 import { battleFor } from './arena/battle';
@@ -224,6 +224,9 @@ export function UnitPanel() {
           ))}
           <span className="mx-0.5 h-6 w-px bg-line" aria-hidden />
           <Action icon="defend" label="Fortify (defend and dig in)" hotkey="D" testId="order-defend" active={order?.type === 'defend'} disabled={resolving || !def.ground} onClick={() => issueOrder(f.id, { type: 'defend' })} />
+          {Object.keys(boardOrders(view, [f])).length > 0 && (
+            <Action icon="move" label="Board the ship alongside" hotkey="B" testId="order-board" active={order?.type === 'embark'} disabled={resolving} onClick={() => issueOrder(f.id, boardOrders(view, [f])[f.id]!)} />
+          )}
           <Action icon="hold" label="Hold position" hotkey="H" testId="order-hold" active={order?.type === 'hold'} disabled={resolving} onClick={() => issueOrder(f.id, { type: 'hold' })} />
           <Action icon="clear" label="Cancel order" hotkey="X" testId="order-clear" disabled={resolving || !order} onClick={() => setOrder(f.id, null)} />
           <button type="button" onClick={() => setDetails(!details)} className="ml-auto text-[10px] text-faint hover:text-text" aria-expanded={details}>

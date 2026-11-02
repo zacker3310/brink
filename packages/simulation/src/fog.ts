@@ -159,6 +159,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
         infrastructure: t.infrastructure,
         owner: visible ? t.owner : (intel.knownOwner[key] ?? null),
         siteId: t.siteId,
+        ...(t.port ? { port: true } : {}),
         lastObserved: visible ? world.turn : (last ?? null),
       };
     } else {

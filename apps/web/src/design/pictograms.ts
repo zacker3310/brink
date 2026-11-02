@@ -57,6 +57,28 @@ export const PICTOGRAMS: Record<UnitClass, Shape[]> = {
     { d: 'M13 9h6v6h-6z' },
     { d: `${ring(8, 5, 4)}${ring(24, 5, 4)}${ring(8, 19, 4)}${ring(24, 19, 4)}`, stroke: 1.6 },
   ],
+  // A warship in profile: hull, superstructure, mast, a gun forward.
+  fleet: [
+    { d: 'M1 15h30l-3.6 5.4H5.2z' },
+    { d: 'M10 10.5h11v4.5H10z' },
+    { d: 'M13.2 6.5h4.4v4h-4.4z' },
+    { d: 'M15.4 1.5v5', stroke: 1.4 },
+    { d: 'M22.5 13h2.6v2h-2.6zM24.5 13.6l5-1.6', stroke: 1.5 },
+  ],
+  // A landing ship: a deep hull with the bow ramp down.
+  transport: [
+    { d: 'M4 13h21l4.5 7H6.5z' },
+    { d: 'M5 8h7v5H5z' },
+    { d: 'M25 13l5.5-4', stroke: 2.2 },
+    { d: 'M14 10.5h9v2.5h-9z' },
+  ],
+  // A carrier: a long flat deck, the island to starboard, an aircraft on deck.
+  carrier: [
+    { d: 'M1 13.5h30l-2.6 6.5H4.5z' },
+    { d: 'M.5 11.5h31v2H.5z' },
+    { d: 'M20.5 5.5h4v6h-4z' },
+    { d: 'M6 9.6h7.5l1.5-1.2h1v1.2h1.5v1.1H6z' },
+  ],
 };
 
 /** The pictogram as SVG markup, for the interface. */

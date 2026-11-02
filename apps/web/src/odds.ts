@@ -78,4 +78,7 @@ export const ROLE: Record<string, string> = {
   recon: 'Fast, sees far. Scout ahead, avoid fights.',
   air: 'Attack helicopters: strike far from base, rebase to your cities.',
   drone: 'Cheap eyes and strikes from range. Fragile.',
+  fleet: 'Warships: sink ships and shell the coast 2 hexes out. Stay near a port for supply.',
+  transport: 'Carries two formations across the sea and lands them on a beach.',
+  carrier: 'A moving airfield: two air wings fly from its deck wherever it sails.',
 };

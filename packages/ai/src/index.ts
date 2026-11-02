@@ -21,7 +21,7 @@ import type {
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, EVENTS, FACILITIES, FACILITY_SLOTS, STACK_LIMIT, TECHS, UNITS, type EventEffect } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
-import { enterCost, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
+import { enterCost, isNaval, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
 // order it writes goes through the same validator as a human's. Two layers:
@@ -30,7 +30,7 @@ import { enterCost, movementAllowance, previewAssault, recruitCost, roll, sorted
 
 export function emptyMemory(): AiMemory {
   return {
-    enemySightings: { infantry: 0, mechanized: 0, armor: 0, artillery: 0, recon: 0, air: 0, drone: 0 },
+    enemySightings: { infantry: 0, mechanized: 0, armor: 0, artillery: 0, recon: 0, air: 0, drone: 0, fleet: 0, transport: 0, carrier: 0 },
     pressure: {},
     aggressors: {},
   };
@@ -42,8 +42,10 @@ interface Plan {
   contacts: Contact[];
   threats: Map<string, number>;
   target: SiteView | null;
-  /** Hexes this nation's formations are planned to end the turn in, with counts. */
+  /** Hexes this nation's formations are planned to end the turn in, with counts (land and air). */
   ends: Map<HexKey, number>;
+  /** The same for ships: a harbour holds its garrison and its ships, each to the limit. */
+  seaEnds: Map<HexKey, number>;
 }
 
 const isHostile = (view: NationView, owner: NationId) => view.relations[owner] === 'war';
@@ -117,13 +119,15 @@ function pathToward(view: NationView, f: Formation, goal: HexKey, plan: Plan, av
     out.push(k);
   }
   // Do not end in an overfull hex: back off until there is room.
-  while (out.length > 0 && (plan.ends.get(out.at(-1)!) ?? 0) >= STACK_LIMIT) out.pop();
+  const layer = isNaval(f.unitClass) ? plan.seaEnds : plan.ends;
+  while (out.length > 0 && (layer.get(out.at(-1)!) ?? 0) >= STACK_LIMIT) out.pop();
   return out;
 }
 
-function endAt(plan: Plan, from: HexKey, to: HexKey): void {
-  plan.ends.set(from, (plan.ends.get(from) ?? 1) - 1);
-  plan.ends.set(to, (plan.ends.get(to) ?? 0) + 1);
+function endAt(plan: Plan, from: HexKey, to: HexKey, naval = false): void {
+  const layer = naval ? plan.seaEnds : plan.ends;
+  layer.set(from, (layer.get(from) ?? 1) - 1);
+  layer.set(to, (layer.get(to) ?? 0) + 1);
 }
 
 function nearestOwnSite(view: NationView, key: HexKey, kinds: readonly SiteView['kind'][]): SiteView | null {
@@ -157,7 +161,7 @@ function chooseResearch(view: NationView): TechId | null | undefined {
 }
 
 /** What to build next, from the force mix and what the enemy fields. */
-function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[]): UnitClass {
+function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[], overseas = false): UnitClass {
   const have = new Map<UnitClass, number>();
   for (const c of UNIT_CLASSES) have.set(c, 0);
   for (const f of own) have.set(f.unitClass, have.get(f.unitClass)! + 1);
@@ -173,6 +177,10 @@ function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[]): U
     recon: 7,
     air: hard > soft ? 12 : 7,
     drone: hard > soft ? 12 : 8,
+    // A war across the sea needs lift and escorts; one on land needs only a fleet to guard the coast.
+    fleet: overseas ? 7 : 4,
+    transport: overseas ? 9 : 2,
+    carrier: overseas ? 3 : 1,
   };
   const total = [...have.values()].reduce((a, v) => a + v, 0) + 1;
   let best: UnitClass = 'infantry';
@@ -187,7 +195,7 @@ function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[]): U
   return best;
 }
 
-function planRecruitment(view: NationView, memory: AiMemory, own: Formation[], committed?: Stockpile): RecruitOrder[] {
+function planRecruitment(view: NationView, memory: AiMemory, own: Formation[], committed?: Stockpile, opts?: { overseas?: boolean }): RecruitOrder[] {
   const out: RecruitOrder[] = [];
   const left = { ...view.self.stockpile };
   if (committed) for (const r of RESOURCES) left[r] -= committed[r];
@@ -200,8 +208,11 @@ function planRecruitment(view: NationView, memory: AiMemory, own: Formation[], c
   const sites = sortedKeys(view.sites)
     .map((id) => view.sites[id]!)
     .filter((s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city'));
+  const overseas = own.some((f) => f.aboard) || (opts?.overseas ?? false);
   for (const s of sites) {
-    const c = wantedClass(memory, own, queued);
+    let c = wantedClass(memory, own, queued, overseas);
+    // Ships are built only in ports.
+    if (UNITS[c].naval && !view.tiles[s.key]?.port) c = 'infantry';
     const cost = recruitCost(view.self, c);
     if (RESOURCES.some((r) => left[r] - cost[r] < reserve[r])) continue;
     for (const r of RESOURCES) left[r] -= cost[r];
@@ -338,6 +349,10 @@ export function updateMemory(memory: AiMemory, view: NationView, events: readonl
 /** Turns without a capture after which a war counts as stalled. */
 const STALL_TURNS = 8;
 
+/** From this turn, a power this many points of standing ahead of the others is everyone's enemy. */
+const RUNAWAY_FROM_TURN = 8;
+const RUNAWAY_GAP = 6;
+
 function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory, spare: readonly NationId[]): NationOrders['diplomacy'] {
   const self = view.self.id;
   const out: NationOrders['diplomacy'] = [];
@@ -352,6 +367,15 @@ function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory, spare: re
   const vp = (n: NationId) => view.nations[n]!.victoryPoints;
   const enemies = alive.filter((n) => view.relations[n] === 'war');
   const partners = alive.filter((n) => view.relations[n] === 'peace');
+  // Balance of power: once the war has found its shape, a power running away with it gets everyone
+  // else's attention. Settle with the other enemies, then turn on the leader.
+  const standing = (n: NationId) => view.supremacy[n] ?? 0;
+  const leader = [...alive].sort((a, b) => standing(b) - standing(a) || (a < b ? -1 : 1))[0];
+  if (view.turn >= RUNAWAY_FROM_TURN && leader && may(leader) && standing(leader) >= standing(self) + RUNAWAY_GAP && alive.every((n) => n === leader || standing(leader) >= standing(n) + RUNAWAY_GAP / 2)) {
+    for (const n of enemies) if (n !== leader) out.push({ target: n, action: 'propose_peace' });
+    if (view.relations[leader] === 'peace') out.push({ target: leader, action: 'declare_war' });
+    return out;
+  }
   // A stalled war is a war to get out of: settle with the enemy we are stuck on and turn on the
   // weakest power instead.
   if (view.turn >= 10 && view.turn - (memory.lastGain ?? 0) >= STALL_TURNS && enemies.length > 0) {
@@ -418,15 +442,21 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     threats: threatsTo(view, contacts),
     target: chooseTarget(view, memory, contacts, own),
     ends: new Map(),
+    seaEnds: new Map(),
   };
-  for (const f of own) plan.ends.set(f.key, (plan.ends.get(f.key) ?? 0) + 1);
+  // Passengers ride free; ships count in their own layer.
+  for (const f of own) {
+    if (f.aboard) continue;
+    const layer = isNaval(f.unitClass) ? plan.seaEnds : plan.ends;
+    layer.set(f.key, (layer.get(f.key) ?? 0) + 1);
+  }
   const hostileHexes = new Set(contacts.filter((c) => c.confirmed || view.turn - c.lastSeen <= 1).map((c) => c.key));
   const orders: Record<FormationId, FormationOrder> = {};
   const committed = new Set<FormationId>();
 
   // Withdraw what is spent.
   for (const f of own) {
-    if (committed.has(f.id) || !UNITS[f.unitClass].ground) continue;
+    if (committed.has(f.id) || !UNITS[f.unitClass].ground || f.aboard) continue;
     if (f.strength >= 350 && f.organization >= 20) continue;
     const home = nearestOwnSite(view, f.key, ['capital', 'city', 'depot']);
     if (!home) continue;
@@ -448,7 +478,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     const site = view.sites[siteId]!;
     let assigned = own.filter((f) => committed.has(f.id) && f.key === site.key).reduce((a, f) => a + f.strength, 0);
     const pool = own
-      .filter((f) => !committed.has(f.id) && UNITS[f.unitClass].ground && f.unitClass !== 'recon')
+      .filter((f) => !committed.has(f.id) && UNITS[f.unitClass].ground && !f.aboard && f.unitClass !== 'recon')
       .sort((a, b) => keyDistance(a.key, site.key) - keyDistance(b.key, site.key) || (a.id < b.id ? -1 : 1));
     for (const f of pool) {
       if (assigned >= threat || keyDistance(f.key, site.key) > 4) break;
@@ -484,6 +514,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
         (f) =>
           !committed.has(f.id) &&
           UNITS[f.unitClass].ground &&
+          !f.aboard &&
           UNITS[f.unitClass].range === 0 &&
           f.unitClass !== 'recon' &&
           f.strength >= 350 &&
@@ -533,10 +564,10 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     for (const [k, n] of ends) plan.ends.set(k, n);
   }
 
-  // Ranged: strike the most valuable contact in range.
+  // Ranged: strike the most valuable contact in range (guns in a ship's hold cannot fire).
   for (const f of own) {
     const def = UNITS[f.unitClass];
-    if (def.range === 0 || committed.has(f.id)) continue;
+    if (def.range === 0 || committed.has(f.id) || (f.aboard && def.ground)) continue;
     const inRange = contacts
       .filter((c) => keyDistance(c.key, f.key) >= 1 && keyDistance(c.key, f.key) <= def.range && c.confirmed)
       .sort((a, b) => b.estimatedStrength - a.estimatedStrength || (a.formation < b.formation ? -1 : 1));
@@ -546,10 +577,17 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     }
   }
 
-  // Everyone else advances on the objective; recon scouts ahead of them.
+  // Everyone else advances on the objective; recon scouts ahead of them. Across the sea, the
+  // navy carries them (planSea).
   const goal = plan.target?.key ?? null;
+  const sea = planSea(view, plan, own, orders, committed, goal, hostileHexes);
   for (const f of own) {
     if (committed.has(f.id)) continue;
+    if (f.aboard) {
+      orders[f.id] = { type: 'hold' };
+      continue;
+    }
+    if (isNaval(f.unitClass)) continue;
     if (!UNITS[f.unitClass].ground) {
       // Air: rebase to the own site nearest the objective, if that is closer than here.
       if (goal) {
@@ -594,7 +632,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   const diplomacy = [...war, ...planTreaties(view, plan, war, opts.spare ?? [])].filter((d, i, all) => all.findIndex((x) => x.target === d.target) === i);
   // Build first (one project at a time), then recruit from what is left.
   const build = planBuilds(view, memory);
-  const recruit = planRecruitment(view, memory, own, build.length ? FACILITIES[build[0]!.facility].cost : undefined);
+  const recruit = planRecruitment(view, memory, own, build.length ? FACILITIES[build[0]!.facility].cost : undefined, { overseas: sea.overseas });
 
   const research = chooseResearch(view);
   const budget = planBudget(view);
@@ -614,4 +652,176 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   const eventChoice = chooseEvent(view);
   if (eventChoice !== undefined) out.eventChoice = eventChoice;
   return out;
+}
+
+/** Land connectivity: which landmass each known hex belongs to (ground units walk within one). */
+function landmasses(view: NationView): Map<HexKey, number> {
+  const out = new Map<HexKey, number>();
+  let id = 0;
+  for (const start of sortedKeys(view.tiles)) {
+    if (out.has(start) || enterCost(view.tiles[start], 'infantry') === null) continue;
+    const queue = [start];
+    out.set(start, id);
+    while (queue.length) {
+      const k = queue.pop()!;
+      for (const n of neighborKeys(k)) {
+        if (!out.has(n) && enterCost(view.tiles[n], 'infantry') !== null) {
+          out.set(n, id);
+          queue.push(n);
+        }
+      }
+    }
+    id++;
+  }
+  return out;
+}
+
+/**
+ * The war at sea. Armies whose goal lies on another landmass are an expedition: they march to a
+ * port with a transport and board it; loaded transports sail for the beach nearest the goal and put
+ * their troops ashore (storming it when the odds are good); empty ones go back for more. Fleets
+ * escort toward the goal's coast; carriers take aircraft aboard and sail toward it. Every order
+ * written here is one the validator accepts: paths come from the engine's own costs, boarding only
+ * happens in the ship's own hex with room aboard.
+ */
+function planSea(
+  view: NationView,
+  plan: Plan,
+  own: Formation[],
+  orders: Record<FormationId, FormationOrder>,
+  committed: Set<FormationId>,
+  goal: HexKey | null,
+  avoid: ReadonlySet<HexKey>,
+): { overseas: boolean } {
+  const ships = own.filter((f) => isNaval(f.unitClass));
+  if (!goal) {
+    for (const s of ships) if (!committed.has(s.id)) orders[s.id] = { type: 'hold' };
+    return { overseas: false };
+  }
+  const land = landmasses(view);
+  const goalLand = land.get(goal);
+  const overseasArmy = own.filter((f) => UNITS[f.unitClass].ground && !f.aboard && !committed.has(f.id) && f.unitClass !== 'artillery' && land.get(f.key) !== goalLand);
+  const overseas = goalLand !== undefined && (overseasArmy.length > 0 || own.some((f) => f.aboard));
+  const room = (c: Formation) => (UNITS[c.unitClass].capacity ?? 0) - own.filter((p) => p.aboard === c.id).length;
+  const isWater = (k: HexKey) => view.tiles[k]?.terrain === 'water';
+  const hostile = (k: HexKey) => avoid.has(k);
+
+  // The beach: a land hex on the goal's landmass, next to the sea, nearest the goal, no enemy on it.
+  const beaches = sortedKeys(view.tiles)
+    .filter((k) => goalLand !== undefined && land.get(k) === goalLand && neighborKeys(k).some(isWater))
+    .sort((a, b) => keyDistance(a, goal) - keyDistance(b, goal) + (hostile(a) ? 3 : 0) - (hostile(b) ? 3 : 0) || (a < b ? -1 : 1));
+  const beach = beaches[0] ?? null;
+  const offshore = beach ? (neighborKeys(beach).filter(isWater).sort()[0] ?? null) : null;
+
+  const sail = (s: Formation, to: HexKey) => {
+    const path = pathToward(view, s, to, plan, new Set());
+    if (path.length) {
+      orders[s.id] = { type: 'move', path };
+      endAt(plan, s.key, path.at(-1)!, true);
+    } else orders[s.id] = { type: 'hold' };
+    committed.add(s.id);
+  };
+
+  // Loaded transports: land when the beach is next to them, else sail for it.
+  for (const t of ships.filter((s) => UNITS[s.unitClass].carries === 'ground' && !committed.has(s.id))) {
+    const aboard = own.filter((p) => p.aboard === t.id);
+    if (aboard.length === 0 || !beach) continue;
+    const shore = neighborKeys(t.key)
+      .filter((k) => land.get(k) === goalLand && enterCost(view.tiles[k], 'infantry') !== null)
+      .sort((a, b) => keyDistance(a, goal) - keyDistance(b, goal) || (a < b ? -1 : 1));
+    if (shore.length > 0) {
+      for (const p of aboard) {
+        const free = shore.find((k) => !hostile(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT);
+        const enemy = shore.find((k) => hostile(k));
+        if (free) {
+          orders[p.id] = { type: 'move', path: [free] };
+          endAt(plan, p.key, free);
+        } else if (enemy && p.ammunition >= UNITS[p.unitClass].ammoPerAttack) {
+          const preview = previewAssault(view, aboard.map((x) => x.id), enemy);
+          orders[p.id] = preview && preview.share[0] >= 450 ? { type: 'attack', target: enemy, path: [] } : { type: 'hold' };
+        } else orders[p.id] = { type: 'hold' };
+        committed.add(p.id);
+      }
+      orders[t.id] = { type: 'hold' };
+      committed.add(t.id);
+      continue;
+    }
+    if (offshore) sail(t, offshore);
+  }
+
+  // Ports where the expedition gathers: own coastal sites, nearest the goal first.
+  const ports = sortedKeys(view.sites)
+    .map((id) => view.sites[id]!)
+    .filter((s) => s.owner === view.self.id && view.tiles[s.key]?.port)
+    .sort((a, b) => keyDistance(a.key, goal) - keyDistance(b.key, goal) || (a.key < b.key ? -1 : 1));
+
+  // Empty transports: take on troops waiting in their hex, else go to where troops are.
+  for (const t of ships.filter((s) => UNITS[s.unitClass].carries === 'ground' && !committed.has(s.id))) {
+    if (!overseas || !beach) {
+      orders[t.id] = { type: 'hold' };
+      committed.add(t.id);
+      continue;
+    }
+    let left = room(t);
+    for (const f of overseasArmy) {
+      if (left <= 0) break;
+      if (committed.has(f.id) || f.key !== t.key) continue;
+      orders[f.id] = { type: 'embark', carrier: t.id };
+      committed.add(f.id);
+      left--;
+    }
+    if (left < room(t)) {
+      orders[t.id] = { type: 'hold' };
+      committed.add(t.id);
+      continue;
+    }
+    const gather = ports.find((s) => overseasArmy.some((f) => !committed.has(f.id) && keyDistance(f.key, s.key) <= 6)) ?? ports[0];
+    if (gather && gather.key !== t.key) sail(t, gather.key);
+    else {
+      orders[t.id] = { type: 'hold' };
+      committed.add(t.id);
+    }
+  }
+
+  // The expedition marches to the port its transports are bound for.
+  if (overseas) {
+    const lift = ships.filter((s) => UNITS[s.unitClass].carries === 'ground');
+    const harbour = ports.find((s) => lift.some((t) => t.key === s.key || (orders[t.id]?.type === 'move' && (orders[t.id] as { path: HexKey[] }).path.at(-1) === s.key))) ?? ports[0];
+    if (harbour && lift.length > 0) {
+      for (const f of overseasArmy) {
+        if (committed.has(f.id) || f.key === harbour.key) continue;
+        if (land.get(f.key) !== land.get(harbour.key)) continue;
+        const path = pathToward(view, f, harbour.key, plan, avoid);
+        if (path.length === 0) continue;
+        orders[f.id] = { type: 'move', path };
+        endAt(plan, f.key, path.at(-1)!);
+        committed.add(f.id);
+      }
+    }
+  }
+
+  // Carriers take aircraft on deck, then sail with the fleets toward the goal's coast.
+  for (const c of ships.filter((s) => UNITS[s.unitClass].carries === 'air' && !committed.has(s.id))) {
+    let left = room(c);
+    for (const a of own) {
+      if (left <= 0) break;
+      if (committed.has(a.id) || a.aboard || a.key !== c.key || UNITS[a.unitClass].ground || isNaval(a.unitClass)) continue;
+      orders[a.id] = { type: 'embark', carrier: c.id };
+      committed.add(a.id);
+      left--;
+    }
+    if (left < room(c)) {
+      orders[c.id] = { type: 'hold' };
+      committed.add(c.id);
+    } else if (offshore) sail(c, offshore);
+  }
+  for (const s of ships) {
+    if (committed.has(s.id)) continue;
+    if (offshore && UNITS[s.unitClass].carries === undefined) sail(s, offshore);
+    else {
+      orders[s.id] = { type: 'hold' };
+      committed.add(s.id);
+    }
+  }
+  return { overseas };
 }

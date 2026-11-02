@@ -149,8 +149,8 @@ export class UnitModel extends Container {
         this.tile.addChild(new Graphics().circle(-S / 2 + 1, -S / 2 + 1, 4.2).fill({ color: SIGNAL }).stroke({ width: 1.4, color: 0x0d1114 }));
       }
     }
-    // Air units ride a little higher, over a shadow on the ground.
-    if (!UNITS[look.cls].ground) {
+    // Air units ride a little higher, over a shadow on the ground. Ships sit on the water.
+    if (!UNITS[look.cls].ground && !UNITS[look.cls].naval) {
       this.tile.y = -3;
       const shade = new Graphics().ellipse(2, S / 2 + 2, S * 0.42, 3.5).fill({ color: 0x000000, alpha: 0.35 });
       this.addChild(shade);

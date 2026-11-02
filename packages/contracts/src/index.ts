@@ -10,7 +10,7 @@ export type HexKey = string;
 
 export type Terrain = 'plains' | 'forest' | 'hills' | 'mountains' | 'urban' | 'water';
 
-export type UnitClass = 'infantry' | 'mechanized' | 'armor' | 'artillery' | 'recon' | 'air' | 'drone';
+export type UnitClass = 'infantry' | 'mechanized' | 'armor' | 'artillery' | 'recon' | 'air' | 'drone' | 'fleet' | 'transport' | 'carrier';
 
 export const UNIT_CLASSES: readonly UnitClass[] = [
   'infantry',
@@ -20,6 +20,9 @@ export const UNIT_CLASSES: readonly UnitClass[] = [
   'recon',
   'air',
   'drone',
+  'fleet',
+  'transport',
+  'carrier',
 ];
 
 export type GovernmentId = 'commonwealth' | 'directorate' | 'federation' | 'union';
@@ -50,6 +53,8 @@ export interface Tile {
   infrastructure: number;
   owner: NationId | null;
   siteId: SiteId | null;
+  /** A site on the coast: ships may enter it, build there, and supply may put to sea from it. */
+  port?: boolean;
 }
 
 export type SiteKind = 'capital' | 'city' | 'depot' | 'objective';
@@ -189,7 +194,7 @@ export interface PendingEvent {
   turn: number;
 }
 
-export type OrderType = 'hold' | 'move' | 'attack' | 'defend' | 'recon' | 'withdraw';
+export type OrderType = 'hold' | 'move' | 'attack' | 'defend' | 'recon' | 'withdraw' | 'embark';
 
 export type SupplyPriority = 'high' | 'normal' | 'low';
 
@@ -200,7 +205,9 @@ export type FormationOrder =
   | { type: 'recon'; path: HexKey[] }
   | { type: 'withdraw'; path: HexKey[] }
   /** Ground: approach along `path`, then assault the adjacent `target`. Ranged: strike `target`. */
-  | { type: 'attack'; target: HexKey; path: HexKey[] };
+  | { type: 'attack'; target: HexKey; path: HexKey[] }
+  /** Go aboard an own transport (ground) or carrier (air) in the same hex, before anything moves. */
+  | { type: 'embark'; carrier: FormationId };
 
 export interface Formation {
   id: FormationId;
@@ -222,6 +229,8 @@ export interface Formation {
   supply: number;
   /** The order this formation executed last turn. */
   lastOrder: OrderType;
+  /** The transport or carrier this formation rides in; it shares that ship's hex. */
+  aboard?: FormationId;
 }
 
 export interface RecruitOrder {
@@ -450,6 +459,7 @@ export interface TileView {
   /** Current owner when visible, last known owner when observed, null when unknown. */
   owner: NationId | null;
   siteId: SiteId | null;
+  port?: boolean;
   lastObserved: number | null;
 }
 

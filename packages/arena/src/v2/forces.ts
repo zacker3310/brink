@@ -57,7 +57,10 @@ const one = (t: TypeId, squad?: TypeId): TemplateSlot => (squad ? { pick: [t], s
 const either = (a: TypeId, b: TypeId, squad?: TypeId): TemplateSlot => (squad ? { pick: [a, b], squad } : { pick: [a, b] });
 const times = (n: number, s: TemplateSlot): TemplateSlot[] => Array.from({ length: n }, () => s);
 
-/** Each class's template per arsenal, cycled in order (section 5). */
+/**
+ * Each class's template per arsenal, cycled in order (section 5). Ships fight at sea, never on the
+ * battlefield: their templates are empty, so a ship in a port hex adds nobody to a land battle.
+ */
 export const TEMPLATES: Record<Arsenal, Record<UnitClass, readonly TemplateSlot[]>> = {
   us: {
     armor: [...times(4, one('m1a2')), one('m88')],
@@ -67,6 +70,9 @@ export const TEMPLATES: Record<Arsenal, Record<UnitClass, readonly TemplateSlot[
     artillery: [one('paladin'), one('paladin'), one('mortar_w')],
     air: [one('ah64e'), one('ah64e'), one('ah6'), one('uh60', 'squad_w')],
     drone: [one('raven'), one('fpv_w'), one('fpv_w'), one('switchblade')],
+    fleet: [],
+    transport: [],
+    carrier: [],
   },
   europe: {
     armor: [...times(4, either('leo2a7', 'cr3')), one('m88')],
@@ -76,6 +82,9 @@ export const TEMPLATES: Record<Arsenal, Record<UnitClass, readonly TemplateSlot[
     artillery: [one('paladin'), one('paladin'), one('mortar_w')],
     air: [one('ah64e'), one('ah6'), one('uh60', 'squad_w')],
     drone: [one('raven'), one('fpv_w'), one('fpv_w'), one('switchblade')],
+    fleet: [],
+    transport: [],
+    carrier: [],
   },
   russia: {
     armor: [...times(4, either('t90m', 't80bvm')), one('brem')],
@@ -85,6 +94,9 @@ export const TEMPLATES: Record<Arsenal, Record<UnitClass, readonly TemplateSlot[
     artillery: [one('msta'), one('msta'), one('mortar_e')],
     air: [one('ka52'), one('ka52'), one('mi8', 'squad_e')],
     drone: [one('orlan'), one('fpv_e'), one('fpv_e'), one('lancet')],
+    fleet: [],
+    transport: [],
+    carrier: [],
   },
   legacy: {
     armor: [...times(4, either('t72b3', 't80bvm')), one('brem')],
@@ -94,6 +106,9 @@ export const TEMPLATES: Record<Arsenal, Record<UnitClass, readonly TemplateSlot[
     artillery: [one('msta'), one('msta'), one('mortar_e')],
     air: [one('mi35', 'squad_e'), one('mi35'), one('mi8', 'squad_e')],
     drone: [one('orlan'), one('fpv_e'), one('fpv_e'), one('lancet')],
+    fleet: [],
+    transport: [],
+    carrier: [],
   },
 };
 

@@ -12,7 +12,7 @@ import { Icon } from './icons';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
-import { describeOrder, hostilesAt } from './planning';
+import { boardOrders, describeOrder, hostilesAt } from './planning';
 import { useReplay } from './replay';
 import { ICON, notesFor, TONE } from './Notifications';
 import { nextObjective } from './objective';
@@ -375,6 +375,9 @@ function UnitCard() {
   const odds = armed ? oddsFor(view, attackers, armed.target) : null;
   const target = armed ? hostilesAt(view, armed.target) : [];
   const forAll = (o: FormationOrder) => issueGroup(Object.fromEntries(members.filter((m) => o.type !== 'defend' || UNITS[m.unitClass].ground).map((m) => [m.id, o])));
+  // Ships alongside with room: the stack can go aboard.
+  const boarding = boardOrders(view, members);
+  const canBoard = Object.keys(boarding).length > 0;
   const btn = 'flex h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-ink-850 text-[11px] font-semibold tracking-wide uppercase active:bg-ink-700 disabled:opacity-30';
   const oddsTone = odds === 'good' ? 'text-good' : odds === 'bad' ? 'text-hostile' : 'text-signal';
   return (
@@ -405,7 +408,17 @@ function UnitCard() {
         {order ? (
           <span className="font-semibold text-friend">{describeOrder(order, view)}</span>
         ) : (
-          <span className="text-signal">{anyGround ? 'Tap a blue hex to move, or an enemy marked WIN to attack.' : 'Tap an enemy in range to strike, or your city to fly there.'}</span>
+          <span className="text-signal">
+            {members.some((m) => m.aboard)
+              ? 'Tap the shore to land, or an enemy on the beach to storm it.'
+              : members.every((m) => UNITS[m.unitClass].naval)
+                ? 'Tap a blue sea hex to sail. Fleets strike enemies in range.'
+                : canBoard
+                  ? 'Board the ship alongside, or tap a blue hex to move.'
+                  : anyGround
+                    ? 'Tap a blue hex to move, or an enemy marked WIN to attack.'
+                    : 'Tap an enemy in range to strike, or your city or carrier to fly there.'}
+          </span>
         )}
       </div>
       {armed ? (
@@ -426,10 +439,17 @@ function UnitCard() {
         </div>
       ) : (
         <div className="flex gap-2 px-4 pt-2.5 pb-1">
-          <button type="button" className={btn} disabled={resolving || !anyGround} onClick={() => forAll({ type: 'defend' })} data-testid="order-defend">
-            <Icon name="defense" className="h-4 w-4" />
-            Dig in
-          </button>
+          {canBoard ? (
+            <button type="button" className={btn} disabled={resolving} onClick={() => issueGroup(boarding)} data-testid="order-board">
+              <Icon name="next" className="h-4 w-4" />
+              Board
+            </button>
+          ) : (
+            <button type="button" className={btn} disabled={resolving || !anyGround} onClick={() => forAll({ type: 'defend' })} data-testid="order-defend">
+              <Icon name="defense" className="h-4 w-4" />
+              Dig in
+            </button>
+          )}
           <button type="button" className={btn} disabled={resolving} onClick={() => forAll({ type: 'hold' })} data-testid="order-hold">
             <Icon name="pause" className="h-4 w-4" />
             Hold
