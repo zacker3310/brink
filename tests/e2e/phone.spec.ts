@@ -25,7 +25,7 @@ async function endTurn(page: Page, turn: number) {
 }
 
 test('a campaign plays on a phone by touch alone: move a stack, attack, end turns', async ({ page }) => {
-  test.setTimeout(480_000);
+  test.setTimeout(900_000); // up to a dozen turns to the first fight, and a battle rendered in software
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
