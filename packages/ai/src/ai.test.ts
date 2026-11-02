@@ -18,7 +18,7 @@ describe('AI', () => {
         w = resolveTurn(w, subs).world;
       }
     }
-  }, 30_000); // whole matches: seconds locally, more on a shared CI runner
+  }, 120_000); // four whole matches on the full map: about 17 s locally, twice that on a shared CI runner
 
   it('is deterministic and reads nothing but its own view', () => {
     const w = createPacificScenario(5);
