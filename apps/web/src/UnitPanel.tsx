@@ -7,7 +7,7 @@ import { ModelPortrait, UnitGlyph } from './glyphs';
 import { Icon } from './icons';
 import { describeEffect, hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
-import { boardOrders, describeOrder, type Mode } from './planning';
+import { boardOrders, describeOrder, fleetLoadOrders, type Mode } from './planning';
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
 import { battleFor } from './arena/battle';
@@ -323,6 +323,12 @@ export function TurnControls() {
   const setShowReport = useGame((s) => s.setShowReport);
   const lastTurn = useGame((s) => s.lastTurn);
   const rewatch = useGame((s) => s.rewatch);
+  const plannedIds = useGame((s) => s.planned);
+  const planned = plannedIds.length;
+  const clearPlan = useGame((s) => s.clearPlan);
+  const issueGroup = useGame((s) => s.issueGroup);
+  const fleetLoad = fleetLoadOrders(view, draft.formations, plannedIds);
+  const toLoad = Object.keys(fleetLoad).length;
   const total = Object.keys(view.formations).length;
   const idle = idleFormations(view, draft.formations).length;
   const over = view.victory !== null;
@@ -359,6 +365,23 @@ export function TurnControls() {
         <Icon name={idle ? 'next' : 'check'} className="mr-1.5 h-3 w-3 align-[-2px]" />
         {idle ? `${idle} of ${total} units need orders` : `All ${total} units have orders`}
       </button>
+      {toLoad > 0 && !resolving && !over && (
+        <button
+          type="button"
+          onClick={() => issueGroup(fleetLoad)}
+          data-testid="load-fleet"
+          className="border border-friend/60 bg-ink-950/90 px-2.5 py-1.5 text-left text-xs font-semibold text-friend hover:bg-friend/15"
+          title="Everyone in port who fits goes aboard the ships alongside"
+        >
+          Load the fleet ({toLoad})
+        </button>
+      )}
+      {planned > 0 && !resolving && (
+        <div className="flex items-center gap-2 border border-signal/40 bg-ink-950/90 px-2.5 py-1.5 text-[11px] text-text" data-testid="staff-plan">
+          <span className="min-w-0 flex-1">Staff has prepared a plan: {planned} order{planned === 1 ? '' : 's'}. Change any, then execute.</span>
+          <button type="button" onClick={clearPlan} className="shrink-0 text-faint hover:text-text" data-testid="clear-plan">Clear</button>
+        </div>
+      )}
       <button
         type="button"
         onClick={openReview}
@@ -366,7 +389,7 @@ export function TurnControls() {
         data-testid="end-turn"
         className="end-turn relative overflow-hidden bg-signal px-4 py-3 text-ink-950 transition-all hover:brightness-110 disabled:opacity-60"
       >
-        <div className="font-display text-lg leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : 'Next turn'}</div>
+        <div className="font-display text-lg leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : planned > 0 ? 'Execute plan' : 'Next turn'}</div>
         <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
       </button>
       <Minimap />

@@ -21,7 +21,8 @@ export type CrisisId =
   | 'kuril-gambit'
   | 'dragon-bear'
   | 'panama-shut'
-  | 'ring-of-fire';
+  | 'ring-of-fire'
+  | 'pacific-pact';
 
 export interface Crisis {
   id: CrisisId;
@@ -40,6 +41,10 @@ export interface Crisis {
 }
 
 const POWERS: readonly NationId[] = ['china', 'japan', 'russia', 'usa'];
+
+/** The West against the East: whose side each nation is on in the Pacific Pact. */
+const WEST: readonly NationId[] = ['usa', 'japan', 'canada', 'mexico'];
+const EAST: readonly NationId[] = ['russia', 'china'];
 
 const cell = (col: number, row: number): HexKey => keyOf(offsetToAxial(col, row));
 
@@ -209,12 +214,12 @@ export const CRISES: readonly Crisis[] = [
       calm(w);
       relate(w, 'russia', 'usa', 'war');
       // Western Alaska: the coast across the strait. Nome falls; the paratroopers dig in there.
-      for (const k of [cell(16, 0), cell(16, 1), cell(17, 0), cell(16, 2)]) seize(w, k, 'russia');
-      w.sites['nome'] = { id: 'nome', name: 'Nome', kind: 'depot', key: cell(16, 1), owner: 'russia', originalOwner: 'usa', population: 100, victoryPoints: 3, yields: { credits: 2, energy: 4, materials: 4, food: 2, industry: 4, research: 0 }, facilities: [] };
-      w.tiles[cell(16, 1)]!.siteId = 'nome';
-      w.tiles[cell(16, 1)]!.terrain = 'plains';
-      land(w, 'russia', cell(16, 1), ['infantry', 'artillery', 'infantry'], 'Airborne');
-      land(w, 'russia', cell(17, 0), ['infantry'], 'Airborne');
+      for (const k of [cell(26, 0), cell(26, 1), cell(27, 0), cell(26, 2)]) seize(w, k, 'russia');
+      w.sites['nome'] = { id: 'nome', name: 'Nome', kind: 'depot', key: cell(26, 1), owner: 'russia', originalOwner: 'usa', population: 100, victoryPoints: 3, yields: { credits: 2, energy: 4, materials: 4, food: 2, industry: 4, research: 0 }, facilities: [] };
+      w.tiles[cell(26, 1)]!.siteId = 'nome';
+      w.tiles[cell(26, 1)]!.terrain = 'plains';
+      land(w, 'russia', cell(26, 1), ['infantry', 'artillery', 'infantry'], 'Airborne');
+      land(w, 'russia', cell(27, 0), ['infantry'], 'Airborne');
     },
   },
   {
@@ -289,7 +294,7 @@ export const CRISES: readonly Crisis[] = [
       calm(w);
       relate(w, 'japan', 'russia', 'war');
       relate(w, 'japan', 'usa', 'alliance');
-      const k = cell(11, 5);
+      const k = cell(22, 5);
       seize(w, k, 'japan');
       land(w, 'japan', k, ['infantry', 'recon'], 'Special Landing Force');
     },
@@ -347,6 +352,27 @@ export const CRISES: readonly Crisis[] = [
           .map((f) => f.key),
         60,
       );
+    },
+  },
+  {
+    id: 'pacific-pact',
+    name: 'The Pacific Pact',
+    hook: 'Two blocs. One ocean. No neutrals.',
+    story: 'Washington, Tokyo, Ottawa and Mexico City sign a mutual defence treaty in Honolulu. Forty minutes later Moscow and Beijing announce a joint command and close the Sea of Japan. The Cold War is back, and this time it is hot.',
+    setup: 'The United States, Japan, Canada and Mexico are allies, at war with Russia and China, who are allies too. Allies share supply, ground and sight. Korea, Taiwan, Kazakhstan and Mongolia are the ground between.',
+    threat: 2,
+    recommended: null,
+    apply: (w) => {
+      for (const side of [WEST, EAST]) for (let i = 0; i < side.length; i++) for (let j = i + 1; j < side.length; j++) relate(w, side[i]!, side[j]!, 'alliance');
+      for (const a of WEST) for (const b of EAST) relate(w, a, b, 'war');
+      // Nobody fights for an ally's capital: a power's prizes are the minor states it is at war with.
+      for (const p of POWERS) {
+        const n = w.nations[p]!;
+        n.objectives = n.objectives.filter((id) => {
+          const owner = w.sites[id]?.owner;
+          return !!owner && w.relations[pairKey(p, owner)] === 'war';
+        });
+      }
     },
   },
 ];

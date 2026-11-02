@@ -16,6 +16,8 @@ test('as Japan, the advisor walks you onto the sea', async ({ page }) => {
   await page.getByTestId('start-game').tap();
   await page.getByTestId('how-to-close').tap({ timeout: 60_000 });
 
+  // Staff plan mode is the default; this walk-through takes command of every unit itself.
+  await page.getByTestId('clear-plan').tap({ timeout: 30_000 });
   // The advisor knows the troops are already aboard and where they should go.
   await expect(page.getByTestId('advisor')).toContainText('aboard');
   await page.getByTestId('advisor-go').tap();

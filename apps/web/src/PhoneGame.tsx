@@ -13,7 +13,7 @@ import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
 import { advise } from './advisor';
-import { boardOrders, describeOrder, hostilesAt, landOrders, loadOrders } from './planning';
+import { boardOrders, describeOrder, fleetLoadOrders, hostilesAt, landOrders, loadOrders } from './planning';
 import { useReplay } from './replay';
 import { ICON, notesFor, TONE } from './Notifications';
 import { nextObjective } from './objective';
@@ -143,6 +143,8 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
   const exportSave = useGame((s) => s.exportSave);
   const animate = useGame((s) => s.animate);
   const setAnimate = useGame((s) => s.setAnimate);
+  const staffPlan = useGame((s) => s.staffPlan);
+  const setStaffPlan = useGame((s) => s.setStaffPlan);
   const toMenu = useGame((s) => s.toMenu);
   const resolving = useGame((s) => s.resolving);
   const [muted, setM] = useState(isMuted());
@@ -173,6 +175,9 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
         }}
       >
         Export save file
+      </button>
+      <button type="button" className={row} onClick={() => setStaffPlan(!staffPlan)} aria-pressed={staffPlan} data-testid="toggle-staff-plan">
+        Staff plans each turn <span className={staffPlan ? 'text-signal' : 'text-faint'}>{staffPlan ? 'On' : 'Off'}</span>
       </button>
       <button type="button" className={row} onClick={() => setAnimate(!animate)} aria-pressed={animate} data-testid="toggle-replay">
         Turn replay <span className={animate ? 'text-signal' : 'text-faint'}>{animate ? 'On' : 'Off'}</span>
@@ -362,6 +367,7 @@ function UnitCard() {
   const toggleGroup = useGame((s) => s.toggleGroup);
   const selectFormation = useGame((s) => s.selectFormation);
   const resolving = useGame((s) => s.resolving);
+  const planned = useGame((s) => s.planned);
   const f = view.formations[fid];
   if (!f) return null;
   const color = view.self.color;
@@ -374,7 +380,9 @@ function UnitCard() {
   const ship = members.length === 1 && UNITS[f.unitClass].carries ? f : null;
   const cargo = ship ? Object.values(view.formations).filter((p) => p.aboard === ship.id) : [];
   const goal = nextObjective(view);
-  const loading = ship ? loadOrders(view, ship, draft.formations) : {};
+  // The staff's orders give way to loading; the player's own do not.
+  const mine = Object.fromEntries(Object.entries(draft.formations).filter(([id]) => !planned.includes(id)));
+  const loading = ship ? loadOrders(view, ship, mine) : {};
   const landing = ship ? landOrders(view, ship, goal?.site.key ?? null) : {};
   const order = draft.formations[fid];
   const def = UNITS[f.unitClass];
@@ -558,8 +566,9 @@ function Advisor({ selected }: { selected: string | null }) {
   const selectStack = useGame((s) => s.selectStack);
   const selectFormation = useGame((s) => s.selectFormation);
   const focusOn = useGame((s) => s.focusOn);
+  const planned = useGame((s) => s.planned).length;
   if (view.victory) return null;
-  const a = advise(view, draft.formations);
+  const a = advise(view, draft.formations, planned);
   // With a unit open, speak only when the advice is about something else that matters more
   // (troops at sea, a ship to load): the card already says what to do with the unit in hand.
   if (selected && (!a.focus || a.focus === selected || group.includes(a.focus) || a.cta === 'Show me' && !/aboard/.test(a.text))) return null;
@@ -640,13 +649,21 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
   const openReview = useGame((s) => s.openReview);
   const nextIdle = useGame((s) => s.nextIdle);
   const autoCommand = useGame((s) => s.autoCommand);
+  const clearPlan = useGame((s) => s.clearPlan);
+  const planned = useGame((s) => s.planned).length;
   const resolving = useGame((s) => s.resolving);
   const report = useGame((s) => s.report);
   const setShowReport = useGame((s) => s.setShowReport);
   const lastTurn = useGame((s) => s.lastTurn);
   const rewatch = useGame((s) => s.rewatch);
   const fid = useGame((s) => s.selectedFormation);
+  const issueGroup = useGame((s) => s.issueGroup);
+  const notify = useGame((s) => s.notify);
+  const plannedIds = useGame((s) => s.planned);
   const idle = idleFormations(view, draft.formations).length;
+  // Everyone in port who fits aboard a ship alongside, in one tap.
+  const fleetLoad = fleetLoadOrders(view, draft.formations, plannedIds);
+  const toLoad = Object.keys(fleetLoad).length;
   const over = view.victory !== null;
   const idleCities = Object.values(view.sites).filter(
     (s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id),
@@ -669,6 +686,20 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
               Rewatch
             </button>
           )}
+          {toLoad > 0 && !over && (
+            <button
+              type="button"
+              className={`${chip} border-friend/60 font-semibold text-friend`}
+              onClick={() => {
+                issueGroup(fleetLoad);
+                notify(`${toLoad} unit${toLoad === 1 ? '' : 's'} boarding the fleet. Sail the ships: they land wherever you take them.`);
+              }}
+              data-testid="load-fleet"
+            >
+              <Icon name="next" className="mr-1 h-3 w-3 align-[-2px]" />
+              Load the fleet ({toLoad})
+            </button>
+          )}
           {idleCities > 0 && (
             <span className={`${chip} border-signal/50 text-signal`}>
               <Icon name="build" className="mr-1 h-3 w-3 align-[-2px]" />
@@ -684,12 +715,21 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
           </svg>
           Nation
         </button>
-        <button type="button" className={key} onClick={() => void autoCommand()} disabled={resolving || over || idle === 0} data-testid="auto-command" title="Your staff drafts orders for every unit still waiting">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
-            <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
-          </svg>
-          Plan
-        </button>
+        {planned > 0 && idle === 0 ? (
+          <button type="button" className={key} onClick={clearPlan} disabled={resolving || over} data-testid="clear-plan" title="Take back the staff's orders: every unit waits for yours">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+            Clear
+          </button>
+        ) : (
+          <button type="button" className={key} onClick={() => void autoCommand()} disabled={resolving || over || idle === 0} data-testid="auto-command" title="Your staff drafts orders for every unit still waiting">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+              <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
+            </svg>
+            Plan
+          </button>
+        )}
         <button type="button" className={`${key} relative ${idle ? 'text-signal' : 'text-good'}`} onClick={nextIdle} disabled={resolving || idle === 0} data-testid="next-idle">
           <Icon name={idle ? 'next' : 'check'} className="h-5 w-5" />
           {idle ? 'Next' : 'Ready'}
@@ -702,8 +742,10 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
           data-testid="end-turn"
           className="end-turn relative flex-1 overflow-hidden rounded-xl bg-signal px-3 text-ink-950 active:brightness-90 disabled:opacity-60"
         >
-          <div className="font-display text-xl leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : 'End turn'}</div>
-          <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : idle ? `${idle} without orders` : 'everyone has orders'}</div>
+          <div className="font-display text-xl leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : planned > 0 ? 'Execute' : 'End turn'}</div>
+          <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">
+            {resolving ? 'orders locked' : idle ? `${idle} without orders` : planned > 0 ? `staff plan · ${planned} order${planned === 1 ? '' : 's'}` : 'everyone has orders'}
+          </div>
         </button>
       </div>
     </>

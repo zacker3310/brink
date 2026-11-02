@@ -6,7 +6,7 @@ document and the code disagree, the code is right and this file is stale.
 ## Premise
 
 The United States, Russia, China and Japan fight across the Pacific (docs/pacific.md). You lead one;
-three AIs lead the others, and five minor states (Canada, Mexico, North and South Korea, Taiwan) hold
+three AIs lead the others, and seven minor states (Canada, Mexico, North and South Korea, Taiwan, Kazakhstan, Mongolia) hold
 their own ground with militias. Every turn all of them write their orders in secret, then one
 deterministic engine resolves them all at once.
 One turn is six hours. You see only what your units and cities can see.

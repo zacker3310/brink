@@ -17,7 +17,11 @@ export interface Advice {
   cta?: string;
 }
 
-export function advise(view: NationView, drafted: Record<FormationId, FormationOrder>): Advice {
+/**
+ * `planned` counts the orders the staff drafted that the player has not touched (staff plan mode):
+ * with a plan up, the advice is the plan.
+ */
+export function advise(view: NationView, drafted: Record<FormationId, FormationOrder>, planned = 0): Advice {
   const goal = nextObjective(view);
   const goalName = goal?.site.name ?? 'your objective';
   const own = Object.values(view.formations).sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -46,11 +50,12 @@ export function advise(view: NationView, drafted: Record<FormationId, FormationO
     if (n > 0) return { text: `Your helicopters and drones can fly from ${c.name}. Load ${n} onto it.`, focus: c.id, cta: 'Load it' };
   }
   const idle = idleFormations(view, drafted);
+  if (planned > 0 && idle.length === 0) return { text: `Staff has prepared a plan: ${planned} order${planned === 1 ? '' : 's'}. Tap any unit to change its orders, then Execute.` };
   if (idle.length > 0)
     return {
       text: `${idle.length} unit${idle.length === 1 ? ' is' : 's are'} waiting for orders. Next walks you through them; Plan gives everyone orders.`,
       focus: idle[0]!.id,
       cta: 'Show me',
     };
-  return { text: `Everyone has orders. End the turn.` };
+  return { text: planned > 0 ? `Staff has prepared a plan. Change any orders, then Execute.` : `Everyone has orders. End the turn.` };
 }

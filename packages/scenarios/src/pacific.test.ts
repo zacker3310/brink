@@ -10,10 +10,10 @@ describe('The Pacific', () => {
   const w = createPacificScenario(1);
   const sitesOf = (n: string) => Object.values(w.sites).filter((s) => s.owner === n);
 
-  it('is the four powers and the five minor states, on a 30 x 18 map with sea and every land terrain', () => {
-    expect(sortedKeys(w.nations)).toEqual(['canada', 'china', 'japan', 'mexico', 'nkorea', 'russia', 'skorea', 'taiwan', 'usa']);
+  it('is the four powers and the seven minor states, on a 46 x 20 map with sea and every land terrain', () => {
+    expect(sortedKeys(w.nations)).toEqual(['canada', 'china', 'japan', 'kazakhstan', 'mexico', 'mongolia', 'nkorea', 'russia', 'skorea', 'taiwan', 'usa']);
     expect(NATIONS.map((n) => n.id)).toEqual(['usa', 'russia', 'china', 'japan']);
-    expect(Object.keys(w.tiles)).toHaveLength(540);
+    expect(Object.keys(w.tiles)).toHaveLength(920);
     const terrains = new Set(Object.values(w.tiles).map((t) => t.terrain));
     for (const t of ['plains', 'forest', 'hills', 'mountains', 'urban', 'water'] as const) expect(terrains.has(t), t).toBe(true);
     expect(createScenario(PACIFIC_ID, 1)).toEqual(w);
@@ -57,14 +57,20 @@ describe('The Pacific', () => {
     // Korea joins China by land; Alaska joins Canada.
     expect(findPath(key('Seoul'), key('Beijing'), cost)).not.toBeNull();
     expect(findPath(key('Anchorage'), key('Vancouver'), cost)).not.toBeNull();
-    expect(w.tiles[keyOf(offsetToAxial(15, 0))]!.terrain).toBe('water'); // the Bering Strait
+    expect(w.tiles[keyOf(offsetToAxial(25, 0))]!.terrain).toBe('water'); // the Bering Strait
+    // Moscow and St Petersburg to the west; Washington and New York on the Atlantic coast.
+    expect([owner('Moscow'), owner('St Petersburg'), owner('Washington'), owner('New York')]).toEqual(['russia', 'russia', 'usa', 'usa']);
+    expect(findPath(key('Moscow'), key('Vladivostok'), cost)).not.toBeNull();
+    expect(findPath(key('Washington'), key('San Francisco'), cost)).not.toBeNull();
+    expect(w.sites['russia-capital']!.name).toBe('Moscow');
+    expect(w.sites['usa-capital']!.name).toBe('Washington');
   });
 
   it('opens with each power\'s navy at sea off a home port, and every coastal site a port', () => {
     const navy = (n: string) => Object.values(w.formations).filter((f) => f.owner === n && UNITS[f.unitClass].naval).map((f) => f.unitClass).sort();
-    expect(navy('usa')).toEqual(['carrier', 'fleet', 'transport']);
-    expect(navy('china')).toEqual(['carrier', 'fleet', 'transport']);
-    expect(navy('japan')).toEqual(['carrier', 'fleet', 'transport', 'transport']);
+    expect(navy('usa')).toEqual(['carrier', 'fleet', 'transport', 'transport']);
+    expect(navy('china')).toEqual(['carrier', 'fleet', 'transport', 'transport']);
+    expect(navy('japan')).toEqual(['carrier', 'carrier', 'fleet', 'transport', 'transport']);
     expect(navy('russia')).toEqual(['carrier', 'fleet', 'transport']);
     for (const f of Object.values(w.formations)) if (UNITS[f.unitClass].naval) expect(w.tiles[f.key]!.terrain).toBe('water');
     const port = (name: string) => w.tiles[Object.values(w.sites).find((s) => s.name === name)!.key]!.port;

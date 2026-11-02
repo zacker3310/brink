@@ -1,45 +1,50 @@
 import type { Formation, GovernmentId, HexKey, Nation, NationId, Site, SiteKind, Terrain, Tile, UnitClass, WorldState, Yields } from '@brink/contracts';
-import { RULESET_VERSION } from '@brink/game-data';
+import { RULESET_VERSION, STACK_LIMIT } from '@brink/game-data';
 import { hexKey, keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { computeVision, emptyIntel, grossYields, mulberry32, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
 // The Pacific: four real powers (the United States, Russia, China, Japan) around a compressed ocean,
-// five independent states between them, and island chains to fight over. The geography is drawn
+// seven independent states between them, and island chains to fight over. The map runs from Moscow
+// in the west to Washington in the east: all of Russia and all of the United States, with the
+// ocean squeezed so the war is on land and sea alike. The geography is drawn
 // below as a character grid, so coastlines and borders never change; the seed varies only the ground
 // inside each country (forest, hills, mountains). Design: docs/pacific.md.
 
 export const PACIFIC_ID = 'pacific';
-export const COLS = 30;
-export const ROWS = 18;
+export const COLS = 46;
+export const ROWS = 20;
 export const MAX_TURNS = 30;
 
 /**
  * One character per hex, odd rows offset half a hex to the right (the engine's offset layout).
- * `.` sea. Powers: R Russia, C China, J Japan, U United States (Alaska, the west coast, the
- * Aleutians, Hawaii, Guam). Minor states: K Canada, M Mexico, N North Korea, S South Korea, T Taiwan.
+ * `.` sea. Powers: R Russia, C China, J Japan, U United States (coast to coast, Alaska, the
+ * Aleutians, Hawaii, Guam). Minor states: K Canada, M Mexico, N North Korea, S South Korea, T Taiwan,
+ * Z Kazakhstan, G Mongolia.
  */
 const GRID: readonly string[] = [
-  'RRRRRRRRRRRRRRR.UUUUKKKKKKKKKK', // 0  Siberia, the Bering Strait, Alaska, the Yukon
-  'RRRRRRRRRRRRRRR.UUUUUKKKKKKKKK', // 1
-  'RRRRRRRRRR..RR..UUUUUKKKKKKKKK', // 2  the Sea of Okhotsk, Kamchatka
-  'RRRRRRRRR...RR...UUUUKKKKKKKKK', // 3
-  'CCCRRRRR.R..R.....U.KKKKKKKKKK', // 4  Sakhalin, the Alaska Peninsula
-  'CCCCRRR....R.U.U.U...KKKKKKKKK', // 5  the Kurils, the Aleutians
-  'CCCCCNN..JJ...........KKKKKKKK', // 6  North Korea, Hokkaido, British Columbia
-  'CCCCNNN.JJJ...........KKKKKKKK', // 7  Honshu
-  'CCCC.SS.JJJ...........UUUUUUUU', // 8  South Korea, the Pacific Northwest
-  'CCCC.SS.JJ............UUUUUUUU', // 9
-  'CCCCC...JJ............UUUUUUUU', // 10 Kyushu
-  'CCCCCC................UUUUUUUU', // 11
-  'CCCCCC...........UU...UUUUUUUU', // 12 Hawaii
-  'CCCCC.T...............UUUUUUUU', // 13 Taiwan
-  'CCCCC.T................MMMMMMM', // 14 Baja
-  'CCCC.......U...........MMMMMMM', // 15 Guam
-  'CCC.....................MMMMMM', // 16
-  'CC.......................MMMMM', // 17
+  'RRRRRRRRRRRRRRRRRRRRRRRRR.UUUUUKKKKKKKKKKKKKK.', // 0  Siberia, the Bering Strait, Alaska, the Yukon
+  'RRRRRRRRRRRRRRRRRRRRRRRRR.UUUUUUKKKKKKKKKKKKK.', // 1  St Petersburg, Yakutsk
+  'RRRRRRRRRRRRRRRRRRR..RRR..UUUUUUKKKKKKKKKKKKK.', // 2  the Sea of Okhotsk, Kamchatka
+  'RRRRRRRRRRRRRRRRRR...RR....UUUUUKKKKKKKKKKKKK.', // 3  Moscow, Anchorage
+  'RRRRRRRRRRRRRRRRRR.R.R.....U....KKKKKKKKKKKKK.', // 4  Sakhalin, the Alaska Peninsula
+  'RRRRRRRRRRRRRRRRRR....R.U.U.....KKKKKKKKKKKKK.', // 5  the Kurils, the Aleutians
+  'ZZZZZZZRRGGGGGCCRR..JJ..........KKKKKKKKKKKKK.', // 6  Kazakhstan, Mongolia, Vladivostok, Hokkaido, Vancouver
+  'ZZZZZZZCGGGGGCCCNN.JJJ..........UUUUUUUUUUUUU.', // 7  Korea, Honshu, Seattle
+  'ZZZZZZCCCCCCCCCC.S..JJ..........UUUUUUUUUUUUU.', // 8  Seoul, Tokyo, New York
+  'ZZZZZZCCCCCCCCCC.SS.J...........UUUUUUUUUUUUU.', // 9
+  'CCCCCCCCCCCCCCCC....J...........UUUUUUUUUUUUU.', // 10 Shanghai, Kyushu, Washington
+  'CCCCCCCCCCCCCCCC................UUUUUUUUUUUUU.', // 11
+  'CCCCCCCCCCCCCCCC.........UU.....UUUUUUUUUUUUU.', // 12 Hawaii
+  'CCCCCCCCCCCCCCC.T...............UUUUUUUUUUUUU.', // 13 Taiwan
+  'CCCCCCCCCCCCCCC.T...............UUUUUUUUUUUUU.', // 14
+  'CCCCCCCCCCCCCCC......U...........MMMMMMMMMM...', // 15 Guam, Baja
+  'CCCCCCCCCCCCCC...................MMMMMMMM.....', // 16
+  'CCCCCCCCCCCCC.....................MMMMMM......', // 17 Mexico City
+  'CCCCCCCCCCCC.......................MMMMM......', // 18
+  '..CCCCCCCC..........................MMM.......', // 19
 ];
 
-const REGION: Record<string, NationId> = { R: 'russia', C: 'china', J: 'japan', U: 'usa', K: 'canada', M: 'mexico', N: 'nkorea', S: 'skorea', T: 'taiwan' };
+const REGION: Record<string, NationId> = { R: 'russia', C: 'china', J: 'japan', U: 'usa', K: 'canada', M: 'mexico', N: 'nkorea', S: 'skorea', T: 'taiwan', Z: 'kazakhstan', G: 'mongolia' };
 
 type Place = [col: number, row: number, name: string];
 
@@ -71,20 +76,25 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'United States',
     color: '#4f8fe0',
     government: 'commonwealth',
-    capital: [22, 11, 'San Francisco'],
+    capital: [44, 10, 'Washington'],
+    // The west coast first: the opening army stands where the Pacific war is.
     cities: [
-      [23, 8, 'Seattle'],
-      [24, 13, 'Los Angeles'],
-      [17, 12, 'Honolulu'],
+      [32, 10, 'San Francisco'],
+      [32, 13, 'Los Angeles'],
+      [32, 7, 'Seattle'],
+      [25, 12, 'Honolulu'],
+      [44, 8, 'New York'],
+      [39, 8, 'Chicago'],
     ],
     // The far-flung bases: a frontier town in Alaska and two island outposts.
     depots: [
-      [18, 2, 'Anchorage'],
-      [11, 15, 'Guam'],
-      [15, 5, 'Adak'],
+      [28, 3, 'Anchorage'],
+      [21, 15, 'Guam'],
+      [24, 5, 'Adak'],
+      [38, 12, 'Houston'],
     ],
     rough: 10,
-    navy: { port: 'San Francisco', ships: ['fleet', 'transport', 'carrier'] },
+    navy: { port: 'San Francisco', ships: ['fleet', 'transport', 'transport', 'carrier'] },
   },
   {
     id: 'russia',
@@ -92,13 +102,20 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'Russia',
     color: '#d0543e',
     government: 'directorate',
-    capital: [6, 5, 'Vladivostok'],
+    capital: [2, 3, 'Moscow'],
+    // The Far East first: the opening army stands on the Pacific front, Moscow keeps its guard.
     cities: [
-      [6, 3, 'Khabarovsk'],
-      [12, 3, 'Petropavlovsk'],
-      [4, 1, 'Yakutsk'],
+      [17, 6, 'Vladivostok'],
+      [16, 4, 'Khabarovsk'],
+      [1, 1, 'St Petersburg'],
+      [22, 3, 'Petropavlovsk'],
+      [9, 4, 'Novosibirsk'],
     ],
-    depots: [[9, 4, 'Sakhalin']],
+    depots: [
+      [19, 4, 'Sakhalin'],
+      [13, 1, 'Yakutsk'],
+      [5, 2, 'Yekaterinburg'],
+    ],
     rough: 30,
     navy: { port: 'Vladivostok', ships: ['fleet', 'transport', 'carrier'] },
   },
@@ -108,15 +125,19 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'China',
     color: '#e0b43c',
     government: 'union',
-    capital: [3, 7, 'Beijing'],
+    capital: [12, 8, 'Beijing'],
     cities: [
-      [4, 10, 'Shanghai'],
-      [2, 14, 'Guangzhou'],
-      [1, 4, 'Harbin'],
+      [15, 10, 'Shanghai'],
+      [14, 15, 'Guangzhou'],
+      [14, 6, 'Harbin'],
+      [8, 12, 'Chengdu'],
     ],
-    depots: [[2, 11, 'Wuhan']],
+    depots: [
+      [11, 11, 'Wuhan'],
+      [2, 11, 'Urumqi'],
+    ],
     rough: -10,
-    navy: { port: 'Shanghai', ships: ['fleet', 'transport', 'carrier'] },
+    navy: { port: 'Shanghai', ships: ['fleet', 'transport', 'transport', 'carrier'] },
   },
   {
     id: 'japan',
@@ -124,25 +145,28 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'Japan',
     color: '#e8e8ee',
     government: 'federation',
-    capital: [10, 8, 'Tokyo'],
+    capital: [21, 8, 'Tokyo'],
     cities: [
-      [8, 9, 'Osaka'],
-      [10, 6, 'Sapporo'],
-      [8, 10, 'Fukuoka'],
+      [20, 9, 'Osaka'],
+      [20, 6, 'Sapporo'],
+      [20, 10, 'Fukuoka'],
     ],
-    depots: [[9, 7, 'Sendai']],
+    depots: [[21, 7, 'Sendai']],
     rough: 35,
-    navy: { port: 'Tokyo', ships: ['fleet', 'transport', 'transport', 'carrier'] },
+    // An island nation's navy: two carrier groups and the lift to put an army ashore.
+    navy: { port: 'Tokyo', ships: ['carrier', 'carrier', 'fleet', 'transport', 'transport'] },
   },
 ];
 
 /** The independent states between the powers. */
 export const MINORS: readonly NationSpec[] = [
-  { id: 'canada', short: 'Canada', name: 'Canada', color: '#b9424f', government: 'commonwealth', minor: true, militia: ['infantry', 'mechanized'], capital: [22, 6, 'Vancouver'], cities: [[26, 4, 'Calgary'], [21, 2, 'Whitehorse']], depots: [], rough: 25 },
-  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, militia: ['infantry', 'infantry'], capital: [27, 16, 'Mexico City'], cities: [[23, 14, 'Tijuana'], [25, 15, 'Guadalajara']], depots: [], rough: 30 },
-  { id: 'nkorea', short: 'N. Korea', name: 'North Korea', color: '#8a5ab8', government: 'directorate', minor: true, capital: [5, 7, 'Pyongyang'], cities: [[6, 6, 'Wonsan']], depots: [], rough: 45 },
-  { id: 'skorea', short: 'S. Korea', name: 'South Korea', color: '#3fa7b5', government: 'federation', minor: true, capital: [5, 8, 'Seoul'], cities: [[6, 9, 'Busan']], depots: [], rough: 30 },
-  { id: 'taiwan', short: 'Taiwan', name: 'Taiwan', color: '#c97ab0', government: 'federation', minor: true, capital: [6, 13, 'Taipei'], cities: [[6, 14, 'Kaohsiung']], depots: [], rough: 40 },
+  { id: 'canada', short: 'Canada', name: 'Canada', color: '#b9424f', government: 'commonwealth', minor: true, militia: ['infantry', 'mechanized'], capital: [42, 5, 'Ottawa'], cities: [[32, 6, 'Vancouver'], [36, 5, 'Calgary'], [32, 2, 'Whitehorse']], depots: [], rough: 25 },
+  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, militia: ['infantry', 'infantry'], capital: [37, 17, 'Mexico City'], cities: [[33, 15, 'Tijuana'], [35, 16, 'Guadalajara'], [40, 15, 'Monterrey']], depots: [], rough: 30 },
+  { id: 'nkorea', short: 'N. Korea', name: 'North Korea', color: '#8a5ab8', government: 'directorate', minor: true, capital: [16, 7, 'Pyongyang'], cities: [[17, 7, 'Wonsan']], depots: [], rough: 45 },
+  { id: 'skorea', short: 'S. Korea', name: 'South Korea', color: '#3fa7b5', government: 'federation', minor: true, capital: [17, 8, 'Seoul'], cities: [[18, 9, 'Busan']], depots: [], rough: 30 },
+  { id: 'taiwan', short: 'Taiwan', name: 'Taiwan', color: '#c97ab0', government: 'federation', minor: true, capital: [16, 13, 'Taipei'], cities: [[16, 14, 'Kaohsiung']], depots: [], rough: 40 },
+  { id: 'kazakhstan', short: 'Kazakh.', name: 'Kazakhstan', color: '#8fae3a', government: 'directorate', minor: true, militia: ['infantry'], capital: [3, 7, 'Astana'], cities: [[4, 9, 'Almaty']], depots: [], rough: 0 },
+  { id: 'mongolia', short: 'Mongolia', name: 'Mongolia', color: '#a8744a', government: 'federation', minor: true, capital: [11, 7, 'Ulaanbaatar'], cities: [[9, 6, 'Khovd']], depots: [], rough: 15 },
 ];
 
 const ALL: readonly NationSpec[] = [...NATIONS, ...MINORS];
@@ -153,7 +177,7 @@ export function shortName(name: string): string {
 }
 
 /** Victory points by site name where a place is worth more than its size: what the war is about. */
-const PRIZE: Record<string, number> = { Taipei: 9, Seoul: 8, 'Mexico City': 8, Vancouver: 8, Pyongyang: 6 };
+const PRIZE: Record<string, number> = { Taipei: 9, Seoul: 8, 'Mexico City': 8, Ottawa: 8, Pyongyang: 6 };
 
 /** Island outposts: a runway and a harbour, worth little in themselves; their worth is where they are. */
 const OUTPOSTS = new Set(['Guam', 'Adak']);
@@ -202,7 +226,7 @@ function regionAt(col: number, row: number): NationId | null {
 function texture(seed: number): (key: HexKey) => number {
   // Soft blobs of roughness; deterministic in the seed, never used during play.
   const next = mulberry32(seed ^ 0x2f6b1a3d);
-  const blobs = Array.from({ length: 16 }, () => ({
+  const blobs = Array.from({ length: 28 }, () => ({
     col: next() % COLS,
     row: next() % ROWS,
     radius: 2 + (next() % 3),
@@ -236,7 +260,7 @@ export interface Theatre {
 }
 
 export const THEATRES: readonly Theatre[] = [
-  { id: PACIFIC_ID, name: 'The Pacific', summary: 'Four powers, five nations caught between them, and an ocean of islands.', unlock: 0 },
+  { id: PACIFIC_ID, name: 'The Pacific', summary: 'Moscow to Washington: four powers, seven nations caught between them, and an ocean of islands.', unlock: 0 },
 ];
 
 export function theatreOf(id: string): Theatre | undefined {
@@ -358,14 +382,13 @@ export function createPacificScenario(seed: number): WorldState {
       if (OUTPOSTS.has(n.depots[i]![2])) last.strength = 500;
     }
     if (n.navy) {
-      // At sea off the home port, in the first open sea hexes (sorted, so every seed agrees).
+      // At sea off the home port: the nearest open sea hexes, a full stack of ships to each (sorted,
+      // so every seed agrees).
       const port = Object.values(sites).find((s) => s.name === n.navy!.port)!;
       if (!tiles[port.key]!.port) throw new Error(`${port.name} is not a port`);
-      const sea = neighborKeys(port.key)
-        .filter((k) => tiles[k]?.terrain === 'water')
-        .sort();
+      const sea = seaNear(tiles, port.key, Math.ceil(n.navy.ships.length / STACK_LIMIT));
       n.navy.ships.forEach((c, i) => {
-        const key = sea[i % sea.length]!;
+        const key = sea[Math.floor(i / STACK_LIMIT)]!;
         const c2 = (counts.get(c) ?? 0) + 1;
         counts.set(c, c2);
         const f = newFormation(world, n.id, c, key, `${n.name} ${c2}${['th', 'st', 'nd', 'rd'][c2] ?? 'th'} ${unitClassName(c)}`);
@@ -427,6 +450,26 @@ export function createPacificScenario(seed: number): WorldState {
     updateIntel(world, id, computeVision(world, id), 0);
   }
   return world;
+}
+
+/** The `count` open sea hexes nearest a port, nearest first, ties by key. */
+function seaNear(tiles: Record<HexKey, Tile>, from: HexKey, count: number): HexKey[] {
+  const out: HexKey[] = [];
+  const seen = new Set<HexKey>([from]);
+  let ring: HexKey[] = [from];
+  while (out.length < count && ring.length > 0) {
+    const next: HexKey[] = [];
+    for (const k of ring) for (const m of neighborKeys(k)) {
+      if (seen.has(m) || tiles[m]?.terrain !== 'water') continue;
+      seen.add(m);
+      next.push(m);
+    }
+    next.sort();
+    out.push(...next);
+    ring = next;
+  }
+  if (out.length < count) throw new Error(`no room at sea off ${from}`);
+  return out.slice(0, count);
 }
 
 function unitClassName(c: UnitClass): string {

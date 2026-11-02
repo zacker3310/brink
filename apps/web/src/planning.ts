@@ -156,6 +156,26 @@ export function loadOrders(view: NationView, ship: Formation, drafted: Record<st
   return out;
 }
 
+/**
+ * Load the whole fleet at once: every transport and carrier takes what fits from the port it lies
+ * in or off, fighting troops first. Orders in `replaceable` (the staff's plan) give way; the
+ * player's own orders do not.
+ */
+export function fleetLoadOrders(view: NationView, drafted: Record<string, FormationOrder>, replaceable: readonly string[] = []): Record<string, FormationOrder> {
+  const free = new Set(replaceable);
+  const taken: Record<string, FormationOrder> = {};
+  for (const [id, o] of Object.entries(drafted)) if (!free.has(id)) taken[id] = o;
+  const out: Record<string, FormationOrder> = {};
+  const ships = Object.values(view.formations)
+    .filter((c) => UNITS[c.unitClass].carries && (UNITS[c.unitClass].capacity ?? 0) > passengers(view, c.id))
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const ship of ships) {
+    const orders = loadOrders(view, ship, { ...taken, ...out });
+    Object.assign(out, orders);
+  }
+  return out;
+}
+
 function rankForLift(f: Formation): number {
   return ['infantry', 'mechanized', 'armor', 'air', 'drone', 'recon', 'artillery'].indexOf(f.unitClass);
 }

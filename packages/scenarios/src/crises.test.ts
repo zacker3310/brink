@@ -27,9 +27,9 @@ export function legal(w: WorldState): string[] {
 }
 
 describe('Opening Crises', () => {
-  it('has twelve crises, each with a story, a setup and a threat', () => {
-    expect(CRISES).toHaveLength(12);
-    expect(new Set(CRISES.map((c) => c.id)).size).toBe(12);
+  it('has thirteen crises, each with a story, a setup and a threat', () => {
+    expect(CRISES).toHaveLength(13);
+    expect(new Set(CRISES.map((c) => c.id)).size).toBe(13);
     for (const c of CRISES) {
       expect(c.story.length, c.id).toBeGreaterThan(60);
       expect(c.setup.length, c.id).toBeGreaterThan(30);
@@ -66,6 +66,19 @@ describe('Opening Crises', () => {
     applyCrisis(red, 'red-dawn');
     expect(Object.values(red.sites).find((s) => s.name === 'Nome')!.owner).toBe('russia');
     expect(red.intel.usa!.knownOwner[Object.values(red.sites).find((s) => s.name === 'Nome')!.key]).toBe('russia');
+  });
+
+  it('the Pacific Pact: the West allied against the East, and nobody\'s prize an ally\'s capital', () => {
+    const w = createPacificScenario(1);
+    applyCrisis(w, 'pacific-pact');
+    for (const [a, b] of [['usa', 'japan'], ['usa', 'canada'], ['japan', 'mexico'], ['canada', 'mexico'], ['russia', 'china']]) expect(w.relations[pairKey(a!, b!)], `${a} ${b}`).toBe('alliance');
+    for (const a of ['usa', 'japan', 'canada', 'mexico']) for (const b of ['russia', 'china']) expect(w.relations[pairKey(a, b)], `${a} ${b}`).toBe('war');
+    expect(w.nations.usa!.objectives).not.toContain('canada-capital');
+    expect(w.nations.usa!.objectives).toContain('taiwan-capital');
+    expect(w.nations.china!.objectives).toContain('canada-capital');
+    // A view shows an ally's units: the bloc fights as one.
+    const v = buildView(w, 'japan');
+    expect(Object.values(v.contacts).some((c) => c.owner === 'usa')).toBe(true);
   });
 
   it('deals every crisis from some seed, the same one each time for a seed', () => {

@@ -36,6 +36,8 @@ function TopBar() {
   const resolving = useGame((s) => s.resolving);
   const animate = useGame((s) => s.animate);
   const setAnimate = useGame((s) => s.setAnimate);
+  const staffPlan = useGame((s) => s.staffPlan);
+  const setStaffPlan = useGame((s) => s.setStaffPlan);
   const [saving, setSaving] = useState(false);
   const exit = toMenu;
   const s = view.self;
@@ -101,6 +103,16 @@ function TopBar() {
             <div className="h-full bg-signal" style={{ width: `${((turn - 1) / view.maxTurns) * 100}%` }} />
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setStaffPlan(!staffPlan)}
+          aria-pressed={staffPlan}
+          data-testid="toggle-staff-plan"
+          title="Your staff drafts a plan at the start of every turn; change any of it, then execute"
+          className={`border px-2 py-1.5 text-[11px] whitespace-nowrap ${staffPlan ? 'border-signal/50 text-signal' : 'border-line text-faint'} hover:border-faint`}
+        >
+          Staff plan {staffPlan ? 'on' : 'off'}
+        </button>
         <button
           type="button"
           onClick={() => setAnimate(!animate)}

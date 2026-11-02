@@ -59,7 +59,7 @@ export function EndTurnSheet({
       <div className="safe-bottom safe-x flex max-h-full w-full flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="mx-2 mt-2 mb-2 flex min-h-0 flex-col rounded-2xl bg-ink-900 p-4">
           <div className="text-[17px] font-bold">{n === 0 ? 'Every Unit Has Acted' : n === 1 ? '1 Unit Still Ready' : `${n} Units Still Ready`}</div>
-          <p className="mt-0.5 text-[14px] text-muted">{n === 0 ? 'End the turn when you are ready.' : 'Each has its best option: do it, hold the unit where it is, or let the crews act for all of them.'}</p>
+          <p className="mt-0.5 text-[14px] text-muted">{n === 0 ? 'End the turn when you are ready.' : 'Each has the staff\'s plan: do it now, hold the unit where it is, or execute the plan for all of them.'}</p>
           {n > 0 && (
             <ul className="mt-2 min-h-[64px] shrink divide-y divide-line overflow-y-auto" data-testid="end-ready">
               {ready.map((u) => {
@@ -87,7 +87,7 @@ export function EndTurnSheet({
             {n > 0 ? (
               <>
                 <button type="button" onClick={onAuto} className="v-btn v-btn-primary h-12 text-[16px] font-semibold" data-testid="arena-end-auto">
-                  Crews Act, Then End Turn
+                  Execute Staff Plan
                 </button>
                 <button type="button" onClick={onEnd} className="v-btn v-btn-secondary h-12 text-[15px]" data-testid="arena-end-now">
                   End Turn Now

@@ -1,33 +1,39 @@
 # The Pacific (design)
 
 Brink's only theatre becomes the Pacific: four real powers (the United States, Russia, China, Japan)
-around a compressed ocean, five independent states between them, island chains to fight over, and
+around a compressed ocean, seven independent states between them, island chains to fight over, and
 from Phase 3 a navy. It replaces the Meridian Crisis and its two variants. Shipped in phases; each
 phase passes `pnpm check`, the soak and e2e on its own and goes to `main`.
 
 ## Map
 
-30 x 18 hexes (540), authored as a character grid in `packages/scenarios/src/pacific.ts`, so the
+46 x 20 hexes (920), authored as a character grid in `packages/scenarios/src/pacific.ts`, so the
 geography is drawn, not generated. The seed varies only ground texture (forest, hills, mountains)
-inside each country, never coastlines or borders. North is up; Asia is west, the Americas east, the
-ocean compressed in the middle (about a third of the real width).
+inside each country, never coastlines or borders. North is up. The map runs from Moscow and St
+Petersburg in the west to Washington and New York on the Atlantic in the east: all of Russia and all
+of the United States, with the ocean squeezed to about a quarter of the map (Tokyo to San Francisco
+is eleven hexes), so the war is fought on land as much as at sea.
 
 | Region | Where | Starts with |
 |---|---|---|
-| Russia | Siberia across the north-west, Chukotka, Kamchatka, Sakhalin, the Kurils | Russia |
-| China | the west and south-west mainland | China |
+| Russia | European Russia, the Urals, Siberia, Chukotka, Kamchatka, Sakhalin, the Kurils | Russia |
+| China | the south of the mainland, Xinjiang to the coast | China |
 | Japan | Hokkaido, Honshu, Kyushu (widened past real scale so a power fits) | Japan |
-| United States | Alaska, the west coast states, and the Aleutians, Hawaii and Guam | United States |
-| Canada, Mexico, North Korea, South Korea, Taiwan | their real places | themselves (minor states) |
+| United States | coast to coast, Alaska, the Aleutians, Hawaii and Guam | United States |
+| Canada, Mexico, North Korea, South Korea, Taiwan, Kazakhstan, Mongolia | their real places | themselves (minor states) |
 
-The Bering Strait is one sea hex between Chukotka and Alaska. The Aleutians are three islands strung
+The Bering Strait is one sea hex between Chukotka and Alaska. The Aleutians are two islands strung
 west from Alaska toward Kamchatka. Hawaii is two hexes in mid-ocean, Guam one in the south-west.
+Kazakhstan and Mongolia sit between Russia and China: the land war's buffer.
 
 ### Sites
 
-Each power: a capital, three cities, a depot. Each minor: a capital and one or two cities. Island
+Capitals are the real ones: Washington, Moscow, Beijing, Tokyo. The opening army stands on the
+Pacific front (the first cities listed: San Francisco and Los Angeles, Vladivostok and Khabarovsk);
+the capital keeps its guard. The United States has six cities and four bases, Russia five cities and
+three depots, China four and two, Japan three and one. Each minor: a capital and one to three cities. Island
 territories get a city (Honolulu) or a depot (Guam, Adak) so they supply themselves; supply never
-crosses water. Victory points weight the prizes: Taipei, Seoul, Mexico City, Vancouver and Honolulu
+crosses water. Victory points weight the prizes: Taipei, Seoul, Mexico City, Ottawa and Pyongyang
 are worth more than their size because they are what the war is about.
 
 ## Powers
@@ -60,9 +66,12 @@ placed, damage, stability). It is chosen at setup (dealt at random by default, o
 in the world (`world.crisis`), so saves and replays carry it. Each has a difficulty and a
 recommended power. Later beats fire through the world-events system.
 
-Built (`packages/scenarios/src/crises.ts`, twelve): Cold Peace, Korean Collapse, Straits of Fire,
+Built (`packages/scenarios/src/crises.ts`, thirteen): Cold Peace, Korean Collapse, Straits of Fire,
 Pearl Harbor 2.0, Red Dawn Arctic Edition, The Test, Operation Sombra, Maple Leaf Down, The Kuril
-Gambit, Dragon and Bear Divorce, Panama Shut, Ring of Fire. Each is a pure edit (relations, seized
+Gambit, Dragon and Bear Divorce, Panama Shut, Ring of Fire, The Pacific Pact. The Pacific Pact is the
+bloc war: the United States, Japan, Canada and Mexico allied against Russia and China (allied too).
+Allies share supply, ground and sight, a coalition victory is open to each bloc, and a power's
+objectives drop its allies' capitals. Each is a pure edit (relations, seized
 hexes and sites, landed forces, battered garrisons, stability and stockpile) applied after the
 difficulty, so its wars are the story; every power's atlas is refreshed after it. Tests: every crisis
 leaves a legal world, and the AI plays five turns of each without a refused order.
@@ -107,8 +116,14 @@ win AI-only matches: the next balance pass.
 
 ## Playing it on a phone
 
+- **Staff plan, the default.** Every turn opens with the staff's plan drafted for every unit and city
+  (the AI's own planner, on the player's view). Change any order, then Execute; Clear hands every unit
+  back, Plan drafts it again. Off in the menu (`staffPlan` in prefs). The battle does the same: a
+  staff plan for every unit not yet commanded, and Execute plays it and ends the turn.
 - **Ready from turn 1.** Every transport sails with two marine regiments aboard; every carrier with its
-  own helicopter wing and drone company on deck.
+  own helicopter wing and drone company on deck. Japan sails two carrier groups.
+- **Load the fleet.** One button boards everyone in port who fits onto the ships alongside, fighting
+  troops first; the staff's orders give way, the player's own do not.
 - **Two layers to a hex.** A tap takes the land units if there are any, else the ships; passengers are
   cargo, listed on their ship's card (tap one to land it alone). A carrier is selected with its air wing,
   which strikes from the deck.

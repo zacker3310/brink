@@ -1967,6 +1967,18 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             </div>
           )}
 
+          {!peeking && !card && !me && myTurn && readyCount > 0 && (
+            <div className="mb-2 flex items-center gap-2 rounded-xl bg-ink-900/95 py-1.5 pr-1.5 pl-3" data-testid="arena-staff-plan">
+              <p className="min-w-0 flex-1 text-[13px] leading-snug">
+                <span className="font-semibold">Staff plan </span>
+                <span className="text-muted">
+                  {readyCount === fieldCount
+                    ? `ready for all ${fieldCount} units. Command any of them to change it, then Execute.`
+                    : `covers the ${readyCount} unit${readyCount === 1 ? '' : 's'} you have not commanded. Execute when ready.`}
+                </span>
+              </p>
+            </div>
+          )}
           {!peeking && !card && !(me && myTurn) && sideChips.length > 0 && <div className="mb-2 flex gap-1.5 overflow-x-auto">{sideChips}</div>}
 
           <div className={`flex items-end gap-2 ${settings.leftHanded ? 'flex-row-reverse' : ''}`}>
@@ -2007,6 +2019,12 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
             {myTurn && undoRef.current && (
               <button type="button" onClick={undo} className="v-btn v-btn-secondary h-14 min-w-14 shrink-0 px-3 text-[15px] font-semibold" data-testid="arena-undo" aria-label={`Undo the last move of ${b?.units.find((u) => u.id === undoRef.current?.unit)?.name ?? 'your unit'}`}>
                 Undo
+              </button>
+            )}
+            {myTurn && readyCount > 0 && (
+              <button type="button" onClick={() => finishTurn(true)} className="v-btn v-btn-primary h-[58px] shrink-0 flex-col gap-0 px-3 text-[15px] leading-tight font-semibold" data-testid="arena-execute" aria-label={`Execute the staff plan for ${readyCount} units and end the turn`}>
+                Execute
+                <span className="text-[12px] font-normal">staff plan</span>
               </button>
             )}
             <button type="button" disabled={!myTurn} onClick={() => (readyCount > 0 && settings.endSheet ? setConfirmEnd(true) : finishTurn())} className={`v-btn relative h-[58px] shrink-0 flex-col gap-0 px-3 text-[15px] leading-tight font-semibold disabled:opacity-40 ${readyCount === 0 ? 'v-btn-primary' : 'v-btn-secondary'}`} data-testid="arena-end-turn">

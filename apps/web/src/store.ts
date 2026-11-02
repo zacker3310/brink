@@ -101,7 +101,14 @@ interface State {
 
   newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty, theatre?: string, crisis?: string): Promise<void>;
   /** Let the staff draft orders for every unit and city still waiting; the player can change any. */
-  autoCommand(): Promise<void>;
+  autoCommand(auto?: boolean): Promise<void>;
+  /** Staff plan mode: the staff drafts a plan at the start of every turn. */
+  staffPlan: boolean;
+  setStaffPlan(on: boolean): void;
+  /** Units whose orders are the staff's and the player has not touched this turn. */
+  planned: FormationId[];
+  /** Take back every order the staff drafted that the player has not touched. */
+  clearPlan(): void;
   /** Load a save. Seats other players held in an old multiplayer save go to the AI. */
   loadGame(text: string): Promise<boolean>;
   toMenu(): void;
@@ -197,7 +204,9 @@ export const useGame = create<State>((set, get) => {
       return false;
     }
     if (r.type === 'state') {
-      set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), submitted: null, rejected: [], screen: 'game' });
+      set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), planned: [], submitted: null, rejected: [], screen: 'game' });
+      // Staff plan mode: every turn opens with the staff's plan drafted; the player changes what they like.
+      if (get().staffPlan && !r.view.victory) void get().autoCommand(true);
       // A war won opens the next theatre.
       if (wonCampaign(r.view)) recordWarWon(r.view.scenarioId);
       // A battle the page was closed in on this turn waits for the same attack (arena/resume.ts).
@@ -341,6 +350,7 @@ export const useGame = create<State>((set, get) => {
       set({ armed: null });
       if (ids.some((id) => orders[id]!.type === 'attack')) sfx.boom();
       else sfx.order();
+      if (get().planned.some((p) => ids.includes(p))) set({ planned: get().planned.filter((p) => !ids.includes(p)) });
       editDraft((d) => {
         for (const id of ids) d.formations[id] = orders[id]!;
         return d;
@@ -355,7 +365,24 @@ export const useGame = create<State>((set, get) => {
       if (a) sfx.arm();
       set({ armed: a });
     },
-    async autoCommand() {
+    staffPlan: readPrefs().staffPlan ?? true,
+    setStaffPlan(on) {
+      writePrefs({ staffPlan: on });
+      set({ staffPlan: on });
+      if (on) void get().autoCommand(true);
+    },
+    planned: [],
+    clearPlan() {
+      const { planned } = get();
+      if (planned.length === 0) return;
+      editDraft((d) => {
+        for (const id of planned) delete d.formations[id];
+        return d;
+      });
+      set({ planned: [] });
+      get().notify('Plan cleared: every unit waits for your orders');
+    },
+    async autoCommand(auto = false) {
       const { view, draft, resolving } = get();
       if (!view || !draft || resolving) return;
       const r = await engine.call({ type: 'suggest', nation: view.self.id });
@@ -364,9 +391,11 @@ export const useGame = create<State>((set, get) => {
       if (!cur) return;
       const next = structuredClone(cur);
       let n = 0;
+      const planned = [...get().planned];
       for (const [id, o] of Object.entries(r.orders.formations)) {
         if (next.formations[id] || !view.formations[id]) continue;
         next.formations[id] = o;
+        planned.push(id);
         n += 1;
       }
       const busy = new Set([...view.self.productionQueue.map((q) => q.siteId), ...next.recruit.map((x) => x.siteId)]);
@@ -386,9 +415,11 @@ export const useGame = create<State>((set, get) => {
         n += 1;
       }
       if (next.research === undefined && !view.self.research.current && r.orders.research) next.research = r.orders.research;
-      set({ draft: next, armed: null, selectedFormation: null });
+      // A turn that moved on while the staff was thinking keeps the new turn's draft.
+      if (get().view !== view) return;
+      set({ draft: next, planned, armed: null, ...(auto ? {} : { selectedFormation: null }) });
       void recheck();
-      get().notify(n ? `Staff drafted ${n} order${n === 1 ? '' : 's'}. Change any, then end the turn.` : 'Every unit already has orders.');
+      if (!auto) get().notify(n ? `Staff drafted ${n} order${n === 1 ? '' : 's'}. Change any, then execute.` : 'Every unit already has orders.');
     },
     setMode: (mode) => set({ mode }),
     setTab: (tab) => set({ tab, panelOpen: true }),
@@ -408,7 +439,8 @@ export const useGame = create<State>((set, get) => {
       if (!get().group.includes(next.id)) get().selectFormation(next.id);
       get().focusOn(next.key);
     },
-    setOrder: (id, order) =>
+    setOrder: (id, order) => {
+      if (get().planned.includes(id)) set({ planned: get().planned.filter((p) => p !== id) });
       editDraft((d) => {
         if (order) d.formations[id] = order;
         else delete d.formations[id];
@@ -418,7 +450,8 @@ export const useGame = create<State>((set, get) => {
           get().notify('Orders changed: that battle will be settled by the odds instead', 'warn');
         }
         return d;
-      }),
+      });
+    },
     attack(target, orders) {
       const view = get().view;
       const req = view ? battleFor(view, target, orders) : null;
