@@ -102,11 +102,11 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
   // Attack by touch: find a stack with an enemy it can hit, tap the enemy (the odds come up), confirm.
   let attacked = false;
   for (let tries = 0; tries < 12 && !attacked; tries++) {
-    const stacks = await page.evaluate(() => [...new Set(window.__brink!.formations().map((f) => f.key))]);
-    for (const key of stacks) {
-      const at = await page.evaluate((k) => window.__brink!.hexToClient(k), key);
-      if (at.y < 170 || at.y > viewport.height - 420 || at.x < 20 || at.x > viewport.width - 20) continue;
-      await page.touchscreen.tap(at.x, at.y);
+    // Next brings each waiting stack up in turn, centred on the map, the way a player looks around.
+    for (let look = 0; look < 10; look++) {
+      if (!(await page.getByTestId('next-idle').isEnabled())) break;
+      await page.getByTestId('next-idle').tap();
+      await page.waitForTimeout(450);
       const target = await page.evaluate(
         ([top, bottom, w]) =>
           window

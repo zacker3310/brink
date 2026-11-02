@@ -317,6 +317,15 @@ export function createPacificScenario(seed: number): WorldState {
     n.depots.forEach((p, i) => placeSite(`${n.id}-depot${i}`, p, 'depot', n.id, OUTPOSTS.has(p[2]) ? OUTPOST_PROFILE : SITE_PROFILE.depot));
   }
 
+  // No city is walled in: the ground next to a site is at worst hills, so its garrison can always
+  // march out (a capital ringed by mountains kept its army home on turn 1).
+  for (const id of sortedKeys(sites)) {
+    for (const k of neighborKeys(sites[id]!.key)) {
+      const t = tiles[k];
+      if (t && t.terrain === 'mountains' && !t.siteId) t.terrain = 'hills';
+    }
+  }
+
   // Every site on the coast is a port: ships enter it, build there, and supply puts to sea from it.
   for (const id of sortedKeys(sites)) {
     const t = tiles[sites[id]!.key]!;
