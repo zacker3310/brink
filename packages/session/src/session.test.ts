@@ -80,7 +80,7 @@ describe('GameSession', () => {
     const s = GameSession.create(PACIFIC_ID, 7, 'usa', ['russia']);
     expect(s.humans).toEqual(['usa', 'russia']);
     // The AI plays every empty seat: the other two powers and the five minor states.
-    expect(s.aiOrders().map((o) => o.nation).sort()).toEqual(['canada', 'china', 'japan', 'mexico', 'nkorea', 'skorea', 'taiwan']);
+    expect(s.aiOrders().map((o) => o.nation).sort()).toEqual(['canada', 'china', 'japan', 'kazakhstan', 'mexico', 'mongolia', 'nkorea', 'skorea', 'taiwan']);
     const korva = s.view('russia');
     expect(Object.values(korva.formations).every((f) => f.owner === 'russia')).toBe(true);
     const fid = Object.keys(korva.formations).sort()[0]!;
