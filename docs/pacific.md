@@ -24,9 +24,20 @@ halfway), so a fleet crosses in a turn and the war is fought on land as much as 
 
 The Bering Strait is one sea hex between Chukotka and Alaska. The Aleutians are two islands strung
 west from Alaska toward Kamchatka. Hawaii is two hexes in mid-ocean, Guam one in the south-west.
-Kazakhstan and Mongolia sit between Russia and China: the land war's buffer. Canada and Mexico start
-at peace with the United States (their own wars with Russia and China stand): the American war is
-across the ocean, not on its doorstep.
+Kazakhstan and Mongolia sit between Russia and China: the land war's buffer. Korea's long border is
+with China (Manchuria); Russia touches it only at Vladivostok's corner. Every power has prizes next
+door: Canada and Mexico for the United States, the Koreas and Mongolia for China and Russia,
+Kazakhstan for Russia, South Korea across the strait for Japan.
+
+### Parity
+
+Every power starts level, whatever its size (`parity` in `pacific.ts`): the same victory points, the
+same raw output (its cities' own yields, before its government's bent, so the Commonwealth's richer
+treasury still pays for its modest army), and an army of the same weight. Victory points and yields
+are scaled across each power's own sites, so where its strength lies is unchanged; lighter armies are
+topped up with garrisons in their cities. The United States is still the biggest country on the map
+and Japan the smallest; the scoreboard starts even. Each power's opening army stands on its front:
+the US west coast, Russia's Far East, China's north (Harbin), Japan at home.
 
 ### Sites
 
@@ -112,12 +123,14 @@ ground formations), **Carrier Group** (carries two air wings, which strike from 
   on deck. It builds ships in ports, more lift when its war is overseas. Balance of power: from turn 8
   a power six points of standing ahead of every other becomes everyone's target.
 
-Second pass (42 x 20 map, 12 AI-only matches): with nothing to take next door the US navy sails at
-once (the AI gives an idle navy its own target across the sea, the best enemy site on another
-landmass, with the troops already aboard), keeps a hex clear of enemy ships, never routes through
-someone else's port, and tries another beach rather than wait off a defended shore. Winners: United
-States 7, Russia 3, China 2, Japan 0. The US wins on standing (its economy) more than on ground; Japan
-takes South Korea every match but has not yet won one.
+Third pass (42 x 20 map, parity, 24 AI-only matches): Japan 10, Russia 7, China 4, United States 3.
+Every power wins. The AI: a navy whose army marches on foot takes its own target across the sea with
+the troops already aboard; ships keep a hex clear of enemy ships (unless the way round costs more than
+two hexes of progress), never route through someone else's port, and try another beach rather than
+wait off a defended shore; a target the army can walk to scores higher than one it must sail to; an
+enemy city in the way is stormed by everyone at its gates, two or more at once (a garrison in a city
+is out of sight, and a move into it only bumps into it). Before parity the United States won 12 of 12
+on its head start; Japan won none.
 
 First pass (30 x 18 map, 12 AI-only matches, 30 turns): every power boards and lands; Japan lands up to nine times a
 match and takes Busan, Seoul, Wuhan. Winners: United States 9, Russia 3. China and Japan do not yet

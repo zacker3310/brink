@@ -69,9 +69,26 @@ function threatsTo(view: NationView, contacts: Contact[]): Map<string, number> {
   return out;
 }
 
+/** Each hex of march off a target's worth: near prizes first, a foothold before the deep strike. */
+const DISTANCE_WEIGHT = 6;
+
+/** A city is stormed by this many formations at once, or not at all. */
+const STORM_TOGETHER = 2;
+
+/** A walk is cheaper than a landing: what the army can reach on foot scores this much higher. */
+const OVERLAND_BONUS = 40;
+
 function chooseTarget(view: NationView, memory: AiMemory, contacts: Contact[], own: Formation[]): SiteView | null {
   if (own.length === 0) return null;
   const centroid = (k: HexKey) => own.reduce((a, f) => a + keyDistance(f.key, k), 0) / own.length;
+  // The landmass most of the army stands on.
+  const land = landmasses(view);
+  const count = new Map<number, number>();
+  for (const f of own) {
+    const l = UNITS[f.unitClass].ground && !f.aboard ? land.get(f.key) : undefined;
+    if (l !== undefined) count.set(l, (count.get(l) ?? 0) + 1);
+  }
+  const home = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
   let best: SiteView | null = null;
   let bestScore = -Infinity;
   for (const id of sortedKeys(view.sites)) {
@@ -81,7 +98,8 @@ function chooseTarget(view: NationView, memory: AiMemory, contacts: Contact[], o
     const guard = contacts.filter((c) => keyDistance(c.key, s.key) <= 1).reduce((a, c) => a + c.estimatedStrength, 0);
     const grudge = s.owner && memory.aggressors[s.owner] !== undefined ? 3 : 0;
     const weak = s.owner && view.nations[s.owner] ? -view.nations[s.owner]!.victoryPoints / 10 : 0;
-    const score = (s.victoryPoints + grudge) * 10 - centroid(s.key) * 6 - guard / 100 + weak;
+    const walk = home !== undefined && land.get(s.key) === home ? OVERLAND_BONUS : 0;
+    const score = (s.victoryPoints + grudge) * 10 - centroid(s.key) * DISTANCE_WEIGHT - guard / 100 + weak + walk;
     if (score > bestScore || (score === bestScore && best && s.id < best.id)) {
       best = s;
       bestScore = score;
@@ -593,6 +611,30 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   const land = landmasses(view);
   const raid = seaTarget(view, memory, contacts, own, land, goal);
   const sea = planSea(view, plan, own, orders, committed, raid?.key ?? goal, hostileHexes, !!raid);
+  // Enemy cities in the army's way are stormed by everyone at their gates, when there are at least
+  // STORM_TOGETHER of them (the objective first). A garrison dug in among the buildings is out of
+  // sight: a move into it only bumps into it, turn after turn.
+  const storming = new Map<FormationId, HexKey>();
+  const gates = sortedKeys(view.sites)
+    .map((id) => view.sites[id]!)
+    .filter((s) => s.owner && plan.enemies.has(s.owner))
+    .sort((a, b) => (a.key === goal ? -1 : b.key === goal ? 1 : keyDistance(a.key, goal ?? a.key) - keyDistance(b.key, goal ?? b.key)) || (a.id < b.id ? -1 : 1));
+  for (const s of gates) {
+    const tile = view.tiles[s.key];
+    const by = own.filter(
+      (f) =>
+        !committed.has(f.id) &&
+        !storming.has(f.id) &&
+        !f.aboard &&
+        areAdjacent(f.key, s.key) &&
+        UNITS[f.unitClass].ground &&
+        f.unitClass !== 'artillery' &&
+        f.unitClass !== 'recon' &&
+        f.ammunition >= UNITS[f.unitClass].ammoPerAttack &&
+        enterCost(tile, f.unitClass) !== null,
+    );
+    if (by.length >= STORM_TOGETHER) for (const f of by) storming.set(f.id, s.key);
+  }
   for (const f of own) {
     if (committed.has(f.id)) continue;
     if (f.aboard) {
@@ -615,6 +657,11 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
       continue;
     }
     if (!goal) continue;
+    const storm = storming.get(f.id);
+    if (storm) {
+      orders[f.id] = { type: 'attack', target: storm, path: [] };
+      continue;
+    }
     // Spread the advance a little so formations do not all queue on one road.
     const jitter = roll(seed, view.turn, self, f.id) % 3;
     const aim = jitter === 0 ? goal : (neighborKeys(goal).filter((k) => view.tiles[k]?.terrain != null).sort()[jitter - 1] ?? goal);
@@ -769,8 +816,14 @@ function planSea(
     // Around enemy ships and shores, not into them: contact stops a ship dead. Transports and
     // carriers also keep a hex clear of enemy ships; fleets go in to fight.
     const fighting = UNITS[s.unitClass].carries === undefined;
-    let path = pathToward(view, s, to, plan, fighting ? avoid : screened);
-    if (!fighting && path.length === 0) path = pathToward(view, s, to, plan, avoid);
+    let path = pathToward(view, s, to, plan, avoid);
+    if (!fighting) {
+      // The way round, unless it costs more than a couple of hexes of progress (a detour by way of
+      // Hawaii is no escort's idea of caution).
+      const safe = pathToward(view, s, to, plan, screened);
+      const progress = (p: HexKey[]) => keyDistance(p.at(-1) ?? s.key, to);
+      if (safe.length > 0 && progress(safe) <= progress(path) + 2) path = safe;
+    }
     if (path.length) {
       orders[s.id] = { type: 'move', path };
       endAt(plan, s.key, path.at(-1)!, true);

@@ -32,7 +32,7 @@ describe('The Pacific', () => {
     }
   });
 
-  it('makes the minor states minor: a capital, militia only, at war with the powers (Canada and Mexico at peace with the US) and at peace with each other', () => {
+  it('makes the minor states minor: a capital, militia only, at war with every power and at peace with each other', () => {
     for (const m of MINORS) {
       expect(w.nations[m.id]!.minor).toBe(true);
       expect(sitesOf(m.id).filter((x) => x.kind === 'capital')).toHaveLength(1);
@@ -40,11 +40,7 @@ describe('The Pacific', () => {
       // Militia: infantry, a recon screen, and in the big countries mechanized; never armour, air or ships.
       for (const c of classes) expect(['infantry', 'mechanized', 'recon'], `${m.id} ${c}`).toContain(c);
     }
-    const home = (n: string, m: string) => n === 'usa' && (m === 'canada' || m === 'mexico');
-    for (const n of NATIONS) for (const m of MINORS) expect(w.relations[[n.id, m.id].sort().join('|')], `${n.id} ${m.id}`).toBe(home(n.id, m.id) ? 'peace' : 'war');
-    // The United States' war is across the ocean: its neighbours are not its prizes.
-    expect(w.nations.usa!.objectives).not.toContain('canada-capital');
-    expect(w.nations.russia!.objectives).toContain('canada-capital');
+    for (const n of NATIONS) for (const m of MINORS) expect(w.relations[[n.id, m.id].sort().join('|')], `${n.id} ${m.id}`).toBe('war');
     expect(w.relations[['canada', 'mexico'].sort().join('|')]).toBe('peace');
   });
 
@@ -80,6 +76,22 @@ describe('The Pacific', () => {
     const port = (name: string) => w.tiles[Object.values(w.sites).find((s) => s.name === name)!.key]!.port;
     expect([port('San Francisco'), port('Tokyo'), port('Vladivostok'), port('Shanghai'), port('Honolulu')]).toEqual([true, true, true, true, true]);
     expect(port('Calgary')).toBeFalsy();
+  });
+
+  it('starts every power level: the same victory points, output and army weight, whatever its size', () => {
+    const vp = (p: string) => Object.values(w.sites).filter((s) => s.owner === p).reduce((a, s) => a + s.victoryPoints, 0);
+    const out = (p: string) => Object.values(w.sites).filter((s) => s.owner === p).reduce((a, s) => a + s.yields.credits + s.yields.energy + s.yields.materials + s.yields.food + s.yields.industry, 0);
+    const army = (p: string) => Object.values(w.formations).filter((f) => f.owner === p).reduce((a, f) => a + f.strength, 0);
+    const spread = (f: (p: string) => number) => {
+      const v = NATIONS.map((n) => f(n.id));
+      return (Math.max(...v) - Math.min(...v)) / Math.max(...v);
+    };
+    expect(spread(vp)).toBeLessThanOrEqual(0.05);
+    expect(spread(out)).toBeLessThanOrEqual(0.05);
+    expect(spread(army)).toBeLessThanOrEqual(0.1);
+    // The United States is still the biggest country on the map, and Japan the smallest.
+    const land = (p: string) => Object.values(w.tiles).filter((t) => t.owner === p).length;
+    expect(land('usa')).toBeGreaterThan(land('japan') * 5);
   });
 
   it('changes only the ground with the seed, never the coasts, borders or sites', () => {

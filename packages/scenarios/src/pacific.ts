@@ -1,5 +1,5 @@
 import type { Formation, GovernmentId, HexKey, Nation, NationId, Site, SiteKind, Terrain, Tile, UnitClass, WorldState, Yields } from '@brink/contracts';
-import { RULESET_VERSION, STACK_LIMIT } from '@brink/game-data';
+import { RULESET_VERSION, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { hexKey, keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { computeVision, emptyIntel, grossYields, mulberry32, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
@@ -28,7 +28,7 @@ const GRID: readonly string[] = [
   'RRRRRRRRRRRRRRRRRR...RR....UUUUUKKKKKKKKK.', // 3  Moscow, Anchorage
   'RRRRRRRRRRRRRRRRRR.R.R.....U....KKKKKKKKK.', // 4  Sakhalin, the Alaska Peninsula
   'RRRRRRRRRRRRRRRRRR....R.U.U.....KKKKKKKKK.', // 5  the Kurils, the Aleutians
-  'ZZZZZZZRRGGGGGCCRR..JJ......KKKKKKKKKKKKK.', // 6  Kazakhstan, Mongolia, Vladivostok, Hokkaido, Vancouver
+  'ZZZZZZZRRGGGGGCCCC..JJ......KKKKKKKKKKKKK.', // 6  Kazakhstan, Mongolia, Vladivostok, Hokkaido, Vancouver
   'ZZZZZZZCGGGGGCCCNN.JJJ......UUUUUUUUUUUUU.', // 7  Korea, Honshu, Seattle
   'ZZZZZZCCCCCCCCCC.S..JJ......UUUUUUUUUUUUU.', // 8  Seoul, Tokyo, New York
   'ZZZZZZCCCCCCCCCC.SS.J.......UUUUUUUUUUUUU.', // 9
@@ -105,7 +105,7 @@ export const NATIONS: readonly NationSpec[] = [
     capital: [2, 3, 'Moscow'],
     // The Far East first: the opening army stands on the Pacific front, Moscow keeps its guard.
     cities: [
-      [17, 6, 'Vladivostok'],
+      [17, 5, 'Vladivostok'],
       [16, 4, 'Khabarovsk'],
       [1, 1, 'St Petersburg'],
       [22, 3, 'Petropavlovsk'],
@@ -126,10 +126,11 @@ export const NATIONS: readonly NationSpec[] = [
     color: '#e0b43c',
     government: 'union',
     capital: [12, 8, 'Beijing'],
+    // The northern front first: the opening army stands facing Russia and Korea.
     cities: [
+      [14, 6, 'Harbin'],
       [15, 10, 'Shanghai'],
       [14, 15, 'Guangzhou'],
-      [14, 6, 'Harbin'],
       [8, 12, 'Chengdu'],
       [9, 10, "Xi'an"],
     ],
@@ -162,7 +163,7 @@ export const NATIONS: readonly NationSpec[] = [
 /** The independent states between the powers. */
 export const MINORS: readonly NationSpec[] = [
   { id: 'canada', short: 'Canada', name: 'Canada', color: '#b9424f', government: 'commonwealth', minor: true, militia: ['infantry', 'mechanized'], capital: [38, 5, 'Ottawa'], cities: [[28, 6, 'Vancouver'], [33, 5, 'Calgary'], [32, 2, 'Whitehorse']], depots: [], rough: 25 },
-  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, militia: ['infantry', 'infantry'], capital: [33, 17, 'Mexico City'], cities: [[29, 15, 'Tijuana'], [31, 16, 'Guadalajara'], [36, 15, 'Monterrey']], depots: [], rough: 30 },
+  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, capital: [33, 17, 'Mexico City'], cities: [[29, 15, 'Tijuana'], [31, 16, 'Guadalajara'], [36, 15, 'Monterrey']], depots: [], rough: 0 },
   { id: 'nkorea', short: 'N. Korea', name: 'North Korea', color: '#8a5ab8', government: 'directorate', minor: true, capital: [16, 7, 'Pyongyang'], cities: [[17, 7, 'Wonsan']], depots: [], rough: 45 },
   { id: 'skorea', short: 'S. Korea', name: 'South Korea', color: '#3fa7b5', government: 'federation', minor: true, capital: [17, 8, 'Seoul'], cities: [[18, 9, 'Busan']], depots: [], rough: 30 },
   { id: 'taiwan', short: 'Taiwan', name: 'Taiwan', color: '#c97ab0', government: 'federation', minor: true, capital: [16, 13, 'Taipei'], cities: [[16, 14, 'Kaohsiung']], depots: [], rough: 40 },
@@ -344,8 +345,8 @@ export function createPacificScenario(seed: number): WorldState {
       eliminated: false,
     };
   }
-  // A power's objectives: the capitals of the minor states it is at war with, the prizes of the war.
-  for (const n of NATIONS) nations[n.id]!.objectives = MINORS.filter((m) => !(n.id === 'usa' && (m.id === 'canada' || m.id === 'mexico'))).map((m) => `${m.id}-capital`);
+  // A power's objectives: the minor states' capitals, the prizes of the war.
+  for (const n of NATIONS) nations[n.id]!.objectives = MINORS.map((m) => `${m.id}-capital`);
 
   // Every pair starts at war: the powers with each other, the minors with everyone (they only defend).
   const relations: Record<string, 'war' | 'peace' | 'alliance'> = {};
@@ -353,10 +354,10 @@ export function createPacificScenario(seed: number): WorldState {
   for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
     const a = spec.get(ids[i]!)!;
     const b = spec.get(ids[j]!)!;
-    // Minor states are at peace with one another: they have no quarrel but survival. Canada and
-    // Mexico are at peace with the United States: its war is across the ocean, not on its doorstep.
-    const neighbours = (x: NationSpec, y: NationSpec) => x.id === 'usa' && (y.id === 'canada' || y.id === 'mexico');
-    relations[pairKey(a.id, b.id)] = (a.minor && b.minor) || neighbours(a, b) || neighbours(b, a) ? 'peace' : 'war';
+    // Minor states are at peace with one another: they have no quarrel but survival. Every power
+    // has prizes next door: Canada and Mexico for the United States, the Koreas and Mongolia for
+    // China and Russia, Kazakhstan for Russia, South Korea across the strait for Japan.
+    relations[pairKey(a.id, b.id)] = a.minor && b.minor ? 'peace' : 'war';
   }
 
   const world: WorldState = {
@@ -447,6 +448,7 @@ export function createPacificScenario(seed: number): WorldState {
       for (const c of n.militia ?? []) raise(n, c, `${n.id}-city${i}`, counts, 60);
     });
   }
+  parity(world, raise);
   for (const n of ALL) {
     nations[n.id]!.industrialCapacity = grossYields(world, n.id).industry;
     nations[n.id]!.population = Object.values(sites)
@@ -466,6 +468,56 @@ export function createPacificScenario(seed: number): WorldState {
     updateIntel(world, id, computeVision(world, id), 0);
   }
   return world;
+}
+
+/**
+ * Every power starts level (docs/pacific.md): the United States is the biggest country on the map
+ * and Japan the smallest, but each starts with the same victory points, the same output and an army
+ * of the same weight. Victory points and yields are scaled across each power's own sites, so where
+ * its strength lies is unchanged; armies are topped up with garrisons in its own cities.
+ */
+function parity(world: WorldState, raise: (n: NationSpec, c: UnitClass, site: string, counts: Map<UnitClass, number>) => void): void {
+  const powers = NATIONS.map((n) => n.id);
+  const sitesOf = (p: NationId) => sortedKeys(world.sites).map((id) => world.sites[id]!).filter((s) => s.owner === p);
+  const mean = (f: (p: NationId) => number) => Math.round(powers.reduce((a, p) => a + f(p), 0) / powers.length);
+
+  // Victory points: each power's sites scaled to the mean, the remainder on its capital.
+  const vp = (p: NationId) => sitesOf(p).reduce((a, s) => a + s.victoryPoints, 0);
+  const vpTarget = mean(vp);
+  for (const p of powers) {
+    const total = vp(p);
+    for (const s of sitesOf(p)) if (s.kind !== 'capital') s.victoryPoints = Math.max(1, Math.round((s.victoryPoints * vpTarget) / total));
+    const capital = world.sites[`${p}-capital`]!;
+    capital.victoryPoints = Math.max(1, capital.victoryPoints + vpTarget - vp(p));
+  }
+
+  // Output: every yield of every site scaled so the power's raw output (its cities' own yields,
+  // before its government's bent) meets the mean. A government's trade stays its own: the
+  // Commonwealth's richer treasury pays for its modest army, the Directorate's industry for its
+  // brittle home front.
+  const output = (p: NationId) => sitesOf(p).reduce((a, s) => a + s.yields.credits + s.yields.energy + s.yields.materials + s.yields.food + s.yields.industry, 0);
+  const outTarget = mean(output);
+  for (const p of powers) {
+    const pct = Math.round((outTarget * 100) / output(p));
+    for (const s of sitesOf(p)) for (const k of sortedKeys(s.yields) as (keyof Yields)[]) s.yields[k] = Math.floor((s.yields[k] * pct) / 100);
+  }
+
+  // Army: the lighter powers raise garrisons (infantry, then mechanized, then artillery) in their
+  // own cities, capital first, until they weigh what the heaviest does.
+  const weight = (p: NationId) => Object.values(world.formations).filter((f) => f.owner === p).reduce((a, f) => a + f.strength, 0);
+  const heaviest = Math.max(...powers.map(weight));
+  const kinds: UnitClass[] = ['infantry', 'mechanized', 'artillery'];
+  for (const n of NATIONS) {
+    const counts = new Map<UnitClass, number>();
+    for (const f of Object.values(world.formations)) if (f.owner === n.id) counts.set(f.unitClass, (counts.get(f.unitClass) ?? 0) + 1);
+    const places = sitesOf(n.id).filter((s) => s.kind !== 'depot').map((s) => s.id);
+    let i = 0;
+    for (let guard = 0; guard < 40 && weight(n.id) + 500 < heaviest; guard++) {
+      const site = places.find((id) => Object.values(world.formations).filter((f) => f.key === world.sites[id]!.key && !f.aboard && !UNITS[f.unitClass].naval).length < STACK_LIMIT);
+      if (!site) break;
+      raise(n, kinds[i++ % kinds.length]!, site, counts);
+    }
+  }
 }
 
 /** The `count` open sea hexes nearest a port, nearest first, ties by key. */
