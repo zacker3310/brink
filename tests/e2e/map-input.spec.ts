@@ -45,3 +45,30 @@ test('a finger the map never heard lift does not lock it into a pinch', async ({
   await page.touchscreen.tap(unit.x, unit.y);
   await expect(page.getByTestId('unit-panel')).toBeVisible();
 });
+
+test('city banners stay on their cities when the screen changes size under the map', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('./');
+  await page.getByTestId('menu-new').tap();
+  await page.getByTestId('nation-japan').tap();
+  await page.getByTestId('crisis-none').tap();
+  await page.getByTestId('start-game').tap();
+  await page.getByTestId('how-to-close').tap({ timeout: 60_000 });
+  await page.getByTestId('deselect').tap().catch(() => undefined);
+  // Where Tokyo's banner sits relative to Tokyo's hex on the map canvas.
+  const offset = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('[data-testid="city-japan-capital"]')!.getBoundingClientRect();
+      return { x: el.left + el.width / 2, y: el.top };
+    });
+  const tokyo = () => page.evaluate(() => window.__brink!.siteToClient('japan-capital'));
+  const before = await offset();
+  const hexBefore = await tokyo();
+  // The phone's toolbar slides away: the page grows under the map.
+  await page.setViewportSize({ width: viewport.width, height: viewport.height + 80 });
+  await page.waitForTimeout(400);
+  const after = await offset();
+  const hexAfter = await tokyo();
+  expect(after.x - hexAfter.x).toBeCloseTo(before.x - hexBefore.x, 0);
+  expect(after.y - hexAfter.y).toBeCloseTo(before.y - hexBefore.y, 0);
+});

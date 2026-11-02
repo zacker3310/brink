@@ -6,6 +6,7 @@ interface Window {
     enemies(): string[];
     formations(): { id: string; cls: string; key: string }[];
     scale(): number;
+    siteToClient(siteId: string): { x: number; y: number };
     targets(): string[];
   };
   // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.

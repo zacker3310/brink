@@ -230,6 +230,8 @@ declare global {
       formations(): { id: string; cls: UnitClass; key: HexKey }[];
       /** The map's zoom. */
       scale(): number;
+      /** A site's hex centre on screen. */
+      siteToClient(siteId: string): { x: number; y: number };
       /** Enemy hexes the selected stack can attack. */
       targets(): HexKey[];
     };
@@ -295,6 +297,14 @@ export function MapView() {
       appRef.current = { app, world, layers, life };
       // Rotors turn and drone teams circle whether or not anything else changes.
       app.ticker.add(() => tickModels(performance.now()));
+      // The city banners and other overlays are HTML laid over the canvas from the published camera.
+      // Whatever moves or resizes the map (a gesture, a resize Pixi handles on its own, the phone's
+      // toolbar sliding away), they follow it within a frame: republish whenever the real transform
+      // and the published one differ.
+      app.ticker.add(() => {
+        const c = useCamera.getState().camera;
+        if (c.x !== world.x || c.y !== world.y || c.scale !== world.scale.x || c.width !== app.screen.width || c.height !== app.screen.height) publish();
+      });
       wireInput(app, world);
       // Imported art arrives after the first frame; redraw with it as soon as it lands.
       void loadArt().then((loaded) => {
@@ -575,6 +585,10 @@ export function MapView() {
       },
       scale() {
         return world.scale.x;
+      },
+      siteToClient(siteId) {
+        const v = useGame.getState().view!;
+        return this.hexToClient(v.sites[siteId]!.key);
       },
       targets() {
         const s = useGame.getState();
