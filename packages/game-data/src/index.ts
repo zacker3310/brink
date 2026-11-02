@@ -526,7 +526,7 @@ export const VICTORY = {
 } as const;
 
 /** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */
-export const CAMPAIGN_TURNS: Record<CampaignLength, number> = { quick: 20, standard: 30, epic: 45 };
+export const CAMPAIGN_TURNS: Record<CampaignLength, number> = { quick: 20, standard: 30, epic: 45, total: 250 };
 
 export const SITE_SUPPLY: Record<'capital' | 'city' | 'depot' | 'objective', number> = {
   capital: 60,

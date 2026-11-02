@@ -18,8 +18,14 @@ export interface AdvanceResult {
  * none for AI-only), and what each AI remembers. The UI holds a session inside a worker and only
  * ever receives views; in multiplayer the host's worker holds it and sends each seat its own.
  */
-/** The longest campaign a session will run. */
-export const MAX_CAMPAIGN_TURNS = 60;
+/** The longest campaign a session will run: Total War. */
+export const MAX_CAMPAIGN_TURNS = 250;
+
+/**
+ * Turn reports kept per seat (in memory and in a save): a Total War runs 250 turns, and a phone's
+ * storage holds a few saves, not a few saves of every report since turn 1.
+ */
+export const HISTORY_KEPT = 60;
 
 export class GameSession {
   private constructor(
@@ -39,7 +45,7 @@ export class GameSession {
     opts: { maxTurns?: number; difficulty?: Difficulty; crisis?: string } = {},
   ): GameSession {
     const world = createScenario(scenarioId, seed);
-    // Any length from 5 turns to an epic 60; the scenario's own limit is only the default.
+    // Any length from 5 turns to a 250-turn Total War; the scenario's own limit is only the default.
     if (opts.maxTurns) world.maxTurns = Math.max(5, Math.min(MAX_CAMPAIGN_TURNS, Math.floor(opts.maxTurns)));
     const humans = playerNation === null ? [] : [playerNation, ...others.filter((n) => n !== playerNation)];
     for (const n of humans) if (!world.nations[n]) throw new Error(`no such nation: ${n}`);
@@ -50,6 +56,8 @@ export class GameSession {
       if (!crisisOf(opts.crisis)) throw new Error(`unknown crisis: ${opts.crisis}`);
       applyCrisis(world, opts.crisis as CrisisId);
     }
+    // Easy keeps its ally through any crisis that does not set the two at war.
+    if (opts.difficulty === 'easy') easyAlly(world, humans);
     const memory: Record<NationId, AiMemory> = {};
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
     return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});
@@ -158,7 +166,11 @@ export class GameSession {
       this.memory[n] = updateMemory(this.memory[n]!, result.observations[n]!, result.reports[n]!.events);
     }
     this.lastReports = result.reports;
-    for (const n of this.humans) this.histories[n]!.push(result.reports[n]!);
+    for (const n of this.humans) {
+      const h = this.histories[n]!;
+      h.push(result.reports[n]!);
+      if (h.length > HISTORY_KEPT) h.splice(0, h.length - HISTORY_KEPT);
+    }
     const reports = this.humans.length ? Object.fromEntries(this.humans.map((n) => [n, result.reports[n]!])) : result.reports;
     return { reports, events: result.events, hash: result.hash };
   }
@@ -195,9 +207,21 @@ export class GameSession {
   }
 }
 
+/** Each power's natural ally, who fights beside a human player on Easy. */
+const ALLY: Record<NationId, NationId> = { japan: 'usa', usa: 'japan', russia: 'china', china: 'russia' };
+
+/** Easy, single player: the ally the difficulty gave stays an ally unless the crisis set them at war. */
+function easyAlly(world: WorldState, humans: readonly NationId[]): void {
+  const me = humans[0];
+  const ally = me ? ALLY[me] : undefined;
+  if (humans.length !== 1 || !me || !ally || !world.nations[ally]) return;
+  if (world.relations[pairKey(me, ally)] === 'peace') world.relations[pairKey(me, ally)] = 'alliance';
+}
+
 /**
- * Set up a campaign's difficulty (see `Difficulty`). Easy, single-player: one front, at war with
- * the rival whose capital is nearest and at peace with the rest, and half again the stockpile.
+ * Set up a campaign's difficulty (see `Difficulty`). Easy, single-player: your natural ally beside
+ * you, one front (the nearest power of the other side), peace with the last, and half again the
+ * stockpile.
  */
 function applyDifficulty(world: WorldState, humans: readonly NationId[], difficulty: Difficulty): void {
   world.difficulty = difficulty;
@@ -220,8 +244,16 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
       const k = capital(n);
       return k ? keyDistance(home, k) : Infinity;
     };
-    const nearest = [...rivals].sort((a, b) => far(a) - far(b) || (a < b ? -1 : 1))[0];
-    for (const n of rivals) if (n !== nearest) world.relations[pairKey(me, n)] = 'peace';
+    // Your natural ally fights beside you (Japan and the United States, Russia and China); the
+    // enemy is the nearest power of the other side; the last stays out of it.
+    const ally = ALLY[me];
+    const enemies = rivals.filter((n) => n !== ally);
+    const nearest = [...enemies].sort((a, b) => far(a) - far(b) || (a < b ? -1 : 1))[0];
+    for (const n of rivals) if (n !== nearest && n !== ally) world.relations[pairKey(me, n)] = 'peace';
+    if (ally && world.nations[ally]) {
+      world.relations[pairKey(me, ally)] = 'alliance';
+      if (nearest) world.relations[pairKey(ally, nearest)] = 'war';
+    }
   } else {
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n) && !world.nations[n]!.minor) boost(n);
   }

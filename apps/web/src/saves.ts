@@ -62,7 +62,7 @@ export interface Prefs {
   tutorialDone?: boolean;
   muted?: boolean;
   /** Campaign length picked on the setup screen. */
-  length?: 'quick' | 'standard' | 'epic';
+  length?: 'quick' | 'standard' | 'epic' | 'total';
   difficulty?: 'easy' | 'normal' | 'hard';
   theatre?: string;
   /** Opening Crisis picked on the setup screen: a crisis id, or 'random' to deal one from the seed. */

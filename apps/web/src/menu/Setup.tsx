@@ -15,7 +15,7 @@ import { MapPreview } from './MapPreview';
 // Console scope's resets so display type survives.
 
 const DIFFICULTIES: { id: Difficulty; label: string; threat: number; text: string }[] = [
-  { id: 'easy', label: 'Easy', threat: 1, text: 'One enemy, the rest at peace. +70% income, +40% attack, cheaper units.' },
+  { id: 'easy', label: 'Easy', threat: 1, text: 'Your natural ally beside you, one enemy. +70% income, +40% attack, cheaper units.' },
   { id: 'normal', label: 'Normal', threat: 2, text: 'All three rivals at war with you. +30% income, +20% attack.' },
   { id: 'hard', label: 'Hard', threat: 3, text: 'Everyone at war, no edge, and the AI starts richer.' },
 ];
@@ -24,6 +24,7 @@ const LENGTHS: [CampaignLength, string][] = [
   ['quick', 'Quick'],
   ['standard', 'Standard'],
   ['epic', 'Epic'],
+  ['total', 'Total War'],
 ];
 
 /** The classic opening, shown as a card like a crisis: no story edits, the difficulty sets the wars. */

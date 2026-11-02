@@ -309,7 +309,7 @@ export interface VictoryState {
 }
 
 /** Campaign lengths offered at setup. */
-export type CampaignLength = 'quick' | 'standard' | 'epic';
+export type CampaignLength = 'quick' | 'standard' | 'epic' | 'total';
 
 /**
  * How hard the campaign is for its human seats. Easy: a single-player campaign opens at war with

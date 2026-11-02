@@ -177,15 +177,22 @@ The standing is public, shown in the World card. Every campaign ends at its turn
 | Quick | 20 | 20 to 40 minutes |
 | Standard | 30 | |
 | Epic | 45 | |
+| Total War | 250 | a war you come back to for weeks |
 
-Difficulty: Easy (one front; the AI never declares war on you and accepts your peace; half again your
-starting stockpile), Normal (everyone at war from turn 1), Hard (the AI starts with the bonus). The
+A save keeps the last 60 turn reports (`HISTORY_KEPT`), so a Total War still fits a phone's storage;
+the world itself stays the same size however long the war runs.
+
+Difficulty: Easy (your natural ally fights beside you, Japan with the United States and Russia with
+China, sharing sight and supply; one front, the nearest power of the other side; the AI never
+declares war on you and accepts your peace; half again your starting stockpile; an opening crisis
+keeps the ally unless it sets the two at war), Normal (everyone at war from turn 1), Hard (the AI starts with the bonus). The
 AI plays at full strength on every level; Easy and Normal give the human seats a command edge
 (`DIFFICULTY_EDGE`): Easy +70% income, +60% industry, +40% attack, +50% home defence, units 30%
 cheaper; Normal +30% income and industry, +20% attack, +25% home defence, units 15% cheaper.
 Measured on the retired Meridian theatre (ruleset 1.6.0) with the AI's own planner in the human seat
 (32 campaigns each, 30 turns): Easy wins 88% (66% playing only defensively), Normal 56% (13%), Hard
-25%. Not yet re-measured on the Pacific. In tactical battles the enemy
+25%. On the Pacific (12 campaigns each, 30 turns, Japan played by the staff, with the opening
+crisis a new campaign deals): Easy wins 11 of 12, Normal 4 of 12. In tactical battles the enemy
 also reads less well on Easy (lower skill).
 Theatre: the Pacific, the only one since ruleset 2.0.0 (the Meridian, Highland Front and Varn Delta
 were retired; their saves are refused with a message). The seed fixes the ground texture and every

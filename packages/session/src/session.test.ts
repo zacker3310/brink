@@ -4,7 +4,7 @@ import { RULESET_VERSION } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { hashState } from '@brink/simulation';
 import { parseSave, SaveError, serializeSave } from './save';
-import { GameSession } from './session';
+import { GameSession, HISTORY_KEPT } from './session';
 
 describe('GameSession', () => {
   it('plays a turn with a human and three AIs', () => {
@@ -70,9 +70,9 @@ describe('GameSession', () => {
     expect(() => parseSave(JSON.stringify(old))).toThrow(/corrupted/);
   });
 
-  it('runs any campaign length from 5 to 60 turns', () => {
+  it('runs any campaign length from 5 turns to a 250-turn Total War', () => {
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 45 }).snapshot().maxTurns).toBe(45);
-    expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 99 }).snapshot().maxTurns).toBe(60);
+    expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 999 }).snapshot().maxTurns).toBe(250);
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 2 }).snapshot().maxTurns).toBe(5);
   });
 
@@ -158,13 +158,31 @@ describe('GameSession', () => {
     expect(s.check(draft)).toEqual([]);
   });
 
+  it('keeps the last 60 turn reports, so a 250-turn Total War still saves on a phone', () => {
+    const s = GameSession.create(PACIFIC_ID, 4, 'japan', [], { maxTurns: 250 });
+    for (let i = 0; i < HISTORY_KEPT + 3; i++) s.advance();
+    expect(s.reports()).toHaveLength(HISTORY_KEPT);
+    expect(s.reports().at(-1)!.turn).toBe(HISTORY_KEPT + 3);
+  }, 120_000);
+
+  it('easy keeps its ally through a crisis that does not set them at war, never through one that does', () => {
+    const calm = GameSession.create(PACIFIC_ID, 5, 'japan', [], { difficulty: 'easy', crisis: 'cold-peace' });
+    expect(calm.view().relations.usa).toBe('alliance');
+    const pearl = GameSession.create(PACIFIC_ID, 5, 'japan', [], { difficulty: 'easy', crisis: 'pearl-harbor' });
+    expect(pearl.view().relations.usa).toBe('war');
+  });
+
   it('easy opens one front, keeps the peace it promises and survives a save', () => {
     const normal = GameSession.create(PACIFIC_ID, 5, 'usa');
     const s = GameSession.create(PACIFIC_ID, 5, 'usa', [], { difficulty: 'easy' });
     const v = s.view();
-    // One war between powers; the minor states are at war with everyone (they only defend).
+    // One war between powers, with the natural ally beside you (the United States and Japan); the
+    // minor states are at war with everyone (they only defend).
     const powers = Object.keys(v.relations).filter((n) => !v.nations[n]!.minor);
     expect(powers.filter((n) => v.relations[n] === 'war')).toHaveLength(1);
+    expect(v.relations.japan).toBe('alliance');
+    const enemy = powers.find((n) => v.relations[n] === 'war')!;
+    expect(s.snapshot().relations[[enemy, 'japan'].sort().join('|')]).toBe('war');
     expect(v.self.stockpile.credits).toBe(Math.floor((normal.view().self.stockpile.credits * 3) / 2));
     const friends = Object.keys(v.relations).filter((n) => v.relations[n] === 'peace');
     for (let i = 0; i < 20 && !s.view().victory; i++) s.advance();
