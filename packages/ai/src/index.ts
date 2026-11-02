@@ -107,7 +107,15 @@ function pathToward(view: NationView, f: Formation, goal: HexKey, plan: Plan, av
     }
   }
   if (dest === f.key) return [];
-  const res = findPath(f.key, dest, (_from, to) => (avoid.has(to) ? null : enterCost(view.tiles[to], f.unitClass)));
+  // Ships put in only at ports of their own side: someone else's port stops them dead.
+  const naval = isNaval(f.unitClass);
+  const self = view.self.id;
+  const shut = (k: HexKey) => {
+    if (!naval || view.tiles[k]?.terrain === 'water') return false;
+    const owner = view.tiles[k]?.owner;
+    return !owner || (owner !== self && view.relations[owner] !== 'alliance');
+  };
+  const res = findPath(f.key, dest, (_from, to) => (avoid.has(to) || (shut(to) && to !== dest) ? null : enterCost(view.tiles[to], f.unitClass)));
   if (!res) return [];
   const allowance = movementAllowance(f);
   const out: HexKey[] = [];
@@ -580,7 +588,11 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   // Everyone else advances on the objective; recon scouts ahead of them. Across the sea, the
   // navy carries them (planSea).
   const goal = plan.target?.key ?? null;
-  const sea = planSea(view, plan, own, orders, committed, goal, hostileHexes);
+  // A war fought on foot leaves the navy idle at home: it takes its own target across the sea, the
+  // best enemy site on another landmass, with the troops already aboard (the army stays on its march).
+  const land = landmasses(view);
+  const raid = seaTarget(view, memory, contacts, own, land, goal);
+  const sea = planSea(view, plan, own, orders, committed, raid?.key ?? goal, hostileHexes, !!raid);
   for (const f of own) {
     if (committed.has(f.id)) continue;
     if (f.aboard) {
@@ -654,6 +666,38 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   return out;
 }
 
+/**
+ * The navy's own target when the army's goal can be walked to (or there is none): the best hostile
+ * site on another landmass, weighed like the army's target but from where the ships are. Null when
+ * the goal is already across the sea (the navy carries the army there) or there are no ships.
+ */
+function seaTarget(view: NationView, memory: AiMemory, contacts: Contact[], own: Formation[], land: Map<HexKey, number>, goal: HexKey | null): SiteView | null {
+  const ships = own.filter((f) => isNaval(f.unitClass));
+  if (ships.length === 0) return null;
+  const army = own.filter((f) => UNITS[f.unitClass].ground && !f.aboard);
+  const goalLand = goal ? land.get(goal) : undefined;
+  // The goal is across the sea for the bulk of the army: the navy carries them there instead.
+  // (Island garrisons, Hawaii's or Guam's, do not count.)
+  if (goal && army.filter((f) => land.get(f.key) === goalLand).length * 2 < army.length) return null;
+  const centroid = (k: HexKey) => ships.reduce((a, f) => a + keyDistance(f.key, k), 0) / ships.length;
+  let best: SiteView | null = null;
+  let bestScore = -Infinity;
+  for (const id of sortedKeys(view.sites)) {
+    const s = view.sites[id]!;
+    if (s.owner === view.self.id || (s.owner !== null && !isHostile(view, s.owner))) continue;
+    const at = land.get(s.key);
+    if (at === undefined || at === goalLand) continue;
+    const guard = contacts.filter((c) => keyDistance(c.key, s.key) <= 1).reduce((a, c) => a + c.estimatedStrength, 0);
+    const grudge = s.owner && memory.aggressors[s.owner] !== undefined ? 3 : 0;
+    const score = (s.victoryPoints + grudge) * 10 - centroid(s.key) * 6 - guard / 100;
+    if (score > bestScore || (score === bestScore && best && s.id < best.id)) {
+      best = s;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 /** Land connectivity: which landmass each known hex belongs to (ground units walk within one). */
 function landmasses(view: NationView): Map<HexKey, number> {
   const out = new Map<HexKey, number>();
@@ -692,6 +736,7 @@ function planSea(
   committed: Set<FormationId>,
   goal: HexKey | null,
   avoid: ReadonlySet<HexKey>,
+  raid = false,
 ): { overseas: boolean } {
   const ships = own.filter((f) => isNaval(f.unitClass));
   if (!goal) {
@@ -700,8 +745,9 @@ function planSea(
   }
   const land = landmasses(view);
   const goalLand = land.get(goal);
-  const overseasArmy = own.filter((f) => UNITS[f.unitClass].ground && !f.aboard && !committed.has(f.id) && f.unitClass !== 'artillery' && land.get(f.key) !== goalLand);
-  const overseas = goalLand !== undefined && (overseasArmy.length > 0 || own.some((f) => f.aboard));
+  // On a raid the army ashore keeps its own war: only who is already aboard goes.
+  const overseasArmy = raid ? [] : own.filter((f) => UNITS[f.unitClass].ground && !f.aboard && !committed.has(f.id) && f.unitClass !== 'artillery' && land.get(f.key) !== goalLand);
+  const overseas = !raid && goalLand !== undefined && (overseasArmy.length > 0 || own.some((f) => f.aboard));
   const room = (c: Formation) => (UNITS[c.unitClass].capacity ?? 0) - own.filter((p) => p.aboard === c.id).length;
   const isWater = (k: HexKey) => view.tiles[k]?.terrain === 'water';
   const hostile = (k: HexKey) => avoid.has(k);
@@ -713,8 +759,18 @@ function planSea(
   const beach = beaches[0] ?? null;
   const offshore = beach ? (neighborKeys(beach).filter(isWater).sort()[0] ?? null) : null;
 
+  // Hexes next to an enemy ship: a ship that sails into one is stopped there (contact).
+  const screened = new Set(avoid);
+  for (const c of plan.contacts) {
+    if (!isNaval(c.unitClass) || !plan.enemies.has(c.owner)) continue;
+    for (const n of neighborKeys(c.key)) if (isWater(n)) screened.add(n);
+  }
   const sail = (s: Formation, to: HexKey) => {
-    const path = pathToward(view, s, to, plan, new Set());
+    // Around enemy ships and shores, not into them: contact stops a ship dead. Transports and
+    // carriers also keep a hex clear of enemy ships; fleets go in to fight.
+    const fighting = UNITS[s.unitClass].carries === undefined;
+    let path = pathToward(view, s, to, plan, fighting ? avoid : screened);
+    if (!fighting && path.length === 0) path = pathToward(view, s, to, plan, avoid);
     if (path.length) {
       orders[s.id] = { type: 'move', path };
       endAt(plan, s.key, path.at(-1)!, true);
@@ -729,6 +785,15 @@ function planSea(
     const shore = neighborKeys(t.key)
       .filter((k) => land.get(k) === goalLand && enterCost(view.tiles[k], 'infantry') !== null)
       .sort((a, b) => keyDistance(a, goal) - keyDistance(b, goal) || (a < b ? -1 : 1));
+    // Nowhere to land here and no assault worth making: try the open beach instead of waiting
+    // off a defended shore forever.
+    const open = shore.some((k) => !hostile(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT);
+    const storm = shore.find((k) => hostile(k));
+    const worth = storm ? (previewAssault(view, aboard.map((x) => x.id), storm)?.share[0] ?? 0) >= 450 : false;
+    if (shore.length > 0 && !open && !worth && offshore && offshore !== t.key) {
+      sail(t, offshore);
+      continue;
+    }
     if (shore.length > 0) {
       for (const p of aboard) {
         // A beach this passenger can reach in one step this turn (mountains may be too much).

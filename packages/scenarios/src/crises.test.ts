@@ -61,7 +61,7 @@ describe('Opening Crises', () => {
     applyCrisis(w, 'pearl-harbor');
     expect(w.relations[pairKey('japan', 'usa')]).toBe('war');
     expect(w.relations[pairKey('china', 'russia')]).toBe('peace');
-    expect(w.relations[pairKey('usa', 'canada')]).toBe('war');
+    expect(w.relations[pairKey('russia', 'canada')]).toBe('war');
     const red = createPacificScenario(1);
     applyCrisis(red, 'red-dawn');
     expect(Object.values(red.sites).find((s) => s.name === 'Nome')!.owner).toBe('russia');

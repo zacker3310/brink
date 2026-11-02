@@ -7,12 +7,12 @@ phase passes `pnpm check`, the soak and e2e on its own and goes to `main`.
 
 ## Map
 
-46 x 20 hexes (920), authored as a character grid in `packages/scenarios/src/pacific.ts`, so the
+42 x 20 hexes (840), authored as a character grid in `packages/scenarios/src/pacific.ts`, so the
 geography is drawn, not generated. The seed varies only ground texture (forest, hills, mountains)
 inside each country, never coastlines or borders. North is up. The map runs from Moscow and St
 Petersburg in the west to Washington and New York on the Atlantic in the east: all of Russia and all
-of the United States, with the ocean squeezed to about a quarter of the map (Tokyo to San Francisco
-is eleven hexes), so the war is fought on land as much as at sea.
+of the United States, with the ocean squeezed hard (Tokyo to San Francisco is seven hexes, Hawaii
+halfway), so a fleet crosses in a turn and the war is fought on land as much as at sea.
 
 | Region | Where | Starts with |
 |---|---|---|
@@ -24,7 +24,9 @@ is eleven hexes), so the war is fought on land as much as at sea.
 
 The Bering Strait is one sea hex between Chukotka and Alaska. The Aleutians are two islands strung
 west from Alaska toward Kamchatka. Hawaii is two hexes in mid-ocean, Guam one in the south-west.
-Kazakhstan and Mongolia sit between Russia and China: the land war's buffer.
+Kazakhstan and Mongolia sit between Russia and China: the land war's buffer. Canada and Mexico start
+at peace with the United States (their own wars with Russia and China stand): the American war is
+across the ocean, not on its doorstep.
 
 ### Sites
 
@@ -110,7 +112,14 @@ ground formations), **Carrier Group** (carries two air wings, which strike from 
   on deck. It builds ships in ports, more lift when its war is overseas. Balance of power: from turn 8
   a power six points of standing ahead of every other becomes everyone's target.
 
-Measured (12 AI-only matches, 30 turns): every power boards and lands; Japan lands up to nine times a
+Second pass (42 x 20 map, 12 AI-only matches): with nothing to take next door the US navy sails at
+once (the AI gives an idle navy its own target across the sea, the best enemy site on another
+landmass, with the troops already aboard), keeps a hex clear of enemy ships, never routes through
+someone else's port, and tries another beach rather than wait off a defended shore. Winners: United
+States 7, Russia 3, China 2, Japan 0. The US wins on standing (its economy) more than on ground; Japan
+takes South Korea every match but has not yet won one.
+
+First pass (30 x 18 map, 12 AI-only matches, 30 turns): every power boards and lands; Japan lands up to nine times a
 match and takes Busan, Seoul, Wuhan. Winners: United States 9, Russia 3. China and Japan do not yet
 win AI-only matches: the next balance pass.
 

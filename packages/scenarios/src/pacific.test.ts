@@ -10,10 +10,10 @@ describe('The Pacific', () => {
   const w = createPacificScenario(1);
   const sitesOf = (n: string) => Object.values(w.sites).filter((s) => s.owner === n);
 
-  it('is the four powers and the seven minor states, on a 46 x 20 map with sea and every land terrain', () => {
+  it('is the four powers and the seven minor states, on a 42 x 20 map with sea and every land terrain', () => {
     expect(sortedKeys(w.nations)).toEqual(['canada', 'china', 'japan', 'kazakhstan', 'mexico', 'mongolia', 'nkorea', 'russia', 'skorea', 'taiwan', 'usa']);
     expect(NATIONS.map((n) => n.id)).toEqual(['usa', 'russia', 'china', 'japan']);
-    expect(Object.keys(w.tiles)).toHaveLength(920);
+    expect(Object.keys(w.tiles)).toHaveLength(840);
     const terrains = new Set(Object.values(w.tiles).map((t) => t.terrain));
     for (const t of ['plains', 'forest', 'hills', 'mountains', 'urban', 'water'] as const) expect(terrains.has(t), t).toBe(true);
     expect(createScenario(PACIFIC_ID, 1)).toEqual(w);
@@ -32,7 +32,7 @@ describe('The Pacific', () => {
     }
   });
 
-  it('makes the minor states minor: a capital, militia only, at war with every power and at peace with each other', () => {
+  it('makes the minor states minor: a capital, militia only, at war with the powers (Canada and Mexico at peace with the US) and at peace with each other', () => {
     for (const m of MINORS) {
       expect(w.nations[m.id]!.minor).toBe(true);
       expect(sitesOf(m.id).filter((x) => x.kind === 'capital')).toHaveLength(1);
@@ -40,7 +40,11 @@ describe('The Pacific', () => {
       // Militia: infantry, a recon screen, and in the big countries mechanized; never armour, air or ships.
       for (const c of classes) expect(['infantry', 'mechanized', 'recon'], `${m.id} ${c}`).toContain(c);
     }
-    for (const n of NATIONS) for (const m of MINORS) expect(w.relations[[n.id, m.id].sort().join('|')]).toBe('war');
+    const home = (n: string, m: string) => n === 'usa' && (m === 'canada' || m === 'mexico');
+    for (const n of NATIONS) for (const m of MINORS) expect(w.relations[[n.id, m.id].sort().join('|')], `${n.id} ${m.id}`).toBe(home(n.id, m.id) ? 'peace' : 'war');
+    // The United States' war is across the ocean: its neighbours are not its prizes.
+    expect(w.nations.usa!.objectives).not.toContain('canada-capital');
+    expect(w.nations.russia!.objectives).toContain('canada-capital');
     expect(w.relations[['canada', 'mexico'].sort().join('|')]).toBe('peace');
   });
 
