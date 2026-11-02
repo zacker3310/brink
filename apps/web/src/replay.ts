@@ -463,12 +463,25 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     }
   };
 
-  app.ticker.add(frame);
+  // A replay is a film: it decides nothing. If drawing a frame ever fails, the film ends there and
+  // the turn goes on, instead of an error every frame freezing the screen mid-replay.
+  const safeFrame = () => {
+    try {
+      frame();
+    } catch (err) {
+      if (done) return;
+      done = true;
+      console.error('replay frame failed; ending the replay', err);
+      useReplay.setState({ paused: false });
+      opts.onDone();
+    }
+  };
+  app.ticker.add(safeFrame);
   // Torn down (the map restarts a replay when its art arrives): the pause stands. It is cleared
   // when the replay ends, above, or is closed (the replay bars clear it as they go).
   return () => {
     done = true;
-    app.ticker.remove(frame);
+    app.ticker.remove(safeFrame);
     layer.removeChildren().forEach((c) => c.destroy());
   };
 }
