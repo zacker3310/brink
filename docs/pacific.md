@@ -22,7 +22,7 @@ halfway), so a fleet crosses in a turn and the war is fought on land as much as 
 | United States | coast to coast, Alaska, the Aleutians, Hawaii and Guam | United States |
 | Canada, Mexico, North Korea, South Korea, Taiwan, Kazakhstan, Mongolia | their real places | themselves (minor states) |
 
-The Bering Strait is one sea hex between Chukotka and Alaska. The Aleutians are two islands strung
+The Bering crossing is land: an army walks from Chukotka into Alaska (and the other way). The Aleutians are two islands strung
 west from Alaska toward Kamchatka. Hawaii is two hexes in mid-ocean, Guam one in the south-west.
 Kazakhstan and Mongolia sit between Russia and China: the land war's buffer. Korea's long border is
 with China (Manchuria); Russia touches it only at Vladivostok's corner. Every power has prizes next
@@ -122,6 +122,9 @@ ground formations), **Carrier Group** (carries two air wings, which strike from 
   are good; empty ones go back for more; fleets escort toward the goal's coast; carriers take aircraft
   on deck. It builds ships in ports, more lift when its war is overseas. Balance of power: from turn 8
   a power six points of standing ahead of every other becomes everyone's target.
+
+Fourth pass (the Bering crossing, conquest of whole countries, 24 AI-only matches): United States 8,
+Russia 7, Japan 6, China 3.
 
 Third pass (42 x 20 map, parity, 24 AI-only matches): Japan 10, Russia 7, China 4, United States 3.
 Every power wins. The AI: a navy whose army marches on foot takes its own target across the sea with

@@ -182,6 +182,10 @@ The standing is public, shown in the World card. Every campaign ends at its turn
 A save keeps the last 60 turn reports (`HISTORY_KEPT`), so a Total War still fits a phone's storage;
 the world itself stays the same size however long the war runs.
 
+Conquest: a nation holding no capital or city is out, and what is left of the country (its ground
+and its bases) falls to the power holding most of its cities, its old capital breaking a tie. Take
+every city and the whole country is yours.
+
 Difficulty: Easy (your natural ally fights beside you, Japan with the United States and Russia with
 China, sharing sight and supply; one front, the nearest power of the other side; the AI never
 declares war on you and accepts your peace; half again your starting stockpile; an opening crisis

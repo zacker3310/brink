@@ -432,7 +432,7 @@ export type GameEvent =
   | { kind: 'construction_cancelled'; nation: NationId; item: string; site: SiteId; facility: FacilityId; reason: string }
   | { kind: 'facility_built'; nation: NationId; site: SiteId; facility: FacilityId }
   | { kind: 'world_event'; nation: NationId; event: WorldEventId; choice: 0 | 1 | null }
-  | { kind: 'elimination'; nation: NationId }
+  | { kind: 'elimination'; nation: NationId; /** Who took the whole country: the holder of most of its cities. */ annexedBy?: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
   | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string };
 

@@ -57,7 +57,9 @@ describe('The Pacific', () => {
     // Korea joins China by land; Alaska joins Canada.
     expect(findPath(key('Seoul'), key('Beijing'), cost)).not.toBeNull();
     expect(findPath(key('Anchorage'), key('Vancouver'), cost)).not.toBeNull();
-    expect(w.tiles[keyOf(offsetToAxial(25, 0))]!.terrain).toBe('water'); // the Bering Strait
+    // The Bering crossing: an army can walk from Siberia into Alaska, and on to Moscow.
+    expect(w.tiles[keyOf(offsetToAxial(25, 0))]!.terrain).not.toBe('water');
+    expect(findPath(key('Anchorage'), key('Petropavlovsk'), cost)).not.toBeNull();
     // Moscow and St Petersburg to the west; Washington and New York on the Atlantic coast.
     expect([owner('Moscow'), owner('St Petersburg'), owner('Washington'), owner('New York')]).toEqual(['russia', 'russia', 'usa', 'usa']);
     expect(findPath(key('Moscow'), key('Vladivostok'), cost)).not.toBeNull();

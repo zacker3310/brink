@@ -70,7 +70,11 @@ function separateNewEnemies(world: WorldState, events: GameEvent[]): void {
   if (mustRetreat.size > 0) resolveRetreats(world, { mustRetreat, advances: new Map() }, events);
 }
 
-/** Phase 11a. A nation holding no capital or city is out; its formations surrender. */
+/**
+ * Phase 11a. A nation holding no capital or city is out; its formations surrender, and what is left
+ * of the country (its ground and its bases) falls to the power holding most of its cities, its old
+ * capital breaking a tie: take every city and the whole country is yours.
+ */
 function resolveEliminations(world: WorldState, events: GameEvent[]): void {
   for (const nation of living(world)) {
     const holds = Object.values(world.sites).some((s) => s.owner === nation && (s.kind === 'capital' || s.kind === 'city'));
@@ -85,8 +89,32 @@ function resolveEliminations(world: WorldState, events: GameEvent[]): void {
       delete world.formations[id];
     }
     world.proposals = world.proposals.filter((p) => p.from !== nation && p.to !== nation);
-    events.push({ kind: 'elimination', nation });
+    const annexedBy = conqueror(world, nation);
+    if (annexedBy) {
+      for (const key of sortedKeys(world.tiles)) {
+        const t = world.tiles[key]!;
+        if (t.owner !== nation) continue;
+        t.owner = annexedBy;
+        if (t.siteId) world.sites[t.siteId]!.owner = annexedBy;
+      }
+    }
+    events.push({ kind: 'elimination', nation, ...(annexedBy ? { annexedBy } : {}) });
   }
+}
+
+/** Who takes a fallen nation: the living power holding most of its own capital and cities. */
+function conqueror(world: WorldState, fallen: NationId): NationId | null {
+  const held = new Map<NationId, number>();
+  let capitalHolder: NationId | null = null;
+  for (const id of sortedKeys(world.sites)) {
+    const s = world.sites[id]!;
+    if (s.originalOwner !== fallen || (s.kind !== 'capital' && s.kind !== 'city') || !s.owner || s.owner === fallen) continue;
+    if (world.nations[s.owner]?.eliminated) continue;
+    held.set(s.owner, (held.get(s.owner) ?? 0) + 1);
+    if (s.kind === 'capital') capitalHolder = s.owner;
+  }
+  const ranked = [...held.entries()].sort((a, b) => b[1] - a[1] || (a[0] === capitalHolder ? -1 : b[0] === capitalHolder ? 1 : a[0] < b[0] ? -1 : 1));
+  return ranked[0]?.[0] ?? null;
 }
 
 /** Events a nation is entitled to see, redacted where they would reveal what it cannot. */

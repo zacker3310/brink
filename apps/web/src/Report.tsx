@@ -178,7 +178,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
         out.Production!.push({ tone: 'bad', text: `${FACILITIES[e.facility].name} at ${view.sites[e.site]?.name ?? e.site} lost: ${e.reason}.` });
         break;
       case 'elimination':
-        out.Diplomacy!.push({ tone: e.nation === me ? 'bad' : undefined, text: `${nation(view, e.nation)} has been eliminated.` });
+        out.Diplomacy!.push({ tone: e.nation === me ? 'bad' : undefined, text: e.annexedBy ? `${nation(view, e.nation)} has fallen: the whole country is ${e.annexedBy === me ? 'yours' : nation(view, e.annexedBy) + "'s"}.` : `${nation(view, e.nation)} has been eliminated.` });
         break;
       case 'victory':
         out.Diplomacy!.push({ tone: e.winner === me || e.coalition?.includes(me) ? 'good' : 'bad', text: `${nation(view, e.winner)} wins ${VICTORY_HOW[e.reason]}.` });

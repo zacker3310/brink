@@ -148,7 +148,7 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
         if (e.nation === me) out.push({ id, icon: 'gear', tone: 'bad', title: 'Construction lost', text: `${FACILITIES[e.facility].name} at ${view.sites[e.site]?.name}: ${e.reason}.` });
         break;
       case 'elimination':
-        out.push({ id, icon: 'skull', tone: e.nation === me ? 'bad' : 'info', title: `${nation(e.nation)} eliminated`, text: 'A power has fallen.' });
+        out.push({ id, icon: 'skull', tone: e.nation === me ? 'bad' : 'info', title: `${nation(e.nation)} has fallen`, text: e.annexedBy ? (e.annexedBy === me ? 'Every city taken: the whole country is yours.' : `The whole country goes to ${nation(e.annexedBy)}.`) : 'A power has fallen.' });
         break;
       case 'economy':
         if (e.nation === me && e.ledger.shortages.length) out.push({ id, icon: 'warn', tone: 'bad', title: 'Shortages', text: `Out of ${e.ledger.shortages.join(', ')}: upkeep went unpaid.` });

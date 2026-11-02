@@ -22,8 +22,8 @@ export const MAX_TURNS = 30;
  * Z Kazakhstan, G Mongolia.
  */
 const GRID: readonly string[] = [
-  'RRRRRRRRRRRRRRRRRRRRRRRRR.UUUUUKKKKKKKKKK.', // 0  Siberia, the Bering Strait, Alaska, the Yukon
-  'RRRRRRRRRRRRRRRRRRRRRRRRR.UUUUUUKKKKKKKKK.', // 1  St Petersburg, Yakutsk
+  'RRRRRRRRRRRRRRRRRRRRRRRRRRUUUUUKKKKKKKKKK.', // 0  Siberia, the Bering land crossing, Alaska, the Yukon
+  'RRRRRRRRRRRRRRRRRRRRRRRRRUUUUUUUKKKKKKKKK.', // 1  St Petersburg, Yakutsk
   'RRRRRRRRRRRRRRRRRRR..RRR..UUUUUUKKKKKKKKK.', // 2  the Sea of Okhotsk, Kamchatka
   'RRRRRRRRRRRRRRRRRR...RR....UUUUUKKKKKKKKK.', // 3  Moscow, Anchorage
   'RRRRRRRRRRRRRRRRRR.R.R.....U....KKKKKKKKK.', // 4  Sakhalin, the Alaska Peninsula
