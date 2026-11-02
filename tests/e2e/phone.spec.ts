@@ -32,6 +32,11 @@ test('a campaign plays on a phone by touch alone: move a stack, attack, end turn
     if (m.type() === 'error') errors.push(m.text());
   });
 
+  // These walk-throughs give every order by hand: the staff plan (the default) is switched off.
+  await page.addInitScript(() => {
+    const prefs = JSON.parse(localStorage.getItem('brink.prefs.v1') ?? '{}');
+    if (prefs.staffPlan === undefined) localStorage.setItem('brink.prefs.v1', JSON.stringify({ ...prefs, staffPlan: false }));
+  });
   await page.goto('./');
   await page.getByTestId('menu-new').tap();
   await expect(page.getByTestId('length-quick')).toHaveAttribute('aria-checked', 'true');

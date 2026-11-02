@@ -415,9 +415,11 @@ export const useGame = create<State>((set, get) => {
         n += 1;
       }
       if (next.research === undefined && !view.self.research.current && r.orders.research) next.research = r.orders.research;
-      // A turn that moved on while the staff was thinking keeps the new turn's draft.
-      if (get().view !== view) return;
-      set({ draft: next, planned, armed: null, ...(auto ? {} : { selectedFormation: null }) });
+      // A turn that moved on while the staff was thinking keeps the new turn's draft. The guided
+      // first match teaches giving orders by hand: no plan while the coach is on.
+      if (get().view !== view || (auto && useCoach.getState().active)) return;
+      // The plan is the picture: nothing selected, so every arrow on the map is the staff's.
+      set({ draft: next, planned, armed: null, selectedFormation: null, ...(auto ? { group: [], selectedHex: null } : {}) });
       void recheck();
       if (!auto) get().notify(n ? `Staff drafted ${n} order${n === 1 ? '' : 's'}. Change any, then execute.` : 'Every unit already has orders.');
     },

@@ -29,7 +29,11 @@ export function Menu() {
         <Title
           slots={slots}
           go={setScreen}
-          onTutorial={() => void newGame(TUTORIAL_NATION, TUTORIAL_SEED, 20, 'easy').then(() => useCoach.getState().begin(1))}
+          onTutorial={() => {
+            // The coach is on before the first turn opens, so the staff leaves the orders to the player.
+            useCoach.getState().begin(1);
+            void newGame(TUTORIAL_NATION, TUTORIAL_SEED, 20, 'easy');
+          }}
           onContinue={(s) => {
             const text = readSlot(s.slot);
             if (text) load(text);

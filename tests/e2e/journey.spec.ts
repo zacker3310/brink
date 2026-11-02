@@ -12,6 +12,11 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
     if (m.type() === 'error') errors.push(m.text());
   });
 
+  // These walk-throughs give every order by hand: the staff plan (the default) is switched off.
+  await page.addInitScript(() => {
+    const prefs = JSON.parse(localStorage.getItem('brink.prefs.v1') ?? '{}');
+    if (prefs.staffPlan === undefined) localStorage.setItem('brink.prefs.v1', JSON.stringify({ ...prefs, staffPlan: false }));
+  });
   await page.goto('./');
   await expect(page).toHaveTitle('Brink');
   await expect(page.getByTestId('wordmark')).toHaveText('Brink');
@@ -94,7 +99,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(page.getByTestId('order-review')).toBeVisible();
   await expect(page.getByTestId('review-orders')).toBeVisible();
   // The infantry chosen in the capital is listed with its cost, and the treasury shows what is left.
-  await expect(page.getByTestId('order-review')).toContainText('Infantry at Vladivostok');
+  await expect(page.getByTestId('order-review')).toContainText('Infantry at Moscow');
   await expect(page.getByTestId('review-treasury')).toBeVisible();
   // Back keeps the orders; End Turn again and Commit sends them.
   await page.getByTestId('review-back').click();
