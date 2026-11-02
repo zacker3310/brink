@@ -100,7 +100,7 @@ export const NATIONS: readonly NationSpec[] = [
     ],
     depots: [[9, 4, 'Sakhalin']],
     rough: 30,
-    navy: { port: 'Vladivostok', ships: ['fleet', 'transport'] },
+    navy: { port: 'Vladivostok', ships: ['fleet', 'transport', 'carrier'] },
   },
   {
     id: 'china',
@@ -132,7 +132,7 @@ export const NATIONS: readonly NationSpec[] = [
     ],
     depots: [[9, 7, 'Sendai']],
     rough: 35,
-    navy: { port: 'Tokyo', ships: ['fleet', 'transport', 'transport'] },
+    navy: { port: 'Tokyo', ships: ['fleet', 'transport', 'transport', 'carrier'] },
   },
 ];
 

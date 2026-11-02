@@ -64,8 +64,8 @@ describe('The Pacific', () => {
     const navy = (n: string) => Object.values(w.formations).filter((f) => f.owner === n && UNITS[f.unitClass].naval).map((f) => f.unitClass).sort();
     expect(navy('usa')).toEqual(['carrier', 'fleet', 'transport']);
     expect(navy('china')).toEqual(['carrier', 'fleet', 'transport']);
-    expect(navy('japan')).toEqual(['fleet', 'transport', 'transport']);
-    expect(navy('russia')).toEqual(['fleet', 'transport']);
+    expect(navy('japan')).toEqual(['carrier', 'fleet', 'transport', 'transport']);
+    expect(navy('russia')).toEqual(['carrier', 'fleet', 'transport']);
     for (const f of Object.values(w.formations)) if (UNITS[f.unitClass].naval) expect(w.tiles[f.key]!.terrain).toBe('water');
     const port = (name: string) => w.tiles[Object.values(w.sites).find((s) => s.name === name)!.key]!.port;
     expect([port('San Francisco'), port('Tokyo'), port('Vladivostok'), port('Shanghai'), port('Honolulu')]).toEqual([true, true, true, true, true]);

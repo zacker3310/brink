@@ -7,7 +7,7 @@
 
 import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
 
-export const RULESET_VERSION = '2.1.0';
+export const RULESET_VERSION = '2.2.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -40,7 +40,7 @@ export const RIVER_MOVE_COST = 2;
 export const NAVAL_MOVE_COST = 2;
 /** Supply route cost per sea hex (a sea lane), and the attack lost storming a beach from a ship. */
 export const SEA_SUPPLY_COST = 1;
-export const AMPHIBIOUS_ASSAULT_PENALTY = 30;
+export const AMPHIBIOUS_ASSAULT_PENALTY = 20;
 /** Percent removed from ground assaults into a river hex. */
 export const RIVER_ASSAULT_PENALTY = 20;
 
@@ -222,7 +222,7 @@ export const UNITS: Record<UnitClass, UnitDef> = {
   fleet: {
     name: 'Surface Fleet',
     short: 'FLT',
-    movement: 12,
+    movement: 14,
     softAttack: 40,
     hardAttack: 55,
     defense: 45,
@@ -243,7 +243,7 @@ export const UNITS: Record<UnitClass, UnitDef> = {
   transport: {
     name: 'Amphibious Group',
     short: 'AMP',
-    movement: 10,
+    movement: 14,
     softAttack: 0,
     hardAttack: 0,
     defense: 15,
@@ -266,7 +266,7 @@ export const UNITS: Record<UnitClass, UnitDef> = {
   carrier: {
     name: 'Carrier Group',
     short: 'CVN',
-    movement: 10,
+    movement: 12,
     softAttack: 10,
     hardAttack: 10,
     defense: 35,

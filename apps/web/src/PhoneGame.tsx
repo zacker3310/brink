@@ -413,7 +413,9 @@ function UnitCard() {
               ? 'Tap the shore to land, or an enemy on the beach to storm it.'
               : members.every((m) => UNITS[m.unitClass].naval)
                 ? 'Tap a blue sea hex to sail. Fleets strike enemies in range.'
-                : canBoard
+                : members.some((m) => UNITS[m.unitClass].carries && Object.values(draft.formations).some((o) => o.type === 'embark' && o.carrier === m.id))
+                  ? 'Troops are boarding. Tap where to sail: they land next turn.'
+                  : canBoard
                   ? 'Board the ship alongside, or tap a blue hex to move.'
                   : anyGround
                     ? 'Tap a blue hex to move, or an enemy marked WIN to attack.'
@@ -440,7 +442,18 @@ function UnitCard() {
       ) : (
         <div className="flex gap-2 px-4 pt-2.5 pb-1">
           {canBoard ? (
-            <button type="button" className={btn} disabled={resolving} onClick={() => issueGroup(boarding)} data-testid="order-board">
+            <button
+              type="button"
+              className={btn}
+              disabled={resolving}
+              onClick={() => {
+                issueGroup(boarding);
+                // Straight to the ship: the next thing to do is say where it sails.
+                const ship = Object.values(boarding)[0];
+                if (ship?.type === 'embark') selectFormation(ship.carrier);
+              }}
+              data-testid="order-board"
+            >
               <Icon name="next" className="h-4 w-4" />
               Board
             </button>

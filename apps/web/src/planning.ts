@@ -1,6 +1,6 @@
 import type { Contact, Formation, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { AIR_REBASE_RANGE, UNITS } from '@brink/game-data';
-import { areAdjacent, keyDistance, neighborKeys, pathFromReach, reachable, type Reach } from '@brink/map';
+import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable, type Reach } from '@brink/map';
 import { alongside, enterCost, isAir, isNaval, movementAllowance } from '@brink/simulation';
 import { hexLabel } from './insight';
 
@@ -61,7 +61,14 @@ export function orderForClick(view: NationView, f: Formation, key: HexKey, mode:
   }
 
   if (key === f.key) return { error: 'Already here' };
-  if (!reach[key]) return { error: view.tiles[key]?.terrain == null ? 'Unknown terrain: scout it first' : 'Out of movement range this turn' };
+  if (!reach[key]) {
+    if (view.tiles[key]?.terrain == null) return { error: 'Unknown terrain: scout it first' };
+    // Land troops tapping a shore they cannot walk to: the sea is in the way.
+    if (UNITS[f.unitClass].ground && !f.aboard && enterCost(view.tiles[key], f.unitClass) !== null && !findPath(f.key, key, (_a, b) => enterCost(view.tiles[b], f.unitClass))) {
+      return { error: 'Across the sea: board a transport in a port, then sail it there' };
+    }
+    return { error: 'Out of movement range this turn' };
+  }
   const path = pathFromReach(reach, key) ?? [];
   const label = mode === 'recon' ? `Recon to ${key}` : mode === 'withdraw' ? `Withdraw to ${key}` : `Move to ${key}`;
   return { order: { type: mode, path }, label };
