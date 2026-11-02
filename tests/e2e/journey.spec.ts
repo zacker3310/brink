@@ -34,16 +34,34 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
 
   // Select a formation from the Military panel.
   await page.getByTestId('tab-military').click();
-  const first = page.locator('[data-testid^="formation-f"]').filter({ hasText: 'Infantry' }).first();
+  // The first infantry that can move this turn: one can be boxed in by mountains and a hostile border.
+  const infantry = page.locator('[data-testid^="formation-f"]').filter({ hasText: 'Infantry' });
+  let first = infantry.first();
+  let target: string | undefined;
+  for (let i = 0; i < (await infantry.count()) && !target; i++) {
+    first = infantry.nth(i);
+    await first.click();
+    // A free hex it can reach that is on the map, not under the side panel.
+    target = await page.evaluate(() => {
+      const b = window.__brink!;
+      const canvas = document.querySelector('[data-testid="map-canvas"] canvas') ?? document.querySelector('[data-testid="map-canvas"]');
+      return b
+        .reachable()
+        .filter((k) => !b.formations().some((f) => f.key === k))
+        .find((k) => {
+          const p = b.hexToClient(k);
+          const el = document.elementFromPoint(p.x, p.y);
+          return !!el && !!canvas && (el === canvas || canvas.contains(el));
+        });
+    });
+  }
   const name = (await first.locator('span').first().textContent())!;
-  await first.click();
   await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
 
   // Hovering a reachable hex previews the move; clicking it orders it. The next unit that needs
   // orders then comes up on its own, so check the order on the formation list.
-  const target = await page.evaluate(() => window.__brink!.reachable().at(-1)!);
   expect(target).toBeTruthy();
-  const at = await page.evaluate((k) => window.__brink!.hexToClient(k), target);
+  const at = await page.evaluate((k) => window.__brink!.hexToClient(k), target!);
   await page.mouse.move(at.x, at.y);
   await expect(page.getByTestId('hover-card')).toContainText('Move');
   await page.mouse.click(at.x, at.y);
@@ -57,8 +75,9 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(armored).toContainText('Defend');
 
   // Jump to the next formation without orders.
-  // Russia opens with eleven: the ten every power gets, and a garrison for its third city.
-  await expect(page.getByTestId('next-idle')).toContainText('9 of 11 units need orders');
+  // Russia opens with fourteen: the ten every power gets, a garrison for its third city, and its
+  // navy (a fleet, an amphibious group and a carrier).
+  await expect(page.getByTestId('next-idle')).toContainText('12 of 14 units need orders');
   await page.getByTestId('next-idle').click();
   await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
 

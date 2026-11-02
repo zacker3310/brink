@@ -157,4 +157,24 @@ describe('the navy', () => {
       if (r.world.formations.p) expect(r.world.formations.p.key).toBe(t.key);
     } else expect(r.world.formations.p).toBeUndefined();
   });
+
+  it('keeps a passenger aboard when its landing is blocked, and holds the ship while troops go ashore', () => {
+    const w = strait();
+    unit(w, 't', 'a', 'transport', k(6, 2));
+    unit(w, 'i', 'a', 'infantry', k(6, 2), { aboard: 't' });
+    // The beach is taken by b at the same instant: the landing is blocked, and the ship tries to sail.
+    unit(w, 'e', 'b', 'infantry', k(8, 2));
+    setRelation(w, 'a', 'b', 'war');
+    const r = resolveTurn(w, [
+      orders(w, 'a', { i: { type: 'move', path: [k(7, 2)] }, t: { type: 'move', path: [k(5, 2), k(4, 2)] } }),
+      orders(w, 'b', { e: { type: 'move', path: [k(7, 2)] } }),
+    ]);
+    const i = r.world.formations.i!;
+    const t = r.world.formations.t!;
+    // Either it got ashore, or it is still aboard; never left in the water on its own.
+    if (r.world.tiles[i.key]!.terrain === 'water') expect(i.aboard).toBe('t');
+    // The ship waited for its troops instead of sailing off.
+    expect(t.key).toBe(k(6, 2));
+    if (i.aboard) expect(i.key).toBe(t.key);
+  });
 });

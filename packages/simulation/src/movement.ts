@@ -68,12 +68,14 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
       events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [], halted: null });
     }
   }
-  // Going ashore: a passenger ordered onto land leaves its ship from where the ship lay.
+  // Going ashore: a passenger ordered onto land stays aboard until its first step lands, so a
+  // blocked landing leaves it safe in its ship. A ship putting troops ashore waits for them.
+  const landing = new Set<FormationId>();
   for (const nation of sortedKeys(orders)) {
     for (const id of sortedKeys(orders[nation]!.formations)) {
       const order = orders[nation]!.formations[id]!;
       const f = world.formations[id];
-      if (f?.aboard && UNITS[f.unitClass].ground && (order.type === 'move' || order.type === 'recon' || order.type === 'withdraw')) delete f.aboard;
+      if (f?.aboard && UNITS[f.unitClass].ground && (order.type === 'move' || order.type === 'recon' || order.type === 'withdraw')) landing.add(f.aboard);
     }
   }
 
@@ -88,7 +90,8 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
         // Air rebases at the end of the phase; it does not contest ground.
         continue;
       }
-      if (f.aboard) continue;
+      if (f.aboard && !UNITS[f.unitClass].ground) continue;
+      if (landing.has(f.id)) continue;
       if (order.type === 'attack' && UNITS[f.unitClass].range > 0) continue;
       const allowance = movementAllowance(f);
       const steps: HexKey[] = [];
@@ -186,6 +189,8 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
       }
       const k = target(m);
       m.f.key = k;
+      // A passenger's first step ashore takes it out of its ship.
+      if (m.f.aboard) delete m.f.aboard;
       for (const p of passengersOf(world, m.f.id)) p.key = k;
       m.f.fuel = Math.max(0, m.f.fuel - UNITS[m.f.unitClass].fuelPerMove);
       m.f.entrenchment = 0;
