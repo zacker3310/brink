@@ -731,7 +731,8 @@ function planSea(
       .sort((a, b) => keyDistance(a, goal) - keyDistance(b, goal) || (a < b ? -1 : 1));
     if (shore.length > 0) {
       for (const p of aboard) {
-        const free = shore.find((k) => !hostile(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT);
+        // A beach this passenger can reach in one step this turn (mountains may be too much).
+        const free = shore.find((k) => !hostile(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT && (enterCost(view.tiles[k], p.unitClass) ?? Infinity) <= movementAllowance(p));
         const enemy = shore.find((k) => hostile(k));
         if (free) {
           orders[p.id] = { type: 'move', path: [free] };

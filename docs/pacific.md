@@ -105,6 +105,18 @@ Measured (12 AI-only matches, 30 turns): every power boards and lands; Japan lan
 match and takes Busan, Seoul, Wuhan. Winners: United States 9, Russia 3. China and Japan do not yet
 win AI-only matches: the next balance pass.
 
+## Playing it on a phone
+
+- **Ready from turn 1.** Every transport sails with two marine regiments aboard; every carrier with its
+  own helicopter wing and drone company on deck.
+- **Two layers to a hex.** A tap takes the land units if there are any, else the ships; passengers are
+  cargo, listed on their ship's card (tap one to land it alone). A carrier is selected with its air wing,
+  which strikes from the deck.
+- **The ship card does the work.** Load fills it from the port it lies in or off; Land troops puts
+  everyone ashore on the open beach nearest the goal, offered only where the shore leads to it.
+- **The advisor** (`apps/web/src/advisor.ts`) says what to do next in a sentence above the dock, with
+  Show me: troops at sea first, then ships to load, then units waiting.
+
 ## Phases
 
 | # | Ships | Notes |

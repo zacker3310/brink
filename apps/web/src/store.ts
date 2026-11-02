@@ -314,14 +314,20 @@ export const useGame = create<State>((set, get) => {
     selectStack(key, idleOnly = false) {
       const { view, draft } = get();
       if (!view) return;
-      const here = Object.values(view.formations)
-        .filter((f) => f.key === key && (!idleOnly || !draft?.formations[f.id]))
+      // Passengers are cargo, not a stack: a ship's card lists them. A hex has two layers, ships and
+      // everything else; a tap takes the land layer if there is one, else the ships.
+      const standing = Object.values(view.formations).filter((f) => f.key === key && !f.aboard && (!idleOnly || !draft?.formations[f.id]));
+      const landLayer = standing.filter((f) => !UNITS[f.unitClass].naval);
+      const here = (landLayer.length > 0 ? landLayer : standing)
         // Led by the slowest ground unit: its range is where the whole stack can go. Aircraft lead only themselves.
         .sort((a, b) => Number(!UNITS[a.unitClass].ground) - Number(!UNITS[b.unitClass].ground) || movementAllowance(a) - movementAllowance(b) || (a.id < b.id ? -1 : 1));
       const lead = here[0];
       if (!lead) return;
+      // A carrier's air wing is its weapon: selected with it, it strikes from the deck and rides
+      // along when the carrier sails.
+      const wings = Object.values(view.formations).filter((p) => p.aboard && here.some((c) => c.id === p.aboard && UNITS[c.unitClass].carries === 'air') && (!idleOnly || !draft?.formations[p.id]));
       if (lead.id !== get().selectedFormation) sfx.select();
-      set({ selectedFormation: lead.id, group: here.map((f) => f.id), selectedHex: key, mode: 'move', armed: null, selectedCity: null });
+      set({ selectedFormation: lead.id, group: [...here, ...wings].map((f) => f.id), selectedHex: key, mode: 'move', armed: null, selectedCity: null });
     },
     toggleGroup(id) {
       const { group, selectedFormation } = get();

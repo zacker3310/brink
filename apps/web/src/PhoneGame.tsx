@@ -12,7 +12,8 @@ import { Icon } from './icons';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
-import { boardOrders, describeOrder, hostilesAt } from './planning';
+import { advise } from './advisor';
+import { boardOrders, describeOrder, hostilesAt, landOrders, loadOrders } from './planning';
 import { useReplay } from './replay';
 import { ICON, notesFor, TONE } from './Notifications';
 import { nextObjective } from './objective';
@@ -364,10 +365,17 @@ function UnitCard() {
   const f = view.formations[fid];
   if (!f) return null;
   const color = view.self.color;
-  const stack = Object.values(view.formations)
-    .filter((x) => x.key === f.key)
-    .sort((a, b) => (a.id < b.id ? -1 : 1));
   const members = (group.length ? group : [fid]).map((id) => view.formations[id]).filter((x): x is Formation => !!x);
+  // What stands in the hex (passengers are cargo, listed on their ship), and the ship's cargo.
+  const stack = Object.values(view.formations)
+    .filter((x) => x.key === f.key && !x.aboard)
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  const naval = (x: Formation) => !!UNITS[x.unitClass].naval;
+  const ship = members.length === 1 && UNITS[f.unitClass].carries ? f : null;
+  const cargo = ship ? Object.values(view.formations).filter((p) => p.aboard === ship.id) : [];
+  const goal = nextObjective(view);
+  const loading = ship ? loadOrders(view, ship, draft.formations) : {};
+  const landing = ship ? landOrders(view, ship, goal?.site.key ?? null) : {};
   const order = draft.formations[fid];
   const def = UNITS[f.unitClass];
   const anyGround = members.some((m) => UNITS[m.unitClass].ground);
@@ -385,10 +393,10 @@ function UnitCard() {
       {stack.length > 1 && (
         <div className="flex items-center gap-2 overflow-x-auto px-4 pt-2.5" data-testid="stack">
           <span className="font-display shrink-0 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">
-            {members.length} of {stack.length} moving
+            {members.filter((m) => !m.aboard).length} of {stack.length} moving
           </span>
           {stack.map((m) => (
-            <button key={m.id} type="button" onClick={() => toggleGroup(m.id)} aria-pressed={group.includes(m.id)} aria-label={`${m.name}: ${group.includes(m.id) ? 'moving with the stack' : 'staying'}`} className={`rounded-lg p-0.5 transition-opacity ${group.includes(m.id) ? 'ring-2 ring-friend' : 'opacity-40'}`}>
+            <button key={m.id} type="button" onClick={() => (naval(m) === naval(f) ? toggleGroup(m.id) : selectFormation(m.id))} aria-pressed={group.includes(m.id)} aria-label={`${m.name}: ${group.includes(m.id) ? 'moving with the stack' : 'staying'}`} className={`rounded-lg p-0.5 transition-opacity ${group.includes(m.id) ? 'ring-2 ring-friend' : 'opacity-40'}`}>
               <Chip cls={m.unitClass} color={color} strength={m.strength} done={!!draft.formations[m.id]} />
             </button>
           ))}
@@ -404,6 +412,19 @@ function UnitCard() {
           </div>
         </div>
       </div>
+      {ship && (
+        <div className="mx-4 mt-2 flex items-center gap-2 overflow-x-auto" data-testid="cargo">
+          <span className="font-display shrink-0 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">
+            Aboard {cargo.length}/{UNITS[ship.unitClass].capacity}
+          </span>
+          {cargo.length === 0 && <span className="text-[13px] text-faint">Empty. {UNITS[ship.unitClass].carries === 'air' ? 'Helicopters and drones' : 'Troops'} board in port.</span>}
+          {cargo.map((p) => (
+            <button key={p.id} type="button" onClick={() => selectFormation(p.id)} aria-label={`${p.name}, aboard`} className="shrink-0 rounded-lg p-0.5" data-testid={`cargo-${p.id}`}>
+              <Chip cls={p.unitClass} color={color} strength={p.strength} done={!!draft.formations[p.id]} />
+            </button>
+          ))}
+        </div>
+      )}
       <div className={`mx-4 mt-2 rounded-lg bg-ink-850 px-3 py-1.5 text-[13px] leading-snug ${armed ? 'hidden' : ''}`} data-testid="planned-order">
         {order ? (
           <span className="font-semibold text-friend">{describeOrder(order, view)}</span>
@@ -411,8 +432,14 @@ function UnitCard() {
           <span className="text-signal">
             {members.some((m) => m.aboard)
               ? 'Tap the shore to land, or an enemy on the beach to storm it.'
-              : members.every((m) => UNITS[m.unitClass].naval)
-                ? 'Tap a blue sea hex to sail. Fleets strike enemies in range.'
+              : ship && cargo.length > 0 && Object.keys(landing).length > 0
+                ? 'Off the coast: Land troops puts them ashore, or tap an enemy on the beach to storm it.'
+                : ship && Object.keys(loading).length > 0
+                  ? 'Load first, then tap a blue sea hex to sail.'
+                  : ship && cargo.length > 0
+                    ? 'Tap a blue sea hex to sail. Next turn, Land troops beside the coast.'
+                    : members.every((m) => UNITS[m.unitClass].naval)
+                      ? 'Tap a blue sea hex to sail. Fleets strike enemies in range.'
                 : members.some((m) => UNITS[m.unitClass].carries && Object.values(draft.formations).some((o) => o.type === 'embark' && o.carrier === m.id))
                   ? 'Troops are boarding. Tap where to sail: they land next turn.'
                   : canBoard
@@ -441,7 +468,17 @@ function UnitCard() {
         </div>
       ) : (
         <div className="flex gap-2 px-4 pt-2.5 pb-1">
-          {canBoard ? (
+          {ship && Object.keys(landing).length > 0 ? (
+            <button type="button" className={`${btn} border-friend/60 text-friend`} disabled={resolving} onClick={() => issueGroup({ ...landing, [ship.id]: { type: 'hold' } })} data-testid="order-land">
+              <Icon name="down" className="h-4 w-4" />
+              Land troops
+            </button>
+          ) : ship && Object.keys(loading).length > 0 ? (
+            <button type="button" className={`${btn} border-friend/60 text-friend`} disabled={resolving} onClick={() => issueGroup(loading)} data-testid="order-load">
+              <Icon name="next" className="h-4 w-4 -rotate-90" />
+              Load {Object.keys(loading).length}
+            </button>
+          ) : canBoard ? (
             <button
               type="button"
               className={btn}
@@ -513,6 +550,40 @@ function HexCard() {
 }
 
 /** What the turn did, the moment it is over: the top few results, each a tap from where it happened. */
+/** What to do next, in a sentence, with the unit to do it with (like the battle's advisor). */
+function Advisor({ selected }: { selected: string | null }) {
+  const view = useGame((s) => s.view)!;
+  const draft = useGame((s) => s.draft)!;
+  const group = useGame((s) => s.group);
+  const selectStack = useGame((s) => s.selectStack);
+  const selectFormation = useGame((s) => s.selectFormation);
+  const focusOn = useGame((s) => s.focusOn);
+  if (view.victory) return null;
+  const a = advise(view, draft.formations);
+  // With a unit open, speak only when the advice is about something else that matters more
+  // (troops at sea, a ship to load): the card already says what to do with the unit in hand.
+  if (selected && (!a.focus || a.focus === selected || group.includes(a.focus) || a.cta === 'Show me' && !/aboard/.test(a.text))) return null;
+  const go = () => {
+    const f = a.focus ? view.formations[a.focus] : undefined;
+    if (!f) return;
+    // A ship is selected on its own; anything else with the units it stands with.
+    if (UNITS[f.unitClass].naval || f.aboard) selectFormation(f.id);
+    else selectStack(f.key, true);
+    focusOn(f.key);
+  };
+  return (
+    <div className="pointer-events-auto mx-3 mb-2 flex items-center gap-3 rounded-xl border border-signal/40 bg-ink-900/95 px-3 py-2.5 shadow-lg" data-testid="advisor">
+      <Icon name="objective" className="h-5 w-5 shrink-0 text-signal" />
+      <p className="min-w-0 flex-1 text-[13px] leading-snug text-text">{a.text}</p>
+      {a.focus && (
+        <button type="button" onClick={go} className="font-display h-11 shrink-0 rounded-lg bg-signal px-3 text-[13px] font-extrabold tracking-wide text-ink-950 uppercase active:brightness-90" data-testid="advisor-go">
+          {a.cta ?? 'Show me'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Debrief({ onDone }: { onDone: () => void }) {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report)!;
@@ -820,6 +891,7 @@ export function PhoneGame() {
                 <EventCard />
               </div>
             )}
+            {!debrief && !city && !resolving && <Advisor selected={fid} />}
             {debrief ? <Debrief onDone={() => setBriefed(reportTurn)} /> : fid ? <UnitCard /> : !city && selectedHex && <HexCard />}
             <Dock onCommand={() => setCommand(true)} cooling={cooling} />
           </>

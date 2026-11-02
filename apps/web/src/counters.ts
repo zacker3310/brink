@@ -194,11 +194,18 @@ export function slotOffsets(n: number): { x: number; y: number; scale: number }[
       { x: -8, y: -5, scale: 0.82 },
       { x: 8, y: 5, scale: 0.82 },
     ];
-  return [
-    { x: -10, y: -7, scale: 0.72 },
-    { x: 10, y: -4, scale: 0.72 },
-    { x: 0, y: 9, scale: 0.72 },
-  ];
+  if (n === 3)
+    return [
+      { x: -10, y: -7, scale: 0.72 },
+      { x: 10, y: -4, scale: 0.72 },
+      { x: 0, y: 9, scale: 0.72 },
+    ];
+  // A port holds a garrison and its ships (and passengers ride along): a ring of smaller counters,
+  // one slot for every unit, however many.
+  return Array.from({ length: n }, (_, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return { x: Math.round(Math.cos(a) * 12), y: Math.round(Math.sin(a) * 10), scale: 0.6 };
+  });
 }
 
 /** Add a counter to `layer` at (x, y). */

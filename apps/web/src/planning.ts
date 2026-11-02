@@ -133,3 +133,59 @@ export function contextualOrder(view: NationView, f: Formation, key: HexKey, mod
   const m: Mode = hostilesAt(view, key).length > 0 ? 'attack' : rightClick && mode === 'attack' ? 'move' : mode;
   return orderForClick(view, f, key, m, reach);
 }
+
+/**
+ * Load a ship from the port it lies in or off: own formations of the kind it carries, not yet
+ * aboard and not already given another order this turn, until it is full.
+ */
+export function loadOrders(view: NationView, ship: Formation, drafted: Record<string, FormationOrder> = {}): Record<string, FormationOrder> {
+  const kind = UNITS[ship.unitClass].carries;
+  if (!kind) return {};
+  let room = (UNITS[ship.unitClass].capacity ?? 0) - passengers(view, ship.id);
+  const out: Record<string, FormationOrder> = {};
+  const candidates = Object.values(view.formations)
+    .filter((f) => !f.aboard && !isNaval(f.unitClass) && (kind === 'ground') === UNITS[f.unitClass].ground && alongside(view, f, ship))
+    .filter((f) => !drafted[f.id] || drafted[f.id]!.type === 'hold' || drafted[f.id]!.type === 'defend')
+    // Fighting troops first: infantry and armour before guns and scouts.
+    .sort((a, b) => rankForLift(a) - rankForLift(b) || (a.id < b.id ? -1 : 1));
+  for (const f of candidates) {
+    if (room <= 0) break;
+    out[f.id] = { type: 'embark', carrier: ship.id };
+    room--;
+  }
+  return out;
+}
+
+function rankForLift(f: Formation): number {
+  return ['infantry', 'mechanized', 'armor', 'air', 'drone', 'recon', 'artillery'].indexOf(f.unitClass);
+}
+
+/**
+ * Put a transport's troops ashore in one go: each takes the open beach beside the ship nearest
+ * `toward` (the goal), one it can reach this turn, with room in the hex. Enemy-held beaches are
+ * left for a deliberate assault.
+ */
+export function landOrders(view: NationView, ship: Formation, toward: HexKey | null): Record<string, FormationOrder> {
+  const aboard = Object.values(view.formations).filter((p) => p.aboard === ship.id && UNITS[p.unitClass].ground);
+  if (aboard.length === 0) return {};
+  const held = new Map<HexKey, number>();
+  for (const f of Object.values(view.formations)) if (!f.aboard && !isNaval(f.unitClass)) held.set(f.key, (held.get(f.key) ?? 0) + 1);
+  // A shore that leads somewhere: on the goal's landmass, or (with no goal) not your own soil.
+  const leads = (k: HexKey) =>
+    toward ? findPath(k, toward, (_a, b) => enterCost(view.tiles[b], 'infantry')) !== null : view.tiles[k]!.owner !== view.self.id;
+  const shore = neighborKeys(ship.key)
+    .filter((k) => view.tiles[k]?.terrain && view.tiles[k]!.terrain !== 'water' && hostilesAt(view, k).length === 0 && leads(k))
+    .filter((k) => {
+      const owner = view.tiles[k]!.owner;
+      return !owner || owner === view.self.id || view.relations[owner] !== 'peace';
+    })
+    .sort((a, b) => (toward ? keyDistance(a, toward) - keyDistance(b, toward) : 0) || (a < b ? -1 : 1));
+  const out: Record<string, FormationOrder> = {};
+  for (const p of aboard) {
+    const k = shore.find((x) => (held.get(x) ?? 0) < 3 && (enterCost(view.tiles[x], p.unitClass) ?? Infinity) <= movementAllowance(p));
+    if (!k) continue;
+    out[p.id] = { type: 'move', path: [k] };
+    held.set(k, (held.get(k) ?? 0) + 1);
+  }
+  return out;
+}

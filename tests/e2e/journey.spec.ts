@@ -75,9 +75,9 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(armored).toContainText('Defend');
 
   // Jump to the next formation without orders.
-  // Russia opens with fourteen: the ten every power gets, a garrison for its third city, and its
-  // navy (a fleet, an amphibious group and a carrier).
-  await expect(page.getByTestId('next-idle')).toContainText('12 of 14 units need orders');
+  // Two of Russia's opening army have orders now (the move and the defend); the rest still wait.
+  const total = await page.evaluate(() => window.__brink!.formations().length);
+  await expect(page.getByTestId('next-idle')).toContainText(`${total - 2} of ${total} units need orders`);
   await page.getByTestId('next-idle').click();
   await expect(page.getByTestId('planned-order')).toContainText('Hold (default)');
 

@@ -371,6 +371,30 @@ export function createPacificScenario(seed: number): WorldState {
         const f = newFormation(world, n.id, c, key, `${n.name} ${c2}${['th', 'st', 'nd', 'rd'][c2] ?? 'th'} ${unitClassName(c)}`);
         f.readiness = 80;
         f.organization = 70;
+        // Ready to go from turn 1: transports sail with their marines aboard, carriers with the
+        // nation's helicopters and drones on deck.
+        if (c === 'transport') {
+          for (let m = 0; m < 2; m++) {
+            const k2 = (counts.get('infantry') ?? 0) + 1;
+            counts.set('infantry', k2);
+            const marines = newFormation(world, n.id, 'infantry', key, `${n.name} ${k2}${['th', 'st', 'nd', 'rd'][k2 % 10 < 4 && (k2 < 11 || k2 > 13) ? k2 % 10 : 0] ?? 'th'} Marine Regiment`);
+            marines.readiness = 80;
+            marines.organization = 70;
+            marines.aboard = f.id;
+          }
+        }
+        if (c === 'carrier') {
+          // The carrier's own air wing: a helicopter wing and a drone company on deck. The air bases
+          // ashore keep theirs.
+          for (const wing of ['air', 'drone'] as const) {
+            const k2 = (counts.get(wing) ?? 0) + 1;
+            counts.set(wing, k2);
+            const w = newFormation(world, n.id, wing, key, `${n.name} ${k2}${['th', 'st', 'nd', 'rd'][k2] ?? 'th'} ${unitClassName(wing)} (carrier)`);
+            w.readiness = 80;
+            w.organization = 70;
+            w.aboard = f.id;
+          }
+        }
       });
     }
   }

@@ -228,6 +228,8 @@ declare global {
       reachable(): HexKey[];
       enemies(): HexKey[];
       formations(): { id: string; cls: UnitClass; key: HexKey }[];
+      /** The map's zoom. */
+      scale(): number;
       /** Enemy hexes the selected stack can attack. */
       targets(): HexKey[];
     };
@@ -240,6 +242,8 @@ export function MapView() {
   const hover = useRef<HexKey | null>(null);
   /** Set once the player pans or zooms; until then the map refits to its container. */
   const userMoved = useRef(false);
+  /** Removes the map's page-level input listeners. */
+  const inputOff = useRef<(() => void) | null>(null);
   const groundSig = useRef('');
   const groundTextures = useRef<Texture[]>([]);
   const reachCache = useRef<{ view: NationView; id: string; reach: Record<HexKey, Reach> } | null>(null);
@@ -341,6 +345,7 @@ export function MapView() {
       useCamera.setState({ control: null });
       if (appRef.current) {
         appRef.current.life.destroy();
+        inputOff.current?.();
         appRef.current.app.destroy(true);
         appRef.current = null;
       }
@@ -438,9 +443,23 @@ export function MapView() {
       pinch = { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y) || 1, scale: world.scale.x, mx: (a!.x + b!.x) / 2 - r.left, my: (a!.y + b!.y) / 2 - r.top, wx: world.x, wy: world.y };
       dragged = true;
     };
+    // Forget every finger: a sheet, an alert or the app going to the background can swallow a lift,
+    // and a finger the map never hears lift would turn every later touch into a pinch.
+    const reset = () => {
+      pts.clear();
+      down = null;
+      pinch = null;
+      dragged = false;
+    };
     canvas.addEventListener('pointerdown', (e) => {
+      // The first finger of a new touch (or any mouse press): every earlier pointer has ended.
+      if (e.isPrimary && pts.size > 0) reset();
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      canvas.setPointerCapture(e.pointerId);
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // A pointer the browser already ended: nothing to capture.
+      }
       if (pts.size === 1) {
         startPan(e.clientX, e.clientY, e.button, e.pointerType !== 'mouse');
         dragged = false;
@@ -448,6 +467,8 @@ export function MapView() {
     });
     canvas.addEventListener('pointermove', (e) => {
       if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // A mouse with no button down, or a touch the map never saw start: no gesture is under way.
+      if (e.pointerType === 'mouse' && e.buttons === 0 && (down || pinch)) reset();
       if (pinch && pts.size >= 2) {
         const [a, b] = [...pts.values()];
         const r = rectOf();
@@ -510,6 +531,21 @@ export function MapView() {
     };
     canvas.addEventListener('pointerup', (e) => lift(e, false));
     canvas.addEventListener('pointercancel', (e) => lift(e, true));
+    // Capture lost without a lift (a sheet opened under the finger, the page lost focus): that finger is gone.
+    canvas.addEventListener('lostpointercapture', (e) => {
+      if (pts.has(e.pointerId)) lift(e, true);
+    });
+    // Page-level listeners go when the map does (unmount aborts them).
+    const off = new AbortController();
+    window.addEventListener('blur', reset, { signal: off.signal });
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.hidden) reset();
+      },
+      { signal: off.signal },
+    );
+    inputOff.current = () => off.abort();
     // iOS Safari sends its own pinch gestures to the page; the map handles pinches itself.
     canvas.addEventListener('gesturestart', (e) => e.preventDefault());
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -536,6 +572,9 @@ export function MapView() {
       formations() {
         const v = useGame.getState().view;
         return v ? Object.values(v.formations).map((f) => ({ id: f.id, cls: f.unitClass, key: f.key })) : [];
+      },
+      scale() {
+        return world.scale.x;
       },
       targets() {
         const s = useGame.getState();
@@ -1002,14 +1041,16 @@ export function MapView() {
     const badges: Container[] = [];
     const r = replaying ? null : currentReach();
     if (r) {
-      const tint = s.mode === 'withdraw' ? 0x9fb8d9 : MOVE;
+      // At sea, friend blue vanishes into the water: a ship's reach is drawn bright, almost white.
+      const atSea = !!UNITS[r.f.unitClass].naval;
+      const tint = s.mode === 'withdraw' ? 0x9fb8d9 : atSea ? 0xd8f3ff : MOVE;
       for (const k of Object.keys(r.reach)) {
         if (k === r.f.key) continue;
-        hl.poly(poly(k, 1)).fill({ color: tint, alpha: 0.16 });
+        hl.poly(poly(k, 1)).fill({ color: tint, alpha: atSea ? 0.26 : 0.16 });
         for (const n of neighborKeys(k)) {
           if (r.reach[n]) continue;
           const [p, q] = edge(k, n, 1.5);
-          hl.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.5, color: tint, alpha: 0.9, cap: 'round' });
+          hl.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: atSea ? 3.2 : 2.5, color: tint, alpha: 0.95, cap: 'round' });
         }
       }
       // Every enemy the selected stack can hit, ringed, with how the fight would likely go.
