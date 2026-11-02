@@ -54,7 +54,8 @@ test('city banners stay on their cities when the screen changes size under the m
   await page.getByTestId('crisis-none').tap();
   await page.getByTestId('start-game').tap();
   await page.getByTestId('how-to-close').tap({ timeout: 60_000 });
-  await page.getByTestId('deselect').tap().catch(() => undefined);
+  // Nothing selected (a staff plan opens that way); deselect if a unit is up.
+  if (await page.getByTestId('deselect').isVisible()) await page.getByTestId('deselect').tap();
   // Where Tokyo's banner sits relative to Tokyo's hex on the map canvas.
   const offset = () =>
     page.evaluate(() => {
