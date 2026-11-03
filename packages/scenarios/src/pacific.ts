@@ -11,7 +11,7 @@ import { computeVision, emptyIntel, grossYields, mulberry32, newFormation, pairK
 // inside each country (forest, hills, mountains). Design: docs/pacific.md.
 
 export const PACIFIC_ID = 'pacific';
-export const COLS = 42;
+export const COLS = 40;
 export const ROWS = 20;
 export const MAX_TURNS = 30;
 
@@ -22,26 +22,26 @@ export const MAX_TURNS = 30;
  * Z Kazakhstan, G Mongolia.
  */
 const GRID: readonly string[] = [
-  'RRRRRRRRRRRRRRRRRRRRRRRRRRUUUUUKKKKKKKKKK.', // 0  Siberia, the Bering land crossing, Alaska, the Yukon
-  'RRRRRRRRRRRRRRRRRRRRRRRRRUUUUUUUKKKKKKKKK.', // 1  St Petersburg, Yakutsk
-  'RRRRRRRRRRRRRRRRRRR..RRR..UUUUUUKKKKKKKKK.', // 2  the Sea of Okhotsk, Kamchatka
-  'RRRRRRRRRRRRRRRRRR...RR....UUUUUKKKKKKKKK.', // 3  Moscow, Anchorage
-  'RRRRRRRRRRRRRRRRRR.R.R.....U....KKKKKKKKK.', // 4  Sakhalin, the Alaska Peninsula
-  'RRRRRRRRRRRRRRRRRR....R.U.U.....KKKKKKKKK.', // 5  the Kurils, the Aleutians
-  'ZZZZZZZRRGGGGGCCCC..JJ......KKKKKKKKKKKKK.', // 6  Kazakhstan, Mongolia, Vladivostok, Hokkaido, Vancouver
-  'ZZZZZZZCGGGGGCCCNN.JJJ......UUUUUUUUUUUUU.', // 7  Korea, Honshu, Seattle
-  'ZZZZZZCCCCCCCCCC.S..JJ......UUUUUUUUUUUUU.', // 8  Seoul, Tokyo, New York
-  'ZZZZZZCCCCCCCCCC.SS.J.......UUUUUUUUUUUUU.', // 9
-  'CCCCCCCCCCCCCCCC....J.......UUUUUUUUUUUUU.', // 10 Shanghai, Kyushu, Washington
-  'CCCCCCCCCCCCCCCC............UUUUUUUUUUUUU.', // 11
-  'CCCCCCCCCCCCCCCC........UU..UUUUUUUUUUUUU.', // 12 Hawaii
-  'CCCCCCCCCCCCCCC.T...........UUUUUUUUUUUUU.', // 13 Taiwan
-  'CCCCCCCCCCCCCCC.T...........UUUUUUUUUUUUU.', // 14
-  'CCCCCCCCCCCCCCC......U.......MMMMMMMMMM...', // 15 Guam, Baja
-  'CCCCCCCCCCCCCC...............MMMMMMMM.....', // 16
-  'CCCCCCCCCCCCC.................MMMMMM......', // 17 Mexico City
-  'CCCCCCCCCCCC...................MMMMM......', // 18
-  '..CCCCCCCC......................MMM.......', // 19
+  'RRRRRRRRRRRRRRRRRRRRRRRRRRUUUUUKKKKKKKK.', // 0  Siberia, the Bering land crossing, Alaska, the Yukon
+  'RRRRRRRRRRRRRRRRRRRRRRRRRUUUUUUUKKKKKKK.', // 1  St Petersburg, Yakutsk
+  'RRRRRRRRRRRRRRRRRRR..RRR..UUUUUUKKKKKKK.', // 2  the Sea of Okhotsk, Kamchatka
+  'RRRRRRRRRRRRRRRRRR...RR....UUUUUKKKKKKK.', // 3  Moscow, Anchorage
+  'RRRRRRRRRRRRRRRRRR.R.R.....U....KKKKKKK.', // 4  Sakhalin, the Alaska Peninsula
+  'RRRRRRRRRRRRRRRRRR....R.U.U.....KKKKKKK.', // 5  the Kurils, the Aleutians
+  'ZZZZZZZRRGGGGGCCCC..JJ....KKKKKKKKKKKKK.', // 6  Kazakhstan, Mongolia, Vladivostok, Hokkaido, Vancouver
+  'ZZZZZZZCGGGGGCCCNN.JJJ....UUUUUUUUUUUUU.', // 7  Korea, Honshu, Seattle
+  'ZZZZZZCCCCCCCCCC.S..JJ....UUUUUUUUUUUUU.', // 8  Seoul, Tokyo, New York
+  'ZZZZZZCCCCCCCCCC.SS.J.....UUUUUUUUUUUUU.', // 9
+  'CCCCCCCCCCCCCCCC....J.....UUUUUUUUUUUUU.', // 10 Shanghai, Kyushu, Washington
+  'CCCCCCCCCCCCCCCC..........UUUUUUUUUUUUU.', // 11
+  'CCCCCCCCCCCCCCCC......UU..UUUUUUUUUUUUU.', // 12 Hawaii
+  'CCCCCCCCCCCCCCC.TT........UUUUUUUUUUUUU.', // 13 Taiwan
+  'CCCCCCCCCCCCCCC.TT........UUUUUUUUUUUUU.', // 14
+  'CCCCCCCCCCCCCCC......U.....MMMMMMMMMM...', // 15 Guam, Baja
+  'CCCCCCCCCCCCCC.............MMMMMMMM.....', // 16
+  'CCCCCCCCCCCCC...............MMMMMM......', // 17 Mexico City
+  'CCCCCCCCCCCC.................MMMMM......', // 18
+  '..CCCCCCCC....................MMM.......', // 19
 ];
 
 const REGION: Record<string, NationId> = { R: 'russia', C: 'china', J: 'japan', U: 'usa', K: 'canada', M: 'mexico', N: 'nkorea', S: 'skorea', T: 'taiwan', Z: 'kazakhstan', G: 'mongolia' };
@@ -76,22 +76,22 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'United States',
     color: '#4f8fe0',
     government: 'commonwealth',
-    capital: [40, 10, 'Washington'],
+    capital: [38, 10, 'Washington'],
     // The west coast first: the opening army stands where the Pacific war is.
     cities: [
-      [28, 10, 'San Francisco'],
-      [28, 13, 'Los Angeles'],
-      [28, 7, 'Seattle'],
-      [25, 12, 'Honolulu'],
-      [40, 8, 'New York'],
-      [35, 8, 'Chicago'],
+      [26, 10, 'San Francisco'],
+      [26, 13, 'Los Angeles'],
+      [26, 7, 'Seattle'],
+      [23, 12, 'Honolulu'],
+      [38, 8, 'New York'],
+      [33, 8, 'Chicago'],
     ],
     // The far-flung bases: a frontier town in Alaska and two island outposts.
     depots: [
       [28, 3, 'Anchorage'],
       [21, 15, 'Guam'],
       [24, 5, 'Adak'],
-      [34, 12, 'Houston'],
+      [32, 12, 'Houston'],
     ],
     rough: 10,
     navy: { port: 'San Francisco', ships: ['fleet', 'transport', 'transport', 'carrier'] },
@@ -162,8 +162,8 @@ export const NATIONS: readonly NationSpec[] = [
 
 /** The independent states between the powers. */
 export const MINORS: readonly NationSpec[] = [
-  { id: 'canada', short: 'Canada', name: 'Canada', color: '#b9424f', government: 'commonwealth', minor: true, militia: ['infantry', 'mechanized'], capital: [38, 5, 'Ottawa'], cities: [[28, 6, 'Vancouver'], [33, 5, 'Calgary'], [32, 2, 'Whitehorse']], depots: [], rough: 25 },
-  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, capital: [33, 17, 'Mexico City'], cities: [[29, 15, 'Tijuana'], [31, 16, 'Guadalajara'], [36, 15, 'Monterrey']], depots: [], rough: 0 },
+  { id: 'canada', short: 'Canada', name: 'Canada', color: '#b9424f', government: 'commonwealth', minor: true, militia: ['infantry', 'mechanized'], capital: [36, 5, 'Ottawa'], cities: [[26, 6, 'Vancouver'], [33, 5, 'Calgary'], [32, 2, 'Whitehorse']], depots: [], rough: 25 },
+  { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, militia: ['infantry'], capital: [31, 17, 'Mexico City'], cities: [[27, 15, 'Tijuana'], [29, 16, 'Guadalajara'], [34, 15, 'Monterrey']], depots: [], rough: 0 },
   { id: 'nkorea', short: 'N. Korea', name: 'North Korea', color: '#8a5ab8', government: 'directorate', minor: true, capital: [16, 7, 'Pyongyang'], cities: [[17, 7, 'Wonsan']], depots: [], rough: 45 },
   { id: 'skorea', short: 'S. Korea', name: 'South Korea', color: '#3fa7b5', government: 'federation', minor: true, capital: [17, 8, 'Seoul'], cities: [[18, 9, 'Busan']], depots: [], rough: 30 },
   { id: 'taiwan', short: 'Taiwan', name: 'Taiwan', color: '#c97ab0', government: 'federation', minor: true, capital: [16, 13, 'Taipei'], cities: [[16, 14, 'Kaohsiung']], depots: [], rough: 40 },

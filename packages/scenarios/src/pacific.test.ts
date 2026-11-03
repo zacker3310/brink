@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { UNIT_CLASSES } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
-import { findPath, offsetToAxial, keyOf } from '@brink/map';
+import { findPath, keyDistance, offsetToAxial, keyOf } from '@brink/map';
 import { enterCost, sortedKeys } from '@brink/simulation';
 import { createPacificScenario, MINORS, NATIONS, PACIFIC_ID } from './pacific';
 import { createScenario } from './index';
@@ -10,10 +10,10 @@ describe('The Pacific', () => {
   const w = createPacificScenario(1);
   const sitesOf = (n: string) => Object.values(w.sites).filter((s) => s.owner === n);
 
-  it('is the four powers and the seven minor states, on a 42 x 20 map with sea and every land terrain', () => {
+  it('is the four powers and the seven minor states, on a 40 x 20 map with sea and every land terrain', () => {
     expect(sortedKeys(w.nations)).toEqual(['canada', 'china', 'japan', 'kazakhstan', 'mexico', 'mongolia', 'nkorea', 'russia', 'skorea', 'taiwan', 'usa']);
     expect(NATIONS.map((n) => n.id)).toEqual(['usa', 'russia', 'china', 'japan']);
-    expect(Object.keys(w.tiles)).toHaveLength(840);
+    expect(Object.keys(w.tiles)).toHaveLength(800);
     const terrains = new Set(Object.values(w.tiles).map((t) => t.terrain));
     for (const t of ['plains', 'forest', 'hills', 'mountains', 'urban', 'water'] as const) expect(terrains.has(t), t).toBe(true);
     expect(createScenario(PACIFIC_ID, 1)).toEqual(w);
@@ -94,6 +94,18 @@ describe('The Pacific', () => {
     // The United States is still the biggest country on the map, and Japan the smallest.
     const land = (p: string) => Object.values(w.tiles).filter((t) => t.owner === p).length;
     expect(land('usa')).toBeGreaterThan(land('japan') * 5);
+  });
+
+  it('gives every island prize open ground to land on beside its cities', () => {
+    // A landing goes onto open ground first, then the city is taken from the land: an island of
+    // nothing but garrisoned cities could only be stormed straight from the ships.
+    for (const m of ['taiwan', 'skorea']) {
+      const ground = Object.values(w.tiles).filter((t) => t.owner === m && !t.siteId);
+      expect(ground.length, m).toBeGreaterThanOrEqual(1);
+    }
+    const taipei = Object.values(w.sites).find((s) => s.name === 'Taipei')!;
+    const beside = Object.values(w.tiles).filter((t) => t.owner === 'taiwan' && !t.siteId && keyDistance(t.key, taipei.key) === 1);
+    expect(beside.length).toBeGreaterThanOrEqual(1);
   });
 
   it('changes only the ground with the seed, never the coasts, borders or sites', () => {

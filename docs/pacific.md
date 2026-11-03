@@ -7,12 +7,15 @@ phase passes `pnpm check`, the soak and e2e on its own and goes to `main`.
 
 ## Map
 
-42 x 20 hexes (840), authored as a character grid in `packages/scenarios/src/pacific.ts`, so the
+40 x 20 hexes (800), authored as a character grid in `packages/scenarios/src/pacific.ts`, so the
 geography is drawn, not generated. The seed varies only ground texture (forest, hills, mountains)
 inside each country, never coastlines or borders. North is up. The map runs from Moscow and St
 Petersburg in the west to Washington and New York on the Atlantic in the east: all of Russia and all
-of the United States, with the ocean squeezed hard (Tokyo to San Francisco is seven hexes, Hawaii
-halfway), so a fleet crosses in a turn and the war is fought on land as much as at sea.
+of the United States, with the ocean squeezed hard (four sea hexes from Tokyo to the California coast,
+Hawaii between), so a fleet crosses in a turn and the war is fought on land as much as at sea.
+Every island prize has open ground beside its cities (Taiwan has two beaches next to Taipei and
+Kaohsiung): a landing goes ashore first and takes the city from the land, rather than storming a
+garrison straight from the ships.
 
 | Region | Where | Starts with |
 |---|---|---|
@@ -122,6 +125,9 @@ ground formations), **Carrier Group** (carries two air wings, which strike from 
   are good; empty ones go back for more; fleets escort toward the goal's coast; carriers take aircraft
   on deck. It builds ships in ports, more lift when its war is overseas. Balance of power: from turn 8
   a power six points of standing ahead of every other becomes everyone's target.
+
+Fifth pass (40 x 20, Taiwan's beaches, Mexico one militia regiment a city, 24 AI-only matches):
+Japan 8, United States 7, China 5, Russia 4.
 
 Fourth pass (the Bering crossing, conquest of whole countries, 24 AI-only matches): United States 8,
 Russia 7, Japan 6, China 3.

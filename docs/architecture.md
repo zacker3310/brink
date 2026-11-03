@@ -10,7 +10,7 @@ packages/contracts   plain JSON types: WorldState, orders, events, NationView, S
 packages/map         axial hex math, pixel layout, A*, reachable sets (render-independent)
 packages/game-data   versioned balance data: terrain, unit classes, techs, governments, RULES
 packages/simulation  pure deterministic engine: resolveTurn, validation, fog, previews
-packages/scenarios   The Pacific (920 hexes, Moscow to Washington: four powers, seven minor states; docs/pacific.md)
+packages/scenarios   The Pacific (800 hexes, Moscow to Washington: four powers, seven minor states; docs/pacific.md)
 packages/ai          utility AI: NationView in, NationOrders out
 packages/session     GameSession (match loop) and versioned save files
 apps/web             React + PixiJS + Zustand + Tailwind client; engine runs in a Web Worker
