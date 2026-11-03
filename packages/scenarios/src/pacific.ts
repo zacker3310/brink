@@ -147,7 +147,7 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'Japan',
     color: '#e8e8ee',
     government: 'federation',
-    capital: [22, 8, 'Tokyo'],
+    capital: [22, 7, 'Tokyo'],
     cities: [
       [20, 9, 'Osaka'],
       [20, 6, 'Sapporo'],
