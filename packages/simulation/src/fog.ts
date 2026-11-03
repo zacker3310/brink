@@ -11,7 +11,7 @@ import type {
   TileView,
   WorldState,
 } from '@brink/contracts';
-import { TERRAIN, VICTORY } from '@brink/game-data';
+import { TERRAIN, victoryBars } from '@brink/game-data';
 import { rangeKeys } from '@brink/map';
 import { clone, nationModifiers, relationOf, sortedKeys, visionRadius } from './rules';
 import { supremacyStanding } from './victory';
@@ -131,7 +131,7 @@ export function totalVictoryPoints(world: WorldState): number {
 }
 
 export function victoryThreshold(world: WorldState): number {
-  return Math.ceil((totalVictoryPoints(world) * VICTORY.dominationShare) / 100);
+  return Math.ceil((totalVictoryPoints(world) * victoryBars(world.maxTurns).dominationShare) / 100);
 }
 
 /**

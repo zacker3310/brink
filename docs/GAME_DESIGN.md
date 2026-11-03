@@ -179,6 +179,10 @@ The standing is public, shown in the World card. Every campaign ends at its turn
 | Epic | 45 | |
 | Total War | 250 | a war you come back to for weeks |
 
+A Total War is won by conquest, not by leading at turn 50 (`victoryBars`): 60% of all victory
+points outright, or 55% standing held from turn 50; coalition, last standing and the score at the
+limit are as ever.
+
 A save keeps the last 60 turn reports (`HISTORY_KEPT`), so a Total War still fits a phone's storage;
 the world itself stays the same size however long the war runs.
 

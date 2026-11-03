@@ -63,7 +63,7 @@ export function Manual({ onBack }: { onBack: () => void }) {
           <Label>Victory</Label>
           <ul className="mt-3 space-y-2 text-sm">
             <li>
-              <span className="font-semibold text-signal">Domination.</span> <span className="text-muted">Hold {VICTORY_SHARE}% of all victory points.</span>
+              <span className="font-semibold text-signal">Domination.</span> <span className="text-muted">Hold {VICTORY_SHARE}% of all victory points (60% in a Total War).</span>
             </li>
             <li>
               <span className="font-semibold text-signal">Survival.</span> <span className="text-muted">Be the last power with a city.</span>

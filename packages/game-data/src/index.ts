@@ -525,6 +525,16 @@ export const VICTORY = {
   supremacyFromTurn: 8,
 } as const;
 
+/**
+ * The bars a campaign is won by, by its length. Up to an epic 60 turns they are `VICTORY`'s; a longer
+ * war (Total War) asks for a conquest: 60% of all victory points outright, or 55% standing held from
+ * turn 50, so the war is not over while most of it is still to fight.
+ */
+export function victoryBars(maxTurns: number): { dominationShare: number; supremacyShare: number; supremacyFromTurn: number } {
+  if (maxTurns > 60) return { dominationShare: 60, supremacyShare: 55, supremacyFromTurn: 50 };
+  return { dominationShare: VICTORY.dominationShare, supremacyShare: VICTORY.supremacyShare, supremacyFromTurn: VICTORY.supremacyFromTurn };
+}
+
 /** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */
 export const CAMPAIGN_TURNS: Record<CampaignLength, number> = { quick: 20, standard: 30, epic: 45, total: 250 };
 

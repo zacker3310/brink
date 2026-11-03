@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Formation, FormationOrder, Resource } from '@brink/contracts';
-import { TERRAIN, UNITS, VICTORY } from '@brink/game-data';
+import { TERRAIN, UNITS, victoryBars } from '@brink/game-data';
 import { useCamera } from './camera';
 import { CityBanners, CityPanel } from './Cities';
 import { Coach } from './Coach';
@@ -764,7 +764,7 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
       <div className="flex items-baseline justify-between">
         <span className="font-display text-lg font-extrabold uppercase">The theatre</span>
         <span className="text-[12px] text-faint">
-          {view.victoryThreshold} VP or {VICTORY.supremacyShare}% standing wins
+          {view.victoryThreshold} VP or {victoryBars(view.maxTurns).supremacyShare}% standing wins
         </span>
       </div>
       <div className="mt-1 flex justify-end gap-2 pr-[3.75rem] text-[10px] text-faint uppercase">

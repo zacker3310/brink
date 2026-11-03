@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
-import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY } from '@brink/game-data';
+import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY, victoryBars } from '@brink/game-data';
 import { CRISES, crisisOf, dealCrisis, MINORS, NATIONS, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Kbd, Mark, useKeys } from '../chrome';
-import { CLASS_ORDER, DOCTRINE, dossier, operationName, randomSeed, traits, VICTORY_SHARE } from './intel';
+import { CLASS_ORDER, DOCTRINE, dossier, operationName, randomSeed, traits } from './intel';
 import { Emblem, UnitGlyph } from '../glyphs';
 import { MapPreview } from './MapPreview';
 
@@ -57,6 +57,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
   const turns = CAMPAIGN_TURNS[length];
+  const bars = victoryBars(turns);
   const [difficulty, setDifficulty] = useState<Difficulty>(() => readPrefs().difficulty ?? 'easy');
   const pickDifficulty = (d: Difficulty) => {
     setDifficulty(d);
@@ -299,10 +300,10 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                     <small>VP</small>
                   </span>
                   <span className="text-right text-xs text-muted">
-                    <b className="text-text">{info.vpShare}%</b> held · domination at <b className="wr-goal-text">{VICTORY_SHARE}%</b>
+                    <b className="text-text">{info.vpShare}%</b> held · domination at <b className="wr-goal-text">{bars.dominationShare}%</b>
                   </span>
                 </div>
-                <div className="wr-vp-track" style={{ ['--held' as string]: `${Math.min(100, info.vpShare)}%`, ['--goal' as string]: `${VICTORY_SHARE}%` } as CSSProperties}>
+                <div className="wr-vp-track" style={{ ['--held' as string]: `${Math.min(100, info.vpShare)}%`, ['--goal' as string]: `${bars.dominationShare}%` } as CSSProperties}>
                   <span className="wr-vp-fill" />
                   <span className="wr-vp-goal" />
                   <span className="wr-vp-goal-label" aria-hidden>
@@ -518,14 +519,14 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
           <div className="wr-panel">
             <SectionHead index="04">Conditions of victory</SectionHead>
             <ul className="wr-wins">
-              <Win figure={`${VICTORY_SHARE}%`} name="Domination">
+              <Win figure={`${bars.dominationShare}%`} name="Domination">
                 of all victory points
               </Win>
               <Win figure={`${coalition2}/${coalition3}%`} name="Coalition">
                 with two or three allies
               </Win>
-              <Win figure={`${VICTORY.supremacyShare}%`} name="Supremacy">
-                avg. land, army, output from turn {VICTORY.supremacyFromTurn}
+              <Win figure={`${bars.supremacyShare}%`} name="Supremacy">
+                avg. land, army, output from turn {bars.supremacyFromTurn}
               </Win>
               <Win figure={`T${turns}`} name="Score">
                 best standing when time runs out

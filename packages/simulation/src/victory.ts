@@ -1,6 +1,6 @@
 import type { NationId, VictoryState, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { VICTORY } from '@brink/game-data';
+import { VICTORY, victoryBars } from '@brink/game-data';
 import { grossYields } from './economy';
 import { totalVictoryPoints, victoryPoints, victoryThreshold } from './fog';
 import { relationOf, sortedKeys } from './rules';
@@ -73,7 +73,8 @@ export function evaluateVictory(world: WorldState): VictoryState | null {
   const leaders = alive.filter((n) => vp[n]! >= victoryThreshold(world));
   if (leaders.length === 1) return { winner: leaders[0]!, reason: 'victory_points', turn };
 
-  if (turn >= VICTORY.supremacyFromTurn) {
+  const bars = victoryBars(world.maxTurns);
+  if (turn >= bars.supremacyFromTurn) {
     const blocs = allianceBlocs(world)
       .map((members) => ({ members, held: members.reduce((a, n) => a + vp[n]!, 0) }))
       .filter((b) => share(b.held, total) >= coalitionShare(b.members.length))
@@ -82,7 +83,7 @@ export function evaluateVictory(world: WorldState): VictoryState | null {
     if (bloc) return { winner: [...bloc.members].sort(byVp)[0]!, reason: 'coalition', turn, coalition: bloc.members };
 
     const standing = supremacyStanding(world);
-    const supreme = alive.filter((n) => standing[n]! >= VICTORY.supremacyShare && world.nations[n]!.stability >= VICTORY.supremacyStability);
+    const supreme = alive.filter((n) => standing[n]! >= bars.supremacyShare && world.nations[n]!.stability >= VICTORY.supremacyStability);
     if (supreme.length === 1) return { winner: supreme[0]!, reason: 'supremacy', turn };
   }
 
