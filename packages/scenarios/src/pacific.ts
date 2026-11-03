@@ -29,16 +29,16 @@ const GRID: readonly string[] = [
   'RRRRRRRRRRRRRRRRRR.R.R.....U....KKKKKKK.', // 4  Sakhalin, the Alaska Peninsula
   'RRRRRRRRRRRRRRRRRR....R.U.U.....KKKKKKK.', // 5  the Kurils, the Aleutians
   'ZZZZZZZRRGGGGGCCCC..JJ....KKKKKKKKKKKKK.', // 6  Kazakhstan, Mongolia, Vladivostok, Hokkaido, Vancouver
-  'ZZZZZZZCGGGGGCCCNN.JJJ....UUUUUUUUUUUUU.', // 7  Korea, Honshu, Seattle
-  'ZZZZZZCCCCCCCCCC.S..JJ....UUUUUUUUUUUUU.', // 8  Seoul, Tokyo, New York
-  'ZZZZZZCCCCCCCCCC.SS.J.....UUUUUUUUUUUUU.', // 9
-  'CCCCCCCCCCCCCCCC....J.....UUUUUUUUUUUUU.', // 10 Shanghai, Kyushu, Washington
-  'CCCCCCCCCCCCCCCC..........UUUUUUUUUUUUU.', // 11
-  'CCCCCCCCCCCCCCCC......UU..UUUUUUUUUUUUU.', // 12 Hawaii
-  'CCCCCCCCCCCCCCC.TT........UUUUUUUUUUUUU.', // 13 Taiwan
-  'CCCCCCCCCCCCCCC.TT........UUUUUUUUUUUUU.', // 14
-  'CCCCCCCCCCCCCCC......U.....MMMMMMMMMM...', // 15 Guam, Baja
-  'CCCCCCCCCCCCCC.............MMMMMMMM.....', // 16
+  'ZZZZZZZCGGGGGCCCNN.JJJJ...UUUUUUUUUUUUU.', // 7  Korea, Honshu, Seattle
+  'ZZZZZZCCCCCCCCCC.S..JJJ...UUUUUUUUUUUUU.', // 8  Seoul, Tokyo, New York
+  'ZZZZZZCCCCCCCCCC.SS.JJJ...UUUUUUUUUUUUU.', // 9
+  'CCCCCCCCCCCCCCCC....JJ....UUUUUUUUUUUUU.', // 10 Shanghai, Kyushu, Washington
+  'CCCCCCCCCCCCCCCC....JJ....UUUUUUUUUUUUU.', // 11
+  'CCCCCCCCCCCCCCCC.......UU.UUUUUUUUUUUUU.', // 12 Hawaii
+  'CCCCCCCCCCCCCCC.TTT.......UUUUUUUUUUUUU.', // 13 Taiwan
+  'CCCCCCCCCCCCCCC.TTT.......UUUUUUUUUUUUU.', // 14
+  'CCCCCCCCCCCCCCC.TT...U.....MMMMMMMMMM...', // 15 Guam, Baja
+  'CCCCCCCCCCCCCC...T.........MMMMMMMM.....', // 16
   'CCCCCCCCCCCCC...............MMMMMM......', // 17 Mexico City
   'CCCCCCCCCCCC.................MMMMM......', // 18
   '..CCCCCCCC....................MMM.......', // 19
@@ -82,7 +82,7 @@ export const NATIONS: readonly NationSpec[] = [
       [26, 10, 'San Francisco'],
       [26, 13, 'Los Angeles'],
       [26, 7, 'Seattle'],
-      [23, 12, 'Honolulu'],
+      [24, 12, 'Honolulu'],
       [38, 8, 'New York'],
       [33, 8, 'Chicago'],
     ],
@@ -147,11 +147,12 @@ export const NATIONS: readonly NationSpec[] = [
     name: 'Japan',
     color: '#e8e8ee',
     government: 'federation',
-    capital: [21, 8, 'Tokyo'],
+    capital: [22, 8, 'Tokyo'],
     cities: [
       [20, 9, 'Osaka'],
       [20, 6, 'Sapporo'],
       [20, 10, 'Fukuoka'],
+      [21, 9, 'Nagoya'],
     ],
     depots: [[21, 7, 'Sendai']],
     rough: 35,
@@ -166,7 +167,7 @@ export const MINORS: readonly NationSpec[] = [
   { id: 'mexico', short: 'Mexico', name: 'Mexico', color: '#3e9a62', government: 'union', minor: true, militia: ['infantry'], capital: [31, 17, 'Mexico City'], cities: [[27, 15, 'Tijuana'], [29, 16, 'Guadalajara'], [34, 15, 'Monterrey']], depots: [], rough: 0 },
   { id: 'nkorea', short: 'N. Korea', name: 'North Korea', color: '#8a5ab8', government: 'directorate', minor: true, capital: [16, 7, 'Pyongyang'], cities: [[17, 7, 'Wonsan']], depots: [], rough: 45 },
   { id: 'skorea', short: 'S. Korea', name: 'South Korea', color: '#3fa7b5', government: 'federation', minor: true, capital: [17, 8, 'Seoul'], cities: [[18, 9, 'Busan']], depots: [], rough: 30 },
-  { id: 'taiwan', short: 'Taiwan', name: 'Taiwan', color: '#c97ab0', government: 'federation', minor: true, capital: [16, 13, 'Taipei'], cities: [[16, 14, 'Kaohsiung']], depots: [], rough: 40 },
+  { id: 'taiwan', short: 'Taiwan', name: 'Taiwan', color: '#c97ab0', government: 'federation', minor: true, capital: [16, 13, 'Taipei'], cities: [[17, 15, 'Kaohsiung']], depots: [], rough: 40 },
   { id: 'kazakhstan', short: 'Kazakh.', name: 'Kazakhstan', color: '#8fae3a', government: 'directorate', minor: true, militia: ['infantry'], capital: [3, 7, 'Astana'], cities: [[4, 9, 'Almaty']], depots: [], rough: 0 },
   { id: 'mongolia', short: 'Mongolia', name: 'Mongolia', color: '#a8744a', government: 'federation', minor: true, capital: [11, 7, 'Ulaanbaatar'], cities: [[9, 6, 'Khovd']], depots: [], rough: 15 },
 ];
@@ -509,6 +510,9 @@ function parity(world: WorldState, raise: (n: NationSpec, c: UnitClass, site: st
   for (const p of powers) {
     const pct = Math.round((outTarget * 100) / output(p));
     for (const s of sitesOf(p)) for (const k of sortedKeys(s.yields) as (keyof Yields)[]) s.yields[k] = Math.floor((s.yields[k] * pct) / 100);
+    // What the rounding lost (or gained) the capital's industry makes up, so the totals match exactly.
+    const capital = world.sites[`${p}-capital`]!;
+    capital.yields.industry = Math.max(0, capital.yields.industry + outTarget - output(p));
   }
 
   // Army: the lighter powers raise garrisons (infantry, then mechanized, then artillery) in their
