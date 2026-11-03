@@ -27,9 +27,9 @@ export function legal(w: WorldState): string[] {
 }
 
 describe('Opening Crises', () => {
-  it('has thirteen crises, each with a story, a setup and a threat', () => {
-    expect(CRISES).toHaveLength(13);
-    expect(new Set(CRISES.map((c) => c.id)).size).toBe(13);
+  it('has fourteen crises, each with a story, a setup and a threat', () => {
+    expect(CRISES).toHaveLength(14);
+    expect(new Set(CRISES.map((c) => c.id)).size).toBe(14);
     for (const c of CRISES) {
       expect(c.story.length, c.id).toBeGreaterThan(60);
       expect(c.setup.length, c.id).toBeGreaterThan(30);
@@ -79,6 +79,33 @@ describe('Opening Crises', () => {
     // A view shows an ally's units: the bloc fights as one.
     const v = buildView(w, 'japan');
     expect(Object.values(v.contacts).some((c) => c.owner === 'usa')).toBe(true);
+  });
+
+  it('the Second Civil War: a Heartland Republic against the cities, Russia behind it, Japan with the cities, Canada and Mexico invading', () => {
+    const w = createPacificScenario(1);
+    applyCrisis(w, 'second-civil-war');
+    const h = w.nations.heartland!;
+    expect(h.minor).toBeUndefined();
+    const sites = (n: string) => Object.values(w.sites).filter((s) => s.owner === n);
+    expect(sites('heartland').find((s) => s.kind === 'capital')!.name).toBe('Houston');
+    // The cities stay with Washington; the countryside goes over.
+    for (const name of ['Washington', 'New York', 'Chicago', 'San Francisco', 'Los Angeles', 'Seattle', 'Honolulu']) expect(sites('usa').map((s) => s.name), name).toContain(name);
+    expect(Object.values(w.tiles).filter((t) => t.owner === 'heartland').length).toBeGreaterThan(Object.values(w.tiles).filter((t) => t.owner === 'usa').length);
+    expect(Object.values(w.formations).some((f) => f.owner === 'heartland' && f.unitClass === 'armor')).toBe(true);
+    for (const [a, b, r] of [
+      ['heartland', 'usa', 'war'],
+      ['heartland', 'russia', 'alliance'],
+      ['russia', 'usa', 'war'],
+      ['japan', 'usa', 'alliance'],
+      ['canada', 'usa', 'war'],
+      ['mexico', 'usa', 'war'],
+      ['canada', 'heartland', 'peace'],
+    ] as const) expect(w.relations[pairKey(a, b)], `${a} ${b}`).toBe(r);
+    // Canada and Mexico fight as powers, not minor states that only hold their ground.
+    expect(w.nations.canada!.minor).toBeUndefined();
+    expect(w.nations.mexico!.minor).toBeUndefined();
+    // The rebels see their own country.
+    expect(buildView(w, 'heartland').self.id).toBe('heartland');
   });
 
   it('deals every crisis from some seed, the same one each time for a seed', () => {

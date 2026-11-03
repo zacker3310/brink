@@ -11,10 +11,10 @@ phase passes `pnpm check`, the soak and e2e on its own and goes to `main`.
 geography is drawn, not generated. The seed varies only ground texture (forest, hills, mountains)
 inside each country, never coastlines or borders. North is up. The map runs from Moscow and St
 Petersburg in the west to Washington and New York on the Atlantic in the east: all of Russia and all
-of the United States, with the ocean squeezed hard (four sea hexes from Tokyo to the California coast,
+of the United States, with the ocean squeezed hard (three sea hexes from Tokyo to the California coast,
 Hawaii between), so a fleet crosses in a turn and the war is fought on land as much as at sea.
-Every island prize has open ground beside its cities (Taiwan has two beaches next to Taipei and
-Kaohsiung): a landing goes ashore first and takes the city from the land, rather than storming a
+Japan (16 hexes, Tokyo on the east coast) and Taiwan (9) are twice their old size. Every island
+prize has open ground beside its cities (Taiwan's beaches beside Taipei and Kaohsiung): a landing goes ashore first and takes the city from the land, rather than storming a
 garrison straight from the ships.
 
 | Region | Where | Starts with |
@@ -82,12 +82,19 @@ placed, damage, stability). It is chosen at setup (dealt at random by default, o
 in the world (`world.crisis`), so saves and replays carry it. Each has a difficulty and a
 recommended power. Later beats fire through the world-events system.
 
-Built (`packages/scenarios/src/crises.ts`, thirteen): Cold Peace, Korean Collapse, Straits of Fire,
+Built (`packages/scenarios/src/crises.ts`, fourteen): Cold Peace, Korean Collapse, Straits of Fire,
 Pearl Harbor 2.0, Red Dawn Arctic Edition, The Test, Operation Sombra, Maple Leaf Down, The Kuril
-Gambit, Dragon and Bear Divorce, Panama Shut, Ring of Fire, The Pacific Pact. The Pacific Pact is the
+Gambit, Dragon and Bear Divorce, Panama Shut, Ring of Fire, The Pacific Pact, The Second Civil War. The Pacific Pact is the
 bloc war: the United States, Japan, Canada and Mexico allied against Russia and China (allied too).
 Allies share supply, ground and sight, a coalition victory is open to each bloc, and a power's
-objectives drop its allies' capitals. Each is a pure edit (relations, seized
+objectives drop its allies' capitals.
+
+The Second Civil War makes a fifth power at turn 1: the Heartland, the American interior and Alaska
+(every US hex on the mainland that is not a city or next to one), with Houston as its capital and
+Denver and Atlanta rising for it, the US units in the countryside going over and a Republican Guard
+besides. Russia is its ally and at war with the cities; Japan is the cities' ally; Canada and Mexico
+stop being minor states (they fight as powers) and invade the cities at once; China watches. 8
+AI-only matches: China 5, the Heartland, Russia and Japan one each; the cities keep 2 to 6 of seven. Each is a pure edit (relations, seized
 hexes and sites, landed forces, battered garrisons, stability and stockpile) applied after the
 difficulty, so its wars are the story; every power's atlas is refreshed after it. Tests: every crisis
 leaves a legal world, and the AI plays five turns of each without a refused order.

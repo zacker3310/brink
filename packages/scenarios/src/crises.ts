@@ -1,7 +1,7 @@
-import type { HexKey, NationId, Relation, UnitClass, WorldState } from '@brink/contracts';
+import type { HexKey, Nation, NationId, Relation, UnitClass, WorldState } from '@brink/contracts';
 import { STACK_LIMIT, UNITS } from '@brink/game-data';
-import { keyOf, neighborKeys, offsetToAxial } from '@brink/map';
-import { computeVision, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
+import { keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
+import { computeVision, emptyIntel, grossYields, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
 // Opening Crises (docs/pacific.md): a story and a deterministic edit of the turn-1 Pacific world.
 // A crisis is chosen at setup (dealt at random by default) and stored in `world.crisis`, so saves
@@ -22,7 +22,8 @@ export type CrisisId =
   | 'dragon-bear'
   | 'panama-shut'
   | 'ring-of-fire'
-  | 'pacific-pact';
+  | 'pacific-pact'
+  | 'second-civil-war';
 
 export interface Crisis {
   id: CrisisId;
@@ -373,6 +374,110 @@ export const CRISES: readonly Crisis[] = [
           return !!owner && w.relations[pairKey(p, owner)] === 'war';
         });
       }
+    },
+  },
+  {
+    id: 'second-civil-war',
+    name: 'The Second Civil War',
+    hook: 'The cities against the heartland. Everyone else smells blood.',
+    story: 'A disputed election, then a general strike, then the governors stop taking Washington\'s calls. The interior declares the Heartland Republic in Houston with Russian money and Russian advisers. The coastal cities hold with Washington and beg Tokyo for help. Then Ottawa and Mexico City look at the map and send their armies south and north at once.',
+    setup: 'The Heartland Republic, a new power, holds the American interior and Alaska from Houston, Denver and Atlanta, at war with the cities, allied with Russia. Every US city and the ground around it stays with Washington, allied with Japan. Canada and Mexico invade the cities, both at once. China watches.',
+    threat: 3,
+    recommended: 'usa',
+    apply: (w) => {
+      calm(w);
+      const usa = w.nations.usa!;
+      // The Heartland: everything American on the mainland that is not a city or next to one.
+      const cityKeys = new Set(Object.values(w.sites).filter((x) => x.owner === 'usa' && (x.kind === 'capital' || x.kind === 'city')).map((x) => x.key));
+      const urban = new Set([...cityKeys].flatMap((k) => [k, ...neighborKeys(k)]));
+      const capital = site(w, 'Washington').key;
+      const mainland = new Set<HexKey>([capital]);
+      const queue = [capital];
+      while (queue.length) {
+        for (const n of neighborKeys(queue.pop()!)) {
+          if (mainland.has(n) || !w.tiles[n] || w.tiles[n]!.terrain === 'water') continue;
+          mainland.add(n);
+          queue.push(n);
+        }
+      }
+      const heartland: Nation = {
+        ...(JSON.parse(JSON.stringify(usa)) as Nation),
+        id: 'heartland',
+        name: 'Heartland',
+        color: '#b08a4e',
+        government: 'union',
+        stockpile: { credits: 480, energy: 240, materials: 300, food: 320 },
+        productionQueue: [],
+        construction: [],
+        objectives: [...cityKeys].map((k) => w.tiles[k]!.siteId!).filter(Boolean),
+        warLosses: 0,
+      };
+      w.nations.heartland = heartland;
+      for (const key of sortedKeys(w.tiles)) {
+        const t = w.tiles[key]!;
+        if (t.owner !== 'usa' || !mainland.has(key) || urban.has(key)) continue;
+        t.owner = 'heartland';
+        if (t.siteId) w.sites[t.siteId]!.owner = 'heartland';
+      }
+      // Houston is the rebel capital.
+      const houston = site(w, 'Houston');
+      Object.assign(houston, { kind: 'capital', originalOwner: 'heartland', victoryPoints: 10, population: 1600 });
+      houston.yields = { credits: 30, energy: 14, materials: 16, food: 18, industry: 30, research: 4 };
+      w.tiles[houston.key]!.terrain = 'urban';
+      // Units in the countryside go over to the Heartland; the cities keep theirs.
+      for (const id of sortedKeys(w.formations)) {
+        const f = w.formations[id]!;
+        if (f.owner === 'usa' && !f.aboard && w.tiles[f.key]?.owner === 'heartland') f.owner = 'heartland';
+      }
+      land(w, 'heartland', houston.key, ['armor', 'mechanized', 'infantry'], 'Republican Guard');
+      // Denver and Atlanta rise for the Republic: the interior's own cities, with their garrisons.
+      for (const [col, row, name, id] of [
+        [30, 9, 'Denver', 'heartland-denver'],
+        [36, 12, 'Atlanta', 'heartland-atlanta'],
+      ] as const) {
+        // The named hex, or the nearest open Heartland ground to it.
+        const want = cell(col, row);
+        const key = sortedKeys(w.tiles)
+          .filter((k) => w.tiles[k]!.owner === 'heartland' && !w.tiles[k]!.siteId && w.tiles[k]!.terrain !== 'water')
+          .sort((a, b) => keyDistance(a, want) - keyDistance(b, want) || (a < b ? -1 : 1))[0]!;
+        w.sites[id] = { id, name, kind: 'city', key, owner: 'heartland', originalOwner: 'heartland', population: 900, victoryPoints: 5, yields: { credits: 14, energy: 6, materials: 8, food: 9, industry: 16, research: 3 }, facilities: [] };
+        Object.assign(w.tiles[key]!, { siteId: id, terrain: 'urban', infrastructure: 3 });
+        land(w, 'heartland', key, ['infantry', 'mechanized', 'artillery'], `${name} Guard`);
+      }
+      // Militias rise outside each city.
+      for (const k of sortedKeys(Object.fromEntries([...cityKeys].map((x) => [x, true])))) {
+        const camp = sortedKeys(w.tiles).find((x) => w.tiles[x]!.owner === 'heartland' && !w.tiles[x]!.siteId && neighborKeys(x).some((n) => urban.has(n) && neighborKeys(n).includes(k)));
+        if (camp) land(w, 'heartland', camp, ['infantry'], 'Militia');
+      }
+      // Canada and Mexico go to war as powers in their own right, and hit the cities at once.
+      for (const m of ['canada', 'mexico'] as const) {
+        delete w.nations[m]!.minor;
+        relate(w, m, 'usa', 'war');
+        relate(w, m, 'japan', 'war');
+        relate(w, m, 'heartland', 'peace');
+        relate(w, m, 'russia', 'peace');
+        relate(w, m, 'china', 'peace');
+        w.nations[m]!.stockpile = { credits: 280, energy: 140, materials: 180, food: 180 };
+      }
+      relate(w, 'canada', 'mexico', 'alliance');
+      land(w, 'canada', site(w, 'Vancouver').key, ['armor', 'mechanized'], 'Pacific Command');
+      land(w, 'canada', site(w, 'Ottawa').key, ['armor', 'mechanized'], 'Eastern Command');
+      land(w, 'mexico', site(w, 'Tijuana').key, ['mechanized', 'armor'], 'Northern Army');
+      land(w, 'mexico', site(w, 'Monterrey').key, ['mechanized', 'armor'], 'Gulf Army');
+      // Moscow arms the Heartland and fights the cities; Tokyo stands with the cities.
+      relate(w, 'heartland', 'usa', 'war');
+      relate(w, 'heartland', 'russia', 'alliance');
+      relate(w, 'russia', 'usa', 'war');
+      relate(w, 'japan', 'usa', 'alliance');
+      relate(w, 'heartland', 'japan', 'war');
+      relate(w, 'heartland', 'china', 'peace');
+      for (const n of sortedKeys(w.nations)) {
+        if (n === 'heartland' || w.relations[pairKey(n, 'heartland')]) continue;
+        relate(w, n, 'heartland', w.nations[n]!.minor ? 'peace' : 'war');
+      }
+      shake(w, 'usa', -20, 70);
+      heartland.industrialCapacity = grossYields(w, 'heartland').industry;
+      w.intel.heartland = emptyIntel();
     },
   },
 ];
