@@ -971,6 +971,8 @@ export function PhoneGame() {
   const [hand, setHand] = useState(false);
   const [decision, setDecision] = useState(false);
   const aiming = useGame((s) => s.aimingCard);
+  // The guided turn's coach is the one voice while it runs: no advisor card beside it.
+  const coaching = useCoach((s) => s.active);
   const firstTurn = useGame((s) => s.view?.turn === 1 && !s.view.victory);
   const [howTo, setHowTo] = useState(firstTurn && !useCoach.getState().active);
   const control = useCamera((s) => s.control);
@@ -1029,7 +1031,7 @@ export function PhoneGame() {
           />
         ) : (
           <>
-            {fid && !debrief && !city && !resolving && !aiming && <Advisor selected={fid} />}
+            {fid && !debrief && !city && !resolving && !aiming && !coaching && <Advisor selected={fid} />}
             {aiming && !resolving && <AimBanner />}
             {debrief ? (
               <Debrief onDone={() => setBriefed(reportTurn)} />

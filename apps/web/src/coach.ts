@@ -79,7 +79,7 @@ export const STEPS: readonly CoachStep[] = [
     done: (s) => s.resolving || s.turn > s.start,
     keys: ['Ctrl+Enter', 'Enter'],
     touch: () => 'Your orders lock, the three AI powers lock theirs, and the world moves at once.',
-    touchAction: () => 'Tap END TURN, then COMMIT',
+    touchAction: (s) => (s.planned > 0 ? 'Tap EXECUTE, then COMMIT' : 'Tap END TURN, then COMMIT'),
   },
   {
     id: 'watch',

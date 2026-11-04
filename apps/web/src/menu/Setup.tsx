@@ -9,6 +9,7 @@ import { Kbd, Mark, useKeys } from '../chrome';
 import { CLASS_ORDER, DOCTRINE, dossier, operationName, randomSeed, traits } from './intel';
 import { Emblem, UnitGlyph } from '../glyphs';
 import { MapPreview } from './MapPreview';
+import { LeaderCard } from './Leader';
 
 // The campaign briefing: a war-room screen in the title screen's language (engraved gold for
 // command, the nation's colour for who you are). Classes are `.wr-*` in index.css, set outside the
@@ -279,6 +280,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                 </div>
               </div>
               <blockquote className="wr-doctrine">{DOCTRINE[spec.government]}</blockquote>
+              <LeaderCard government={spec.government} />
               {NATION_BLURB[spec.id] && (
                 <p className="wr-blurb" data-testid="dossier-blurb">
                   {NATION_BLURB[spec.id]}

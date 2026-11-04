@@ -1,7 +1,7 @@
 {
   "name": "Brink",
   "short_name": "Brink",
-  "description": "Simultaneous-turn modern war. Plan in secret; the world moves at once.",
+  "description": "A war of nations on the map, every battle fought by hand. Plan in secret; the world moves at once.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
@@ -9,10 +9,59 @@
   "orientation": "any",
   "background_color": "#070909",
   "theme_color": "#070909",
-  "categories": ["games", "strategy"],
+  "categories": [
+    "games",
+    "strategy"
+  ],
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Quick battle",
+      "short_name": "Battle",
+      "description": "Straight into a fight",
+      "url": "./?quick=1",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Continue campaign",
+      "short_name": "Continue",
+      "description": "Your latest campaign",
+      "url": "./?continue=1",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

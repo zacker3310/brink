@@ -107,7 +107,7 @@ export function Coach() {
   if (showReport || (phone && cityOpen)) {
     return (
       <section
-        className={`coach coach-strip fixed left-1/2 z-40 w-[min(720px,calc(100%-24px))] -translate-x-1/2 ${phone ? 'top-[calc(env(safe-area-inset-top)+6px)]' : 'bottom-3'}`}
+        className={`coach coach-strip fixed left-1/2 z-[45] w-[min(720px,calc(100%-24px))] -translate-x-1/2 ${phone ? 'top-[calc(env(safe-area-inset-top)+6px)]' : 'bottom-3'}`}
         data-testid="coach"
         data-step={def.id}
         aria-live="polite"
@@ -120,15 +120,57 @@ export function Coach() {
       </section>
     );
   }
-  const place = phone
-    ? 'top-[calc(env(safe-area-inset-top)+104px)] left-2 right-2'
-    : shifted
-      ? 'bottom-36 left-[calc(50%+180px)] w-[400px] -translate-x-1/2'
-      : 'bottom-3 left-1/2 w-[440px] -translate-x-1/2';
+  // On a phone the coach is a slim card under the turn row: the title, the one thing to do, and a
+  // button only when the step waits for one. The map stays open between it and the unit card; the
+  // dock below already holds Plan and End Turn.
+  if (phone) {
+    return (
+      <section
+        key={def.id}
+        className="coach coach-card coach-compact panel-in fixed top-[calc(env(safe-area-inset-top)+54px)] right-2 left-2 z-[45]"
+        data-testid="coach"
+        data-step={def.id}
+        aria-live="polite"
+        aria-label="Guided first match"
+      >
+        <div className="flex items-center gap-2">
+          <Pips step={step} />
+          <h2 className="coach-title coach-title-inline min-w-0 flex-1 truncate" data-testid="coach-title">
+            {def.title}
+          </h2>
+          <button type="button" onClick={finish} className="min-h-6 text-[10px] text-faint uppercase" data-testid="coach-skip-all">
+            End guide
+          </button>
+        </div>
+        {!def.done && <p className="coach-body">{body}</p>}
+        <div className="flex items-center gap-2">
+          {action && (
+            <p className="coach-action min-w-0 flex-1" data-testid="coach-action">
+              <svg viewBox="0 0 12 12" className="coach-action-arrow" aria-hidden>
+                <path d="M3 1.5L8.5 6 3 10.5z" fill="currentColor" />
+              </svg>
+              {action}
+            </p>
+          )}
+          {def.skippable && (
+            <button type="button" onClick={next} className="coach-btn coach-btn-quiet mt-1.5" data-testid="coach-skip">
+              Later
+            </button>
+          )}
+          {!def.done && (
+            <button type="button" onClick={next} className="coach-btn coach-btn-go mt-1.5" data-testid="coach-next">
+              {step === STEPS.length - 1 ? 'Dismissed' : 'Got it'}
+            </button>
+          )}
+        </div>
+      </section>
+    );
+  }
+  const place = shifted ? 'bottom-36 left-[calc(50%+180px)] w-[400px] -translate-x-1/2' : 'bottom-3 left-1/2 w-[440px] -translate-x-1/2';
   return (
     <section
       key={def.id}
-      className={`coach coach-card panel-in fixed z-40 ${phone ? 'coach-compact' : ''} ${place}`}
+      className={`coach coach-card panel-in fixed z-[45] ${place}`}
       data-testid="coach"
       data-step={def.id}
       aria-live="polite"
@@ -155,8 +197,8 @@ export function Coach() {
           {action}
         </p>
       )}
-      <div className={`flex flex-wrap items-center gap-2 ${phone ? 'mt-1.5' : 'mt-2.5'}`}>
-        {def.keys && !phone && def.keys.map((k) => <Kbd key={k}>{k}</Kbd>)}
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {def.keys && def.keys.map((k) => <Kbd key={k}>{k}</Kbd>)}
         <span className="flex-1" />
         {showMe && !snap.resolving && (
           <button type="button" onClick={showMe.run} className="coach-btn" data-testid="coach-show">
