@@ -329,8 +329,12 @@ export function resolveCommanders(world: WorldState, events: GameEvent[]): void 
 
   for (const id of ids) {
     const c = all[id]!;
-    if (c.status === 'killed') continue;
     const level = Math.min(COMMANDER_RULES.maxLevel, levelForXp(c.xp));
+    // A general killed in the fight that earned a level keeps it on the record: no promotion, no offer.
+    if (c.status === 'killed') {
+      c.level = Math.max(c.level, level);
+      continue;
+    }
     if (level > c.level) {
       c.level = level;
       out.push(event(c, 'level_up', { level }));
