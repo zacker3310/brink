@@ -10,7 +10,7 @@ import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, Si
 export * from './commanders';
 export * from './doctrine';
 
-export const RULESET_VERSION = '2.3.0';
+export const RULESET_VERSION = '2.4.0';
 
 export const HOURS_PER_TURN = 6;
 
