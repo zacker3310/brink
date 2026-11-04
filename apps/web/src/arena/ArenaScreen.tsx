@@ -70,6 +70,7 @@ import type { BattleRequest } from './battle';
 import { BattleLog } from './BattleLog';
 import { EndTurnSheet, type ResetState } from './EndTurnSheet';
 import { HapticTick } from './haptics';
+import { AudioMix } from '../audio/AudioMix';
 import { bandOf, OutcomeBar } from './OutcomeBar';
 import { metered } from './pacing';
 import { PerfOverlay } from './PerfOverlay';
@@ -2237,6 +2238,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               <input type="range" min={0} max={100} step={10} value={settings.shake} disabled={settings.motion === 'off'} onChange={(e) => changeSettings({ ...settings, shake: Number(e.target.value) })} className="h-11 min-w-0 flex-1 accent-white disabled:opacity-40" aria-label="Screen shake" data-testid="setting-shake" />
               <span className="w-12 shrink-0 text-right text-[14px] text-muted tabular-nums">{settings.motion === 'off' ? 'Off' : `${settings.shake}%`}</span>
             </label>
+            <AudioMix rowClass="flex min-h-12 items-center gap-3 rounded-xl bg-ink-900 px-4 py-2" />
             <ul className="divide-y divide-line overflow-hidden rounded-xl bg-ink-900">
               {(
                 [

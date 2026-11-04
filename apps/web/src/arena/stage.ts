@@ -477,7 +477,7 @@ export class BattleStage {
     this.fx.setArsenals?.(opts.arsenal.blue, opts.arsenal.red);
     this.crowd = new SoldierCrowd({ max: 420, shadows: this.preset.soldierShadows, scale: SOLDIER_SCALE });
     this.scene.add(this.crowd.group);
-    this.audio = new BattleAudio({ radio: opts.settings.radio });
+    this.audio = new BattleAudio({ radio: opts.settings.radio, battle });
     this.audio.setNight(night);
     this.audio.ambience(battle.conditions.biome, battle.conditions.weather);
     this.sorties = new Sorties(this.scene, this.fx, this.audio, (x, z) => this.world.heightAt(x, z), { w: W, h: H }, () => this.world.seaLevel);
@@ -1639,6 +1639,7 @@ export class BattleStage {
   play(events: readonly BattleEvent[]): void {
     this.invalidate();
     this.notes = { kills: lastKills(events), shook: shakes(events) };
+    this.audio.feed(events);
     for (const beat of beatsOf(events)) {
       const clip = this.clipOf(beat);
       this.building = clip;
@@ -2295,7 +2296,7 @@ export class BattleStage {
         break;
       }
       case 'end':
-        this.step(0.6, {});
+        this.step(0.6, { start: () => this.audio.ended(e.won) });
         break;
     }
   }

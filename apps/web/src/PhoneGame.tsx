@@ -22,6 +22,7 @@ import { nextObjective } from './objective';
 import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
 import { isMuted, setMuted } from './sfx';
+import { AudioMix } from './audio/AudioMix';
 import { useGame, type Tab } from './store';
 import { EventCard } from './UnitPanel';
 import { CommandRow, GeneralsRoster, PromotionModal } from './Generals';
@@ -200,6 +201,7 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
       >
         Sound <span className={muted ? 'text-faint' : 'text-signal'}>{muted ? 'Off' : 'On'}</span>
       </button>
+      {!muted && <AudioMix rowClass="flex w-full items-center gap-3 border-b border-line/60 px-4 py-1.5 text-sm" />}
       <button type="button" className={row} onClick={() => setMapStyle(mapStyle === 'painted' ? 'atlas' : mapStyle === 'atlas' ? 'satellite' : 'painted')} data-testid="toggle-map-style">
         Map style <span className="text-signal">{mapStyle === 'painted' ? 'Painted' : mapStyle === 'atlas' ? 'Clean' : 'Satellite'}</span>
       </button>

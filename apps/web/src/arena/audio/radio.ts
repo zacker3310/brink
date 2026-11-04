@@ -2,6 +2,7 @@
 // battle, decoded once and kept for the session. One call on the net at a time.
 
 import type { RadioCall } from '@brink/arena/v2';
+import { noise, tone } from '../../audio/voices';
 
 export type Direction = 'front' | 'left' | 'right' | 'rear';
 
@@ -155,6 +156,7 @@ export class RadioDesk {
     const at = now + 0.02;
     src.start(at);
     const ends = at + buf.duration;
+    keyed(ctx, out, at, ends);
     // Duck the battle under the voice, then let it back up.
     duck.gain.cancelScheduledValues(now);
     duck.gain.setTargetAtTime(0.55, now, 0.04);
@@ -189,4 +191,12 @@ export class RadioDesk {
     }
     this.air = null;
   }
+}
+
+/** The net keyed around a call: a squelch burst as it opens, a roger beep and a hiss tail as it closes. */
+export function keyed(ctx: BaseAudioContext, out: AudioNode, at: number, ends: number): void {
+  noise(ctx, out, Math.max(ctx.currentTime, at - 0.015), 0.05, 0.08, { type: 'bandpass', freq: 2400, q: 1.4 });
+  tone(ctx, out, ends + 0.01, 1250, 0.06, 0.05, { type: 'sine', attack: 0.002 });
+  tone(ctx, out, ends + 0.08, 1650, 0.05, 0.045, { type: 'sine', attack: 0.002 });
+  noise(ctx, out, ends + 0.13, 0.1, 0.05, { type: 'bandpass', freq: 1900, freqEnd: 900, q: 1.2 });
 }
