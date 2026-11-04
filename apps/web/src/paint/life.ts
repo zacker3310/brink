@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, Texture, type Application } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Texture, type Application } from 'pixi.js';
 import type { HexKey, NationView, TurnReport } from '@brink/contracts';
 import { neighborKeys, type Point } from '@brink/map';
 import { getArt } from '../art';
@@ -51,6 +51,16 @@ export interface LifeContext {
 export class MapLife {
   private readonly root = new Container();
   private readonly fogLayer = new Container();
+  /** Mist over ground only remembered. */
+  private readonly mistLayer = new Container();
+  /**
+   * Fog and mist, each baked into two low-resolution textures that heave and breathe out of step:
+   * a few sprites to draw each frame instead of thousands of overlapping puffs (overdraw a phone
+   * GPU cannot afford). Rebuilt only when what is seen changes.
+   */
+  private banks: { s: Sprite; x: number; y: number; phase: number; drift: number; breathe: number }[] = [];
+  private bankTextures: Texture[] = [];
+  private bankSig = '';
   private readonly shadowLayer = new Container();
   private readonly glintLayer = new Container();
   private readonly fireLayer = new Container();
@@ -59,7 +69,6 @@ export class MapLife {
   private fronts: Front[] = [];
   private fires: { p: Point; next: number }[] = [];
   private glints: { s: Sprite; phase: number; speed: number }[] = [];
-  private fogs: { s: Sprite; x: number; y: number; phase: number }[] = [];
   private shadows: { s: Sprite; vx: number }[] = [];
   private bounds = { x: 0, y: 0, w: 1, h: 1 };
   private clock = 0;
@@ -71,7 +80,7 @@ export class MapLife {
     parent: Container,
     private readonly ctx: LifeContext,
   ) {
-    this.root.addChild(this.shadowLayer, this.glintLayer, this.fireLayer, this.fxLayer, this.fogLayer);
+    this.root.addChild(this.shadowLayer, this.glintLayer, this.mistLayer, this.fireLayer, this.fxLayer, this.fogLayer);
     this.root.eventMode = 'none';
     parent.addChild(this.root);
     app.ticker.add(this.tick);
@@ -79,6 +88,7 @@ export class MapLife {
 
   destroy(): void {
     this.app.ticker.remove(this.tick);
+    for (const t of this.bankTextures) t.destroy(true);
     this.root.destroy({ children: true });
   }
 
@@ -92,20 +102,74 @@ export class MapLife {
     this.bounds = { x: minX - size, y: minY - size, w: Math.max(...pts.map((p) => p.x)) - minX + size * 2, h: Math.max(...pts.map((p) => p.y)) - minY + size * 2 };
     const tex = softTexture();
 
-    // Fog: banks of cloud over every hex nobody has seen, gently heaving.
-    this.fogLayer.removeChildren().forEach((c) => c.destroy());
-    this.fogs = [];
-    for (const k of keys) {
-      if (v.tiles[k]!.visibility !== 'unknown') continue;
-      const p = center(k);
-      const s = new Sprite(tex);
-      s.anchor.set(0.5);
-      s.tint = 0x26313a;
-      s.alpha = 0.95;
-      s.scale.set((size * 3.2) / 128);
-      s.position.set(p.x, p.y);
-      this.fogLayer.addChild(s);
-      this.fogs.push({ s, x: p.x, y: p.y, phase: hash(k) * Math.PI * 2 });
+    // Fog: banks of cloud over every hex nobody has seen. Each hex is a dark body of cloud with
+    // lighter billows on top, lit from the north-west like the land, and at the edge of what is
+    // known the bank thins into wisps over the ground instead of stopping at a hex line.
+    // Mist: a pale veil over ground you have seen but cannot see now; the haze under it (on the map)
+    // keeps the edge of what you see exact.
+    const sig = keys.map((k) => v.tiles[k]!.visibility[0]).join('');
+    if (sig !== this.bankSig) {
+      this.bankSig = sig;
+      this.fogLayer.removeChildren().forEach((c) => c.destroy());
+      this.mistLayer.removeChildren().forEach((c) => c.destroy());
+      for (const t of this.bankTextures) t.destroy(true);
+      this.bankTextures = [];
+      this.banks = [];
+      const groups = [0, 1, 2, 3].map(() => new Container());
+      const puff = (group: number, x: number, y: number, r: number, tint: number, alpha: number) => {
+        const s = new Sprite(tex);
+        s.anchor.set(0.5);
+        s.tint = tint;
+        s.alpha = alpha;
+        s.scale.set((r * 2) / 128, (r * 1.6) / 128);
+        s.position.set(x, y);
+        groups[group]!.addChild(s);
+      };
+      const unknown = keys.filter((k) => v.tiles[k]!.visibility === 'unknown');
+      for (const k of unknown) {
+        const p = center(k);
+        puff(0, p.x, p.y, size * 1.7, 0x1e2a33, 0.93);
+      }
+      for (const k of unknown) {
+        const p = center(k);
+        const h = hash(k);
+        const h2 = hash(`${k}b`);
+        puff(1, p.x + (h - 0.5) * size * 0.6, p.y - size * 0.25, size * (0.9 + h2 * 0.5), 0x4a5a66, 0.42);
+        if (h < 0.55) puff(1, p.x - size * 0.35 + h2 * size * 0.3, p.y - size * 0.45, size * (0.55 + h * 0.3), 0x8b9aa4, 0.26);
+        for (const n of neighborKeys(k)) {
+          if (!v.tiles[n] || v.tiles[n]!.visibility === 'unknown' || hash(k + n) > 0.5) continue;
+          const q = center(n);
+          puff(1, p.x + (q.x - p.x) * 0.55, p.y + (q.y - p.y) * 0.55, size * 0.8, 0x56656f, 0.35);
+        }
+      }
+      for (const k of keys) {
+        if (v.tiles[k]!.visibility !== 'observed') continue;
+        const p = center(k);
+        const h = hash(`${k}m`);
+        puff(h < 0.5 ? 2 : 3, p.x + (h - 0.5) * size * 0.5, p.y + (hash(`${k}n`) - 0.5) * size * 0.4, size * 1.3, 0xb8c6cf, 0.15 + h * 0.08);
+      }
+      const look = [
+        { drift: 2, breathe: 0.05, phase: 0 },
+        { drift: 4, breathe: 0.12, phase: 2.1 },
+        { drift: 4, breathe: 0.3, phase: 0.7 },
+        { drift: 5, breathe: 0.3, phase: 3.9 },
+      ];
+      groups.forEach((group, i) => {
+        if (group.children.length === 0) {
+          group.destroy();
+          return;
+        }
+        const b = group.getLocalBounds();
+        const frame = new Rectangle(b.x, b.y, Math.max(1, b.width), Math.max(1, b.height));
+        // Cloud is soft: a quarter of the map's resolution loses nothing and costs a sixteenth.
+        const baked = this.app.renderer.generateTexture({ target: group, frame, resolution: 0.25 });
+        group.destroy({ children: true });
+        this.bankTextures.push(baked);
+        const s = new Sprite(baked);
+        s.position.set(frame.x, frame.y);
+        (i < 2 ? this.fogLayer : this.mistLayer).addChild(s);
+        this.banks.push({ s, ...look[i]!, x: frame.x, y: frame.y });
+      });
     }
 
     // Cloud shadows: a few, made once, drifting west to east forever.
@@ -283,9 +347,9 @@ export class MapLife {
   private step(dt: number): void {
     this.clock += dt;
     const t = this.clock;
-    for (const f of this.fogs) {
-      f.s.position.set(f.x + Math.sin(t * 0.25 + f.phase) * 3, f.y + Math.cos(t * 0.2 + f.phase) * 2);
-      f.s.alpha = 0.88 + Math.sin(t * 0.4 + f.phase) * 0.07;
+    for (const b of this.banks) {
+      b.s.position.set(b.x + Math.sin(t * 0.25 + b.phase) * b.drift, b.y + Math.cos(t * 0.2 + b.phase) * b.drift * 0.6);
+      b.s.alpha = 1 - b.breathe * (0.5 + 0.5 * Math.sin(t * 0.4 + b.phase));
     }
     if (this.still) return;
     for (const s of this.shadows) {

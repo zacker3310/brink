@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
+import { Application, BlurFilter, CanvasSource, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
@@ -20,7 +20,7 @@ import { operationById } from '@brink/ai';
 import type { ActiveOperation } from './saves';
 import { groupOrders, oddsFor, ODDS_TAG, type Odds } from './odds';
 import { useGame } from './store';
-import { paintTheatre } from './paint/ground';
+import { paintSteps, SEA, sizeClass, TABLE } from './paint/ground';
 import { MapLife } from './paint/life';
 
 /** Region names on the painted map: an engraved serif, like a printed atlas of a fantasy world. */
@@ -273,6 +273,12 @@ export function MapView() {
   /** Removes the map's page-level input listeners. */
   const inputOff = useRef<(() => void) | null>(null);
   const groundSig = useRef('');
+  /** The painted map's hex grid, faded in with zoom. */
+  const gridRef = useRef<Graphics | null>(null);
+  /** Counts paints of the ground: a paint under way stops when a newer one starts. */
+  const paintJob = useRef(0);
+  /** When the map last had something to show at full rate. */
+  const wokeAt = useRef(0);
   const groundTextures = useRef<Texture[]>([]);
   const reachCache = useRef<{ view: NationView; id: string; plays: unknown; reach: Record<HexKey, Reach> } | null>(null);
   const view = useGame((s) => s.view);
@@ -324,6 +330,14 @@ export function MapView() {
       appRef.current = { app, world, layers, life };
       // Rotors turn and drone teams circle whether or not anything else changes.
       app.ticker.add(() => tickModels(performance.now()));
+      // Render on demand, in two speeds: full rate while the player touches the map, the camera
+      // moves, the board changes or a turn replays; once all is still for two seconds, only the
+      // map's ambient life moves (cloud, water, fronts), and it is drawn at 24 frames a second.
+      app.ticker.add(() => {
+        const busy = useGame.getState().playback !== null || performance.now() - wokeAt.current < 2000;
+        const want = busy ? 0 : 24;
+        if (app.ticker.maxFPS !== want) app.ticker.maxFPS = want;
+      });
       // The city banners and other overlays are HTML laid over the canvas from the published camera.
       // Whatever moves or resizes the map (a gesture, a resize Pixi handles on its own, the phone's
       // toolbar sliding away), they follow it within a frame: republish whenever the real transform
@@ -401,13 +415,38 @@ export function MapView() {
     return useGame.getState().view?.tiles[key] ? key : null;
   }
 
+  /** Back to full frame rate for a while (see the ticker in the setup). */
+  function wake() {
+    wokeAt.current = performance.now();
+    const a = appRef.current;
+    if (a && a.app.ticker.maxFPS !== 0) a.app.ticker.maxFPS = 0;
+  }
+
   function publish() {
     const a = appRef.current;
     if (!a) return;
+    wake();
     useCamera.setState({ camera: { x: a.world.x, y: a.world.y, scale: a.world.scale.x, width: a.app.screen.width, height: a.app.screen.height } });
     setModelZoom(a.world.scale.x);
-    // Zoomed out, the map becomes a political map: nation names across their land.
-    a.layers.labels!.visible = a.world.scale.x < 0.95;
+    fadeByZoom();
+  }
+
+  /**
+   * Level of detail. Zoomed out, the map becomes a political map: nation names across their land,
+   * fading in as the land shrinks. Zoomed in, the hex grid fades up so every hex can be counted.
+   */
+  function fadeByZoom() {
+    const a = appRef.current;
+    if (!a) return;
+    const z = a.world.scale.x;
+    const names = Math.max(0, Math.min(1, (1.0 - z) / 0.12));
+    a.layers.labels!.alpha = names;
+    a.layers.labels!.visible = names > 0;
+    const grid = gridRef.current;
+    if (grid && !grid.destroyed) {
+      grid.alpha = Math.max(0, Math.min(1, (z - 0.8) / 0.9));
+      grid.visible = grid.alpha > 0;
+    }
   }
 
   function zoomAt(px: number, py: number, factor: number) {
@@ -493,6 +532,7 @@ export function MapView() {
       dragged = false;
     };
     canvas.addEventListener('pointerdown', (e) => {
+      wake();
       // The first finger of a new touch (or any mouse press): every earlier pointer has ended.
       if (e.isPrimary && pts.size > 0) reset();
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -507,6 +547,7 @@ export function MapView() {
       } else if (pts.size === 2) startPinch();
     });
     canvas.addEventListener('pointermove', (e) => {
+      wake();
       if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // A mouse with no button down, or a touch the map never saw start: no gesture is under way.
       if (e.pointerType === 'mouse' && e.buttons === 0 && (down || pinch)) reset();
@@ -805,19 +846,84 @@ export function MapView() {
     layer.addChild(g);
   }
 
+  /**
+   * The painted ground: one hand-painted canvas for the whole theatre, baked into a single texture.
+   * It paints a little each frame (about 12 ms at a time), so opening the map or exploring land never
+   * holds the page still; the ground it replaces stays until it is done, and the new one fades in.
+   * Instrumented: `brink:paint` in the browser's performance timeline, from first stroke to install.
+   */
+  function paintGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: HexKey[], paper: boolean, job: number) {
+    performance.mark('brink:paint-start');
+    const steps = paintSteps(v, keys, SIZE, { paper });
+    const run = () => {
+      if (job !== paintJob.current || !appRef.current) return;
+      const t0 = performance.now();
+      let r = steps.next();
+      while (!r.done && performance.now() - t0 < 12) r = steps.next();
+      if (!r.done) {
+        setTimeout(run, 0);
+        return;
+      }
+      const p = r.value;
+      performance.measure('brink:paint', 'brink:paint-start');
+      const layer = a.layers.terrain!;
+      layer.removeChildren().forEach((c) => c.destroy());
+      for (const t of groundTextures.current) t.destroy(true);
+      // Beyond the canvas the open sea runs on (or the table under the paper).
+      a.app.renderer.background.color = p.background;
+      // Mipmapped, so the whole theatre seen from afar stays smooth instead of shimmering.
+      const tex = new Texture({ source: new CanvasSource({ resource: p.canvas, autoGenerateMipmaps: true }) });
+      groundTextures.current = [tex];
+      const ground = new Sprite(tex);
+      ground.position.set(p.x, p.y);
+      ground.scale.set(p.unit);
+      layer.addChild(ground);
+      // The hex grid, faint, drawn only close in (see `fadeByZoom`): far out the land reads as land.
+      const grid = new Graphics();
+      for (const k of keys) if (v.tiles[k]!.visibility !== 'unknown') grid.poly(poly(k));
+      grid.stroke({ width: 1, color: 0x1c1a10, alpha: 0.32 });
+      gridRef.current = grid;
+      layer.addChild(grid);
+      fadeByZoom();
+      // Fade the new ground in over what was there (the open sea on the first paint).
+      ground.alpha = 0;
+      const fade = () => {
+        if (ground.destroyed) return a.app.ticker.remove(fade);
+        ground.alpha = Math.min(1, ground.alpha + a.app.ticker.deltaMS / 250);
+        if (ground.alpha >= 1) a.app.ticker.remove(fade);
+      };
+      a.app.ticker.add(fade);
+    };
+    // Until the first paint lands, the sea.
+    if (groundTextures.current.length === 0) a.app.renderer.background.color = paper ? TABLE : SEA;
+    run();
+  }
+
   /** The ground: rebuilt only when what the viewer knows of the land changes, not on every click. */
   function drawGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: string[]) {
     const style = useGame.getState().mapStyle;
     const atlas = style === 'atlas';
-    const painted = style === 'painted';
+    // Paper is the painted map printed on parchment: the same land, the same overlays.
+    const painted = style === 'painted' || style === 'paper';
     const art = atlas || painted ? null : getArt();
     // The painted canvas only changes when land is explored; seen-versus-visible shading is drawn
     // over it, so a new turn does not repaint the theatre.
     const vis = (k: HexKey) => (painted ? (v.tiles[k]!.visibility === 'unknown' ? 'u' : 'k') : v.tiles[k]!.visibility[0]);
-    const sig = `${style}${art ? 1 : 0}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
+    // Towns are painted as big as their people and with what has been built there: repaint when that changes.
+    const sites = Object.keys(v.sites)
+      .sort()
+      .map((id) => `${id}${sizeClass(v.sites[id]!)}${v.sites[id]!.facilities.join('')}`)
+      .join(',');
+    const sig = `${style}${art ? 1 : 0}|${sites}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
     if (groundSig.current === sig) return;
     groundSig.current = sig;
     const layer = a.layers.terrain!;
+    // A paint still under way is for ground that is no longer current.
+    paintJob.current += 1;
+    if (painted) {
+      paintGround(a, v, keys, style === 'paper', paintJob.current);
+      return;
+    }
     layer.removeChildren().forEach((c) => c.destroy());
     for (const t of groundTextures.current) t.destroy(true);
     const made: Texture[] = [];
@@ -826,22 +932,7 @@ export function MapView() {
       layer.addChild(atlasGround(v, keys));
       return;
     }
-    // Beyond the painted canvas the open sea runs on.
-    a.app.renderer.background.color = painted ? 0x0a2433 : SURFACE.ink950;
-    if (painted) {
-      // One hand-painted canvas for the whole theatre, baked into a single texture.
-      // Instrumented: `brink:paint` in the browser's performance timeline.
-      performance.mark('brink:paint-start');
-      const p = paintTheatre(v, keys, SIZE);
-      performance.measure('brink:paint', 'brink:paint-start');
-      const tex = Texture.from(p.canvas);
-      made.push(tex);
-      const ground = new Sprite(tex);
-      ground.position.set(p.x, p.y);
-      ground.scale.set(p.unit);
-      layer.addChild(ground);
-      return;
-    }
+    a.app.renderer.background.color = SURFACE.ink950;
     // Terrain: satellite-style ground mapped in world space, so the landscape runs on across hexes.
     const terrain = new Graphics();
     const crisp = new Graphics();
@@ -931,6 +1022,7 @@ export function MapView() {
   }
 
   function redraw() {
+    wake();
     const a = appRef.current;
     const s = useGame.getState();
     // While a turn replays, the board shows the world it was planned against.
@@ -942,8 +1034,10 @@ export function MapView() {
     }
     const keys = Object.keys(v.tiles).sort();
     const art = getArt();
-    const paintedMap = s.mapStyle === 'painted';
-    drawGround(a, v, keys);
+    const paintedMap = s.mapStyle === 'painted' || s.mapStyle === 'paper';
+    // A replay plays over the ground as it is now: repainting the land for the board before the
+    // turn would cost a second paint each turn (and stall the film) for a difference of a few hexes.
+    if (!replaying || !groundSig.current) drawGround(a, v, keys);
     a.life.update(v, s.report, !replaying);
 
 
@@ -987,11 +1081,12 @@ export function MapView() {
     if (paintedMap) {
       const wash = new Graphics();
       for (const [owner, list] of [...washes].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
-        for (const k of list) wash.poly(poly(k, -0.6));
+        for (const k of list) wash.poly(poly(k));
         wash.fill({ color: hex(v.nations[owner]?.color ?? '#888888'), alpha: 0.1 });
       }
-      for (const k of stale) wash.poly(poly(k, -0.6));
-      if (stale.length) wash.fill({ color: 0x0a0c0b, alpha: 0.36 });
+      // Ground only remembered lies under a cool haze: still readable, plainly not seen now.
+      for (const k of stale) wash.poly(poly(k));
+      if (stale.length) wash.fill({ color: 0x1b2a36, alpha: 0.3 });
       a.layers.overlay!.addChild(wash);
     }
     a.layers.overlay!.addChild(overlay);
@@ -1036,7 +1131,7 @@ export function MapView() {
       label.alpha = 0.92;
       a.layers.labels!.addChild(label);
     }
-    a.layers.labels!.visible = a.world.scale.x < 0.95;
+    fadeByZoom();
 
     // Threat: where seen enemies could hit next turn, darker where more of them could.
     if (s.showThreat && !replaying) {

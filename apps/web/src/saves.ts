@@ -2,7 +2,7 @@
 // windows, blocked site data) or full, and the game must still run without it.
 
 /** How the map is drawn: painted (default), a clean board, or satellite imagery. */
-export type MapStyle = 'painted' | 'atlas' | 'satellite';
+export type MapStyle = 'painted' | 'paper' | 'atlas' | 'satellite';
 
 export interface SlotInfo {
   slot: string;
