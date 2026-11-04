@@ -6,7 +6,7 @@ import { makeWorld, orders, setRelation, site } from './fixture.test-util';
 import { buildView } from './fog';
 import { attitude, memoryValue, recordMemories, stanceOf } from './leaders';
 import { resolveTurn } from './resolve';
-import { clone, treatyIn } from './rules';
+import { clone, recruitCost, treatyIn } from './rules';
 import { supremacyStanding } from './victory';
 
 const k = hexKey;
@@ -48,6 +48,25 @@ describe('deals', () => {
     expect(r.world.nations.b!.stockpile.credits - plain.world.nations.b!.stockpile.credits).toBe(100);
     expect(r.world.nations.a!.stockpile.materials - plain.world.nations.a!.stockpile.materials).toBe(60);
     expect(r.world.proposals).toEqual([]);
+  });
+
+  it('a deal agreed on a later turn does not spend what that turn\'s recruits hold', () => {
+    const w = makeWorld();
+    setRelation(w, 'a', 'b', 'peace');
+    // Turn 1: a offers credits for materials; b says nothing yet, so the offer waits.
+    const first = resolveTurn(w, [orders(w, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_exchange', terms: { give: { credits: 100 }, get: { materials: 60 } } }] })]);
+    const w2 = first.world;
+    expect(w2.proposals).toHaveLength(1);
+    // Turn 2: a recruits with nearly every credit, and b answers the waiting offer in kind. Validation
+    // reserved only the recruit (the deal is not in a's orders this turn), so the deal must not take it.
+    const armor = recruitCost(w2.nations.a!, 'armor');
+    w2.nations.a!.stockpile.credits = armor.credits + 50;
+    const r = resolveTurn(w2, [
+      orders(w2, 'a', {}, { recruit: [{ siteId: 'a-home', unitClass: 'armor' }] }),
+      orders(w2, 'b', {}, { diplomacy: [{ target: 'a', action: 'propose_exchange', terms: { give: { materials: 60 }, get: { credits: 100 } } }] }),
+    ]);
+    expect(r.events.find((e) => e.kind === 'exchange')).toMatchObject({ a: 'a', b: 'b', void: true });
+    expect(r.events.some((e) => e.kind === 'recruitment_queued' && e.nation === 'a')).toBe(true);
   });
 
   it('refuses a deal the stockpile cannot cover after recruits, and malformed terms', () => {

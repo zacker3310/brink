@@ -36,6 +36,8 @@ export interface LeaderOptions {
   spare?: readonly NationId[];
   /** Offers made to this nation this turn, not yet in its view: the human's orders as they end the turn. */
   incoming?: readonly Offer[];
+  /** A prize the army is ordered onto (an operation): its holder is the focus, whatever memory says. */
+  target?: SiteId;
 }
 
 /** The offer a diplomatic order makes to its target, or null for war and embargoes. */
@@ -71,8 +73,9 @@ function worth(view: NationView, s: Partial<Stockpile> | undefined): number {
 }
 
 /** The site this nation's army marches on (its memory's objective), and whose it is. */
-function focusOf(view: NationView, memory: AiMemory): NationId | null {
-  const s = memory.objective ? view.sites[memory.objective] : undefined;
+function focusOf(view: NationView, memory: AiMemory, opts: LeaderOptions = {}): NationId | null {
+  const id = opts.target ?? memory.objective;
+  const s = id ? view.sites[id] : undefined;
   return s?.owner && s.owner !== view.self.id ? s.owner : null;
 }
 
@@ -94,7 +97,7 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
   const leader = leaderFor(self, view.self.government);
   const temper = leader.temperament;
   const mood = moodOf(view, from);
-  const focus = focusOf(view, memory);
+  const focus = focusOf(view, memory, opts);
   const enemies = powers(view).filter((n) => view.relations[n] === 'war');
   const losing = standing(view, self) + 5 < standing(view, from) || view.self.stability < 30;
   const yes: Verdict = { accept: true, reason: 'agreed' };
@@ -103,6 +106,8 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
     case 'peace':
     case 'ceasefire': {
       if (opts.spare?.includes(from)) return yes;
+      // An operation ordered onto their city is not called off by a peace offer.
+      if (from === focus && opts.target) return { accept: false, reason: 'focus' };
       if (from === focus && !losing && standing(view, self) >= standing(view, from)) return { accept: false, reason: 'focus' };
       const score =
         mood + (enemies.length > 1 ? 30 : 0) + (losing ? 30 : 0) + (from !== focus ? 15 : 0) + (temper === 'dove' ? 15 : temper === 'hawk' ? -10 : 0);
@@ -204,6 +209,8 @@ export function leaderDiplomacy(view: NationView, memory: AiMemory, planned: Nat
     }
     const kind = kindOf(d);
     if (kind && refused.has(`${d.target}|${kind}`)) return false;
+    // No peace, truce or pact with the power an ordered operation marches on.
+    if (opts.target && d.target === focusOf(view, memory, opts) && (kind === 'peace' || kind === 'ceasefire' || kind === 'nonaggression')) return false;
     if ((d.action === 'propose_trade' || d.action === 'propose_nonaggression') && mood < AI.sulkMood) return false;
     return true;
   });
@@ -227,7 +234,7 @@ export function leaderDiplomacy(view: NationView, memory: AiMemory, planned: Nat
     if (rel === 'war') {
       // A war going badly against a power we are not marching on: a dove or an opportunist asks for a ceasefire.
       const losingBadly = standing(view, self) + AI.ceasefireGap <= standing(view, n);
-      if (view.turn >= AI.ceasefireFromTurn && temper !== 'hawk' && losingBadly && n !== focusOf(view, memory) && mood >= -70 && !pendingOwn(n, 'ceasefire') && !pendingOwn(n, 'peace')) {
+      if (view.turn >= AI.ceasefireFromTurn && temper !== 'hawk' && losingBadly && n !== focusOf(view, memory, opts) && mood >= -70 && !pendingOwn(n, 'ceasefire') && !pendingOwn(n, 'peace')) {
         add({ target: n, action: 'propose_ceasefire' });
       }
       continue;

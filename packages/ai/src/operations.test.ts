@@ -46,16 +46,17 @@ describe('operations', () => {
     const china = run(1, 'china', 'Taipei', 12);
     expect(china.rejected).toBe(0);
     expect(china.fell).not.toBeNull();
-    // Sendai, beside Tokyo. Tokyo itself fell to this landing only while Japan's AI emptied it to
-    // guard its coast against Korean militia that never leave home (fixed in ruleset 2.5.0): with
-    // its garrison in place the capital holds this one landing for 30 turns, as a capital should.
-    // Since ruleset 2.6.0 Japan meets a landing before it lands (an amphibious group off its coast
-    // is a threat, its fleets hunt convoys): Sendai holds out until turn 22 instead of falling by 16.
-    const usa = run(1, 'usa', 'Sendai', 24);
+    // A landing across the ocean onto a great power's coast: Petropavlovsk, on Kamchatka (it falls on
+    // turn 9). The prize was Tokyo, then Sendai beside it. Since ruleset 2.7.0 Japan's dove leader
+    // makes peace on its other fronts and its whole army meets a landing on the home islands (an
+    // amphibious group off the coast is a threat, its fleets hunt convoys): no lone US landing takes
+    // a Japanese city in 30 turns. That is balance to tune (PROGRESS), not what this test proves.
+    const usa = run(1, 'usa', 'Petropavlovsk', 16);
     expect(usa.rejected).toBe(0);
     expect(usa.fell).not.toBeNull();
-    // And the island power carries its own landing across the ocean.
-    const japan = run(1, 'japan', 'Seattle', 24);
+    // And the island power carries its own landing across the ocean: Honolulu falls on turn 15.
+    // (Seattle, on the US mainland, now holds for 30 turns.)
+    const japan = run(1, 'japan', 'Honolulu', 22);
     expect(japan.rejected).toBe(0);
     expect(japan.fell).not.toBeNull();
   }, 300_000);

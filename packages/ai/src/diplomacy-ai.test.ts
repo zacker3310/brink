@@ -19,6 +19,19 @@ function peaceful(): WorldState {
 }
 
 describe('leaders answering offers', () => {
+  it('makes no peace with the power an ordered operation marches on', () => {
+    const w = peaceful();
+    setRelation(w, 'a', 'c', 'war');
+    const view = buildView(w, 'c');
+    // Without an operation the offer is weighed on mood and the war; with one, its prize's holder is the focus.
+    expect(consider(view, emptyMemory(), { from: 'a', kind: 'peace' }).reason).not.toBe('focus');
+    expect(consider(view, emptyMemory(), { from: 'a', kind: 'peace' }, { target: 'a-home' })).toEqual({ accept: false, reason: 'focus' });
+    expect(consider(view, emptyMemory(), { from: 'a', kind: 'ceasefire' }, { target: 'a-home' })).toEqual({ accept: false, reason: 'focus' });
+    // A peace the war plan drafted toward that power is dropped, and only that one.
+    const planned = blank(w, 'c', { diplomacy: [{ target: 'a', action: 'propose_peace' }] });
+    expect(leaderDiplomacy(view, emptyMemory(), planned, { target: 'a-home' }).diplomacy.filter((d) => d.target === 'a' && d.action === 'propose_peace')).toEqual([]);
+  });
+
   it('trades with a neutral power, not with one that betrayed it', () => {
     const w = peaceful();
     expect(consider(buildView(w, 'c'), emptyMemory(), { from: 'a', kind: 'trade' })).toEqual({ accept: true, reason: 'agreed' });

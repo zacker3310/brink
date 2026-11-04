@@ -1,7 +1,8 @@
 import type { DealTerms, DiplomaticAction, GameEvent, NationId, NationOrders, Proposal, ProposalKind, SiteId, Stockpile, Treaty, TreatyKind, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { LEADER_TUNING, TREATIES } from '@brink/game-data';
-import { pairKey, relationOf, sortedKeys, treatyIn } from './rules';
+import { facilityCost } from './progression';
+import { pairKey, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
 /** Pending proposals lapse after this many turns. */
 export const PROPOSAL_LIFETIME = 2;
@@ -197,7 +198,7 @@ function goToWar(world: WorldState, declarer: NationId, target: NationId, events
 }
 
 /** Hand over what each side agreed to give, if both still can: all or nothing. */
-function settleDeal(world: WorldState, p: Proposal, events: GameEvent[]): void {
+function settleDeal(world: WorldState, p: Proposal, events: GameEvent[], committed: Record<NationId, Stockpile>): void {
   const tribute = p.kind === 'tribute';
   // `a` hands over `aGives`: the proposer's `give`, or the payer of a demand.
   const demand = tribute && stockTotal(p.terms?.get) > 0;
@@ -207,7 +208,11 @@ function settleDeal(world: WorldState, p: Proposal, events: GameEvent[]): void {
   const bGives: Partial<Stockpile> = demand ? {} : { ...p.terms?.get };
   const sa = world.nations[a]!.stockpile;
   const sb = world.nations[b]!.stockpile;
-  const can = RESOURCES.every((r) => sa[r] >= (aGives[r] ?? 0) && sb[r] >= (bGives[r] ?? 0));
+  // What this turn's recruits and buildings already hold is not on offer: a deal agreed on an
+  // earlier turn settles now, after validation reserved those costs, and may not spend them.
+  const ca = committed[a];
+  const cb = committed[b];
+  const can = RESOURCES.every((r) => sa[r] - (ca?.[r] ?? 0) >= (aGives[r] ?? 0) && sb[r] - (cb?.[r] ?? 0) >= (bGives[r] ?? 0));
   if (can) {
     for (const r of RESOURCES) {
       sa[r] += (bGives[r] ?? 0) - (aGives[r] ?? 0);
@@ -266,6 +271,23 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
     }
   }
 
+  // Each nation's recruits and buildings this turn, paid in production after diplomacy.
+  const committed: Record<NationId, Stockpile> = {};
+  for (const nation of sortedKeys(orders)) {
+    const n = world.nations[nation];
+    if (!n) continue;
+    const c: Stockpile = { credits: 0, energy: 0, materials: 0, food: 0 };
+    for (const r of orders[nation]!.recruit) {
+      const cost = recruitCost(n, r.unitClass);
+      for (const res of RESOURCES) c[res] += cost[res];
+    }
+    for (const b of orders[nation]!.build ?? []) {
+      const cost = facilityCost(n, b.facility);
+      for (const res of RESOURCES) c[res] += cost[res];
+    }
+    committed[nation] = c;
+  }
+
   const fresh: Proposal[] = [];
   for (const nation of sortedKeys(orders)) {
     for (const d of orders[nation]!.diplomacy) {
@@ -320,7 +342,7 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
         break;
       case 'exchange':
       case 'tribute':
-        settleDeal(world, p, events);
+        settleDeal(world, p, events, committed);
         break;
       case 'joint_op':
         sign(world, 'joint_op', a, b, LEADER_TUNING.jointOpTurns, events, undefined, p.terms!.site!);
