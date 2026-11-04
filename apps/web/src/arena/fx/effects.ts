@@ -1254,6 +1254,18 @@ export class Effects {
    * (a jet's wingtips and spine, a rocket's body), `len` long behind `at` along `dir`. It sells the
    * speed a single frame cannot. Skipped on Low.
    */
+  /** A rocket motor's glare for one frame: a soft bright point round the nozzle that reads from afar. */
+  motorGlow(at: THREE.Vector3, size: number): void {
+    const g = this.gt;
+    g.reset(GLOW).colour(FLASH);
+    g.s0 = g.s1 = 0.3 * size;
+    g.life = this.lastDt * 1.5 + 1e-4;
+    g.fade = 0;
+    g.inten = this.night ? 1.8 : 1.2;
+    g.imp = 2.4;
+    this.glow(at.x, at.y, at.z);
+  }
+
   speedStreak(at: THREE.Vector3, dir: THREE.Vector3, len: number, width = 0.02, strength = 1): void {
     if (this.budget.density < 0.5) return;
     const g = this.gt;

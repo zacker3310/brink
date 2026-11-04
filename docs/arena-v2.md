@@ -871,8 +871,12 @@ a little over figure scale so it reads from the battle camera (the jet 1.25x: an
 long, about two and a half tanks; the drones 2.1x, the missiles 1.9x, the bombs 1.7x).
 
 - **Filmed wide**: everything that comes in by air (all but the naval guns) is watched from 17
-  cells back instead of the close play view, so the sky over the target is in the frame; the zoom
-  goes back once the last thing in the air has come down (not if you zoomed meanwhile).
+  cells back instead of the close play view, framed 3 cells beyond the target (away from the
+  camera), so the target sits low in the frame and the sky it comes down from is in it; the zoom
+  goes back once the last thing in the air has come down (not if you zoomed meanwhile) and the
+  camera settles back on the target. For a target on the back row that framing stands past the
+  field's edge: the film alone may take the focus up to 4 cells beyond it (`FILM_SLACK`); fingers
+  never can (the gestures' limits are the field), and a touch mid-strike brings the focus back in.
 - **Strike jet**: an F-35A (west, Have Glass grey, gold canopy, coated edges, panel seams, the
   weapons-bay doors) or Su-34 (east, two-tone grey-blue, dark radome, framed side-by-side canopy,
   red stars on the fins and under the wings) runs in at 2.4 cells (24 m at figure scale), easing
@@ -890,8 +894,12 @@ long, about two and a half tanks; the drones 2.1x, the missiles 1.9x, the bombs 
   Intercepted near the top of its climb: a puff and debris.
 - **Naval gunfire**: an Arleigh Burke or Slava, broadside on, 26 cells off the side's edge, a
   silhouette in the haze, seated in the sea: its waterline just under the plain beyond the field
-  (`World.seaLevel`), the hull's foot melting into a darker patch of sea, a bow wave and a wake down
-  its side; its gun's flash ripples, the shells whistle in and the three blasts walk over the area.
+  (`World.seaLevel`), the hull's foot melting into a darker patch of sea, a bow wave, white water
+  down its side, a wake streaming two and a half lengths astern with the two arms of its V spreading
+  behind, the churn at the screws boiling, and white water standing off the sea at the bow, the stern
+  and along the waterline (billboards, so the low cut from the field's edge, where the flat wake is
+  edge-on, shows them; the cut stands 2.8 cells up); its gun's flash ripples, the shells whistle in and
+  the three blasts walk over the area.
 - **Kamikaze swarm**: one beat (`film.ts`, three drones of one mission), LUCAS or Geran-2 airframes
   weaving in close together with a two-stroke buzz, staggered; each one shot down gets tracers or a
   missile from the gun when blue sees it and a puff of debris, the rest dive in.
@@ -899,12 +907,16 @@ long, about two and a half tanks; the drones 2.1x, the missiles 1.9x, the bombs 
   motor flare and smoke trail climbing out with a flash at the rail. HIMARS flies a GMLRS pair high
   over and down in the near-vertical terminal dive onto the cell; Tornado-G ripples a salvo of
   122 mm rockets (20 on High, 17 on Balanced, 15 on Low, where only every other one trails smoke)
-  on lower arcs, landing round each of the four blasts as it plays. Blue's own launch gets a cut to
-  the edge to watch the salvo climb out, then back for the dive.
+  on lower arcs, landing round each of the four blasts as it plays. Each rocket is drawn at 2.3x with
+  a bigger motor flame and a glare round the nozzle, so it reads as a lit point across the sky from
+  the wide camera (on Low, every other rocket of a ripple). Blue's own launch gets a cut to the edge
+  to watch the salvo climb out, then back for the dive.
 - Fog: the interceptor is drawn only when blue sees it (the engine names it only then); otherwise
   the kill comes out of the sky. Ships and launchers are off the map and show nothing of the field.
 - Action cams (with the setting on and full motion, as ever): a blue jet run or cruise missile that
-  kills a vehicle gets a moving shot (beside the target as the jet comes in; chasing the missile);
+  kills a vehicle gets a moving shot (low, off to one side and a little past the target, looking
+  back up the run between the jet and the target, so the jet comes at the lens over the target and
+  drops before it settles on the blast; chasing the missile);
   blue naval gunfire cuts to the ship for its first salvo, blue rockets to their launch.
 - Trails space their puffs by the quality's density (fewer on Low); geometry and material are shared
   per kind, the stage releases what was drawn.
