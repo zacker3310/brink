@@ -361,7 +361,7 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     if (ctl.seek !== null) {
       t = Math.max(0, Math.min(tl.end, ctl.seek));
       useReplay.setState({ seek: null });
-    } else if (!ctl.paused) t += (now - last) * ctl.speed;
+    } else if (!ctl.paused) t += Math.min(250, now - last) * ctl.speed; // a long stall slows the film instead of skipping it
     last = now;
     const progress = Math.min(1, t / tl.end);
     if (Math.abs(progress - ctl.progress) > 0.02 || progress === 1) useReplay.setState({ progress });

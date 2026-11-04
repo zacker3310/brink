@@ -1031,7 +1031,9 @@ export function MapView() {
     const keys = Object.keys(v.tiles).sort();
     const art = getArt();
     const paintedMap = s.mapStyle === 'painted' || s.mapStyle === 'paper';
-    drawGround(a, v, keys);
+    // A replay plays over the ground as it is now: repainting the land for the board before the
+    // turn would cost a second paint each turn (and stall the film) for a difference of a few hexes.
+    if (!replaying || !groundSig.current) drawGround(a, v, keys);
     a.life.update(v, s.report, !replaying);
 
 
