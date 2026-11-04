@@ -61,4 +61,21 @@ describe('supportFor', () => {
     expect(req.setup.support?.map((x) => x.id)).toEqual(['naval_gun', 'cruise_missile', 'strike_jet', 'kamikaze']);
     expect(req.setup.redSupport?.map((x) => x.id)).toEqual(['naval_gun', 'cruise_missile', 'strike_jet']);
   });
+
+  it('adds what doctrine cards bring: played this turn, or still in force from an earlier one', () => {
+    const view = scene();
+    const orders = { inf: { type: 'attack' as const, target: '10,10', path: [] } };
+    const jets = (req: ReturnType<typeof battleFor>) => req!.setup.support?.find((x) => x.id === 'strike_jet')?.missions;
+    const kamikaze = (req: ReturnType<typeof battleFor>) => req!.setup.support?.find((x) => x.id === 'kamikaze')?.missions;
+    expect(jets(battleFor(view, '10,10', orders))).toBe(4);
+    expect(jets(battleFor(view, '10,10', orders, [{ card: 'air_superiority' }]))).toBe(6);
+    expect(kamikaze(battleFor(view, '10,10', orders, [{ card: 'kamikaze_swarm' }]))).toBe(3);
+    // A Kamikaze Swarm played on an earlier turn and lasting through this one.
+    view.self.doctrine = { cp: 0, hand: [], deck: [], discard: [], effects: [{ card: 'kamikaze_swarm', from: view.turn - 1, until: view.turn }] };
+    expect(kamikaze(battleFor(view, '10,10', orders))).toBe(3);
+    view.self.doctrine.effects[0]!.until = view.turn - 1;
+    expect(kamikaze(battleFor(view, '10,10', orders))).toBe(1);
+    // Red never gets blue's cards.
+    expect(battleFor(view, '10,10', orders, [{ card: 'air_superiority' }])!.setup.redSupport?.find((x) => x.id === 'strike_jet')?.missions).toBe(1);
+  });
 });

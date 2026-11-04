@@ -1,6 +1,7 @@
 import type { Formation, FormationId, GameEvent, HexKey, NationId, NationOrders, WorldState } from '@brink/contracts';
 import { STACK_LIMIT, UNITS } from '@brink/game-data';
 import { neighborKeys } from '@brink/map';
+import { marchBonus } from './doctrine';
 import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, relationOf, sortedKeys, stackAt } from './rules';
 
 type Halt = 'enemy' | 'contact' | 'contested' | 'stacking';
@@ -93,7 +94,7 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
       if (f.aboard && !UNITS[f.unitClass].ground) continue;
       if (landing.has(f.id)) continue;
       if (order.type === 'attack' && UNITS[f.unitClass].range > 0) continue;
-      const allowance = movementAllowance(f);
+      const allowance = movementAllowance(f) + marchBonus(world.nations[f.owner], world.turn, f);
       const steps: HexKey[] = [];
       const times: number[] = [];
       let cum = 0;

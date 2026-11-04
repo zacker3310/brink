@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { FACILITY_SLOTS, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { CARDS, DOCTRINE, FACILITY_SLOTS, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { GameSession } from '@brink/session';
 
@@ -13,6 +13,14 @@ function invariants(w: WorldState): string[] {
   for (const n of Object.values(w.nations)) {
     for (const r of RESOURCES) if (!Number.isInteger(n.stockpile[r]) || n.stockpile[r] < 0) bad.push(`${n.id} ${r}=${n.stockpile[r]}`);
     if (n.stability < 0 || n.stability > 100) bad.push(`${n.id} stability ${n.stability}`);
+    // Doctrine: integer Command Points within the cap, a hand never over its size, every card known.
+    const d = n.doctrine;
+    if (d) {
+      if (!Number.isInteger(d.cp) || d.cp < 0 || d.cp > DOCTRINE.cpCap) bad.push(`${n.id} cp ${d.cp}`);
+      if (d.hand.length > DOCTRINE.handSize) bad.push(`${n.id} holds ${d.hand.length} cards`);
+      for (const c of [...d.hand, ...d.deck, ...d.discard, ...d.effects.map((e) => e.card)]) if (!CARDS[c]) bad.push(`${n.id} unknown card ${c}`);
+      if (d.effects.some((e) => e.until < e.from)) bad.push(`${n.id} malformed card effect`);
+    } else if (!n.minor && !n.eliminated) bad.push(`${n.id} has no doctrine`);
   }
   const perHex = new Map<string, string[]>();
   const stacked = new Map<string, number>();
@@ -59,7 +67,7 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
     const endings: Record<string, number> = {};
     const turns: number[] = [];
     let rejected = 0;
-    const usage = { facilities: 0, treaties: 0 };
+    const usage = { facilities: 0, treaties: 0, cards: 0 };
     for (let seed = 1; seed <= MATCHES; seed++) {
       const s = GameSession.create(PACIFIC_ID, seed, null);
       let guard = 0;
@@ -68,6 +76,7 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
         rejected += r.events.filter((e) => e.kind === 'order_rejected').length;
         usage.facilities += r.events.filter((e) => e.kind === 'facility_built').length;
         usage.treaties += r.events.filter((e) => e.kind === 'treaty').length;
+        usage.cards += r.events.filter((e) => e.kind === 'card_played').length;
         const bad = invariants(s.snapshot());
         expect(bad, `seed ${seed} turn ${s.turn}`).toEqual([]);
         if (++guard > 40) throw new Error(`seed ${seed} did not end`);
@@ -78,10 +87,11 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
       turns.push(v.turn);
     }
     turns.sort((a, b) => a - b);
-    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties);
+    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties, 'cards played', usage.cards);
     // The AI uses the economy and diplomacy it is given.
     expect(usage.facilities).toBeGreaterThan(MATCHES);
     expect(usage.treaties).toBeGreaterThan(MATCHES);
+    expect(usage.cards).toBeGreaterThan(MATCHES * 10);
     expect(rejected).toBe(0);
   });
 });

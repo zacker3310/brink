@@ -1,5 +1,5 @@
 import type { HexKey, NationView, TurnReport } from '@brink/contracts';
-import { EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
+import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { arenaNote, atPlace, describeEffect, hexLabel, treatyText } from './insight';
 import { useGame } from './store';
 
@@ -26,6 +26,7 @@ export const ICON: Record<string, string> = {
   flask: 'M9 3h6 M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3',
   scroll: 'M6 4h11v14a2 2 0 0 1-2 2H6 M6 4a2 2 0 0 0 0 4h3 M9 9h6 M9 13h6',
   warn: 'M12 3l10 18H2z M12 10v5 M12 18h.01',
+  card: 'M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M9 7h6 M9 11h6',
 };
 
 export const TONE: Record<Tone, string> = {
@@ -153,6 +154,22 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
       case 'economy':
         if (e.nation === me && e.ledger.shortages.length) out.push({ id, icon: 'warn', tone: 'bad', title: 'Shortages', text: `Out of ${e.ledger.shortages.join(', ')}: upkeep went unpaid.` });
         break;
+      case 'card_played': {
+        // Public, like a declaration of war: "China played Missile Barrage on Kaohsiung".
+        const card = CARDS[e.card]?.name ?? e.card;
+        const on = e.target ? ` on ${hexLabel(view, e.target)}` : e.targetNation ? ` on ${nation(e.targetNation)}` : '';
+        const loss = (e.victims ?? []).reduce((a, v) => a + v.strengthLoss, 0);
+        const hitUs = (e.victims ?? []).some((v) => v.owner === me) || e.targetNation === me;
+        out.push({
+          id,
+          icon: 'card',
+          tone: e.nation === me ? 'good' : hitUs ? 'bad' : 'info',
+          title: `${e.nation === me ? 'We' : nation(e.nation)} played ${card}${on}`,
+          text: e.victims ? (e.victims.length ? `${loss} strength lost by the targets.` : 'No confirmed hits.') : (CARDS[e.card]?.flavour ?? ''),
+          ...(e.target ? { at: e.target } : {}),
+        });
+        break;
+      }
       case 'order_rejected':
         if (e.nation === me) out.push({ id, icon: 'warn', tone: 'bad', title: 'Order rejected', text: e.reason });
         break;

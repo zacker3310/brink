@@ -2,7 +2,7 @@ import type { SaveFile, WorldState } from '@brink/contracts';
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { RULESET_VERSION } from '@brink/game-data';
 import { SCENARIOS, THEATRES } from '@brink/scenarios';
-import { hashState } from '@brink/simulation';
+import { clone, hashState, initDoctrine } from '@brink/simulation';
 
 /** Theatres the game no longer has (ruleset 2.0.0 replaced them with the Pacific). */
 const RETIRED: readonly string[] = ['meridian-crisis', 'highland-front', 'varn-delta'];
@@ -54,7 +54,9 @@ export function migrateSave(save: SaveFile): SaveFile {
   if (s.rulesetVersion === RULESET_VERSION && s === save) return s;
   // An older ruleset resumes under this build's rules: the campaign carries on, balance changes apply.
   const from = save.rulesetVersion;
-  const world = { ...s.world, rulesetVersion: RULESET_VERSION };
+  const world = { ...s.world, rulesetVersion: RULESET_VERSION, nations: clone(s.world.nations) };
+  // Before 2.3.0 there were no doctrine cards: every power is dealt its deck and a first hand now.
+  initDoctrine(world);
   return { ...s, world, rulesetVersion: RULESET_VERSION, hash: hashState(world), ...(from !== RULESET_VERSION ? { migratedFrom: from } : {}) };
 }
 

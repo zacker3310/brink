@@ -94,7 +94,7 @@ function FightButton({ target }: { target: string }) {
   const fight = useGame((s) => s.fight);
   const fought = draft.battles?.find((b) => b.target === target);
   const orders = Object.fromEntries(Object.entries(draft.formations).filter(([, o]) => o.type === 'attack' && o.target === target));
-  const req = battleFor(view, target, orders);
+  const req = battleFor(view, target, orders, draft.play);
   if (!req && !fought) return null;
   return (
     <div className="flex items-center gap-2 border-t border-line px-3 py-2 text-[11px]">

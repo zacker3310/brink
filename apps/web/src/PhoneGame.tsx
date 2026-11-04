@@ -23,6 +23,7 @@ import { SLOT_NAMES } from './saves';
 import { isMuted, setMuted } from './sfx';
 import { useGame, type Tab } from './store';
 import { EventCard } from './UnitPanel';
+import { AimBanner, HandChip, PhoneHand } from './Hand';
 import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
 import { crisisOf, shortName } from '@brink/scenarios';
 import { minorsOf, powersOf, signed } from './ui';
@@ -34,7 +35,7 @@ import { RANKS, rankOf } from '@brink/arena';
 
 const RES_NAME: Record<Resource, string> = { credits: 'funds', energy: 'energy', materials: 'materials', food: 'food' };
 
-function Hud({ onMenu, onEconomy, onWorld }: { onMenu: () => void; onEconomy: () => void; onWorld: () => void }) {
+function Hud({ onMenu, onEconomy, onWorld, onHand }: { onMenu: () => void; onEconomy: () => void; onWorld: () => void; onHand: () => void }) {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report);
   const operation = useGame((s) => s.operation);
@@ -114,6 +115,7 @@ function Hud({ onMenu, onEconomy, onWorld }: { onMenu: () => void; onEconomy: ()
           {net && net.credits !== 0 && <span className={`text-xs tabular-nums ${net.credits > 0 ? 'text-good' : 'text-hostile'}`}>{signed(net.credits)} last turn</span>}
           {short.length > 0 && <span className="text-xs font-semibold text-hostile">· short of {short.map((r) => RES_NAME[r]).join(', ')}</span>}
         </button>
+        {!resolving && !view.victory && <HandChip onOpen={onHand} />}
         {goal && !resolving && (
           <button
             type="button"
@@ -604,7 +606,12 @@ function Debrief({ onDone }: { onDone: () => void }) {
   const report = useGame((s) => s.report)!;
   const focusOn = useGame((s) => s.focusOn);
   const setShowReport = useGame((s) => s.setShowReport);
-  const notes = notesFor(view, report);
+  // Cards played lead the debrief, ours first: the table hears what everyone played.
+  const rank = (n: { icon: string; tone: string }) => (n.icon !== 'card' ? 2 : n.tone === 'good' ? 0 : 1);
+  const notes = notesFor(view, report)
+    .map((n, i) => ({ n, i }))
+    .sort((a, b) => rank(a.n) - rank(b.n) || a.i - b.i)
+    .map((x) => x.n);
   const vp = report.victoryPoints[view.self.id] ?? 0;
   return (
     <div className="sheet-in pointer-events-auto border-t border-signal/60 bg-ink-950/95 px-3 pt-2.5 pb-1" data-testid="debrief">
@@ -878,6 +885,8 @@ export function PhoneGame() {
   const [menu, setMenu] = useState(false);
   const [command, setCommand] = useState(false);
   const [world, setWorld] = useState(false);
+  const [hand, setHand] = useState(false);
+  const aiming = useGame((s) => s.aimingCard);
   const firstTurn = useGame((s) => s.view?.turn === 1 && !s.view.victory);
   const [howTo, setHowTo] = useState(firstTurn && !useCoach.getState().active);
   const control = useCamera((s) => s.control);
@@ -907,6 +916,7 @@ export function PhoneGame() {
         </div>
       )}
       <Hud
+        onHand={() => setHand(true)}
         onMenu={() => setMenu(true)}
         onEconomy={() => {
           useGame.getState().setTab('economy');
@@ -945,14 +955,16 @@ export function PhoneGame() {
                 <OperationStrip className="max-w-full" />
               </div>
             )}
-            {!debrief && !city && !resolving && <Advisor selected={fid} />}
-            {debrief ? <Debrief onDone={() => setBriefed(reportTurn)} /> : fid ? <UnitCard /> : !city && selectedHex && <HexCard />}
+            {!debrief && !city && !resolving && !aiming && <Advisor selected={fid} />}
+            {aiming && !resolving && <AimBanner />}
+            {debrief ? <Debrief onDone={() => setBriefed(reportTurn)} /> : fid ? <UnitCard /> : !city && !aiming && selectedHex && <HexCard />}
             <Dock onCommand={() => setCommand(true)} cooling={cooling} />
           </>
         )}
       </div>
       <CityPanel />
       {command && <CommandSheet onClose={() => setCommand(false)} />}
+      {hand && !playback && <PhoneHand onClose={() => setHand(false)} />}
       <OperationsSheet />
       {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
       {howTo && <HowToWin onClose={() => setHowTo(false)} />}

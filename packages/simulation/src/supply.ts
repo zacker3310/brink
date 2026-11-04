@@ -1,6 +1,7 @@
 import type { GameEvent, HexKey, NationId, NationOrders, Stockpile, SupplyPriority, WorldState } from '@brink/contracts';
 import { RULES, SEA_SUPPLY_COST, SITE_SUPPLY, TERRAIN, UNITS } from '@brink/game-data';
 import { neighborKeys } from '@brink/map';
+import { sabotagedHexes } from './doctrine';
 import { clamp, nationModifiers, pct, relationOf, sortedKeys, zeroStockpile } from './rules';
 
 /** Hexes holding a formation of a nation at war with `nation`, from one shared snapshot. */
@@ -94,6 +95,7 @@ export function allocateLogistics(world: WorldState, nation: NationId, orders: N
   const n = world.nations[nation]!;
   const mods = nationModifiers(n);
   const dist = supplyDistances(world, nation);
+  const cut = sabotagedHexes(world, nation);
   let capacity = supplyCapacity(world, nation);
   const own = sortedKeys(world.formations)
     .map((id) => world.formations[id]!)
@@ -119,7 +121,7 @@ export function allocateLogistics(world: WorldState, nation: NationId, orders: N
   const ammoWant = new Map<string, number>();
   for (const f of own) {
     const demand = UNITS[f.unitClass].supplyDemand;
-    const eff = deliveryEfficiency(dist.get(f.key), mods.supplyRange);
+    const eff = cut.has(f.key) ? 0 : deliveryEfficiency(dist.get(f.key), mods.supplyRange);
     f.supply = clamp(Math.floor(((allocated.get(f.id) ?? 0) * eff) / demand), 0, 100);
     const s = f.supply;
     f.readiness = clamp(f.readiness + (s >= 80 ? 10 : s >= 50 ? 4 : s >= 25 ? -4 : -10), 0, 100);

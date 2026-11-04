@@ -248,7 +248,7 @@ export function MapView() {
   const inputOff = useRef<(() => void) | null>(null);
   const groundSig = useRef('');
   const groundTextures = useRef<Texture[]>([]);
-  const reachCache = useRef<{ view: NationView; id: string; reach: Record<HexKey, Reach> } | null>(null);
+  const reachCache = useRef<{ view: NationView; id: string; plays: unknown; reach: Record<HexKey, Reach> } | null>(null);
   const view = useGame((s) => s.view);
   const draft = useGame((s) => s.draft);
   const submitted = useGame((s) => s.submitted);
@@ -265,9 +265,10 @@ export function MapView() {
     const f = v && s.selectedFormation ? v.formations[s.selectedFormation] : undefined;
     if (!v || !f || s.playback) return null;
     const c = reachCache.current;
-    if (c && c.view === v && c.id === f.id) return { f, reach: c.reach };
-    const reach = reachFor(v, f);
-    reachCache.current = { view: v, id: f.id, reach };
+    const plays = s.draft?.play;
+    if (c && c.view === v && c.id === f.id && c.plays === plays) return { f, reach: c.reach };
+    const reach = reachFor(v, f, plays);
+    reachCache.current = { view: v, id: f.id, plays, reach };
     return { f, reach };
   }
 
@@ -595,7 +596,7 @@ export function MapView() {
         const v = s.view;
         if (!v || s.group.length === 0) return [];
         const keys = [...new Set(Object.values(v.contacts).filter((c) => v.relations[c.owner] === 'war').map((c) => c.key))].sort();
-        return keys.filter((k) => Object.values(groupOrders(v, s.group, k).orders).some((o) => o.type === 'attack'));
+        return keys.filter((k) => Object.values(groupOrders(v, s.group, k, s.draft?.play).orders).some((o) => o.type === 'attack'));
       },
       enemies() {
         const v = useGame.getState().view;
@@ -613,6 +614,12 @@ export function MapView() {
     const s = useGame.getState();
     const v = s.view;
     if (!v || s.playback) return;
+    // A doctrine card in hand waiting for its target: this tap aims it (right-click puts it back).
+    if (s.aimingCard) {
+      if (input === 'right') s.cancelAim();
+      else s.aimCard(key);
+      return;
+    }
     const right = input === 'right';
     const touch = input === 'touch';
     const r = currentReach();
@@ -689,7 +696,7 @@ export function MapView() {
     }
     const group = s.group.filter((id) => v.formations[id]);
     if (group.length > 0 && !s.resolving) {
-      const { orders, error } = groupOrders(v, group, key);
+      const { orders, error } = groupOrders(v, group, key, s.draft?.play);
       const ids = Object.keys(orders);
       if (ids.length > 0) {
         if (ids.some((id) => orders[id]!.type === 'attack')) {
@@ -1074,7 +1081,7 @@ export function MapView() {
       for (const c of Object.values(v.contacts)) {
         if (v.relations[c.owner] !== 'war' || seen.has(c.key)) continue;
         seen.add(c.key);
-        const able = attackers.filter((f) => !('error' in orderForClick(v, f, c.key, 'attack', f.id === r.f.id ? r.reach : reachFor(v, f))));
+        const able = attackers.filter((f) => !('error' in orderForClick(v, f, c.key, 'attack', f.id === r.f.id ? r.reach : reachFor(v, f, s.draft?.play))));
         if (able.length === 0) continue;
         hl.poly(poly(c.key, 2)).fill({ color: ATTACK, alpha: 0.18 }).stroke({ width: 3, color: ATTACK, alpha: 0.95 });
         const odds = oddsFor(v, able, c.key);

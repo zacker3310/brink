@@ -1,7 +1,7 @@
-import type { Contact, Formation, FormationOrder, HexKey, NationView } from '@brink/contracts';
+import type { CardPlay, Contact, Formation, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { AIR_REBASE_RANGE, UNITS } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable, type Reach } from '@brink/map';
-import { alongside, enterCost, isAir, isNaval, movementAllowance } from '@brink/simulation';
+import { alongside, enterCost, isAir, isNaval, marchBonus, movementAllowance } from '@brink/simulation';
 import { hexLabel } from './insight';
 
 export type Mode = 'move' | 'attack' | 'recon' | 'withdraw';
@@ -14,10 +14,12 @@ export function hostilesAt(view: NationView, key: HexKey): Contact[] {
  * Hexes the formation can reach this turn over terrain its nation knows, avoiding known enemies.
  * Ships sail the sea and put in at ports; troops aboard a ship reach the shore beside it and beyond.
  */
-export function reachFor(view: NationView, f: Formation): Record<HexKey, Reach> {
+export function reachFor(view: NationView, f: Formation, plays: readonly CardPlay[] = []): Record<HexKey, Reach> {
   if (isAir(f.unitClass)) return { [f.key]: { cost: 0, prev: null } };
   const blocked = new Set(Object.values(view.contacts).filter((c) => c.confirmed && view.relations[c.owner] === 'war').map((c) => c.key));
-  return reachable(f.key, movementAllowance(f), (_from, to) => (blocked.has(to) ? null : enterCost(view.tiles[to], f.unitClass)));
+  // A Forced March in force, or played in this turn's draft, goes further: the validator counts it too.
+  const mp = movementAllowance(f) + marchBonus(view.self, view.turn, f, plays);
+  return reachable(f.key, mp, (_from, to) => (blocked.has(to) ? null : enterCost(view.tiles[to], f.unitClass)));
 }
 
 export interface Planned {

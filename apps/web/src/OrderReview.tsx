@@ -1,6 +1,7 @@
 import type { DiplomaticAction, OrderType, Resource, Stockpile } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { FACILITIES, TECHS, UNITS } from '@brink/game-data';
+import { CARDS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
+import { CardFace, cpLeft } from './Hand';
 import { useKeys } from './chrome';
 import { idleFormations, netChange, selfLedger } from './insight';
 import { usePhone } from './phone';
@@ -108,6 +109,24 @@ export function OrderReview() {
             </div>
             {(draft.battles?.length ?? 0) > 0 && <p className="mt-1.5 text-[12px] text-good">{draft.battles!.length} battle{draft.battles!.length === 1 ? '' : 's'} fought by hand: their results replace the odds if the enemy there has not changed.</p>}
           </section>
+
+          {(draft.play?.length ?? 0) > 0 && (
+            <section className="mt-3" data-testid="review-cards">
+              <h3 className="font-display text-[11px] font-bold tracking-[0.08em] text-muted uppercase">
+                Doctrine · {draft.play!.length} card{draft.play!.length === 1 ? '' : 's'} · {cpLeft(view, draft.play)} CP left
+              </h3>
+              <div className="mt-1.5 flex gap-2">
+                {draft.play!.map((p, i) => {
+                  const def = CARDS[p.card];
+                  return def ? (
+                    <div key={i} className="h-[150px] w-[118px] shrink-0">
+                      <CardFace def={def} cp={def.cost} played={p} compact />
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            </section>
+          )}
 
           {(draft.recruit.length > 0 || (draft.build?.length ?? 0) > 0) && (
             <section className="mt-3">

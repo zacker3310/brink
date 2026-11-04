@@ -1,6 +1,9 @@
 // Shared data contracts. Everything here is plain JSON-serializable data: no classes,
 // no functions, no Maps or Sets, so world state can be hashed, saved and posted to a worker.
 
+import type { CardPlay, CardPlayedEvent, DoctrineState, PublicDoctrine } from './doctrine';
+export * from './doctrine';
+
 export type NationId = string;
 export type FormationId = string;
 export type SiteId = string;
@@ -177,6 +180,8 @@ export interface Nation {
   event?: PendingEvent | null;
   /** A human seat's command edge from the campaign difficulty (`DIFFICULTY_EDGE`). Absent: none. */
   edge?: Difficulty;
+  /** Doctrine cards and Command Points (`doctrine.ts`). Absent for minor states and older worlds. */
+  doctrine?: DoctrineState;
 }
 
 export type WorldEventId =
@@ -279,6 +284,8 @@ export interface NationOrders {
   eventChoice?: 0 | 1;
   /** Battles fought in the arena this turn, one per target. */
   battles?: ArenaBattle[];
+  /** Doctrine cards played this turn (at most `DOCTRINE.maxPlays`). */
+  play?: CardPlay[];
 }
 
 export interface LastKnownContact {
@@ -434,7 +441,8 @@ export type GameEvent =
   | { kind: 'world_event'; nation: NationId; event: WorldEventId; choice: 0 | 1 | null }
   | { kind: 'elimination'; nation: NationId; /** Who took the whole country: the holder of most of its cities. */ annexedBy?: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
-  | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string };
+  | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string }
+  | CardPlayedEvent;
 
 export interface TurnReport {
   turn: number;
@@ -498,6 +506,8 @@ export interface PublicNation {
   victoryPoints: number;
   /** A minor state: neutral ground with a militia, never a rival power. */
   minor?: boolean;
+  /** Command Points and hand size: public. The cards themselves are not. */
+  doctrine?: PublicDoctrine;
 }
 
 export interface NationView {

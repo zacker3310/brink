@@ -22,6 +22,7 @@ import {
   type AssaultContext,
   type AssaultOutcome,
 } from './combat';
+import { amphibiousInForce, strikeBonus } from './doctrine';
 import { canDetect, type Vision } from './fog';
 import { rollRange } from './rng';
 import { clamp, enterCost, fortressFloor, isAir, isNaval, nationModifiers, passengersOf, relationOf, sameLayer, sortedKeys } from './rules';
@@ -36,7 +37,7 @@ interface Effects {
   entrenchment: number;
 }
 
-class EffectBook {
+export class EffectBook {
   private map = new Map<FormationId, Effects>();
   add(id: FormationId, e: Partial<Effects>): void {
     const cur = this.map.get(id) ?? { strength: 0, organization: 0, morale: 0, ammunition: 0, experience: 0, entrenchment: 0 };
@@ -149,7 +150,7 @@ export function resolveStrikes(
       if (keyDistance(f.key, order.target) > def.range) continue;
       const victims = hostilesAt(world, nation, order.target);
       const spotted = canDetect(world, vision[nation]!, order.target);
-      const ctx = { terrain: world.tiles[order.target]!.terrain, spotted, sourceMods: nationModifiers(world.nations[nation]!) };
+      const ctx = { terrain: world.tiles[order.target]!.terrain, spotted, sourceMods: nationModifiers(world.nations[nation]!), bonus: strikeBonus(world.nations[nation], world.turn, f.unitClass) };
       const hits: { formation: FormationId; owner: NationId; strengthLoss: number }[] = [];
       for (const v of victims) {
         const swing = rollRange(100 - RULES.combatSwing, 100 + RULES.combatSwing, seed, world.turn, 'strike', id, v.id);
@@ -276,6 +277,7 @@ export function resolveEngagements(
       attackerMods: nationModifiers(world.nations[a.nation]!),
       defenderMods: (owner) => nationModifiers(world.nations[owner]!),
       defending: (fid) => defendingIds.has(fid),
+      amphibious: amphibiousInForce(world.nations[a.nation], world.turn),
     };
     const power = { attack: attackerPower(a.attackers, defenders, ctx), defense: defenderPower(defenders, ctx) };
     const res = assaultLosses(power, swing(id, 'attacker'), swing(id, 'defender'));

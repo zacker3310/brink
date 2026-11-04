@@ -17,6 +17,7 @@ import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
 import { useGame, type Tab } from './store';
 import { TurnControls, UnitPanel } from './UnitPanel';
+import { AimBanner, DesktopHand } from './Hand';
 import { Meter, powersOf, signed, Swatch } from './ui';
 import { Icon } from './icons';
 import { sfx } from './sfx';
@@ -391,6 +392,7 @@ function useShortcuts(toggleHelp: () => void) {
       g.togglePanel();
     } else if (k === 'n') g.nextIdle();
     else if (e.key === 'Escape') {
+      if (g.aimingCard) return g.cancelAim();
       if (g.selectedCity) return;
       if (g.panelOpen) g.togglePanel(false);
       g.selectFormation(null);
@@ -428,6 +430,10 @@ export function Game() {
           <HoverCard />
           <ZoomControls onHelp={() => setHelp(!help)} />
           <Notifications />
+          <DesktopHand />
+          <div className="pointer-events-none absolute bottom-40 left-1/2 z-30 flex w-[min(30rem,60%)] -translate-x-1/2 flex-col">
+            <AimBanner />
+          </div>
           <UnitPanel />
           <TurnControls />
           <SidePanel />

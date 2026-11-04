@@ -43,6 +43,8 @@ export interface AssaultContext {
   defenderMods: (owner: NationId) => FullModifiers;
   /** Formations under a defend order. */
   defending: (id: string) => boolean;
+  /** Amphibious Doctrine: a landing from ships pays no beach penalty. */
+  amphibious?: boolean;
 }
 
 export interface Power {
@@ -60,7 +62,7 @@ export function attackerPower(attackers: readonly Formation[], defenders: readon
     v = pct(v, 100 + ctx.attackerMods.attack);
     if (a.unitClass === 'armor' || a.unitClass === 'mechanized') v = pct(v, 100 - terrain.armorPenalty);
     // Storming a beach from a ship.
-    if (a.aboard) v = pct(v, 100 - AMPHIBIOUS_ASSAULT_PENALTY);
+    if (a.aboard && !ctx.amphibious) v = pct(v, 100 - AMPHIBIOUS_ASSAULT_PENALTY);
     total += v;
   }
   if (ctx.river) total = pct(total, 100 - RIVER_ASSAULT_PENALTY);
@@ -127,6 +129,8 @@ export interface StrikeContext {
   terrain: Terrain;
   spotted: boolean;
   sourceMods: FullModifiers;
+  /** Percent added by a doctrine card (Air Superiority, Kamikaze Swarm). */
+  bonus?: number;
 }
 
 /** Strength one ranged strike takes off one victim. */
@@ -134,6 +138,7 @@ export function strikeLoss(source: Formation, victim: Formation, ctx: StrikeCont
   const hardness = UNITS[victim.unitClass].hardness;
   let v = condition(source, attackStat(source, hardness) * source.strength);
   v = pct(v, 100 + ctx.sourceMods.ranged);
+  if (ctx.bonus) v = pct(v, 100 + ctx.bonus);
   if (!ctx.spotted) v = pct(v, 50);
   v = Math.floor((v * 100) / (100 + TERRAIN[ctx.terrain].defense));
   v = pct(v, 100 - Math.floor(victim.entrenchment / 2));
