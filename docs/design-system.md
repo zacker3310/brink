@@ -186,7 +186,8 @@ the ambient life moves, drawn at 24 frames a second.
 With reduced motion only the fog and mist stay (still). The turn replay (`replay.ts`) draws a wake
 behind every moving formation, missiles on smoke trails with a ground shadow and a closing aim ring,
 shell bursts and shock rings over battles, and a banner in the new owner's colour over every
-captured town (its name, and who took it).
+captured town (its name, and who took it). It plays over the ground as it is now (no repaint for
+the board before the turn), and advances at most 250 ms a frame, so a stall slows it, never skips it.
 
 ## Console (v3): text screens
 
