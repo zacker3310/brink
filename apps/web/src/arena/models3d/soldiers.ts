@@ -87,6 +87,10 @@ class Piece {
     }
     return this;
   }
+  /** Triangles drawn per instance, hidden variants included (they collapse in the vertex shader). */
+  get drawn(): number {
+    return this.pos.length / 9;
+  }
   /** Triangles one figure shows: the shared ones plus its largest variant. */
   get tris(): number {
     const per = new Map<number, number>();
@@ -130,40 +134,25 @@ function blob(stations: [number, number, number, number][], n = 8): THREE.Buffer
   return convex(pts);
 }
 
-/** A box with its edges cut back, so a pack reads soft. */
-function chamferBox(w: number, h: number, d: number): THREE.BufferGeometry {
-  const c = Math.min(w, h, d) * 0.22;
-  const x = w / 2;
-  const y = h / 2;
-  const z = d / 2;
-  const pts: V3[] = [];
-  for (const sx of [1, -1])
-    for (const sy of [1, -1])
-      for (const sz of [1, -1]) {
-        pts.push([sx * (x - c), sy * y, sz * (z - c)]);
-        pts.push([sx * x, sy * (y - c), sz * (z - c)]);
-        pts.push([sx * (x - c), sy * (y - c), sz * z]);
-      }
-  return convex(pts);
-}
-
 function headPiece(): Piece {
   const p = new Piece();
   // Neck, then a head with a jaw and a brow: wider at the cheekbones, the chin forward; a nose.
-  p.add(cyl(0.045, 0.05, 0.08, 6), SKIN, M(0, 0.02, -0.005));
+  p.add(cyl(0.045, 0.05, 0.08, 5, 'y', true), SKIN, M(0, 0.02, -0.005));
   p.add(
-    blob([
-      [0.045, 0.045, 0.075, 0.04],
-      [0.09, 0.07, 0.1, 0.075],
-      [0.15, 0.078, 0.1, 0.092],
-      [0.21, 0.07, 0.085, 0.088],
-      [0.245, 0.04, 0.05, 0.06],
-    ]),
+    blob(
+      [
+        [0.045, 0.045, 0.075, 0.04],
+        [0.1, 0.072, 0.1, 0.08],
+        [0.18, 0.076, 0.095, 0.092],
+        [0.245, 0.045, 0.055, 0.062],
+      ],
+      6,
+    ),
     SKIN,
   );
   p.add(convex([[0, 0.14, 0.098], [-0.014, 0.1, 0.1], [0.014, 0.1, 0.1], [0, 0.095, 0.122]]), SKIN);
 
-  // West: a high-cut helmet over a headset, NVG shroud, side rails, a counterweight, eye protection.
+  // West: a high-cut helmet over a headset, NVG shroud, a counterweight, eye protection.
   p.add(
     lathe(
       [
@@ -173,17 +162,15 @@ function headPiece(): Piece {
         [0.08, 0.262],
         [0.001, 0.276],
       ],
-      10,
+      8,
     ),
     HELMET,
     M(0, 0, -0.008),
     WEST,
   );
   for (const s of [1, -1]) {
-    p.add(cyl(0.042, 0.04, 0.04, 8, 'x'), GEAR, M(s * 0.093, 0.13, -0.005), WEST);
-    p.add(bx(0.008, 0.022, 0.1), METAL, M(s * 0.12, 0.182, -0.01), WEST);
+    p.add(bx(0.04, 0.075, 0.07), GEAR, M(s * 0.095, 0.13, -0.005), WEST);
   }
-  p.add(bx(0.022, 0.012, 0.19), GEAR, M(0, 0.268, -0.01, 0.2, 0, 0), WEST);
   p.add(bx(0.06, 0.04, 0.03), METAL, M(0, 0.215, 0.122), WEST);
   p.add(bx(0.09, 0.06, 0.04), GEAR, M(0, 0.2, -0.13), WEST);
   p.add(bx(0.155, 0.032, 0.02), METAL, M(0, 0.143, 0.1), WEST);
@@ -198,7 +185,7 @@ function headPiece(): Piece {
         [0.09, 0.262],
         [0.001, 0.28],
       ],
-      10,
+      8,
     ),
     HELMET,
     M(0, 0, -0.012),
@@ -206,7 +193,7 @@ function headPiece(): Piece {
   );
   p.add(bx(0.17, 0.035, 0.03), METAL, M(0, 0.2, 0.125, -0.3, 0, 0), EAST);
   p.add(bx(0.27, 0.012, 0.012), GEAR, M(0, 0.2, 0.07), EAST);
-  p.add(cyl(0.07, 0.065, 0.055, 7), GEAR, M(0, 0.035, 0.0), EAST);
+  p.add(cyl(0.07, 0.065, 0.055, 6, 'y', true), GEAR, M(0, 0.035, 0.0), EAST);
   return p;
 }
 
@@ -218,91 +205,76 @@ function torsoPiece(): Piece {
       [
         [-0.1, 0.15, 0.1, 0.11],
         [0.06, 0.145, 0.095, 0.1],
-        [0.24, 0.18, 0.11, 0.1],
-        [0.4, 0.205, 0.09, 0.09],
-        [0.47, 0.16, 0.06, 0.07],
-        [0.52, 0.07, 0.04, 0.05],
+        [0.26, 0.185, 0.11, 0.1],
+        [0.42, 0.2, 0.085, 0.085],
+        [0.52, 0.08, 0.045, 0.05],
       ],
-      8,
+      6,
     ),
     UNIFORM,
   );
   // Belt line, both factions.
   p.add(bx(0.32, 0.05, 0.23), GEAR, M(0, -0.03, 0.0));
 
-  // West: the plate carrier with its cummerbund, three magazine pouches and an admin flap, a radio on the
-  // left of the back with its whip, shoulder straps, and a battle belt with a pouch each side.
+  // West: the plate carrier with its cummerbund and three magazine pouches, a radio on the left of the
+  // back with its whip.
   p.add(bx(0.31, 0.3, 0.07), GEAR, M(0, 0.3, 0.11), WEST);
-  p.add(bx(0.31, 0.3, 0.07), GEAR, M(0, 0.31, -0.11), WEST);
   p.add(bx(0.37, 0.16, 0.2), GEAR, M(0, 0.22, 0), WEST);
   for (const x of [-0.085, 0, 0.085]) p.add(bx(0.072, 0.1, 0.055), GEAR, M(x, 0.2, 0.17), WEST);
-  p.add(bx(0.17, 0.065, 0.03), PACK, M(0, 0.36, 0.155), WEST);
-  for (const s of [1, -1]) p.add(bx(0.07, 0.03, 0.27), GEAR, M(s * 0.1, 0.455, 0), WEST);
   p.add(bx(0.06, 0.15, 0.05), METAL, M(0.15, 0.3, -0.16), WEST);
-  p.add(cyl(0.004, 0.004, 0.32, 3), METAL, M(0.16, 0.52, -0.17, -0.15, 0, 0), WEST);
-  for (const s of [1, -1]) p.add(bx(0.05, 0.09, 0.08), GEAR, M(s * 0.17, -0.05, 0.03), WEST);
+  p.add(bx(0.008, 0.32, 0.008), METAL, M(0.16, 0.52, -0.17, -0.15, 0, 0), WEST);
 
-  // East: the 6B45 vest, longer and bulkier, its collar, shoulder guards and a groin flap; four tall
-  // magazine pouches, a grenade pouch each side.
+  // East: the 6B45 vest, longer and bulkier, its collar, shoulder guards and a groin flap; three tall
+  // magazine pouches.
   p.add(bx(0.34, 0.38, 0.27), GEAR, M(0, 0.26, 0), EAST);
-  p.add(cyl(0.13, 0.15, 0.07, 8), GEAR, M(0, 0.47, -0.005), EAST);
+  p.add(cyl(0.13, 0.15, 0.07, 6, 'y', true), GEAR, M(0, 0.47, -0.005), EAST);
   for (const s of [1, -1]) p.add(bx(0.11, 0.04, 0.2), GEAR, M(s * 0.2, 0.43, 0, 0, 0, s * -0.5), EAST);
   p.add(bx(0.17, 0.12, 0.03), GEAR, M(0, -0.04, 0.12, 0.1, 0, 0), EAST);
-  for (const x of [-0.11, -0.037, 0.037, 0.11]) p.add(bx(0.068, 0.13, 0.05), PACK, M(x, 0.15, 0.155), EAST);
-  for (const s of [1, -1]) p.add(bx(0.05, 0.08, 0.07), PACK, M(s * 0.185, 0.17, 0.04), EAST);
+  for (const x of [-0.08, 0, 0.08]) p.add(bx(0.07, 0.13, 0.05), PACK, M(x, 0.15, 0.155), EAST);
   return p;
 }
 
 function packPiece(): Piece {
   const p = new Piece();
   // West: a compact assault pack with a top pocket and side pockets.
-  p.add(chamferBox(0.26, 0.3, 0.13), PACK, M(0, 0.3, -0.21), WEST);
+  p.add(bx(0.26, 0.3, 0.13), PACK, M(0, 0.3, -0.21), WEST);
   p.add(bx(0.2, 0.08, 0.06), PACK, M(0, 0.44, -0.23, 0.3, 0, 0), WEST);
   for (const s of [1, -1]) p.add(bx(0.04, 0.13, 0.09), GEAR, M(s * 0.145, 0.24, -0.22), WEST);
   // East: a taller rucksack with a rolled sleeping mat across its top.
-  p.add(chamferBox(0.28, 0.36, 0.15), PACK, M(0, 0.3, -0.22), EAST);
-  p.add(cyl(0.055, 0.055, 0.36, 8, 'x'), GEAR, M(0, 0.52, -0.21), EAST);
+  p.add(bx(0.28, 0.36, 0.15), PACK, M(0, 0.3, -0.22), EAST);
+  p.add(cyl(0.055, 0.055, 0.36, 6, 'x'), GEAR, M(0, 0.52, -0.21), EAST);
   p.add(bx(0.22, 0.12, 0.04), PACK, M(0, 0.2, -0.31), EAST);
   return p;
 }
 
 function upperArm(): Piece {
-  const p = new Piece().add(limb(0.31, 0.058, 0.045, 6, 1, 1, 0.056), UNIFORM);
-  // Elbow pad.
-  p.add(bx(0.07, 0.06, 0.06), GEAR, M(0, -0.29, -0.025));
-  return p;
+  return new Piece().add(limb(0.31, 0.058, 0.045, 6), UNIFORM);
 }
 
 function lowerArm(): Piece {
   const p = new Piece().add(limb(0.26, 0.046, 0.034, 6, 1, 1, 0.048), UNIFORM);
-  // Glove: the back of the hand, the fingers curled forward, the thumb.
-  p.add(bx(0.05, 0.085, 0.07), BOOTS, M(0, -0.3, 0.01));
-  p.add(bx(0.045, 0.04, 0.05), BOOTS, M(0, -0.35, 0.035, 0.5, 0, 0));
-  p.add(bx(0.02, 0.045, 0.025), BOOTS, M(0.03, -0.29, 0.04, 0, 0, 0.4));
+  // Glove: the hand, its fingers curled forward.
+  p.add(bx(0.05, 0.1, 0.075), BOOTS, M(0, -0.31, 0.015, 0.25, 0, 0));
   return p;
 }
 
 function upperLeg(): Piece {
-  const p = new Piece().add(limb(0.44, 0.09, 0.062, 6, 1.1, 1, 0.088), UNIFORM);
-  // Cargo pockets either side of the thigh (one limb serves both legs).
-  for (const s of [1, -1]) p.add(bx(0.025, 0.11, 0.09), UNIFORM, M(s * 0.075, -0.22, 0.0));
-  return p;
+  return new Piece().add(limb(0.44, 0.09, 0.062, 6, 1.1, 1, 0.088), UNIFORM);
 }
 
 function lowerLeg(): Piece {
   const p = new Piece().add(limb(0.38, 0.062, 0.048, 6, 1, 1, 0.064), UNIFORM);
   // Knee pad.
   p.add(bx(0.09, 0.1, 0.05), GEAR, M(0, -0.02, 0.055));
-  // Boot: ankle to the sole, the toe forward, a darker sole.
+  // Boot: ankle to the sole, the toe forward.
   p.add(convex([[-0.052, -0.33, -0.065], [0.052, -0.33, -0.065], [-0.052, -0.33, 0.055], [0.052, -0.33, 0.055], [-0.055, -0.48, -0.075], [0.055, -0.48, -0.075], [-0.058, -0.48, 0.18], [0.058, -0.48, 0.18], [-0.046, -0.43, 0.18], [0.046, -0.43, 0.18]]), BOOTS);
-  p.add(bx(0.115, 0.022, 0.27), METAL, M(0, -0.49, 0.05));
   return p;
 }
 
-/** Rifle: grip at the origin, muzzle toward +z. West an M4 with an optic and a light; East an AK-12. */
+/** Rifle: grip at the origin, muzzle toward +z. West an M4 with an optic; East an AK-12. */
 function rifle(): Piece {
   const p = new Piece();
-  // M4: receiver, collapsible stock, rail handguard, barrel, curved magazine, grip, red-dot, light.
+  // M4: receiver, collapsible stock, rail handguard, barrel, curved magazine, grip, red-dot.
   p.add(bx(0.036, 0.075, 0.3), METAL, M(0, 0.035, 0.05), WEST);
   p.add(bx(0.03, 0.065, 0.2), METAL, M(0, 0.03, -0.24), WEST);
   p.add(bx(0.045, 0.05, 0.27), METAL, M(0, 0.045, 0.33), WEST);
@@ -310,7 +282,6 @@ function rifle(): Piece {
   p.add(bx(0.026, 0.11, 0.055), FURNITURE, M(0, -0.055, 0.12, 0.2, 0, 0), WEST);
   p.add(bx(0.026, 0.07, 0.03), METAL, M(0, -0.04, -0.01, -0.3, 0, 0), WEST);
   p.add(bx(0.034, 0.045, 0.07), METAL, M(0, 0.1, 0.05), WEST);
-  p.add(cyl(0.012, 0.012, 0.07, 6, 'z'), METAL, M(0.03, 0.04, 0.38), WEST);
   // AK-12: receiver, folding stock, handguard, the long curved magazine, grip, a dovetail optic.
   p.add(bx(0.04, 0.08, 0.32), METAL, M(0, 0.03, 0.05), EAST);
   p.add(bx(0.03, 0.06, 0.22), METAL, M(0, 0.03, -0.25), EAST);
@@ -833,6 +804,7 @@ export class SoldierCrowd {
   private readonly material = soldierMaterial();
   private readonly depth = depthMaterial();
   private readonly tris: Record<PartName, number>;
+  private readonly drawnTris: Record<PartName, number>;
   private looksDirty = true;
   /** Soldiers wearing an outline (the selected squad, the target), and the hull meshes drawing it. */
   private readonly outlined = new Map<string, OutlineRole>();
@@ -862,6 +834,7 @@ export class SoldierCrowd {
       heavy: [heavy(), 1],
     };
     this.tris = {} as Record<PartName, number>;
+    this.drawnTris = {} as Record<PartName, number>;
     for (const [name, [piece, per]] of Object.entries(pieces) as [PartName, [Piece, number]][]) {
       const g = piece.build();
       const n = this.max * per;
@@ -877,6 +850,7 @@ export class SoldierCrowd {
       this.meshes.set(name, mesh);
       this.group.add(mesh);
       this.tris[name] = piece.tris;
+      this.drawnTris[name] = piece.drawn;
     }
   }
 
@@ -955,9 +929,9 @@ export class SoldierCrowd {
   }
 
   /** Draw calls and triangles per soldier, as built. */
-  stats(): { calls: number; trisPer: number } {
-    const t = this.tris;
-    return { calls: this.meshes.size, trisPer: Math.round(t.head + t.torso + t.pack + 2 * (t.uarm + t.larm + t.uleg + t.lleg) + t.rifle) };
+  stats(): { calls: number; trisPer: number; drawnPer: number } {
+    const per = (t: Record<PartName, number>) => Math.round(t.head + t.torso + t.pack + 2 * (t.uarm + t.larm + t.uleg + t.lleg) + t.rifle);
+    return { calls: this.meshes.size, trisPer: per(this.tris), drawnPer: per(this.drawnTris) };
   }
 
   update(dt: number): void {

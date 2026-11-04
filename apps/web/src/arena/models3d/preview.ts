@@ -211,7 +211,7 @@ function statsTable(): string {
     b.dispose();
   }
   const s = crowd.stats();
-  lines.push(`soldiers (all)   calls ${s.calls}, tris per soldier ${s.trisPer}`);
+  lines.push(`soldiers (all)   calls ${s.calls}, tris per soldier ${s.trisPer} (drawn ${s.drawnPer})`);
   (window as unknown as { __stats: unknown }).__stats = { models: out, soldiers: s };
   return lines.join('\n');
 }
