@@ -296,7 +296,7 @@ export const useGame = create<State>((set, get) => {
       get().notify(res.rejected[0]!, 'warn');
       return false;
     }
-    sfx.order();
+    sfx.card();
     editDraft((d) => ({ ...d, play: plays }));
     get().notify(`${CARDS[p.card]?.name ?? p.card} played`);
     return true;

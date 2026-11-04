@@ -4,7 +4,9 @@
 // is a few nodes. At most MAX_VOICES at once on an iPhone; the quietest gives way. Tank guns,
 // artillery, rockets and the heavy blasts play in layers weighed by distance (`layers`).
 
-import type { RadioCall } from '@brink/arena/v2';
+import type { Battle, BattleEvent, RadioCall } from '@brink/arena/v2';
+import { battleScore } from '../../audio';
+import { mixer } from '../../audio/output';
 import { audio, isMuted } from '../../sfx';
 import { dB, rand, type Rand, type Samples } from './dsp';
 import { crickets, diesel, DIESEL_RPM, rain, rotor as rotorLoop, tracks, white } from './loops';
@@ -229,6 +231,8 @@ export interface BattleAudioOptions {
   radio: boolean;
   /** Render into this context instead of the game's (the audition page, offline measurement). */
   context?: BaseAudioContext;
+  /** The battle on stage: the score follows it (audio/battleMood.ts) while this lives. */
+  battle?: Battle;
 }
 
 export class BattleAudio {
@@ -252,6 +256,20 @@ export class BattleAudio {
   constructor(opts: BattleAudioOptions) {
     this.injected = opts.context ?? null;
     this.desk = new RadioDesk(opts.radio);
+    this.scored = !!opts.battle && !opts.context;
+    if (this.scored) battleScore.begin(opts.battle!);
+  }
+
+  private readonly scored: boolean;
+
+  /** A batch of the battle's events as the stage takes them: the score's intensity follows. */
+  feed(events: readonly BattleEvent[]): void {
+    if (this.scored) battleScore.feed(events);
+  }
+
+  /** The film has reached the battle's end: the score's stinger. */
+  ended(won: boolean): void {
+    if (this.scored) battleScore.ended(won);
   }
 
   /** The mix after the limiter, for metering. */
@@ -470,6 +488,7 @@ export class BattleAudio {
 
   dispose(): void {
     if (this.disposed) return;
+    if (this.scored) battleScore.end();
     this.silence();
     this.sources.clear();
     this.bed = null;
@@ -503,7 +522,8 @@ export class BattleAudio {
     limiter.attack.value = 0.002;
     limiter.release.value = 0.25;
     const out = ctx.createGain();
-    master.connect(limiter).connect(out).connect(ctx.destination);
+    // Into the mixer's sfx bus (its volume and mute); an injected context renders straight out.
+    master.connect(limiter).connect(out).connect((!this.injected && mixer.bus('sfx', ctx)) || ctx.destination);
     const battle = ctx.createGain();
     battle.connect(master);
     const dry = ctx.createGain();
