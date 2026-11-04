@@ -5,7 +5,7 @@ import { wellFormed } from './orders';
 import { replay, hashBattle, submit, type PlayerCommand } from './replay';
 import { SUPPORT, supportName } from './roster';
 import { BATTLES, bare, put, setup, spec, unit } from './fixture.test-util';
-import { SUPPORT_IDS, type Battle, type SupportId } from './types';
+import { ROUND_LIMIT, SUPPORT_IDS, type Battle, type SupportId } from './types';
 
 // Off-map support the war map brings (docs/arena-v2.md, section 14): naval gunfire, cruise missiles,
 // strike jets and kamikaze swarms, for both sides, with air defence that can bring the last three down.
@@ -129,6 +129,23 @@ describe('war-map support in the arena', () => {
     }
     expect(called).toBeGreaterThan(0);
   }, BATTLES);
+
+  it('a mission kept for a big target early is fired at a smaller one late, not taken home unused', () => {
+    const at = (round: number) => {
+      const b = bare(['m2a3'], ['t90m'], { seed: 3, redSupport: [{ id: 'naval_gun', missions: 1 }] });
+      const target = put(unit(b, 'm2a3'), 15, 20);
+      put(unit(b, 't90m', 'red'), 15, 12);
+      b.turn = 'red';
+      b.round = round;
+      b.intel.red = { [target.id]: { unit: target.id, type: target.type, x: target.x, y: target.y, turn: b.turnIndex, now: true } };
+      return decide(b, 'red');
+    };
+    // One lone carrier is not worth the ship's guns in round 1.
+    expect(at(1)?.type).not.toBe('support');
+    // By the last round it is.
+    const late = at(ROUND_LIMIT);
+    expect(late).toMatchObject({ type: 'support', asset: 'naval_gun', at: { x: 15, y: 20 } });
+  });
 
   it('replays to the same hash', () => {
     const s = setup({ attackers: [spec('a', ['m1a2', 'm2a3'])], defenders: [spec('x', ['t90m', 'tunguska'])], support: WAR_SUPPORT.map((id) => ({ id, missions: 1 })), redSupport: [{ id: 'kamikaze', missions: 2 }] });

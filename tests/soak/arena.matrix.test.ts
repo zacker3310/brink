@@ -93,7 +93,11 @@ function runCase(n: number): Result {
   };
   try {
     const b = createBattle(setup);
-    const p = player(n, { advice: 0.03, planner: 0.01, illegal: 0.1, auto: 0.3, retreat: 0.003 });
+    // Blue plays like an attacker who means it: two orders in five are the advice (what Do It
+    // plays), the rest random legal orders and orders meant to be refused. With advice at 3% blue
+    // was a random walk that seldom reached the enemy, so 17 of 24 battles ran out the clock and
+    // the matrix hardly saw a capture, a break or an end-game state (docs/arena-v2.md, section 15).
+    const p = player(n, { advice: 0.4, planner: 0.01, illegal: 0.1, auto: 0.3, retreat: 0.003 });
     const played: Played = { setup, b, p, marks: [{ at: 0, hash: hashBattle(b) }] };
     let k = 0;
     const watch = (st: Step) => {

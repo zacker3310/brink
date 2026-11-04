@@ -66,9 +66,10 @@ otherwise the way they drove. `face` points them anywhere.
 snap -12. AD units on overwatch watch the sky only, with no snap penalty (radar cued).
 
 **Win**: destroy them, or (capitals, cities, objectives) end 2 rounds in a row with a unit in the
-amber circle (radius 3.5) and no defender in it. The defender withdraws (attacker wins) when its
-force falls under 35% of its starting value (combat ineffective); the attacker's company breaks (a
-loss) under 25%. Losing every unit, retreating, or reaching the end of round 16 loses. Stars: win; lose under 10% of your force value; win by round 9 or take under 20%.
+amber circle (radius 3.5) and no defender in it; on the last round one round alone in it is enough
+(section 15). The defender withdraws (attacker wins) when its force falls under 40% of its starting
+value (combat ineffective); the attacker's company breaks (a loss) under 25%. Losing every unit,
+retreating, or reaching the end of round 16 otherwise loses. Stars: win; lose under 10% of your force value; win by round 9 or take under 20%.
 
 ### 3.2 Sight and fog
 
@@ -613,7 +614,7 @@ adds difficulty on top of the rules (sections 3 to 6 are unchanged).
   Suppressed, Pinned, Broken, Contact. Kills put a line under the title ("Abrams 2 knocked out a
   T-72B3", "Lost Bradley 1 by a Kornet team").
 - Two strength bars under the title: yours exact, theirs as far as you have seen it fall, with the
-  marks where you break (25%) and where they pull back (35%). They move when the film is still.
+  marks where you break (25%) and where they pull back (40% since v2.5). They move when the film is still.
 - The enemy turn has a banner and a Skip button; your turn opens with the round and a line on what
   happened ("2 knocked out · 1 lost").
 - Best Shot on the unit card opens the shot card on its best target, even off screen.
@@ -924,6 +925,45 @@ three rules the stars are earned by. Fight It and Back stay docked over the thum
 after-action card in the same frame: Victory or Repulsed in the same caps, the three stars (earned
 amber, the rest hollow), the same three rules each marked earned or not (`starsEarned`, as
 `arenaResult` counts them), the count, the grades and the turning round. Targets stay 44 pt.
+
+## 15. Pacing: battles that end (v2.5)
+
+`pnpm test:matrix` reported `{"lost time":17,"lost retreat":1,"won withdrew":5,"lost withdrew":1}`:
+most battles ran out the clock. Taking it apart:
+
+- **The matrix's player was not attacking.** Its blue seat played the advice for 3% of its orders,
+  the planner for 1%, and random legal orders (moves uniform over the reachable cells) for the rest:
+  a random walk that seldom met the enemy. Its own setups, fought by the AI in blue's seat
+  (`autoBattle`), already won 18 of 24 with 4 timeouts. The matrix now plays the advice for two
+  orders in five and keeps random legal orders and orders meant to be refused for the rest (10%
+  illegal, as before), so it reaches contact, captures, breaks and end-game states and still
+  checks every refusal. The checks themselves are unchanged.
+- **Defenders fought on too long.** A company down to 36 to 45% of its value, hidden in the trees
+  of a Destroy battle, held to the round limit in most of the AI's own timeouts. A tabletop company
+  is combat ineffective well before that: the defender now withdraws under **40%** (was 35%); the
+  attacker still breaks under 25%. The strength bars mark the new line from `WITHDRAW_AT`.
+- **The last round's bell.** Capture still takes two rounds alone in the circle, but an attacker
+  alone in it when round 16 closes has taken it (one round is enough then): a last push is worth
+  making.
+- **Support went home unused.** The AI called off-map missions only on a cluster worth a fixed bar
+  (8 to 10 unit values after odds), so most missions were never flown and the battle lost the
+  firepower the war map paid for. The bar now falls with the rounds (`supportPatience` in `ai.ts`:
+  the full bar in round 1, two fifths of it in round 16), for both sides: a mission kept for a big
+  target early is fired at a smaller one late.
+- `ARENA_RULES_VERSION` is 2: a battle saved mid-fight under the old withdrawal line is not
+  resumed under the new one.
+
+Measured (default matrix, 24 battles; soak at `ARENA_SOAK=20`, the AI in blue's seat, 60 battles):
+
+| | Before | After |
+|---|---|---|
+| Matrix endings | lost time 17, won withdrew 5, lost retreat 1, lost withdrew 1 | won withdrew 10, won captured 4, lost time 6, lost withdrew 3, lost retreat 1 |
+| Soak end reasons | time 12, withdrew 40, captured 8 | time 10, withdrew 45, captured 5 |
+| Soak attacker wins (Easy / Normal / Hard) | 85% / 75% / 50% | 85% / 80% / 55% |
+| Soak off-map missions flown | 13 | 15 |
+
+What still times out is mostly a single weak formation (one mechanised platoon, guns only or
+drones only) against a full company: those battles are meant to be hard, and quick resolve stays.
 
 ## Sources
 

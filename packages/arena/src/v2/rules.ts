@@ -8,7 +8,7 @@ import type { AbilityDef, AbilityId, Difficulty, Side } from './types';
  * The arena's rules version. A saved battle (snapshot.ts) is picked up only under the rules it was
  * fought by: bump this when a change to the rules or the roster changes what an action does.
  */
-export const ARENA_RULES_VERSION = 1;
+export const ARENA_RULES_VERSION = 2;
 
 /** Veterancy, read from a formation's experience on the war map. `aim` is the hit bonus (section 3.4). */
 export const RANKS = [

@@ -1113,7 +1113,7 @@ export function holdingZone(b: Battle): boolean {
   return b.units.some((u) => u.side === 'blue' && inZone(u)) && !b.units.some((u) => u.side === 'red' && inZone(u));
 }
 
-/** A defender bled under a third of its strength pulls out; an attacker under a quarter breaks. */
+/** A defender bled under two fifths of its strength pulls out; an attacker under a quarter breaks. */
 function withdrawCheck(b: Battle): void {
   if (b.ended) return;
   if (sideValue(b, 'red') < WITHDRAW_AT * startValue(b, 'red')) end(b, true, 'withdrew');
@@ -1136,7 +1136,8 @@ export function endTurn(b: Battle): void {
   if (b.map.mode === 'capture') {
     b.capture = holdingZone(b) ? b.capture + 1 : 0;
     if (b.capture > 0) b.events.push({ type: 'capture', rounds: b.capture });
-    if (b.capture >= CAPTURE_ROUNDS) return end(b, true, 'captured');
+    // The last round's bell: an attacker alone in the circle when time runs out has taken it.
+    if (b.capture >= CAPTURE_ROUNDS || (b.capture > 0 && b.round >= ROUND_LIMIT)) return end(b, true, 'captured');
   }
   withdrawCheck(b);
   if (b.ended) return;
