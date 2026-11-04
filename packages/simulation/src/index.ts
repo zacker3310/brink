@@ -1,4 +1,5 @@
 export * from './combat';
+export * from './commanders';
 export * from './economy';
 export * from './events';
 export * from './fog';

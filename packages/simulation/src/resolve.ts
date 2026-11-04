@@ -12,6 +12,7 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { RULESET_VERSION } from '@brink/game-data';
+import { applyCommanderOrders, applyLeaderSupply, resolveCommanders } from './commanders';
 import { settleEconomy } from './economy';
 import { resolveDiplomacy } from './diplomacy';
 import { resolveWorldEvents } from './events';
@@ -166,6 +167,7 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
       case 'construction_queued':
       case 'construction_cancelled':
       case 'facility_built':
+      case 'commander':
         if (e.nation === nation) out.push(e);
         break;
       case 'proposal':
@@ -202,6 +204,8 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   const { orders, rejected } = lockOrders(world, submissions);
   events.push(...rejected);
   const nations = sortedKeys(orders);
+  // 1b. Promotions answered and generals assigned take effect before anything moves.
+  applyCommanderOrders(world, orders, events);
 
   // 2. Diplomacy.
   resolveDiplomacy(world, orders, events);
@@ -214,6 +218,7 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   // 4. Logistics, against one snapshot of enemy positions.
   const logistics: Record<NationId, Stockpile> = {};
   for (const n of nations) logistics[n] = allocateLogistics(world, n, orders[n]!, events);
+  applyLeaderSupply(world);
 
   // 5. Reconnaissance: vision for this turn's targeting, with recon orders active.
   const recon = new Set<FormationId>();
@@ -244,6 +249,8 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
 
   // 11. Victory.
   resolveEliminations(world, events);
+  // 11b. Generals: experience, wounds, promotions.
+  resolveCommanders(world, events);
   world.victory = evaluateVictory(world);
   if (world.victory) events.push({ kind: 'victory', winner: world.victory.winner, reason: world.victory.reason, ...(world.victory.coalition ? { coalition: world.victory.coalition } : {}) });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyCrisis, CRISES, createPacificScenario } from '@brink/scenarios';
 import { hexKey } from '@brink/map';
-import { buildView, lockOrders, previewAssault, resolveTurn, sortedKeys } from '@brink/simulation';
+import { buildView, lockOrders, previewAssault, resolveTurn, seedCommanders, sortedKeys } from '@brink/simulation';
 import { makeWorld, own, setRelation, site, unit } from '../../simulation/src/fixture.test-util';
 import { emptyMemory, planOrders, updateMemory } from './index';
 
@@ -19,6 +19,27 @@ describe('AI', () => {
       }
     }
   }, 120_000); // four whole matches on the full map: about 17 s locally, twice that on a shared CI runner
+
+  it('puts its generals at the head of its strongest assault formations and answers every promotion, never refused', () => {
+    let w = seedCommanders(createPacificScenario(7));
+    let promoted = 0;
+    for (let turn = 0; turn < 30 && !w.victory; turn++) {
+      const subs = sortedKeys(w.nations)
+        .filter((n) => !w.nations[n]!.eliminated)
+        .map((n) => planOrders(buildView(w, n), emptyMemory(), w.seed));
+      const { rejected } = lockOrders(w, subs);
+      expect(rejected, `turn ${w.turn}`).toEqual([]);
+      for (const s of subs) for (const id of Object.keys(s.commanders?.perks ?? {})) expect(w.commanders![id]!.offer, id).not.toBeNull();
+      const r = resolveTurn(w, subs);
+      promoted += r.events.filter((e) => e.kind === 'commander' && e.change === 'perk').length;
+      w = r.world;
+    }
+    const gens = Object.values(w.commanders!);
+    expect(gens.filter((c) => c.formation).length).toBeGreaterThan(4);
+    for (const c of gens.filter((x) => x.formation)) expect(w.formations[c.formation!]!.owner).toBe(c.nation);
+    expect(gens.some((c) => c.xp > 0)).toBe(true);
+    expect(promoted).toBeGreaterThan(0);
+  }, 120_000);
 
   it('is deterministic and reads nothing but its own view', () => {
     const w = createPacificScenario(5);

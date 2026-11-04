@@ -11,6 +11,7 @@ import { boardOrders, describeOrder, fleetLoadOrders, type Mode } from './planni
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
 import { battleFor } from './arena/battle';
+import { CommandRow } from './Generals';
 import { RANKS, rankOf } from '@brink/arena';
 
 // Civ-style unit panel (bottom-left) and turn controls (bottom-right), floating over the map.
@@ -186,6 +187,8 @@ export function UnitPanel() {
           </div>
         </div>
 
+        <CommandRow fid={f.id} compact />
+        <div className="h-2" aria-hidden />
         {order?.type === 'attack' && !resolving && (
           <FightButton target={order.target} />
         )}

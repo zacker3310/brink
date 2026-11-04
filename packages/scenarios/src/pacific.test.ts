@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { UNIT_CLASSES } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { findPath, keyDistance, offsetToAxial, keyOf } from '@brink/map';
-import { enterCost, sortedKeys } from '@brink/simulation';
+import { enterCost, seedCommanders, sortedKeys } from '@brink/simulation';
 import { createPacificScenario, MINORS, NATIONS, PACIFIC_ID } from './pacific';
 import { createScenario } from './index';
 
@@ -16,7 +16,9 @@ describe('The Pacific', () => {
     expect(Object.keys(w.tiles)).toHaveLength(800);
     const terrains = new Set(Object.values(w.tiles).map((t) => t.terrain));
     for (const t of ['plains', 'forest', 'hills', 'mountains', 'urban', 'water'] as const) expect(terrains.has(t), t).toBe(true);
-    expect(createScenario(PACIFIC_ID, 1)).toEqual(w);
+    // createScenario is the Pacific with each power's starting generals (ruleset 2.3); the theatre
+    // itself carries none, so the dispatch check compares against the seeded world.
+    expect(createScenario(PACIFIC_ID, 1)).toEqual(seedCommanders(JSON.parse(JSON.stringify(w)) as typeof w));
   });
 
   it('gives every power a capital, three or more cities, a depot and the same opening army', () => {

@@ -9,6 +9,7 @@ import {
   type AssaultContext,
   type AssaultOutcome,
 } from './combat';
+import { leaderEffects } from './commanders';
 import { nationModifiers } from './rules';
 
 export type Confidence = 'confirmed' | 'estimated' | 'blind';
@@ -80,6 +81,7 @@ export function previewAssault(view: NationView, attackerIds: readonly Formation
   const staleness = Math.max(0, ...Object.values(view.contacts).filter((c) => c.key === target).map((c) => view.turn - c.lastSeen));
   const believed = believedDefenders(view, target, staleness * 10);
   const tile = view.tiles[target];
+  const leaders = leaderEffects(view.commanders);
   const ctx: AssaultContext = {
     terrain: tile?.terrain ?? 'plains',
     river: tile?.river ?? false,
@@ -90,6 +92,7 @@ export function previewAssault(view: NationView, attackerIds: readonly Formation
     attackerMods: nationModifiers(view.self),
     defenderMods: (owner) => enemyMods(view, owner),
     defending: () => false,
+    leader: (fid) => leaders[fid],
   };
   if (believed.low.length === 0) {
     return { confidence: 'blind', defenders: 0, share: [1000, 1000], attackerLoss: [0, 0], defenderLoss: [0, 0], outcomes: ['attacker_victory'] };
@@ -127,6 +130,7 @@ export function previewStrike(view: NationView, sourceId: FormationId, target: H
     terrain: view.tiles[target]?.terrain ?? 'plains',
     spotted: view.tiles[target]?.visibility === 'visible' && believed.confidence === 'confirmed',
     sourceMods: nationModifiers(view.self),
+    sourceLeader: leaderEffects(view.commanders)[sourceId],
   };
   const losses = believed.high.flatMap((v) => [strikeLoss(source, v, ctx, 100 - RULES.combatSwing), strikeLoss(source, v, ctx, 100 + RULES.combatSwing)]);
   return { confidence: believed.confidence, targets: believed.low.length, loss: [Math.min(...losses), Math.max(...losses)] };

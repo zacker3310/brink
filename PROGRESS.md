@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-10-30 (arena v2.3). Milestone 1 (first playable).
+Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -281,6 +281,15 @@ Updated 2026-10-30 (arena v2.3). Milestone 1 (first playable).
     touch and navigation at 375, 393 and 440 pt), the frame-time probes and the long leak run opt-in.
   - Not measured: anything on a real iPhone (GPU frame time, touch feel on glass, haptics, Safari
     memory pressure). The checklist is `docs/device-testing.md`.
+
+- Commanders (ruleset 2.3.0): three named generals per power (generic roster by government; a
+  per-country roster is one file plus one registry entry), assigned to formations by order, earning
+  experience in battle, strikes and captures, levels 1 to 5 with a choice of two perk cards per
+  level (11 perks, 9 signature traits), wounded or killed when their formation falls. Effects feed
+  combat, strikes, sight, supply, morale, readiness and entrenchment; +1 arena rank. Fog shows
+  enemy generals by name and level only. AI posts its generals to its strongest assault formations
+  and picks perks by utility. UI: commander row on the unit card (phone and desktop), Assign picker,
+  promotion modal, Command > Generals roster. Saves before 2.3 gain generals on load.
 
 ## Outstanding
 

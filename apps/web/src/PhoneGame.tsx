@@ -22,6 +22,7 @@ import { SLOT_NAMES } from './saves';
 import { isMuted, setMuted } from './sfx';
 import { useGame, type Tab } from './store';
 import { EventCard } from './UnitPanel';
+import { CommandRow, GeneralsRoster, PromotionModal } from './Generals';
 import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
 import { crisisOf, shortName } from '@brink/scenarios';
 import { minorsOf, powersOf, signed } from './ui';
@@ -243,6 +244,7 @@ const TABS: [Tab, string][] = [
   ['economy', 'Economy'],
   ['research', 'Research'],
   ['diplomacy', 'Diplomacy'],
+  ['generals', 'Generals'],
 ];
 
 function CommandSheet({ onClose }: { onClose: () => void }) {
@@ -283,6 +285,7 @@ function CommandSheet({ onClose }: { onClose: () => void }) {
       {tab === 'economy' && <Economy />}
       {tab === 'research' && <Research />}
       {tab === 'diplomacy' && <Diplomacy />}
+      {tab === 'generals' && <GeneralsRoster />}
     </Sheet>
   );
 }
@@ -420,6 +423,7 @@ function UnitCard() {
           </div>
         </div>
       </div>
+      {!armed && <CommandRow fid={f.id} />}
       {ship && (
         <div className="mx-4 mt-2 flex items-center gap-2 overflow-x-auto" data-testid="cargo">
           <span className="font-display shrink-0 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">
@@ -464,6 +468,9 @@ function UnitCard() {
             Attack {target.length ? target.map((c) => UNITS[c.unitClass].name).join(', ') : hexLabel(view, armed.target)} with {attackers.length}
           </div>
           {odds && <div className={`font-display text-2xl font-extrabold uppercase ${oddsTone}`} data-testid="preview">{ODDS_TEXT[odds]}</div>}
+          {target.map((c) => view.enemyCommanders?.[c.formation]).filter(Boolean).slice(0, 1).map((g) => (
+            <div key={g!.name} className="text-[13px] text-signal" data-testid="enemy-general">Led by {g!.name}, level {g!.level}</div>
+          ))}
           <div className="text-[13px] text-muted">{lossText(view, attackers, armed.target) ?? 'Reading the odds…'}</div>
           <div className="mt-2.5 flex gap-2">
             <button type="button" onClick={() => armAttack(null)} className="h-12 flex-1 rounded-lg border border-line bg-ink-900 text-base font-semibold" data-testid="cancel-attack">
@@ -942,6 +949,7 @@ export function PhoneGame() {
       <CityPanel />
       {command && <CommandSheet onClose={() => setCommand(false)} />}
       {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
+      <PromotionModal />
       {howTo && <HowToWin onClose={() => setHowTo(false)} />}
       <VictoryOverlay />
       {showReport && <Report />}

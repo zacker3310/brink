@@ -1,17 +1,18 @@
 import { defineConfig } from '@playwright/test';
+const port = Number(process.env.E2E_PORT ?? 4173);
 
 export default defineConfig({
   testDir: 'e2e',
   timeout: 60_000,
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: `http://localhost:${port}`,
     viewport: { width: 1440, height: 900 },
     // A machine with a different Chromium installed than this Playwright expects can point at it.
     ...(process.env.PW_CHROMIUM ? { launchOptions: { executablePath: process.env.PW_CHROMIUM } } : {}),
   },
   webServer: {
-    command: 'pnpm --filter @brink/web build && pnpm --filter @brink/web preview',
-    url: 'http://localhost:4173',
+    command: `pnpm --filter @brink/web build && pnpm --filter @brink/web preview --port ${port} --strictPort`,
+    url: `http://localhost:${port}`,
     reuseExistingServer: true,
     timeout: 120_000,
   },

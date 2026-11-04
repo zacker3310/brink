@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { FACILITY_SLOTS, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { COMMANDER_RULES, FACILITY_SLOTS, levelForXp, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { GameSession } from '@brink/session';
 
@@ -51,6 +51,18 @@ function invariants(w: WorldState): string[] {
     if (!(t.a < t.b) || t.until < t.from) bad.push(`malformed treaty ${JSON.stringify(t)}`);
     if (t.kind !== 'embargo' && t.until >= w.turn && w.relations[`${t.a}|${t.b}`] === 'war') bad.push(`${t.kind} between ${t.a} and ${t.b} at war`);
   }
+  const led = new Set<string>();
+  for (const c of Object.values(w.commanders ?? {})) {
+    if (c.level !== Math.min(COMMANDER_RULES.maxLevel, levelForXp(c.xp)) || !Number.isInteger(c.xp)) bad.push(`general ${c.id} level ${c.level} at ${c.xp} xp`);
+    if (c.perks.length + (c.offer ? 1 : 0) > c.level - 1 || new Set(c.perks).size !== c.perks.length) bad.push(`general ${c.id} perks ${c.perks.join(',')}`);
+    if (c.status !== 'active' && c.formation) bad.push(`general ${c.id} ${c.status} but in command`);
+    if ((c.status === 'wounded') !== c.woundedTurns > 0) bad.push(`general ${c.id} ${c.status} with ${c.woundedTurns} turns of wounds`);
+    if (!c.formation) continue;
+    const f = w.formations[c.formation];
+    if (!f || f.owner !== c.nation || UNITS[f.unitClass].naval) bad.push(`general ${c.id} leads ${c.formation}, not an own land or air formation`);
+    if (led.has(c.formation)) bad.push(`two generals lead ${c.formation}`);
+    led.add(c.formation);
+  }
   return bad;
 }
 
@@ -60,6 +72,7 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
     const turns: number[] = [];
     let rejected = 0;
     const usage = { facilities: 0, treaties: 0 };
+    const generals = { promoted: 0, killed: 0, topLevel: 1 };
     for (let seed = 1; seed <= MATCHES; seed++) {
       const s = GameSession.create(PACIFIC_ID, seed, null);
       let guard = 0;
@@ -68,20 +81,25 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
         rejected += r.events.filter((e) => e.kind === 'order_rejected').length;
         usage.facilities += r.events.filter((e) => e.kind === 'facility_built').length;
         usage.treaties += r.events.filter((e) => e.kind === 'treaty').length;
+        generals.promoted += r.events.filter((e) => e.kind === 'commander' && e.change === 'level_up').length;
+        generals.killed += r.events.filter((e) => e.kind === 'commander' && e.change === 'killed').length;
         const bad = invariants(s.snapshot());
         expect(bad, `seed ${seed} turn ${s.turn}`).toEqual([]);
         if (++guard > 40) throw new Error(`seed ${seed} did not end`);
       }
+      for (const c of Object.values(s.snapshot().commanders ?? {})) generals.topLevel = Math.max(generals.topLevel, c.level);
       const v = s.snapshot().victory!;
       expect(v.turn).toBeLessThanOrEqual(30);
       endings[v.reason] = (endings[v.reason] ?? 0) + 1;
       turns.push(v.turn);
     }
     turns.sort((a, b) => a - b);
-    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties);
+    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties, 'generals promoted', generals.promoted, 'killed', generals.killed, 'top level', generals.topLevel);
     // The AI uses the economy and diplomacy it is given.
     expect(usage.facilities).toBeGreaterThan(MATCHES);
     expect(usage.treaties).toBeGreaterThan(MATCHES);
     expect(rejected).toBe(0);
+    // Generals see war: they rise in rank.
+    expect(generals.promoted).toBeGreaterThan(0);
   });
 });

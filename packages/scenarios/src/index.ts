@@ -1,4 +1,5 @@
 import type { WorldState } from '@brink/contracts';
+import { seedCommanders } from '@brink/simulation';
 import { createPacificScenario, MAX_TURNS, PACIFIC_ID, THEATRES } from './pacific';
 
 export * from './crises';
@@ -23,6 +24,6 @@ export const SCENARIOS: readonly ScenarioInfo[] = [
 ];
 
 export function createScenario(id: string, seed: number): WorldState {
-  if (THEATRES.some((t) => t.id === id)) return createPacificScenario(seed);
+  if (THEATRES.some((t) => t.id === id)) return seedCommanders(createPacificScenario(seed));
   throw new Error(`unknown scenario: ${id}`);
 }

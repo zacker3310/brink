@@ -70,6 +70,27 @@ describe('GameSession', () => {
     expect(() => parseSave(JSON.stringify(old))).toThrow(/corrupted/);
   });
 
+  it('gives a campaign begun before commanders its starting generals on load', () => {
+    const s = GameSession.create(PACIFIC_ID, 6, 'japan');
+    expect(Object.keys(s.view().commanders!).sort()).toEqual(['japan-gen-1', 'japan-gen-2', 'japan-gen-3']);
+    s.advance();
+    // What ruleset 2.2.0 wrote: no commanders in the world.
+    const old = JSON.parse(serializeSave(s.toSave('old', '2026-11-01T12:00:00Z')));
+    old.rulesetVersion = '2.2.0';
+    old.world.rulesetVersion = '2.2.0';
+    delete old.world.commanders;
+    old.hash = hashState(old.world);
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.migratedFrom).toBe('2.2.0');
+    expect(Object.keys(loaded.world.commanders!).filter((id) => id.startsWith('usa-'))).toHaveLength(3);
+    // Minor states field none.
+    expect(Object.values(loaded.world.commanders!).some((c) => loaded.world.nations[c.nation]!.minor)).toBe(false);
+    expect(loaded.hash).toBe(hashState(loaded.world));
+    const resumed = GameSession.fromSave(loaded);
+    resumed.advance();
+    expect(resumed.view().commanders!['japan-gen-1']!.status).toBe('active');
+  });
+
   it('runs any campaign length from 5 turns to a 250-turn Total War', () => {
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 45 }).snapshot().maxTurns).toBe(45);
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 999 }).snapshot().maxTurns).toBe(250);
