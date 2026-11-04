@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
-import { CAMPAIGN_TURNS, GOVERNMENTS, UNITS, VICTORY, victoryBars } from '@brink/game-data';
+import { CAMPAIGN_TURNS, GOVERNMENTS, NATION_BLURB, UNITS, VICTORY, victoryBars } from '@brink/game-data';
 import { CRISES, crisisOf, dealCrisis, MINORS, NATIONS, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
@@ -279,6 +279,11 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                 </div>
               </div>
               <blockquote className="wr-doctrine">{DOCTRINE[spec.government]}</blockquote>
+              {NATION_BLURB[spec.id] && (
+                <p className="wr-blurb" data-testid="dossier-blurb">
+                  {NATION_BLURB[spec.id]}
+                </p>
+              )}
               <p className="mt-2 text-[13px] leading-snug text-muted">
                 {gov.summary} Theatre command: <span className="text-text">{spec.capital[2]}</span>.
               </p>

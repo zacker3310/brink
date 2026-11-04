@@ -15,6 +15,9 @@ import { isPhone } from './phone';
 import { threatZones } from '@brink/simulation';
 import { contextualOrder, hostilesAt, orderForClick, reachFor } from './planning';
 import { nextObjective } from './objective';
+import { cardTargets, operationSpot, type Spot } from './opspot';
+import { operationById } from '@brink/ai';
+import type { ActiveOperation } from './saves';
 import { groupOrders, oddsFor, ODDS_TAG, type Odds } from './odds';
 import { useGame } from './store';
 import { paintTheatre } from './paint/ground';
@@ -207,6 +210,25 @@ function tagBadge(c: Point, text: string, color: number): Container {
   return box;
 }
 
+/** The hexes the armed card can take, worked out once per view and card. */
+let aimMemo: { view: NationView; card: string; keys: HexKey[] } | null = null;
+function aimTargets(view: NationView, card: string | null): HexKey[] {
+  if (!card) return [];
+  if (aimMemo?.view !== view || aimMemo.card !== card) aimMemo = { view, card, keys: cardTargets(view, card) };
+  return aimMemo.keys;
+}
+
+/** Where the running operation's current phase happens, worked out once per view. */
+let spotMemo: { view: NationView; id: string; spot: Spot | null } | null = null;
+function opSpot(view: NationView, op: ActiveOperation | null): Spot | null {
+  if (!op) return null;
+  if (spotMemo?.view !== view || spotMemo.id !== op.id) {
+    const full = operationById(view, op.id, op.kind);
+    spotMemo = { view, id: op.id, spot: full ? operationSpot(view, full) : null };
+  }
+  return spotMemo.spot;
+}
+
 function drawCrosshair(g: Graphics, c: Point, color: number, alpha: number) {
   g.circle(c.x, c.y, SIZE * 0.55).stroke({ width: 3, color, alpha });
   for (const [dx, dy] of [
@@ -234,6 +256,10 @@ declare global {
       siteToClient(siteId: string): { x: number; y: number };
       /** Enemy hexes the selected stack can attack. */
       targets(): HexKey[];
+      /** Hexes the armed doctrine card is shown to be aimable at. */
+      cardTargets(): HexKey[];
+      /** The running operation's current place on the map, if it is not the prize. */
+      opSpot(): Spot | null;
     };
   }
 }
@@ -597,6 +623,14 @@ export function MapView() {
         if (!v || s.group.length === 0) return [];
         const keys = [...new Set(Object.values(v.contacts).filter((c) => v.relations[c.owner] === 'war').map((c) => c.key))].sort();
         return keys.filter((k) => Object.values(groupOrders(v, s.group, k, s.draft?.play).orders).some((o) => o.type === 'attack'));
+      },
+      cardTargets() {
+        const s = useGame.getState();
+        return s.view ? aimTargets(s.view, s.aimingCard) : [];
+      },
+      opSpot() {
+        const s = useGame.getState();
+        return s.view ? opSpot(s.view, s.operation) : null;
       },
       enemies() {
         const v = useGame.getState().view;
@@ -1111,6 +1145,23 @@ export function MapView() {
       hl.circle(c.x, c.y, SIZE * 0.95).stroke({ width: 3, color: SIGNAL, alpha: 0.95 });
       hl.circle(c.x, c.y, SIZE * 1.12).stroke({ width: 1.5, color: SIGNAL, alpha: 0.5 });
     }
+    // The running operation's next place: the port to gather at, the beach to land on.
+    const spot = replaying ? null : opSpot(v, useGame.getState().operation);
+    if (spot) {
+      const c = center(spot.key);
+      hl.poly(poly(spot.key, 1)).fill({ color: SIGNAL, alpha: 0.14 });
+      for (let i = 0; i < 12; i++) {
+        const a0 = (i / 12) * Math.PI * 2;
+        hl.moveTo(c.x + Math.cos(a0) * SIZE * 0.9, c.y + Math.sin(a0) * SIZE * 0.9)
+          .arc(c.x, c.y, SIZE * 0.9, a0, a0 + Math.PI / 12)
+          .stroke({ width: 3, color: SIGNAL, alpha: 0.95 });
+      }
+      badges.push(tagBadge(c, spot.label, SIGNAL));
+    }
+    // A doctrine card waiting for its target: every hex it can be aimed at, in your blue.
+    if (s.aimingCard && !replaying) {
+      for (const k of aimTargets(v, s.aimingCard)) hl.poly(poly(k, 1)).fill({ color: MOVE, alpha: 0.2 }).stroke({ width: 2, color: MOVE, alpha: 0.9 });
+    }
     // A touch attack waiting for its second tap: the target in crosshairs.
     if (s.armed && !replaying) {
       const c = center(s.armed.target);
@@ -1207,7 +1258,7 @@ export function MapView() {
 
   useEffect(() => {
     const unsub = useGame.subscribe((s, prev) => {
-      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat || s.armed !== prev.armed || s.mapStyle !== prev.mapStyle || s.group !== prev.group) redraw();
+      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat || s.armed !== prev.armed || s.aimingCard !== prev.aimingCard || s.operation !== prev.operation || s.mapStyle !== prev.mapStyle || s.group !== prev.group) redraw();
     });
     return unsub;
   }, []);

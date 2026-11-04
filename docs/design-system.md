@@ -114,7 +114,8 @@ hover combat card) and gets the same map.
 
 | Component | File | Notes |
 |---|---|---|
-| Phone game screen | `PhoneGame.tsx`, `phone.ts` | Status strip (turn, victory bar, funds, goal), unit card with stack row and attack card, dock (Nation, Plan, Next, End Turn), debrief, sheets |
+| Phone game screen | `PhoneGame.tsx`, `phone.ts` | Status strip (turn, victory bar, funds, hand, goal), dock (Nation, Plan, Next, End Turn), and over the dock exactly one card at a time: the command card (operation row, one line of advice, a row of 44 px chips for a decision, idle cities, last turn), the unit card, the hex card (only for a hex you tapped), the aim banner or the debrief; sheets |
+| Map pointers | `opspot.ts`, `MapView.tsx` | The running operation's current place (port or beach) in a dashed amber ring with a tag; every hex an armed card can take in friend blue |
 | Counters, pictograms | `counters.ts`, `design/pictograms.ts`, `glyphs.tsx` | The only way to draw a unit |
 | Odds, goal | `odds.ts`, `objective.ts` | Shared by map and cards |
 | World card, How to win | `PhoneGame.tsx` | The whole theatre with war/peace per nation; the three-step brief |

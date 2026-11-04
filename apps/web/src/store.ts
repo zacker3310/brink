@@ -74,6 +74,8 @@ interface State {
   resolving: boolean;
   rejected: GameEvent[];
   selectedHex: HexKey | null;
+  /** The selected hex was put there by the camera (focusOn), not by a tap: the phone shows no hex card for it. */
+  hexFromFocus: boolean;
   selectedFormation: FormationId | null;
   /** Units ordered together: the selected unit's stack (on a touch screen). The selected unit leads. */
   group: FormationId[];
@@ -310,6 +312,7 @@ export const useGame = create<State>((set, get) => {
     resolving: false,
     rejected: [],
     selectedHex: null,
+    hexFromFocus: false,
     selectedFormation: null,
     group: [],
     battle: null,
@@ -346,7 +349,7 @@ export const useGame = create<State>((set, get) => {
     async newGame(nation, seed, maxTurns, difficulty, theatre, crisis) {
       if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre, crisis }))) {
         const capital = Object.values(get().view!.sites).find((s) => s.owner === nation && s.kind === 'capital');
-        set({ selectedHex: capital?.key ?? null, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
+        set({ selectedHex: capital?.key ?? null, hexFromFocus: true, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
         get().nextIdle();
       }
     },
@@ -374,11 +377,12 @@ export const useGame = create<State>((set, get) => {
       }
       set({ screen: 'menu', slots: listSlots() });
     },
-    selectHex: (key) => set({ selectedHex: key }),
+    selectHex: (key) => set({ selectedHex: key, hexFromFocus: false }),
     selectFormation: (id) => {
       const f = id ? get().view?.formations[id] : null;
       if (id && id !== get().selectedFormation) sfx.select();
-      set({ selectedFormation: id, group: id ? [id] : [], selectedHex: f?.key ?? get().selectedHex, mode: 'move', armed: null, ...(id ? { selectedCity: null } : {}) });
+      // Closing a unit leaves its hex outlined but asks nothing about it: no hex card after Close.
+      set({ selectedFormation: id, group: id ? [id] : [], selectedHex: f?.key ?? get().selectedHex, mode: 'move', armed: null, ...(id ? { selectedCity: null } : { hexFromFocus: true }) });
     },
     selectStack(key, idleOnly = false) {
       const { view, draft } = get();
@@ -743,7 +747,7 @@ export const useGame = create<State>((set, get) => {
       }
     },
 
-    focusOn: (key) => set({ focus: { key, n: (get().focus?.n ?? 0) + 1 }, selectedHex: key }),
+    focusOn: (key) => set({ focus: { key, n: (get().focus?.n ?? 0) + 1 }, selectedHex: key, hexFromFocus: true }),
     setShowReport: (show) => set({ showReport: show }),
     notify: (text, tone = 'info') => {
       const n = { id: noticeId++, tone, text };

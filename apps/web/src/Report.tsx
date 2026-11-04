@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { GameEvent, HexKey, NationView, TurnReport, UnitClass } from '@brink/contracts';
 import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { Label, useKeys } from './chrome';
+import { commanderNote } from './generals';
 import { UnitGlyph } from './glyphs';
 import { arenaNote, atPlace, describeEffect, hexLabel, netChange, toPlace, treatyText, turnClock, VICTORY_HOW } from './insight';
 import { useGame } from './store';
@@ -39,6 +40,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
   const out: Record<string, Row[]> = {
     Doctrine: [],
     Engagements: [],
+    Generals: [],
     Casualties: [],
     Territory: [],
     Movement: [],
@@ -197,6 +199,11 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
             e.victims ? `: ${e.victims.length ? e.victims.map((v) => `${name(view, v.formation, v.owner)} −${v.strengthLoss}`).join(', ') : 'no confirmed hits'}` : ''
           }.`,
         });
+        break;
+      }
+      case 'commander': {
+        const n = e.nation === me ? commanderNote(view, e) : null;
+        if (n) out.Generals!.push({ ...(n.at ? { at: n.at } : {}), tone: n.tone === 'info' ? undefined : n.tone, text: `${n.title}. ${n.text}` });
         break;
       }
       case 'order_rejected':

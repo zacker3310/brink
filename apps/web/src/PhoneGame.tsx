@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Formation, FormationOrder, Resource } from '@brink/contracts';
-import { TERRAIN, UNITS, victoryBars } from '@brink/game-data';
+import { EVENTS, TERRAIN, UNITS, victoryBars } from '@brink/game-data';
 import { useCamera } from './camera';
 import { CityBanners, CityPanel } from './Cities';
 import { Coach } from './Coach';
@@ -13,7 +13,8 @@ import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
 import { advise } from './advisor';
-import { OperationsSheet, OperationStrip } from './Operations';
+import { OperationRow, OperationsSheet } from './Operations';
+import { operationById } from '@brink/ai';
 import { boardOrders, describeOrder, fleetLoadOrders, hostilesAt, landOrders, loadOrders } from './planning';
 import { useReplay } from './replay';
 import { ICON, notesFor, TONE } from './Notifications';
@@ -117,7 +118,7 @@ function Hud({ onMenu, onEconomy, onWorld, onHand }: { onMenu: () => void; onEco
           {short.length > 0 && <span className="text-xs font-semibold text-hostile">· short of {short.map((r) => RES_NAME[r]).join(', ')}</span>}
         </button>
         {!resolving && !view.victory && <HandChip onOpen={onHand} />}
-        {goal && !resolving && (
+        {goal && !resolving && !operation && (
           <button
             type="button"
             onClick={() => {
@@ -571,7 +572,7 @@ function HexCard() {
 
 /** What the turn did, the moment it is over: the top few results, each a tap from where it happened. */
 /** What to do next, in a sentence, with the unit to do it with (like the battle's advisor). */
-function Advisor({ selected }: { selected: string | null }) {
+function Advisor({ selected }: { selected: string }) {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
   const group = useGame((s) => s.group);
@@ -582,8 +583,6 @@ function Advisor({ selected }: { selected: string | null }) {
   if (view.victory) return null;
   const operation = useGame((s) => s.operation);
   const a = advise(view, draft.formations, planned, operation);
-  // The operation strip already says the plan is up: speak only about a unit to act on.
-  if (operation && !a.focus) return null;
   // With a unit open, speak only when the advice is about something else that matters more
   // (troops at sea, a ship to load): the card already says what to do with the unit in hand.
   if (selected && (!a.focus || a.focus === selected || group.includes(a.focus) || a.cta === 'Show me' && !/aboard/.test(a.text))) return null;
@@ -608,13 +607,119 @@ function Advisor({ selected }: { selected: string | null }) {
   );
 }
 
+/**
+ * The phone's one command area when no unit is open: the operation (or the way to start one), one
+ * sentence of advice with the unit to act on, and whatever else waits (a decision, idle cities,
+ * last turn) as a row of buttons. It replaces a stack of separate cards over the map.
+ */
+function CommandCard({ onEvent }: { onEvent: () => void }) {
+  const view = useGame((s) => s.view)!;
+  const draft = useGame((s) => s.draft)!;
+  const operation = useGame((s) => s.operation);
+  const planned = useGame((s) => s.planned);
+  const report = useGame((s) => s.report);
+  const lastTurn = useGame((s) => s.lastTurn);
+  const rewatch = useGame((s) => s.rewatch);
+  const setShowReport = useGame((s) => s.setShowReport);
+  const openCity = useGame((s) => s.openCity);
+  const issueGroup = useGame((s) => s.issueGroup);
+  const notify = useGame((s) => s.notify);
+  const selectStack = useGame((s) => s.selectStack);
+  const selectFormation = useGame((s) => s.selectFormation);
+  const focusOn = useGame((s) => s.focusOn);
+  const choice = useGame((s) => s.draft?.eventChoice);
+  if (view.victory) return null;
+  const a = advise(view, draft.formations, planned.length, operation);
+  // With an operation up, its row already says the plan is drafted: speak only about a unit to act on.
+  const advice = !operation || !!a.focus;
+  const fleetLoad = fleetLoadOrders(view, draft.formations, planned);
+  const toLoad = Object.keys(fleetLoad).length;
+  const idleCities = Object.values(view.sites)
+    .filter((s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id))
+    .sort((x, y) => y.victoryPoints - x.victoryPoints || (x.id < y.id ? -1 : 1));
+  const event = view.self.event;
+  const go = () => {
+    const f = a.focus ? view.formations[a.focus] : undefined;
+    if (!f) return;
+    // A ship is selected on its own; anything else with the units it stands with.
+    if (UNITS[f.unitClass].naval || f.aboard) selectFormation(f.id);
+    else selectStack(f.key, true);
+    focusOn(f.key);
+  };
+  const chip = 'flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-line bg-ink-850 px-3 text-[13px] text-muted active:bg-ink-800';
+  return (
+    <div className="pointer-events-auto rounded-t-2xl border-t border-line bg-ink-900/97 px-3 pt-2.5 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]" data-testid="command-card">
+      <OperationRow />
+      {advice && (
+        <div className="mt-2 flex items-center gap-3 border-t border-line/60 pt-2" data-testid="advisor">
+          <p className="min-w-0 flex-1 text-[13px] leading-snug text-text">{a.text}</p>
+          {a.focus && (
+            <button type="button" onClick={go} className="font-display h-11 shrink-0 rounded-lg bg-signal px-3 text-[13px] font-extrabold tracking-wide text-ink-950 uppercase active:brightness-90" data-testid="advisor-go">
+              {a.cta ?? 'Show me'}
+            </button>
+          )}
+        </div>
+      )}
+      {(event || report || lastTurn || toLoad > 0 || idleCities.length > 0) && (
+        <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3" data-testid="command-chips">
+          {event && (
+            <button type="button" className={`${chip} border-signal/60 text-signal`} onClick={onEvent} data-testid="event-open">
+              <Icon name="alert" className="h-3.5 w-3.5" />
+              Decide: {EVENTS[event.id].title}
+              {choice === undefined && <span className="rounded-full bg-signal px-1.5 text-[11px] font-bold text-ink-950">1</span>}
+            </button>
+          )}
+          {toLoad > 0 && (
+            <button
+              type="button"
+              className={`${chip} border-friend/60 font-semibold text-friend`}
+              onClick={() => {
+                issueGroup(fleetLoad);
+                notify(`${toLoad} unit${toLoad === 1 ? '' : 's'} boarding the fleet. Sail the ships: they land wherever you take them.`);
+              }}
+              data-testid="load-fleet"
+            >
+              <Icon name="next" className="h-3.5 w-3.5 -rotate-90" />
+              Load the fleet ({toLoad})
+            </button>
+          )}
+          {idleCities.length > 0 && (
+            <button type="button" className={`${chip} border-signal/50 text-signal`} onClick={() => openCity(idleCities[0]!.id)} data-testid="idle-cities">
+              <Icon name="build" className="h-3.5 w-3.5" />
+              {idleCities.length} {idleCities.length === 1 ? 'city' : 'cities'} idle: build
+            </button>
+          )}
+          {report && (
+            <button type="button" className={chip} onClick={() => setShowReport(true)} data-testid="open-report">
+              <Icon name="report" className="h-3.5 w-3.5" />
+              Turn {report.turn} report
+            </button>
+          )}
+          {lastTurn && (
+            <button type="button" className={chip} onClick={rewatch} data-testid="rewatch">
+              <Icon name="replay" className="h-3.5 w-3.5" />
+              Rewatch
+            </button>
+          )}
+        </div>
+      )}
+      <div className="h-2" />
+    </div>
+  );
+}
+
 function Debrief({ onDone }: { onDone: () => void }) {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report)!;
   const focusOn = useGame((s) => s.focusOn);
   const setShowReport = useGame((s) => s.setShowReport);
-  // Cards played lead the debrief, ours first: the table hears what everyone played.
-  const rank = (n: { icon: string; tone: string }) => (n.icon !== 'card' ? 2 : n.tone === 'good' ? 0 : 1);
+  const operation = useGame((s) => s.operation);
+  // Cities won or lost lead, then our own cards, then the rest of our news (battles, generals), then
+  // the world's news, and the rivals' cards last: the table hears them, but they are not ours.
+  const rank = (n: { icon: string; tone: string }) =>
+    n.icon === 'card' ? (n.tone === 'good' ? 1 : n.tone === 'bad' ? 2 : 4) : n.icon === 'flag' && n.tone !== 'info' ? 0 : n.tone === 'info' ? 3 : 2;
+  const op = operation ? operationById(view, operation.id, operation.kind) : null;
+  const now = op?.phases.find((p) => p.state === 'now');
   const notes = notesFor(view, report)
     .map((n, i) => ({ n, i }))
     .sort((a, b) => rank(a.n) - rank(b.n) || a.i - b.i)
@@ -626,6 +731,12 @@ function Debrief({ onDone }: { onDone: () => void }) {
         <span className="font-display text-[11px] font-black tracking-[0.1em] text-signal uppercase">Turn {report.turn} debrief</span>
         <span className="font-mono text-[11px] text-muted">{vp} VP</span>
       </div>
+      {operation && (
+        <p className="mt-1 truncate text-[12px] text-muted" data-testid="debrief-operation">
+          <span className="font-mono text-signal uppercase">{operation.codename}</span>{' '}
+          {op && now ? `· next: ${now.title.toLowerCase()} (${op.phases.filter((p) => p.state === 'done').length}/${op.phases.length}), ~${op.turns} turn${op.turns === 1 ? '' : 's'} to ${op.name.replace('Take ', '')}` : `· ${operation.name}`}
+        </p>
+      )}
       <ul className="mt-1.5 flex flex-col gap-1">
         {notes.length === 0 && <li className="text-[12px] text-muted">A quiet turn. Nothing your forces saw changed hands.</li>}
         {notes.slice(0, 3).map((n) => (
@@ -652,10 +763,10 @@ function Debrief({ onDone }: { onDone: () => void }) {
         ))}
       </ul>
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={() => setShowReport(true)} className="h-10 flex-1 border border-line bg-ink-900 text-[13px]" data-testid="debrief-report">
+        <button type="button" onClick={() => setShowReport(true)} className="h-11 flex-1 rounded-lg border border-line bg-ink-900 text-[13px]" data-testid="debrief-report">
           Full report{notes.length > 3 ? ` (+${notes.length - 3})` : ''}
         </button>
-        <button type="button" onClick={onDone} className="font-display h-10 flex-1 bg-friend/90 text-[13px] font-bold tracking-wide text-ink-950 uppercase" data-testid="debrief-close">
+        <button type="button" onClick={onDone} className="font-display h-11 flex-1 rounded-lg bg-friend/90 text-[13px] font-bold tracking-wide text-ink-950 uppercase" data-testid="debrief-close">
           To orders
         </button>
       </div>
@@ -672,62 +783,11 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
   const clearPlan = useGame((s) => s.clearPlan);
   const planned = useGame((s) => s.planned).length;
   const resolving = useGame((s) => s.resolving);
-  const report = useGame((s) => s.report);
-  const setShowReport = useGame((s) => s.setShowReport);
-  const lastTurn = useGame((s) => s.lastTurn);
-  const rewatch = useGame((s) => s.rewatch);
-  const fid = useGame((s) => s.selectedFormation);
-  const issueGroup = useGame((s) => s.issueGroup);
-  const notify = useGame((s) => s.notify);
-  const plannedIds = useGame((s) => s.planned);
   const idle = idleFormations(view, draft.formations).length;
-  // Everyone in port who fits aboard a ship alongside, in one tap.
-  const fleetLoad = fleetLoadOrders(view, draft.formations, plannedIds);
-  const toLoad = Object.keys(fleetLoad).length;
   const over = view.victory !== null;
-  const idleCities = Object.values(view.sites).filter(
-    (s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id),
-  ).length;
-  const chip = 'shrink-0 rounded-full border border-line bg-ink-900/90 px-3 py-1.5 text-[13px] text-muted active:bg-ink-800';
   const key = 'font-display flex h-14 w-[3.6rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-line bg-ink-850 text-[11px] font-bold tracking-wide uppercase active:bg-ink-700 disabled:opacity-35';
   return (
     <>
-      {!fid && !resolving && (
-        <div className="pointer-events-auto flex gap-1.5 overflow-x-auto px-3 pb-2">
-          {report && (
-            <button type="button" className={chip} onClick={() => setShowReport(true)} data-testid="open-report">
-              <Icon name="report" className="mr-1 h-3 w-3 align-[-2px]" />
-              Turn {report.turn} report
-            </button>
-          )}
-          {lastTurn && (
-            <button type="button" className={chip} onClick={rewatch} data-testid="rewatch">
-              <Icon name="replay" className="mr-1 h-3 w-3 align-[-2px]" />
-              Rewatch
-            </button>
-          )}
-          {toLoad > 0 && !over && (
-            <button
-              type="button"
-              className={`${chip} border-friend/60 font-semibold text-friend`}
-              onClick={() => {
-                issueGroup(fleetLoad);
-                notify(`${toLoad} unit${toLoad === 1 ? '' : 's'} boarding the fleet. Sail the ships: they land wherever you take them.`);
-              }}
-              data-testid="load-fleet"
-            >
-              <Icon name="next" className="mr-1 h-3 w-3 align-[-2px]" />
-              Load the fleet ({toLoad})
-            </button>
-          )}
-          {idleCities > 0 && (
-            <span className={`${chip} border-signal/50 text-signal`}>
-              <Icon name="build" className="mr-1 h-3 w-3 align-[-2px]" />
-              {idleCities} {idleCities === 1 ? 'city' : 'cities'} idle: tap a banner
-            </span>
-          )}
-        </div>
-      )}
       <div className="pointer-events-auto flex items-stretch gap-2 border-t border-line bg-ink-900/97 px-3 pt-2">
         <button type="button" className={key} onClick={onCommand} data-testid="open-command">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
@@ -873,7 +933,22 @@ function HowToWin({ onClose }: { onClose: () => void }) {
             </li>
           ))}
         </ol>
-        <button type="button" onClick={onClose} className="font-display mt-4 mb-1 h-12 w-full rounded-xl bg-signal text-lg font-extrabold text-ink-950 uppercase" data-testid="how-to-close">
+        <div className="mt-4 rounded-xl border border-signal/50 bg-signal/10 p-3" data-testid="how-to-ops">
+          <div className="font-display text-base font-bold tracking-wide text-signal uppercase">Or let the staff run it</div>
+          <p className="mt-0.5 text-[14px] leading-snug text-muted">Pick an operation, like taking a city across the sea. Every turn the staff drafts the marching, sailing, landing and assault; you change what you like and end the turn.</p>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              useGame.getState().setOpsOpen(true);
+            }}
+            className="font-display mt-2 h-11 w-full rounded-lg border border-signal/70 text-[15px] font-extrabold tracking-wide text-signal uppercase active:bg-signal/15"
+            data-testid="how-to-operations"
+          >
+            Pick an operation
+          </button>
+        </div>
+        <button type="button" onClick={onClose} className="font-display mt-3 mb-1 h-12 w-full rounded-xl bg-signal text-lg font-extrabold text-ink-950 uppercase" data-testid="how-to-close">
           Got it
         </button>
       </div>
@@ -886,13 +961,15 @@ export function PhoneGame() {
   const playback = useGame((s) => s.playback);
   const fid = useGame((s) => s.selectedFormation);
   const city = useGame((s) => s.selectedCity);
-  const selectedHex = useGame((s) => s.selectedHex);
+  // A hex the camera moved to (Next, a debrief line) is not a question about that hex: no card for it.
+  const selectedHex = useGame((s) => (s.hexFromFocus ? null : s.selectedHex));
   const event = useGame((s) => s.view?.self.event);
   const resolving = useGame((s) => s.resolving);
   const [menu, setMenu] = useState(false);
   const [command, setCommand] = useState(false);
   const [world, setWorld] = useState(false);
   const [hand, setHand] = useState(false);
+  const [decision, setDecision] = useState(false);
   const aiming = useGame((s) => s.aimingCard);
   const firstTurn = useGame((s) => s.view?.turn === 1 && !s.view.victory);
   const [howTo, setHowTo] = useState(firstTurn && !useCoach.getState().active);
@@ -952,19 +1029,17 @@ export function PhoneGame() {
           />
         ) : (
           <>
-            {event && !fid && (
-              <div className="pointer-events-auto mx-3 mb-2">
-                <EventCard />
-              </div>
-            )}
-            {!debrief && !city && !resolving && !fid && (
-              <div className="pointer-events-none mx-3 mb-2 flex">
-                <OperationStrip className="max-w-full" />
-              </div>
-            )}
-            {!debrief && !city && !resolving && !aiming && <Advisor selected={fid} />}
+            {fid && !debrief && !city && !resolving && !aiming && <Advisor selected={fid} />}
             {aiming && !resolving && <AimBanner />}
-            {debrief ? <Debrief onDone={() => setBriefed(reportTurn)} /> : fid ? <UnitCard /> : !city && !aiming && selectedHex && <HexCard />}
+            {debrief ? (
+              <Debrief onDone={() => setBriefed(reportTurn)} />
+            ) : fid ? (
+              <UnitCard />
+            ) : aiming || city ? null : selectedHex ? (
+              <HexCard />
+            ) : (
+              !resolving && <CommandCard onEvent={() => setDecision(true)} />
+            )}
             <Dock onCommand={() => setCommand(true)} cooling={cooling} />
           </>
         )}
@@ -972,9 +1047,21 @@ export function PhoneGame() {
       <CityPanel />
       {command && <CommandSheet onClose={() => setCommand(false)} />}
       {hand && !playback && <PhoneHand onClose={() => setHand(false)} />}
+      {decision && event && !playback && (
+        <Sheet title="Decision" onClose={() => setDecision(false)} testId="decision-sheet">
+          <div className="p-3">
+            <EventCard />
+          </div>
+          <div className="px-3 pb-3">
+            <button type="button" onClick={() => setDecision(false)} className="font-display h-11 w-full rounded-lg bg-signal text-[15px] font-extrabold tracking-wide text-ink-950 uppercase" data-testid="decision-done">
+              Done
+            </button>
+          </div>
+        </Sheet>
+      )}
       <OperationsSheet />
       {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
-      <PromotionModal />
+      <PromotionModal hold={debrief} />
       {howTo && <HowToWin onClose={() => setHowTo(false)} />}
       <VictoryOverlay />
       {showReport && <Report />}

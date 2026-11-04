@@ -1,4 +1,5 @@
 import { devices, expect, test } from '@playwright/test';
+import { CARDS, describeCard } from '@brink/game-data';
 
 // Doctrine cards on a phone: the hand behind its chip, a card played at once, a card aimed at a hex,
 // the stamps on the order review, and the card in the debrief.
@@ -17,8 +18,9 @@ test('a phone plays a doctrine card and aims another at a hex', async ({ page },
   await page.goto('./');
   await page.getByTestId('menu-new').tap();
   await page.getByTestId('nation-usa').tap();
-  // Seed 7 deals the United States Air Superiority, Dig In and Forced March, with 3 Command Points.
-  await page.getByTestId('seed').fill('7');
+  // Seed 20 deals the United States Rally, Dig In and Arsenal of Democracy, with 3 Command Points.
+  // (Seed 7 dealt Air Superiority, Dig In and Forced March until 2.4.0 gave the United States its own deck.)
+  await page.getByTestId('seed').fill('20');
   await page.getByTestId('crisis-none').tap();
   await page.getByTestId('start-game').tap();
   await page.getByTestId('how-to-close').tap();
@@ -30,18 +32,18 @@ test('a phone plays a doctrine card and aims another at a hex', async ({ page },
   await expect(chip).toContainText('CP 3');
   await chip.tap();
   await expect(page.getByTestId('hand')).toBeVisible();
-  for (const id of ['air_superiority', 'dig_in', 'forced_march']) await expect(page.getByTestId(`card-${id}`)).toBeVisible();
-  await expect(page.getByTestId('card-forced_march')).toContainText('Ground units move 2 points further');
+  for (const id of ['rally', 'dig_in', 'us_arsenal_of_democracy']) await expect(page.getByTestId(`card-${id}`)).toBeVisible();
+  await expect(page.getByTestId('card-rally')).toContainText(describeCard(CARDS.rally!));
   await page.waitForTimeout(400);
   await page.screenshot({ path: info.outputPath('doctrine-hand.png') });
 
   // A card with no target plays at once, and wears its stamp.
-  await page.getByTestId('card-forced_march').tap();
+  await page.getByTestId('card-rally').tap();
   await page.getByTestId('play-card').tap();
-  await expect(page.getByTestId('stamp-forced_march')).toBeVisible();
+  await expect(page.getByTestId('stamp-rally')).toBeVisible();
   await expect(page.getByTestId('hand')).toContainText('1 of 3 Command Points left');
-  // Air Superiority now costs more than is left.
-  await page.getByTestId('card-air_superiority').tap();
+  // Arsenal of Democracy now costs more than is left.
+  await page.getByTestId('card-us_arsenal_of_democracy').tap();
   await expect(page.getByTestId('play-card')).toBeDisabled();
 
   // A targeted card is armed, and the next tap on the map aims it.
@@ -49,6 +51,10 @@ test('a phone plays a doctrine card and aims another at a hex', async ({ page },
   await page.getByTestId('play-card').tap();
   await expect(page.getByTestId('hand')).toBeHidden();
   await expect(page.getByTestId('aim-banner')).toContainText('Dig In');
+  // The map shows where it can go: your own ground, in friend blue.
+  expect(await page.evaluate(() => window.__brink!.cardTargets().length)).toBeGreaterThan(0);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: info.outputPath('doctrine-aiming.png') });
   const spot = await page.evaluate((h) => {
     const b = window.__brink!;
     return b

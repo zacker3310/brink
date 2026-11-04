@@ -1,6 +1,7 @@
 import type { HexKey, NationView, TurnReport } from '@brink/contracts';
 import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { arenaNote, atPlace, describeEffect, hexLabel, treatyText } from './insight';
+import { commanderNote } from './generals';
 import { useGame } from './store';
 
 // Civ-style turn notifications: a column of icons on the right edge of the map. Hover to read,
@@ -26,6 +27,7 @@ export const ICON: Record<string, string> = {
   flask: 'M9 3h6 M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3',
   scroll: 'M6 4h11v14a2 2 0 0 1-2 2H6 M6 4a2 2 0 0 0 0 4h3 M9 9h6 M9 13h6',
   warn: 'M12 3l10 18H2z M12 10v5 M12 18h.01',
+  star: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z',
   card: 'M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M9 7h6 M9 11h6',
 };
 
@@ -173,6 +175,12 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
       case 'order_rejected':
         if (e.nation === me) out.push({ id, icon: 'warn', tone: 'bad', title: 'Order rejected', text: e.reason });
         break;
+      case 'commander': {
+        if (e.nation !== me) break;
+        const n = commanderNote(view, e);
+        if (n) out.push({ id, icon: 'star', tone: n.tone, title: n.title, text: n.text, ...(n.at ? { at: n.at } : {}) });
+        break;
+      }
     }
   });
   return out;

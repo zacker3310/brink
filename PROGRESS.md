@@ -332,6 +332,19 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
   (`__arena.pauseFilm`). Gate: typecheck, lint, unit (web 73), matrix 0 genuine failures, arena e2e 20
   passed / 5 skipped. Not done: HIMARS and Tornado-G still fly as plain rockets.
 
+- Playtest pass (phone, China, "Take Taipei", 8 turns; `tests/e2e/playthrough*.spec.ts`):
+  - One command card over the phone dock replaces the stack of operation strip, advisor, chip row and
+    decision card; a world event waits behind a chip and opens in a sheet; a hex the camera moved to
+    (Next, turn start) no longer raises a hex card over it.
+  - The debrief leads with cities won or lost and our own news, rivals' cards last; it says where the
+    operation stands, and a promotion waits until it is read. Commander events (promotion, perk,
+    wound, death, recovery, escape) are worded in the debrief and the report.
+  - The map rings the operation's port or beach (`opspot.ts`) and shows every hex an armed card can
+    take; the hand shows the tapped card in full below the fan, with the operation's advice on when to
+    play it. The roster posts a reserve general to the operation's strongest formation in one tap.
+  - The setup dossier shows each power's blurb (`NATION_BLURB`); the first-turn brief points at
+    Operations.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
