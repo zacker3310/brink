@@ -10,7 +10,8 @@ import { Emblem } from './glyphs';
 import { netChange, selfLedger, turnClock, VICTORY_HOW, wonCampaign } from './insight';
 import { HoverCard, ModeBanner, Toasts, ZoomControls } from './MapOverlays';
 import { MapView } from './MapView';
-import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
+import { Diplomacy, Economy, Military, Overview } from './Panels';
+import { ResearchScreen } from './Research';
 import { Notifications } from './Notifications';
 import { useReplay } from './replay';
 import { Report } from './Report';
@@ -258,7 +259,7 @@ function SidePanel() {
       {tab === 'overview' && <Overview />}
       {tab === 'military' && <Military />}
       {tab === 'economy' && <Economy />}
-      {tab === 'research' && <Research />}
+      {tab === 'research' && <ResearchScreen />}
       {tab === 'diplomacy' && <Diplomacy />}
       {tab === 'generals' && <GeneralsRoster />}
     </aside>

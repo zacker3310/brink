@@ -1,17 +1,16 @@
 import { useState, type ReactNode } from 'react';
 import type { DiplomaticAction, NationView, ProposalKind, UnitClass } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { GOVERNMENTS, RULES, TECH_IDS, TECHS, TREATIES, UNITS } from '@brink/game-data';
+import { GOVERNMENTS, RULES, TREATIES, UNITS } from '@brink/game-data';
 import { Label } from './chrome';
 import { Emblem, UnitGlyph } from './glyphs';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
-import { checkResearchView, diplomacyBlocked, recommendedTech, recruitCostFor, researchPerTurn } from './rules-view';
+import { diplomacyBlocked, recruitCostFor } from './rules-view';
 import { describeOrder } from './planning';
 import { useGame } from './store';
 import { shortName } from '@brink/scenarios';
 import { Button, costText, Meter, powersOf, Stat, Swatch } from './ui';
 import { Icon } from './icons';
-import { ABILITIES, type AbilityId } from '@brink/arena';
 
 function Section({ title, children, right }: { title: ReactNode; children: ReactNode; right?: ReactNode }) {
   return (
@@ -357,122 +356,6 @@ export function Economy() {
         </Section>
       )}
     </>
-  );
-}
-
-/** Each technology in plain words: what it is called, and what you get. */
-/** The arena weapon each breakthrough hands your crews. */
-const BATTLE_UNLOCK: Record<string, string> = Object.fromEntries((Object.keys(ABILITIES) as AbilityId[]).map((a) => [ABILITIES[a].tech, `${ABILITIES[a].name}. ${ABILITIES[a].text}`]));
-
-export const TECH_PLAIN: Record<string, { name: string; gives: string }> = {
-  logistics_doctrine: { name: 'Better supply lines', gives: 'Your units stay supplied further from home.' },
-  signals_intelligence: { name: 'Better scouting', gives: 'Every unit sees one hex further.' },
-  industrial_automation: { name: 'Faster factories', gives: 'Your cities build units 20% faster.' },
-  combined_arms: { name: 'Combined arms', gives: 'Attacks with mixed unit types hit harder.' },
-  precision_munitions: { name: 'Precision strikes', gives: 'Artillery, helicopters and drones hit 20% harder.' },
-  composite_armor: { name: 'Tougher armour', gives: 'Tanks and IFVs take 20% less damage.' },
-};
-
-export function Research() {
-  const view = useGame((s) => s.view)!;
-  const draft = useGame((s) => s.draft)!;
-  const setResearch = useGame((s) => s.setResearch);
-  const setBudget = useGame((s) => s.setBudget);
-  const current = draft.research !== undefined ? draft.research : view.self.research.current;
-  const budget = draft.budget ?? view.self.budget;
-  const output = researchPerTurn(view, budget.research);
-  const others = budget.infrastructure + budget.welfare;
-  const levels: [string, number][] = [
-    ['Low', 10],
-    ['Normal', 25],
-    ['High', 40],
-  ];
-  const done = view.self.research.unlocked;
-  // What you can start now first, cheapest first; what needs an earlier breakthrough after.
-  const open = TECH_IDS.filter((id) => !done.includes(id) && id !== current).sort(
-    (x, y) => Number(!!checkResearchView(view, x)) - Number(!!checkResearchView(view, y)) || TECHS[x]!.cost - TECHS[y]!.cost,
-  );
-  const best = recommendedTech(view);
-  const turnsFor = (id: string, progress = 0) => Math.max(1, Math.ceil((TECHS[id]!.cost - progress) / output));
-  return (
-    <Section title="Research">
-      <p className="mb-3 text-[13px] leading-snug text-muted">
-        One breakthrough at a time. Pick one and it finishes by itself. If you never pick, your scientists start the recommended one.
-      </p>
-      {current ? (
-        <div className="mb-3 rounded-lg border-2 border-signal/70 bg-ink-850 p-3" data-testid="research-current">
-          <div className="font-display text-[11px] font-bold tracking-[0.08em] text-signal uppercase">Working on</div>
-          <div className="font-display text-lg font-extrabold">{TECH_PLAIN[current]?.name ?? TECHS[current]?.name}</div>
-          <div className="text-[13px] text-muted">{TECH_PLAIN[current]?.gives}</div>
-          <div className="mt-2">
-            <Meter value={view.self.research.progress} max={TECHS[current]!.cost} />
-          </div>
-          <div className="mt-1 text-[12px] text-faint">Ready in about {turnsFor(current, current === view.self.research.current ? view.self.research.progress : 0)} turns</div>
-        </div>
-      ) : (
-        <p className="mb-3 rounded-lg border border-line bg-ink-850 p-3 text-[13px] text-signal">Nothing in progress. Pick one below.</p>
-      )}
-      <ul className="space-y-2">
-        {open.map((id) => {
-          const why = checkResearchView(view, id);
-          const plain = TECH_PLAIN[id];
-          return (
-            <li key={id}>
-              <button
-                type="button"
-                onClick={() => setResearch(id)}
-                disabled={!!why}
-                data-testid={`research-${id}`}
-                className="w-full rounded-lg border border-line bg-ink-850 p-3 text-left active:bg-ink-700 disabled:opacity-45"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-display text-base font-bold">{plain?.name ?? TECHS[id]!.name}</span>
-                  {id === best && !why && <span className="rounded-full bg-signal px-2 py-0.5 text-[10px] font-bold text-ink-950 uppercase">Recommended</span>}
-                </div>
-                <div className="text-[13px] text-muted">{plain?.gives ?? TECHS[id]!.summary}</div>
-                {BATTLE_UNLOCK[id] && <div className="mt-1 text-[12px] font-semibold text-signal">In battle: {BATTLE_UNLOCK[id]}</div>}
-                <div className="mt-1 text-[12px] text-faint">{why ? `First: ${TECH_PLAIN[TECHS[id]!.requires[0]!]?.name ?? 'an earlier breakthrough'}` : `About ${turnsFor(id)} turns · tap to research`}</div>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="mt-4">
-        <div className="font-display text-[11px] font-bold tracking-[0.08em] text-muted uppercase">Research funding</div>
-        <div className="mt-1.5 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Research funding">
-          {levels.map(([label, share]) => {
-            const ok = share + others <= 60;
-            const on = budget.research === share || (label === 'Normal' && !levels.some(([, x]) => x === budget.research));
-            return (
-              <button
-                key={label}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                disabled={!ok}
-                onClick={() => setBudget({ ...budget, research: share })}
-                data-testid={`research-funding-${label.toLowerCase()}`}
-                className={`rounded-lg border px-2 py-2 text-center disabled:opacity-40 ${on ? 'border-signal bg-signal/15 text-signal' : 'border-line'}`}
-              >
-                <div className="font-display text-sm font-bold uppercase">{label}</div>
-                <div className="text-[11px] text-muted">{researchPerTurn(view, share)} pts/turn</div>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-1.5 text-[12px] text-faint">More funding spends more of your income each turn and finishes breakthroughs sooner.</p>
-      </div>
-      {done.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {done.map((id) => (
-            <span key={id} className="rounded-full border border-good/50 bg-good/10 px-2.5 py-1 text-[12px] text-good">
-              <Icon name="check" className="mr-1 h-3 w-3 align-[-2px]" />
-              {TECH_PLAIN[id]?.name ?? TECHS[id]?.name}
-            </span>
-          ))}
-        </div>
-      )}
-    </Section>
   );
 }
 

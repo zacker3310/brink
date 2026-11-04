@@ -2,7 +2,7 @@ import type { SaveFile, WorldState } from '@brink/contracts';
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { RULESET_VERSION } from '@brink/game-data';
 import { SCENARIOS, THEATRES } from '@brink/scenarios';
-import { clone, hashState, initDoctrine, seedCommanders } from '@brink/simulation';
+import { clone, hashState, initDoctrine, initProgression, seedCommanders } from '@brink/simulation';
 
 /** Theatres the game no longer has (ruleset 2.0.0 replaced them with the Pacific). */
 const RETIRED: readonly string[] = ['meridian-crisis', 'highland-front', 'varn-delta'];
@@ -56,8 +56,10 @@ export function migrateSave(save: SaveFile): SaveFile {
   const from = save.rulesetVersion;
   // Ruleset 2.3: a campaign begun before commanders gains each power's starting generals, and
   // before doctrine cards every power is dealt its deck and a first hand.
-  const world = seedCommanders({ ...s.world, rulesetVersion: RULESET_VERSION, nations: clone(s.world.nations) });
+  // Ruleset 2.6: cities made before development start it at nothing.
+  const world = seedCommanders({ ...s.world, rulesetVersion: RULESET_VERSION, nations: clone(s.world.nations), sites: clone(s.world.sites) });
   initDoctrine(world);
+  initProgression(world);
   return { ...s, world, rulesetVersion: RULESET_VERSION, hash: hashState(world), ...(from !== RULESET_VERSION ? { migratedFrom: from } : {}) };
 }
 

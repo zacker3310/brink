@@ -1,11 +1,13 @@
-import type { FacilityId, UnitClass } from '@brink/contracts';
+import type { UnitClass } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { FACILITIES, FACILITY_ORDER, FACILITY_SLOTS, UNITS } from '@brink/game-data';
+import { FACILITIES, UNITS } from '@brink/game-data';
+import { facilityCost, levelYields } from '@brink/simulation';
+import { CityBuild } from './CityBuild';
 import { hexToPixel, parseKey } from '@brink/map';
 import { HEX_SIZE, useCamera } from './camera';
 import { useKeys } from './chrome';
 import { ModelPortrait, UnitGlyph } from './glyphs';
-import { buildBlocked, recruitCostFor } from './rules-view';
+import { recruitCostFor } from './rules-view';
 import { usePhone } from './phone';
 import { useGame } from './store';
 import { costText } from './ui';
@@ -97,7 +99,6 @@ export function CityPanel() {
   const openCity = useGame((s) => s.openCity);
   const addRecruit = useGame((s) => s.addRecruit);
   const removeRecruit = useGame((s) => s.removeRecruit);
-  const setBuild = useGame((s) => s.setBuild);
   const selectFormation = useGame((s) => s.selectFormation);
   useKeys((e) => e.key === 'Escape' && id && openCity(null), [id]);
   const phone = usePhone();
@@ -120,7 +121,8 @@ export function CityPanel() {
     }
     for (const b of draft.build ?? []) {
       if (skipBuild && b.siteId === site.id) continue;
-      for (const res of RESOURCES) acc[res] += FACILITIES[b.facility].cost[res];
+      const c = facilityCost(view.self, b.facility);
+      for (const res of RESOURCES) acc[res] += c[res];
     }
     return acc;
   };
@@ -129,18 +131,7 @@ export function CityPanel() {
     const cost = recruitCostFor(view, c);
     return RESOURCES.every((r) => reserved[r] + cost[r] <= view.self.stockpile[r]);
   };
-  const affordBuild = (f: FacilityId) => {
-    const reserved = reservedExcept(false, true);
-    return RESOURCES.every((r) => reserved[r] + FACILITIES[f].cost[r] <= view.self.stockpile[r]);
-  };
-  const planned = draft.build?.find((b) => b.siteId === site.id)?.facility ?? null;
-  const works = view.self.construction.filter((c) => c.siteId === site.id);
-  /** Construction takes industry in queue order, ahead of units. */
-  const buildTurns = (upTo: number, extra = 0) => {
-    const ahead = view.self.construction.slice(0, upTo).reduce((a, c) => a + c.required - c.progress, 0);
-    return Math.max(1, Math.ceil((ahead + extra) / Math.max(1, view.self.industrialCapacity)));
-  };
-  const boost = (key: 'credits' | 'energy' | 'materials' | 'food' | 'industry' | 'research') => site.facilities.reduce((a, f) => a + (FACILITIES[f].yields[key] ?? 0), 0);
+  const boost = (key: 'credits' | 'energy' | 'materials' | 'food' | 'industry' | 'research') => levelYields(site)[key] + site.facilities.reduce((a, f) => a + (FACILITIES[f].yields[key] ?? 0), 0);
   const capacity = view.self.industrialCapacity;
   return (
     <aside className={'vercel ' + (phone ? 'sheet-in safe-bottom fixed inset-x-0 bottom-0 z-30 flex max-h-[78dvh] flex-col ds-panel backdrop-blur' : 'panel-in absolute top-3 bottom-3 left-3 z-20 flex w-[340px] flex-col ds-panel backdrop-blur')} data-testid="city-panel" aria-label={`${site.name} production`}>
@@ -243,63 +234,7 @@ export function CityPanel() {
           <p className="text-xs text-muted">{site.kind === 'depot' ? 'Depots supply the front; they cannot raise units.' : 'Objectives are prizes, not factories.'}</p>
         )}
 
-        <section className="mt-3" data-testid="facilities">
-          <h3 className="font-display mb-1.5 flex justify-between text-[10px] font-bold tracking-[0.06em] text-faint uppercase">
-            <span>Facilities</span>
-            <span className="font-mono tracking-normal">
-              {site.facilities.length + works.length}/{FACILITY_SLOTS[site.kind]} slots
-            </span>
-          </h3>
-          {site.facilities.length > 0 && (
-            <ul className="mb-1.5 flex flex-wrap gap-1.5">
-              {site.facilities.map((f) => (
-                <li key={f} className="rounded-full border border-good/50 px-2 py-0.5 text-[11px] font-semibold text-good" title={FACILITIES[f].summary}>
-                  {FACILITIES[f].name}
-                </li>
-              ))}
-            </ul>
-          )}
-          {works.map((c) => (
-            <div key={c.id} className="mb-1.5 border border-line bg-ink-900 p-2">
-              <div className="flex items-center text-sm font-semibold">
-                {FACILITIES[c.facility].name}
-                <span className="ml-auto font-mono text-xs text-signal">{buildTurns(view.self.construction.indexOf(c) + 1)} turns</span>
-              </div>
-              <div className="mt-1.5 h-1.5 bg-ink-700">
-                <div className="h-full bg-signal" style={{ width: `${(c.progress / c.required) * 100}%` }} />
-              </div>
-            </div>
-          ))}
-          <ul className="space-y-1">
-            {FACILITY_ORDER.map((f) => {
-              const why = buildBlocked(view, site.id, f);
-              const active = planned === f;
-              if (why === 'Already built' || why === 'Under construction') return null;
-              const blocked = why ?? (affordBuild(f) ? null : 'Not enough in the treasury');
-              const def = FACILITIES[f];
-              return (
-                <li key={f}>
-                  <button
-                    type="button"
-                    disabled={!!blocked && !active}
-                    onClick={() => setBuild(site.id, active ? null : f)}
-                    aria-pressed={active}
-                    data-testid={`facility-${f}`}
-                    className={`flex min-h-11 w-full items-center gap-3 border px-2.5 py-2 text-left disabled:cursor-not-allowed disabled:opacity-45 ${active ? 'border-signal bg-signal/15' : 'border-line bg-ink-900 hover:border-faint'}`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold">{def.name}</div>
-                      <div className="text-[11px] text-muted">{def.summary}</div>
-                      <div className="text-[10px] text-faint">{blocked && !active ? blocked : `${costText(def.cost)} · ${def.industry} ind`}</div>
-                    </div>
-                    <div className={`text-right font-mono text-xs ${active ? 'text-signal' : 'text-faint'}`}>{active ? 'queued' : `${buildTurns(view.self.construction.length, def.industry)}t`}</div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-2 text-[10px] text-faint">One new building per site per turn, paid when the turn resolves. Construction takes industry before units. Buildings pass to whoever takes the site.</p>
-        </section>
+        <CityBuild siteId={site.id} />
 
         {garrison.length > 0 && (
           <section className="mt-3">

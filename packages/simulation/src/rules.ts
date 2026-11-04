@@ -65,6 +65,15 @@ export function nationModifiers(nation: Pick<Nation, 'government' | 'research'> 
     combinedArms: 0,
     ranged: 0,
     armorDefense: 0,
+    armorAttack: 0,
+    navalAttack: 0,
+    navalDefense: 0,
+    armorMove: 0,
+    navalMove: 0,
+    handSize: 0,
+    commandPoints: 0,
+    buildDiscount: 0,
+    growth: 0,
   };
   const sources: Modifiers[] = [GOVERNMENTS[nation.government].modifiers];
   if (nation.edge) sources.push(DIFFICULTY_EDGE[nation.edge]);
@@ -86,6 +95,15 @@ export function nationModifiers(nation: Pick<Nation, 'government' | 'research'> 
     out.combinedArms += m.combinedArms ?? 0;
     out.ranged += m.ranged ?? 0;
     out.armorDefense += m.armorDefense ?? 0;
+    out.armorAttack += m.armorAttack ?? 0;
+    out.navalAttack += m.navalAttack ?? 0;
+    out.navalDefense += m.navalDefense ?? 0;
+    out.armorMove += m.armorMove ?? 0;
+    out.navalMove += m.navalMove ?? 0;
+    out.handSize += m.handSize ?? 0;
+    out.commandPoints += m.commandPoints ?? 0;
+    out.buildDiscount += m.buildDiscount ?? 0;
+    out.growth += m.growth ?? 0;
   }
   return out;
 }

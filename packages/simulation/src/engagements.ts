@@ -26,6 +26,7 @@ import { leaderEffects } from './commanders';
 import { amphibiousInForce, strikeBonus } from './doctrine';
 import { canDetect, type Vision } from './fog';
 import { rollRange } from './rng';
+import { siteDefense } from './progression';
 import { clamp, enterCost, fortressFloor, isAir, isNaval, nationModifiers, passengersOf, relationOf, sameLayer, sortedKeys } from './rules';
 
 /** Per-formation effects computed from a snapshot, then committed together. */
@@ -283,6 +284,7 @@ export function resolveEngagements(
       defending: (fid) => defendingIds.has(fid),
       leader,
       amphibious: amphibiousInForce(world.nations[a.nation], world.turn),
+      fortified: siteDefense(tile.siteId ? world.sites[tile.siteId] : undefined),
     };
     const power = { attack: attackerPower(a.attackers, defenders, ctx), defense: defenderPower(defenders, ctx) };
     const res = assaultLosses(power, swing(id, 'attacker'), swing(id, 'defender'));

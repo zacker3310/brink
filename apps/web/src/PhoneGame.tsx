@@ -11,7 +11,8 @@ import { UnitGlyph } from './glyphs';
 import { Icon } from './icons';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
-import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
+import { Diplomacy, Economy, Military, Overview } from './Panels';
+import { ResearchScreen } from './Research';
 import { advise } from './advisor';
 import { OperationRow, OperationsSheet } from './Operations';
 import { operationById } from '@brink/ai';
@@ -288,7 +289,7 @@ function CommandSheet({ onClose }: { onClose: () => void }) {
       {tab === 'overview' && <Overview />}
       {tab === 'military' && <Military />}
       {tab === 'economy' && <Economy />}
-      {tab === 'research' && <Research />}
+      {tab === 'research' && <ResearchScreen />}
       {tab === 'diplomacy' && <Diplomacy />}
       {tab === 'generals' && <GeneralsRoster />}
     </Sheet>

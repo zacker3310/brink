@@ -6,6 +6,7 @@ import type {
   NationId,
   NationOrders,
   NationView,
+  Resource,
   Stockpile,
   TurnReport,
   TurnResult,
@@ -22,6 +23,7 @@ import { buildView, canDetect, computeVision, detectedFormations, updateIntel, v
 import { hashState } from './hash';
 import { resolveMovement } from './movement';
 import { resolveProduction } from './production';
+import { growCities } from './progression';
 import { clone, relationOf, sortedKeys } from './rules';
 import { allocateLogistics } from './supply';
 import { resolveTerritory } from './territory';
@@ -40,6 +42,7 @@ export const PHASES = [
   'engagements',
   'territory',
   'economy',
+  'development',
   'victory',
   'reports',
 ] as const;
@@ -169,6 +172,7 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
       case 'construction_queued':
       case 'construction_cancelled':
       case 'facility_built':
+      case 'city_grew':
       case 'commander':
         if (e.nation === nation) out.push(e);
         break;
@@ -254,11 +258,14 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   resolveTerritory(world, events);
 
   // 10. Economy.
+  const shortages: Record<NationId, Resource[]> = {};
   for (const n of nations) {
     if (world.nations[n]!.eliminated) continue;
-    settleEconomy(world, n, orders[n]!, engaged, movement.moved, { production: production[n]!, logistics: logistics[n]! }, events);
+    shortages[n] = settleEconomy(world, n, orders[n]!, engaged, movement.moved, { production: production[n]!, logistics: logistics[n]! }, events).shortages;
   }
   resolveWorldEvents(world, orders, events);
+  // 10b. Development: cities held in good order grow.
+  growCities(world, shortages, events);
 
   // 11. Victory.
   resolveEliminations(world, events);

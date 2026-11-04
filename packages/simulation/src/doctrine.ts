@@ -16,7 +16,8 @@ import type {
 import { CARDS, deckFor, DOCTRINE, isLasting, UNITS, type CardDef, type CardEffect, type CardSupportAsset } from '@brink/game-data';
 import { keyDistance, neighborKeys, rangeKeys } from '@brink/map';
 import { roll } from './rng';
-import { clamp, pct, relationOf, sortedKeys } from './rules';
+import { handSizeOf, techMovement } from './progression';
+import { clamp, nationModifiers, pct, relationOf, sortedKeys } from './rules';
 
 // Doctrine cards (contracts `doctrine.ts`, data in game-data `doctrine.ts`). Cards are checked with
 // the turn's orders (`checkPlays`, from `lockOrders`), settle in the doctrine phase right after
@@ -55,10 +56,10 @@ export function initDoctrine(world: WorldState): void {
   }
 }
 
-/** Fill the hand to `DOCTRINE.handSize`. Each draw is addressed, so nothing about order or count elsewhere matters. */
-function draw(d: DoctrineState, seed: number, turn: number, nation: NationId): void {
+/** Fill the hand to `size` (`DOCTRINE.handSize`, more with Staff College). Each draw is addressed, so nothing about order or count elsewhere matters. */
+function draw(d: DoctrineState, seed: number, turn: number, nation: NationId, size: number = DOCTRINE.handSize): void {
   let n = 0;
-  while (d.hand.length < DOCTRINE.handSize) {
+  while (d.hand.length < size) {
     if (d.deck.length === 0) {
       if (d.discard.length === 0) break;
       d.deck = [...d.discard].sort();
@@ -215,12 +216,21 @@ export function effectsInForce(nation: Pick<Nation, 'doctrine'> | undefined, tur
   return out;
 }
 
-/** Extra movement points for a formation of `unitClass` (ground only, never aboard a ship). */
-export function marchBonus(nation: Pick<Nation, 'doctrine'> | undefined, turn: number, f: { unitClass: UnitClass; aboard?: FormationId }, plays: readonly CardPlay[] = []): number {
-  if (!UNITS[f.unitClass].ground || f.aboard) return 0;
+/**
+ * Extra movement points for a formation of `unitClass`: a card's march (ground only, never aboard a
+ * ship), and what research adds (Mobile Warfare for armour, Naval Engineering for ships).
+ */
+export function marchBonus(
+  nation: (Pick<Nation, 'doctrine'> & { research?: Nation['research'] }) | undefined,
+  turn: number,
+  f: { unitClass: UnitClass; aboard?: FormationId },
+  plays: readonly CardPlay[] = [],
+): number {
+  const tech = techMovement(nation?.research?.unlocked ?? [], f);
+  if (!UNITS[f.unitClass].ground || f.aboard) return tech;
   let best = 0;
   for (const x of effectsInForce(nation, turn, plays)) if (x.effect.kind === 'movement') best = Math.max(best, x.effect.bonus);
-  return best;
+  return best + tech;
 }
 
 /** Percent added to war-map strikes by `unitClass`. Cards of one kind do not stack: the best counts. */
@@ -376,7 +386,7 @@ export function resolveDoctrine(world: WorldState, orders: Record<NationId, Nati
     const n = world.nations[id]!;
     const d = n.doctrine;
     if (!d || n.eliminated) continue;
-    d.cp = Math.min(DOCTRINE.cpCap, d.cp + cpIncome(world, id));
-    draw(d, world.seed, turn, id);
+    d.cp = Math.min(DOCTRINE.cpCap, d.cp + cpIncome(world, id) + nationModifiers(n).commandPoints);
+    draw(d, world.seed, turn, id, handSizeOf(n));
   }
 }

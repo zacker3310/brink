@@ -1,5 +1,5 @@
 import type { GameEvent, HexKey, NationId, NationOrders, Stockpile, SupplyPriority, WorldState } from '@brink/contracts';
-import { RULES, SEA_SUPPLY_COST, SITE_SUPPLY, TERRAIN, UNITS } from '@brink/game-data';
+import { FACILITIES, RULES, SEA_SUPPLY_COST, SITE_SUPPLY, TERRAIN, UNITS } from '@brink/game-data';
 import { neighborKeys } from '@brink/map';
 import { sabotagedHexes } from './doctrine';
 import { clamp, nationModifiers, pct, relationOf, sortedKeys, zeroStockpile } from './rules';
@@ -71,7 +71,7 @@ export function supplyCapacity(world: WorldState, nation: NationId): number {
   let cap = 0;
   for (const id of sortedKeys(world.sites)) {
     const s = world.sites[id]!;
-    if (s.owner === nation) cap += SITE_SUPPLY[s.kind];
+    if (s.owner === nation) cap += SITE_SUPPLY[s.kind] + s.facilities.reduce((a, f) => a + (FACILITIES[f].supply ?? 0), 0);
   }
   return pct(cap, 100 + mods.supplyCapacity + n.budget.infrastructure);
 }

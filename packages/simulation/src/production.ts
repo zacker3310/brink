@@ -1,6 +1,7 @@
 import type { Formation, GameEvent, NationId, NationOrders, Stockpile, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { FACILITIES, RULES, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { facilityCost } from './progression';
 import { recruitCost, relationOf, sameLayer, zeroStockpile } from './rules';
 
 export function newFormation(world: WorldState, owner: NationId, unitClass: Formation['unitClass'], key: string, name: string): Formation {
@@ -63,7 +64,7 @@ export function resolveProduction(world: WorldState, nation: NationId, orders: N
     return false;
   });
   for (const b of orders.build ?? []) {
-    const cost = FACILITIES[b.facility].cost;
+    const cost = facilityCost(n, b.facility);
     if (RESOURCES.some((res) => cost[res] > n.stockpile[res])) throw new Error(`a build for ${nation} passed validation without the resources to pay for it`);
     for (const res of RESOURCES) {
       n.stockpile[res] -= cost[res];

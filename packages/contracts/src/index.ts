@@ -77,12 +77,17 @@ export interface Site {
   yields: Yields;
   /** Facilities built here, sorted. They pass to whoever takes the site. */
   facilities: FacilityId[];
+  /**
+   * Capitals and cities: development points toward the next city level (game-data `CITY_GROWTH`).
+   * Absent in worlds made before city development, and on depots and objectives: 0.
+   */
+  development?: number;
 }
 
 /** Buildings a nation can put up at its sites. Effects and costs live in game-data `FACILITIES`. */
-export type FacilityId = 'factory' | 'power_plant' | 'farm' | 'mine' | 'research_lab' | 'fortress';
+export type FacilityId = 'factory' | 'power_plant' | 'farm' | 'mine' | 'research_lab' | 'fortress' | 'naval_yard' | 'airbase' | 'missile_battery';
 
-export const FACILITY_IDS: readonly FacilityId[] = ['factory', 'power_plant', 'farm', 'mine', 'research_lab', 'fortress'];
+export const FACILITY_IDS: readonly FacilityId[] = ['factory', 'power_plant', 'farm', 'mine', 'research_lab', 'fortress', 'naval_yard', 'airbase', 'missile_battery'];
 
 export type Relation = 'war' | 'peace' | 'alliance';
 
@@ -444,6 +449,8 @@ export type GameEvent =
   | { kind: 'construction_queued'; nation: NationId; item: string; site: SiteId; facility: FacilityId }
   | { kind: 'construction_cancelled'; nation: NationId; item: string; site: SiteId; facility: FacilityId; reason: string }
   | { kind: 'facility_built'; nation: NationId; site: SiteId; facility: FacilityId }
+  /** A city of `nation`'s reached a new development level. */
+  | { kind: 'city_grew'; nation: NationId; site: SiteId; level: number }
   | { kind: 'world_event'; nation: NationId; event: WorldEventId; choice: 0 | 1 | null }
   | { kind: 'elimination'; nation: NationId; /** Who took the whole country: the holder of most of its cities. */ annexedBy?: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
@@ -490,6 +497,8 @@ export interface SiteView {
   yields: Yields;
   /** Known only for your own sites and ones you can see now; otherwise empty. */
   facilities: FacilityId[];
+  /** Development, known like facilities: your own sites and ones you can see now. */
+  development?: number;
 }
 
 export interface Contact {

@@ -48,6 +48,8 @@ export interface AssaultContext {
   leader?: (id: FormationId) => LeaderEffect | undefined;
   /** Amphibious Doctrine: a landing from ships pays no beach penalty. */
   amphibious?: boolean;
+  /** A facility at the hex's site (missile battery) stiffens its owner's defenders by `percent`. */
+  fortified?: { owner: NationId; percent: number };
 }
 
 export interface Power {
@@ -64,7 +66,8 @@ export function attackerPower(attackers: readonly Formation[], defenders: readon
     const lead = ctx.leader?.(a.id);
     let v = condition(a, attackStat(a, hardness) * a.strength);
     v = pct(v, 100 + ctx.attackerMods.attack + (lead?.attack ?? 0));
-    if (a.unitClass === 'armor' || a.unitClass === 'mechanized') v = pct(v, 100 - terrain.armorPenalty);
+    if (a.unitClass === 'armor' || a.unitClass === 'mechanized') v = pct(pct(v, 100 + ctx.attackerMods.armorAttack), 100 - terrain.armorPenalty);
+    if (UNITS[a.unitClass].naval) v = pct(v, 100 + ctx.attackerMods.navalAttack);
     // Storming a beach from a ship: a general who knows beaches takes some or all of the sting out,
     // Amphibious Doctrine all of it.
     if (a.aboard && !ctx.amphibious) v = pct(v, 100 - pct(AMPHIBIOUS_ASSAULT_PENALTY, 100 - (lead?.amphibious ?? 0)));
@@ -93,6 +96,8 @@ export function defenderPower(defenders: readonly Formation[], ctx: AssaultConte
     if (ctx.defending(d.id)) v = pct(v, 120);
     if (ctx.tileOwner === d.owner) v = pct(v, 100 + mods.homeDefense);
     if (d.unitClass === 'armor' || d.unitClass === 'mechanized') v = pct(v, 100 + mods.armorDefense);
+    if (def.naval) v = pct(v, 100 + mods.navalDefense);
+    if (ctx.fortified && ctx.fortified.owner === d.owner) v = pct(v, 100 + ctx.fortified.percent);
     const lead = ctx.leader?.(d.id);
     if (lead?.defense) v = pct(v, 100 + lead.defense);
     total += v;
@@ -147,6 +152,7 @@ export function strikeLoss(source: Formation, victim: Formation, ctx: StrikeCont
   const hardness = UNITS[victim.unitClass].hardness;
   let v = condition(source, attackStat(source, hardness) * source.strength);
   v = pct(v, 100 + ctx.sourceMods.ranged + (ctx.sourceLeader?.strike ?? 0));
+  if (UNITS[source.unitClass].naval) v = pct(v, 100 + ctx.sourceMods.navalAttack);
   if (ctx.bonus) v = pct(v, 100 + ctx.bonus);
   if (!ctx.spotted) v = pct(v, 50);
   v = Math.floor((v * 100) / (100 + TERRAIN[ctx.terrain].defense));
