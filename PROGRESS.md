@@ -344,6 +344,22 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
     play it. The roster posts a reserve general to the operation's strongest formation in one tap.
   - The setup dossier shows each power's blurb (`NATION_BLURB`); the first-turn brief points at
     Operations.
+- Arena pacing (docs/arena-v2.md section 15, arena rules 2): the matrix's blue seat was a random
+  walk (advice for 3% of its orders), so 17 of 24 battles ran out the clock; it now plays the advice
+  two orders in five, keeping random and illegal orders for the rest. Rules: the defender withdraws
+  under 40% (was 35%), an attacker alone in the circle when round 16 closes takes it, and the AI's
+  bar for off-map missions falls with the rounds. Matrix endings: lost time 17 -> 6, wins 5 -> 14
+  of 24, 0 genuine failures. Soak (AI attacker, 60 battles): time 12 -> 10, wins 70% -> 73%.
+- Fight it yourself: the order review lists the turn's battles (staff, operation or your own on
+  the odds), each with Fight It Yourself; the staff-plan banner and the phone's Execute key count
+  them (`plannedBattles` in `arena/battle.ts`, `staff-battle.spec.ts`).
+- Arena film: strikes filmed wide are framed 3 cells beyond the target (past the field's edge for
+  the back row: the film only, `FILM_SLACK`); the jet kill cam looks back up the run so the jet is
+  in it; rockets are larger with a nozzle glare; the ship has a long wake, a churn and white water
+  that shows from the low cut.
+- Desktop: notifications and turn controls share one right rail (the column shows what fits above
+  the stack, "+N more" for the rest); the theatre fits beside the rail; the VP race shows from
+  1400 px so the top bar fits at 1280.
 - Arena film polish and tabletop cards (docs/arena-v2.md sections 14.1 and 14.2): the strike jet read
   as a flat grey slab because it flew at 2.2x scale through the camera; it now flies at 1.25x (two
   cells long) at 2.4 cells, its slant and break chosen against the camera that will watch it (in
@@ -387,8 +403,8 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
 - Arena: tested in Chromium (iPhone 13 and 14 Pro emulation, software WebGL, and desktop), not on a
   real iPhone GPU; GPU frame time is unmeasured. Weakest spots: soldiers read as mannequins close up,
   T-80BVM and T-72B3 look alike, close-up paint is too clean, trees and house fronts repeat close up,
-  rotor wash and the biggest fireballs are the weakest effects. The AI never splits squads; all-fog,
-  all-artillery and all-drone attacks often run to the round limit. New nations per theatre not done.
+  rotor wash and the biggest fireballs are the weakest effects. The AI never splits squads; a lone
+  weak formation (guns only, drones only, one platoon) still often runs to the round limit. New nations per theatre not done.
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
 ## Blockers

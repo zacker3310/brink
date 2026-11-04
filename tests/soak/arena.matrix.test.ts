@@ -34,7 +34,8 @@ import {
 // the film told to show a shooter blue cannot see. `ARENA_MATRIX` is the number of battles; failing
 // cases are kept in arena-failing-seeds.json and run first next time.
 
-// About 10 s of CPU a battle: the default 24 run in about 4 minutes on a quiet machine.
+// About 6 to 15 s of CPU a battle (blue asks for the advice two orders in five): the default 24
+// run in 3 to 6 minutes, more on a loaded machine.
 const SIZE = Number(process.env.ARENA_MATRIX ?? 24);
 const SEEDS = fileURLToPath(new URL('./arena-failing-seeds.json', import.meta.url));
 
