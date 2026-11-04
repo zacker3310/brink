@@ -1,4 +1,5 @@
-import type { Difficulty, GameEvent, NationId, NationOrders, NationView, SiteId, TurnReport } from '@brink/contracts';
+import type { DealTerms, Difficulty, GameEvent, NationId, NationOrders, NationView, ProposalKind, SiteId, TurnReport } from '@brink/contracts';
+import type { Verdict } from '@brink/ai';
 import type { AssaultPreview, StrikePreview } from '@brink/simulation';
 
 // Messages between the UI and the engine worker. The worker holds the authoritative world;
@@ -24,6 +25,8 @@ export type Request =
   | { type: 'seat'; nation: NationId; to: 'ai' | 'human' }
   | { type: 'load'; text: string }
   | { type: 'check'; orders: NationOrders }
+  /** Put an offer to an AI power's leader: they answer now, as they will when the turn resolves. */
+  | { type: 'negotiate'; from: NationId; to: NationId; kind: ProposalKind; terms?: DealTerms }
   | { type: 'previewAssault'; attackers: string[]; target: string }
   | { type: 'previewStrike'; source: string; target: string }
   | { type: 'submit'; orders: NationOrders }
@@ -38,6 +41,7 @@ export type Response =
   | { type: 'resolved'; states: Record<NationId, SeatState> }
   | { type: 'ok' }
   | { type: 'checked'; rejected: GameEvent[] }
+  | { type: 'verdict'; verdict: Verdict }
   | { type: 'suggested'; orders: NationOrders }
   | { type: 'assault'; preview: AssaultPreview | null }
   | { type: 'strike'; preview: StrikePreview | null }

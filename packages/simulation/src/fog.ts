@@ -15,6 +15,7 @@ import { TERRAIN, victoryBars } from '@brink/game-data';
 import { rangeKeys } from '@brink/map';
 import { leaderEffects, leaderOf } from './commanders';
 import { revealedHexes } from './doctrine';
+import { attitudesFor } from './leaders';
 import { clone, nationModifiers, relationOf, sortedKeys, visionRadius } from './rules';
 import { supremacyStanding } from './victory';
 
@@ -268,6 +269,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     if (id !== nation) relations[id] = relationOf(world.relations, nation, id);
   }
 
+  const standing = supremacyStanding(world);
   return {
     scenarioId: world.scenarioId,
     rulesetVersion: world.rulesetVersion,
@@ -287,7 +289,9 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     victory: world.victory ? { ...world.victory } : null,
     difficulty: world.difficulty ?? 'normal',
     ...(world.crisis ? { crisis: world.crisis } : {}),
-    supremacy: supremacyStanding(world),
+    supremacy: standing,
     ...(world.commanders ? { commanders, enemyCommanders } : {}),
+    // Leaders' moods: how every rival feels about you (their envoys make no secret of it), and how you feel about them.
+    ...(self.minor ? {} : attitudesFor(world, nation, standing)),
   };
 }

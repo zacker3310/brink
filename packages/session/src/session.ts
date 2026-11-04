@@ -1,6 +1,6 @@
 import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationView, SaveFile, SiteId, TurnReport, WorldState } from '@brink/contracts';
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
-import { emptyMemory, planOrders, updateMemory } from '@brink/ai';
+import { consider, emptyMemory, offerOf, planOrders, updateMemory, type Offer, type Verdict } from '@brink/ai';
 import { HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
 import { applyCrisis, createScenario, type CrisisId, crisisOf } from '@brink/scenarios';
 import { keyDistance } from '@brink/map';
@@ -141,13 +141,41 @@ export class GameSession {
     return planOrders(buildView(this.world, nation), emptyMemory(), this.world.seed, target ? { target } : {});
   }
 
-  aiOrders(): NationOrders[] {
+  /** Who the AI spares this campaign: the human seats, on Easy. */
+  private get spare(): NationId[] {
+    return this.world.difficulty === 'easy' ? [...this.seats] : [];
+  }
+
+  /**
+   * Every AI's orders. `human` are the human seats' orders this turn: an offer one makes to an AI
+   * reaches that AI's leader before it decides, as `negotiate` showed the player.
+   */
+  aiOrders(human: readonly NationOrders[] = []): NationOrders[] {
     const out: NationOrders[] = [];
     for (const n of sortedKeys(this.memory)) {
       if (this.world.nations[n]!.eliminated) continue;
-      out.push(planOrders(buildView(this.world, n), this.memory[n]!, this.world.seed, { spare: this.world.difficulty === 'easy' ? this.seats : [] }));
+      const incoming: Offer[] = [];
+      for (const o of [...human].sort((a, b) => (a.nation < b.nation ? -1 : 1))) {
+        if (!this.humans.includes(o.nation) || o.turn !== this.world.turn) continue;
+        for (const d of o.diplomacy ?? []) {
+          const offer = d && d.target === n ? offerOf(o.nation, d) : null;
+          if (offer) incoming.push(offer);
+        }
+      }
+      out.push(planOrders(buildView(this.world, n), this.memory[n]!, this.world.seed, { spare: this.spare, ...(incoming.length ? { incoming } : {}) }));
     }
     return out;
+  }
+
+  /**
+   * What an AI power's leader says to an offer from a human seat this turn: yes or no, and why.
+   * The same judgement the leader makes when the turn resolves, so a yes here is a deal signed.
+   */
+  negotiate(from: NationId, to: NationId, offer: Omit<Offer, 'from'>): Verdict {
+    if (!this.humans.includes(from)) throw new Error(`${from} is not a human seat`);
+    const memory = this.memory[to];
+    if (!memory || this.world.nations[to]?.eliminated) return { accept: false, reason: 'cannot' };
+    return consider(buildView(this.world, to), memory, { ...offer, from }, { spare: this.spare });
   }
 
   /**
@@ -156,8 +184,8 @@ export class GameSession {
    */
   advance(humanOrders: NationOrders | readonly NationOrders[] | null = null): AdvanceResult {
     if (this.over) throw new Error('the match is over');
-    const submissions = this.aiOrders();
     const given = humanOrders === null ? [] : Array.isArray(humanOrders) ? humanOrders : [humanOrders as NationOrders];
+    const submissions = this.aiOrders(given);
     for (const o of given) if (this.humans.includes(o.nation)) submissions.push(o);
     const result = resolveTurn(this.world, submissions);
     this.world = result.world;

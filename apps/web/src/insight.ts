@@ -2,6 +2,7 @@ import type { Formation, GameEvent, HexKey, Ledger, NationView, Stockpile, Treat
 import { RESOURCES } from '@brink/contracts';
 import { HOURS_PER_TURN, type EventEffect } from '@brink/game-data';
 import { keyDistance } from '@brink/map';
+import { TREATY_TEXT } from './leaders';
 
 // Read-only derivations for the game screen. Nothing here touches authoritative state.
 
@@ -92,7 +93,7 @@ export const VICTORY_HOW: Record<VictoryReason, string> = {
   turn_limit: 'on strategic score at the turn limit',
 };
 
-const TREATY_NAME: Record<TreatyKind, string> = { nonaggression: 'non-aggression pact', trade: 'trade agreement', embargo: 'embargo' };
+const TREATY_NAME: Record<TreatyKind, string> = TREATY_TEXT;
 
 /** A treaty event as one sentence, from `me`'s side where it involves `me`. */
 export function treatyText(view: Pick<NationView, 'nations' | 'self'>, e: Extract<GameEvent, { kind: 'treaty' | 'treaty_ended' }>): string {
@@ -109,7 +110,7 @@ export function treatyText(view: Pick<NationView, 'nations' | 'self'>, e: Extrac
     if (other) return `We signed a ${TREATY_NAME[e.treaty]} with ${view.nations[other]?.name ?? other}, in force through turn ${e.until}.`;
     return `${pair} signed a ${TREATY_NAME[e.treaty]}, in force through turn ${e.until}.`;
   }
-  const why = { expired: 'ran out', war: 'ended with the war', embargo: 'ended under an embargo' }[e.reason];
+  const why = { expired: 'ran out', war: 'ended with the war', embargo: 'ended under an embargo', fulfilled: 'took its prize' }[e.reason];
   const between = other ? `us and ${view.nations[other]?.name ?? other}` : pair;
   return `The ${TREATY_NAME[e.treaty]} between ${between} ${why}.`;
 }

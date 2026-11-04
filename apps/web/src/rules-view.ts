@@ -1,4 +1,4 @@
-import type { DiplomaticAction, FacilityId, NationId, NationView, Relation, Stockpile, TechId, UnitClass } from '@brink/contracts';
+import type { DealTerms, DiplomaticAction, FacilityId, NationId, NationView, Relation, Stockpile, TechId, UnitClass } from '@brink/contracts';
 import { FACILITIES, FACILITY_SLOTS, TECH_IDS, TECHS } from '@brink/game-data';
 import { checkDiplomacy, pairKey, recruitCost } from '@brink/simulation';
 
@@ -30,10 +30,10 @@ export function researchPerTurn(view: NationView, share = view.self.budget.resea
 }
 
 /** Why the player may not take `action` toward `target` this turn, or null. The engine's own check, run on the view. */
-export function diplomacyBlocked(view: NationView, target: NationId, action: DiplomaticAction): string | null {
+export function diplomacyBlocked(view: NationView, target: NationId, action: DiplomaticAction, terms?: DealTerms): string | null {
   const relations: Record<string, Relation> = {};
   for (const [n, r] of Object.entries(view.relations)) relations[pairKey(view.self.id, n)] = r;
-  return checkDiplomacy({ relations, treaties: view.treaties, turn: view.turn, nations: view.nations }, view.self.id, target, action);
+  return checkDiplomacy({ relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites }, view.self.id, target, action, terms);
 }
 
 /** Why `facility` cannot be started at `siteId`, ignoring cost, or null. Mirrors the engine's check. */

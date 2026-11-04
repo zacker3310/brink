@@ -58,6 +58,8 @@ export function migrateSave(save: SaveFile): SaveFile {
   // before doctrine cards every power is dealt its deck and a first hand.
   const world = seedCommanders({ ...s.world, rulesetVersion: RULESET_VERSION, nations: clone(s.world.nations) });
   initDoctrine(world);
+  // Ruleset 2.6: leaders remember. A campaign begun before them starts with clean slates.
+  world.memories ??= {};
   return { ...s, world, rulesetVersion: RULESET_VERSION, hash: hashState(world), ...(from !== RULESET_VERSION ? { migratedFrom: from } : {}) };
 }
 

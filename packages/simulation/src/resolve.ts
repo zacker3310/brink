@@ -14,7 +14,8 @@ import type {
 import { RULESET_VERSION } from '@brink/game-data';
 import { applyCommanderOrders, applyLeaderSupply, resolveCommanders } from './commanders';
 import { settleEconomy } from './economy';
-import { resolveDiplomacy } from './diplomacy';
+import { resolveDiplomacy, resolveJointOps } from './diplomacy';
+import { recordMemories } from './leaders';
 import { resolveDoctrine } from './doctrine';
 import { resolveWorldEvents } from './events';
 import { removeDestroyed, resolveEngagements, resolveRetreats, resolveStrikes } from './engagements';
@@ -173,7 +174,12 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
         if (e.nation === nation) out.push(e);
         break;
       case 'proposal':
+      case 'proposal_lapsed':
         if (e.from === nation || e.to === nation) out.push(e);
+        break;
+      // Tribute is public (an ultimatum met is news); an exchange only to its parties.
+      case 'exchange':
+        if (e.tribute || e.a === nation || e.b === nation) out.push(e);
         break;
       // A card played is public; who it hurt is told like a strike's victims.
       case 'card_played': {
@@ -264,6 +270,9 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   resolveEliminations(world, events);
   // 11b. Generals: experience, wounds, promotions.
   resolveCommanders(world, events);
+  // 11c. Leaders: joint operations won, then what each leader will remember of this turn.
+  resolveJointOps(world, events);
+  recordMemories(world, events);
   world.victory = evaluateVictory(world);
   if (world.victory) events.push({ kind: 'victory', winner: world.victory.winner, reason: world.victory.reason, ...(world.victory.coalition ? { coalition: world.victory.coalition } : {}) });
 

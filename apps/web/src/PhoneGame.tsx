@@ -11,7 +11,8 @@ import { UnitGlyph } from './glyphs';
 import { Icon } from './icons';
 import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
-import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
+import { Economy, Military, Overview, Research } from './Panels';
+import { Diplomacy, LeaderQuotes } from './Diplomacy';
 import { advise } from './advisor';
 import { OperationRow, OperationsSheet } from './Operations';
 import { operationById } from '@brink/ai';
@@ -762,6 +763,7 @@ function Debrief({ onDone }: { onDone: () => void }) {
           </li>
         ))}
       </ul>
+      <LeaderQuotes view={view} report={report} />
       <div className="mt-2 flex gap-2">
         <button type="button" onClick={() => setShowReport(true)} className="h-11 flex-1 rounded-lg border border-line bg-ink-900 text-[13px]" data-testid="debrief-report">
           Full report{notes.length > 3 ? ` (+${notes.length - 3})` : ''}

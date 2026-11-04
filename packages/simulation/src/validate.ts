@@ -3,6 +3,7 @@ import type {
   BuildOrder,
   Budget,
   CardPlay,
+  DealTerms,
   DiplomaticAction,
   FacilityId,
   FormationOrder,
@@ -19,7 +20,7 @@ import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, FACILITIES, FACILITY_SLOTS, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
 import { lockCommanderOrders } from './commanders';
-import { canPropose } from './diplomacy';
+import { bindingTreaty, canPropose, cleanTerms, PROPOSAL_OF, termsProblem, type DiplomacyWorld } from './diplomacy';
 import { checkPlays, marchBonus } from './doctrine';
 import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
@@ -177,26 +178,45 @@ function lockRecruits(
   return out;
 }
 
-/** Why `nation` may not take `action` toward `target` this turn, or null. */
+/**
+ * Why `nation` may not take `action` toward `target` this turn, or null. Works on a world or on a
+ * view's public facts (`rules-view` in the client, the AI's own checks). Affordability of a deal
+ * is checked by `lockOrders` against the stockpile left after recruits and buildings.
+ */
 export function checkDiplomacy(
-  world: Pick<WorldState, 'relations' | 'treaties' | 'turn'> & { nations: Record<NationId, { name: string }> },
+  world: DiplomacyWorld & { nations: Record<NationId, { name: string; eliminated: boolean; minor?: boolean }> },
   nation: NationId,
   target: NationId,
   action: DiplomaticAction,
+  terms?: DealTerms,
 ): string | null {
   const t = world.nations[target]!;
   const rel = relationOf(world.relations, nation, target);
+  const malformed = termsProblem(action, terms);
+  if (malformed) return malformed;
   switch (action) {
     case 'declare_war': {
       if (rel === 'war') return `already at war with ${t.name}`;
       const pact = treatyIn(world.treaties, 'nonaggression', nation, target, world.turn);
       if (pact) return `bound by a non-aggression pact with ${t.name} through turn ${pact.until}`;
+      const truce = treatyIn(world.treaties, 'ceasefire', nation, target, world.turn);
+      if (truce) return `bound by a ceasefire with ${t.name} through turn ${truce.until}`;
       return null;
     }
     case 'propose_peace':
+    case 'propose_ceasefire':
       return rel === 'war' ? null : `not at war with ${t.name}`;
-    case 'propose_alliance':
-      return rel === 'peace' ? null : `must be at peace with ${t.name} to ally`;
+    case 'propose_alliance': {
+      const x = terms?.against;
+      if (x === undefined) return rel === 'peace' ? null : `must be at peace with ${t.name} to ally`;
+      const foe = world.nations[x];
+      if (!foe || x === nation || x === target) return 'an alliance against whom?';
+      if (foe.eliminated || foe.minor) return `${foe.name} is no power to ally against`;
+      if (rel === 'war') return `at war with ${t.name}`;
+      if (bindingTreaty(world, nation, x)) return `bound by a treaty with ${foe.name}`;
+      if (bindingTreaty(world, target, x)) return `${t.name} is bound by a treaty with ${foe.name}`;
+      return null;
+    }
     case 'propose_nonaggression':
       if (rel !== 'peace') return `a non-aggression pact needs peace with ${t.name}`;
       return canPropose(world, nation, target, 'nonaggression') ? null : `a pact with ${t.name} is already in force`;
@@ -204,6 +224,20 @@ export function checkDiplomacy(
       if (rel === 'war') return `no trade with ${t.name} while at war`;
       if (treatyIn(world.treaties, 'embargo', nation, target, world.turn)) return `an embargo bars trade with ${t.name}`;
       return canPropose(world, nation, target, 'trade') ? null : `trade with ${t.name} is already running`;
+    case 'propose_exchange':
+      if (rel === 'war') return `no exchange with ${t.name} while at war`;
+      return canPropose(world, nation, target, 'exchange', terms) ? null : `an embargo bars trade with ${t.name}`;
+    case 'demand_tribute':
+    case 'pay_tribute':
+      return rel === 'peace' ? null : 'tribute passes only between powers at peace';
+    case 'propose_joint_op': {
+      const site = world.sites?.[terms!.site!];
+      if (!site) return 'no such prize';
+      if (!site.owner || site.owner === nation || site.owner === target) return 'a joint operation is against a third power';
+      if (rel === 'war') return `at war with ${t.name}`;
+      if (relationOf(world.relations, nation, site.owner) !== 'war') return 'a joint operation needs you at war with its holder';
+      return canPropose(world, nation, target, 'joint_op', terms) ? null : `a joint operation with ${t.name} is already under way`;
+    }
     case 'embargo': {
       const e = treatyIn(world.treaties, 'embargo', nation, target, world.turn);
       return e && e.until > world.turn ? `an embargo on ${t.name} is already in force` : null;
@@ -370,9 +404,17 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
       else if (n.minor) reject('a minor state makes no treaties');
       else if (t.minor) reject(`${t.name} is a minor state: it makes no treaties`);
       else {
-        const why = checkDiplomacy(world, nation, d.target, d.action);
+        const terms = PROPOSAL_OF[d.action] ? d.terms : undefined;
+        const why = checkDiplomacy(world, nation, d.target, d.action, terms);
+        const clean = why ? undefined : cleanTerms(d.action, terms);
+        // What a deal hands over is reserved like a recruit's cost: it must fit what is left.
+        const gives = d.action === 'propose_exchange' || d.action === 'pay_tribute' ? (clean?.give ?? {}) : {};
         if (why) reject(why);
-        else locked.diplomacy.push({ target: d.target, action: d.action });
+        else if (RESOURCES.some((r) => reserved[r] + (gives[r] ?? 0) > n.stockpile[r])) reject(`not enough in the stockpile for the deal with ${t.name}`);
+        else {
+          for (const r of RESOURCES) reserved[r] += gives[r] ?? 0;
+          locked.diplomacy.push({ target: d.target, action: d.action, ...(clean ? { terms: clean } : {}) });
+        }
       }
     }
 
