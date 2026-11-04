@@ -1,10 +1,10 @@
-import { devices, expect, test } from '@playwright/test';
+import { devices, expect, test, type Page } from '@playwright/test';
 
 // The front door: the title's menu and wire, Settings that stick, Quick Battle straight into the
 // arena, the campaign briefing's leader and the deploy screen, the installable app's manifest, and
 // the investor demo (?demo=1) playing through to its end card on its own.
 
-function watchErrors(page: import('@playwright/test').Page): string[] {
+function watchErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
