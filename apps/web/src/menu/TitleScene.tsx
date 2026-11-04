@@ -69,11 +69,13 @@ export function TitleScene({ className = '' }: { className?: string }) {
     let life: MapLife | null = null;
     const textures: Texture[] = [];
     const app = new Application();
-    void app.init({ resizeTo: el, background: 0x0a2433, antialias: true, autoDensity: true, resolution: Math.min(window.devicePixelRatio || 1, 2) }).then(() => {
+    void app.init({ resizeTo: el, background: 0x0a2433, antialias: true, autoDensity: true, resolution: Math.min(window.devicePixelRatio || 1, 1.5) }).then(() => {
       if (dead) {
         app.destroy(true);
         return;
       }
+      // A backdrop under a shade: 30 frames a second is smooth enough and halves the GPU's work.
+      app.ticker.maxFPS = 30;
       el.appendChild(app.canvas);
       app.canvas.setAttribute('aria-hidden', 'true');
       const world = new Container();
