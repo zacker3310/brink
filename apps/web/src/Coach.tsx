@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { Kbd } from './chrome';
+import './menu/front.css';
+import { Kbd, useKeys } from './chrome';
 import { STEPS, useCoach, type CoachSnap } from './coach';
 import { idleFormations } from './insight';
 import { useGame } from './store';
@@ -15,6 +16,7 @@ function useSnap(): CoachSnap | null {
   const showThreat = useGame((s) => s.showThreat);
   const panelOpen = useGame((s) => s.panelOpen);
   const tab = useGame((s) => s.tab);
+  const planned = useGame((s) => s.planned.length);
   const start = useCoach((s) => s.start);
   const reportSeen = useCoach((s) => s.reportSeen);
   if (!view || !draft) return null;
@@ -26,6 +28,7 @@ function useSnap(): CoachSnap | null {
     start,
     ordered: orders.filter((o) => o.type !== 'hold').length,
     idle: idleFormations(view, draft.formations).length,
+    planned,
     recruiting: draft.recruit.length > 0,
     resolving,
     playback: playback !== null,
@@ -37,31 +40,27 @@ function useSnap(): CoachSnap | null {
   };
 }
 
-/** A shortcut for the step: put the thing it talks about in front of the player. */
+/** A shortcut for the step: do (or show) the thing it talks about. */
 function useShowMe(id: string): { label: string; run: () => void } | null {
   const view = useGame((s) => s.view);
   const g = useGame.getState;
   if (!view) return null;
-  if (id === 'move' || id === 'all') return { label: 'Select a unit', run: () => g().nextIdle() };
-  if (id === 'build') {
-    const capital = Object.values(view.sites).find((s) => s.owner === view.self.id && s.kind === 'capital');
-    if (!capital) return null;
-    return {
-      label: 'Open the capital',
-      run: () => {
-        g().focusOn(capital.key);
-        g().openCity(capital.id);
-      },
-    };
-  }
-  if (id === 'attack') {
-    const enemy = Object.values(view.contacts).find((c) => c.confirmed && view.relations[c.owner] === 'war');
-    return enemy ? { label: 'Show me an enemy', run: () => g().focusOn(enemy.key) } : null;
-  }
-  if (id === 'report') return { label: 'Open the summary', run: () => g().setShowReport(true) };
-  if (id === 'threat') return { label: 'Show threats', run: () => g().toggleThreat() };
-  if (id === 'diplomacy') return { label: 'Open Diplomacy', run: () => g().setTab('diplomacy') };
+  if (id === 'move') return { label: 'Select a unit', run: () => g().nextIdle() };
+  if (id === 'plan') return { label: 'Let the staff plan', run: () => void g().autoCommand() };
+  if (id === 'end') return { label: 'Review orders', run: () => g().openReview() };
+  if (id === 'done') return { label: 'Turn summary', run: () => g().setShowReport(true) };
   return null;
+}
+
+/** Five pips: done, current, to come. */
+function Pips({ step }: { step: number }) {
+  return (
+    <span className="coach-pips" aria-label={`Step ${step + 1} of ${STEPS.length}`}>
+      {STEPS.map((s, i) => (
+        <i key={s.id} data-state={i < step ? 'done' : i === step ? 'now' : 'next'} />
+      ))}
+    </span>
+  );
 }
 
 export function Coach() {
@@ -80,8 +79,21 @@ export function Coach() {
 
   const sawReport = useCoach((s) => s.sawReport);
   useEffect(() => {
-    if (active && def?.id === 'report' && showReport) sawReport();
-  }, [active, def?.id, showReport, sawReport]);
+    if (active && showReport) sawReport();
+  }, [active, showReport, sawReport]);
+
+  // On a keyboard the coach's own buttons have keys: P lets the staff plan, Enter dismisses a step
+  // that waits for "Got it". Not over the review, the summary or the replay, which own Enter.
+  useKeys(
+    (e) => {
+      if (!active || !def || phone || e.ctrlKey || e.metaKey || e.altKey) return;
+      const g = useGame.getState();
+      if (g.review || g.showReport || g.playback || g.selectedCity) return;
+      if (def.id === 'plan' && e.key.toLowerCase() === 'p') showMe?.run();
+      else if (!def.done && e.key === 'Enter' && !document.activeElement?.closest('button, a, input, select, textarea')) next();
+    },
+    [active, def?.id, phone, showMe?.label],
+  );
 
   // A step the player has already done moves on by itself.
   useEffect(() => {
@@ -90,57 +102,116 @@ export function Coach() {
 
   if (!active || !def || !snap) return null;
   const body = phone && def.touch ? def.touch(snap) : def.body(snap);
+  const action = phone && def.touchAction ? def.touchAction(snap) : def.action?.(snap);
   // Over the turn summary (or, on a phone, a city sheet) the coach shrinks to a strip out of the way.
   if (showReport || (phone && cityOpen)) {
     return (
-      <section className={`coach fixed left-1/2 z-40 w-[min(720px,calc(100%-24px))] -translate-x-1/2 ds-panel border-signal/70 px-3 py-2 shadow-2xl ${phone ? 'top-[calc(env(safe-area-inset-top)+6px)]' : 'bottom-3'}`} data-testid="coach" data-step={def.id} aria-live="polite" aria-label="Guided first match">
-        <span className="ds-label mr-2 text-signal">
+      <section
+        className={`coach coach-strip fixed left-1/2 z-[45] w-[min(720px,calc(100%-24px))] -translate-x-1/2 ${phone ? 'top-[calc(env(safe-area-inset-top)+6px)]' : 'bottom-3'}`}
+        data-testid="coach"
+        data-step={def.id}
+        aria-live="polite"
+        aria-label="Guided first match"
+      >
+        <span className="coach-kicker mr-2">
           {step + 1}/{STEPS.length} · {def.title}
         </span>
-        <span className="text-xs text-muted">{body}</span>
+        <span className="text-xs text-muted">{action ?? body}</span>
       </section>
     );
   }
-  const place = phone
-    ? 'top-[calc(env(safe-area-inset-top)+108px)] left-2 right-2'
-    : shifted ? 'bottom-36 left-[calc(50%+180px)] w-[380px] -translate-x-1/2' : 'bottom-3 left-1/2 w-[420px] -translate-x-1/2';
+  // On a phone the coach is a slim card under the turn row: the title, the one thing to do, and a
+  // button only when the step waits for one. The map stays open between it and the unit card; the
+  // dock below already holds Plan and End Turn.
+  if (phone) {
+    return (
+      <section
+        key={def.id}
+        className="coach coach-card coach-compact panel-in fixed top-[calc(env(safe-area-inset-top)+54px)] right-2 left-2 z-[45]"
+        data-testid="coach"
+        data-step={def.id}
+        aria-live="polite"
+        aria-label="Guided first match"
+      >
+        <div className="flex items-center gap-2">
+          <Pips step={step} />
+          <h2 className="coach-title coach-title-inline min-w-0 flex-1 truncate" data-testid="coach-title">
+            {def.title}
+          </h2>
+          <button type="button" onClick={finish} className="min-h-6 text-[10px] text-faint uppercase" data-testid="coach-skip-all">
+            End guide
+          </button>
+        </div>
+        {!def.done && <p className="coach-body">{body}</p>}
+        <div className="flex items-center gap-2">
+          {action && (
+            <p className="coach-action min-w-0 flex-1" data-testid="coach-action">
+              <svg viewBox="0 0 12 12" className="coach-action-arrow" aria-hidden>
+                <path d="M3 1.5L8.5 6 3 10.5z" fill="currentColor" />
+              </svg>
+              {action}
+            </p>
+          )}
+          {def.skippable && (
+            <button type="button" onClick={next} className="coach-btn coach-btn-quiet mt-1.5" data-testid="coach-skip">
+              Later
+            </button>
+          )}
+          {!def.done && (
+            <button type="button" onClick={next} className="coach-btn coach-btn-go mt-1.5" data-testid="coach-next">
+              {step === STEPS.length - 1 ? 'Dismissed' : 'Got it'}
+            </button>
+          )}
+        </div>
+      </section>
+    );
+  }
+  const place = shifted ? 'bottom-36 left-[calc(50%+180px)] w-[400px] -translate-x-1/2' : 'bottom-3 left-1/2 w-[440px] -translate-x-1/2';
   return (
-    <section className={`coach panel-in fixed z-40 ds-panel border-signal/70 shadow-2xl ${phone ? 'px-3 py-2' : 'p-3'} ${place}`} data-testid="coach" data-step={def.id} aria-live="polite" aria-label="Guided first match">
+    <section
+      key={def.id}
+      className={`coach coach-card panel-in fixed z-[45] ${place}`}
+      data-testid="coach"
+      data-step={def.id}
+      aria-live="polite"
+      aria-label="Guided first match"
+    >
       <div className="flex items-center justify-between gap-2">
-        <span className="ds-label text-signal">
-          Boot camp · {step + 1}/{STEPS.length}
+        <span className="coach-kicker flex items-center gap-2">
+          Boot camp
+          <Pips step={step} />
         </span>
-        <button type="button" onClick={finish} className="text-[10px] text-faint uppercase hover:text-text" data-testid="coach-skip-all">
+        <button type="button" onClick={finish} className="min-h-6 text-[10px] text-faint uppercase hover:text-text" data-testid="coach-skip-all">
           End guide
         </button>
       </div>
-      <div className="mt-1 h-0.5 bg-ink-700">
-        <div className="h-full bg-signal transition-[width] duration-300" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
-      </div>
-      <h2 className="font-display mt-2 text-lg leading-tight font-bold tracking-wide uppercase" data-testid="coach-title">
+      <h2 className="coach-title" data-testid="coach-title">
         {def.title}
       </h2>
-      <p className={`mt-1 text-xs text-muted ${phone ? 'leading-snug' : 'leading-relaxed'}`}>{body}</p>
-      {def.keys && !phone && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {def.keys.map((k) => (
-            <Kbd key={k}>{k}</Kbd>
-          ))}
-        </div>
+      <p className="coach-body">{body}</p>
+      {action && (
+        <p className="coach-action" data-testid="coach-action">
+          <svg viewBox="0 0 12 12" className="coach-action-arrow" aria-hidden>
+            <path d="M3 1.5L8.5 6 3 10.5z" fill="currentColor" />
+          </svg>
+          {action}
+        </p>
       )}
-      <div className={`flex items-center justify-end gap-2 ${phone ? 'mt-1.5' : 'mt-3'}`}>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {def.keys && def.keys.map((k) => <Kbd key={k}>{k}</Kbd>)}
+        <span className="flex-1" />
         {showMe && !snap.resolving && (
-          <button type="button" onClick={showMe.run} className="border border-line px-2.5 py-1 text-[11px] text-muted hover:border-faint hover:text-text" data-testid="coach-show">
+          <button type="button" onClick={showMe.run} className="coach-btn" data-testid="coach-show">
             {showMe.label}
           </button>
         )}
         {def.skippable && (
-          <button type="button" onClick={next} className="px-2 py-1 text-[11px] text-faint hover:text-text" data-testid="coach-skip">
+          <button type="button" onClick={next} className="coach-btn coach-btn-quiet" data-testid="coach-skip">
             Later
           </button>
         )}
         {!def.done && (
-          <button type="button" onClick={next} className="bg-signal px-3 py-1 font-display text-sm font-bold tracking-wide text-ink-950 uppercase hover:brightness-110" data-testid="coach-next">
+          <button type="button" onClick={next} className="coach-btn coach-btn-go" data-testid="coach-next">
             {step === STEPS.length - 1 ? 'Dismissed' : 'Got it'}
           </button>
         )}

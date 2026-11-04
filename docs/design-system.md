@@ -124,7 +124,7 @@ hover combat card) and gets the same map.
 | Desktop HUD | `Game.tsx`, `UnitPanel.tsx`, `MapOverlays.tsx` | Mouse and keyboard |
 | City banners, production | `Cities.tsx` | Production is a bottom sheet on a phone |
 | City development, build queue | `CityBuild.tsx` | Level and growth meter, slots, the construction queue with turns, every facility with its cost or why it cannot start |
-| Coach | `Coach.tsx`, `coach.ts` | Guided first match, touch wording on phones |
+| Coach | `Coach.tsx`, `coach.ts` | Guided first turn in five steps (move, staff plan, end turn, watch, what next), one amber action line each; keys on a desk (P, Ctrl+Enter, Enter), touch wording on phones |
 | Sound | `sfx.ts` | WebAudio, no files |
 
 ## Painted map (v3)
@@ -232,3 +232,20 @@ The home screen is a game title screen (`menu/Title.tsx`, `menu/TitleScene.tsx`,
 - **Corners**: your record (stars, battles won, wars won) and the version and a sound toggle.
 - A shade keeps the menu legible over the map: from the left on wide screens, from the bottom on
   phones.
+- **Cold open** (first visit of a page load): letterbox bars retract, the theatre zooms in, the
+  logo resolves from wide tracking; then a light sweep crosses it every few seconds. Missiles arc
+  between rival cities in the launcher's colour and flash where they land (`TitleScene.tsx`).
+- **Wire**: a LIVE crawl of the theatre's crises across the top.
+- **Menu**: Guided first turn (first for a new player), Continue, New campaign, Quick battle (the
+  open skirmish with the fewest stars, straight to its brief), Skirmish; Load, Manual and Settings
+  as a row of small keys under it.
+- **Settings** (`menu/Settings.tsx`, Console): sound, radio, battle quality, motion (also sets
+  `html[data-motion]`, which stills the menus), colours, war map, haptics, hand, staff plan, replay,
+  the guided turn, and installing to the Home Screen.
+- **Deploying**: while the engine builds a world, a full-screen card with the nation's emblem in a
+  radar sweep, the operation's codename and a status line; the game fades up from it.
+- **Leader**: the campaign briefing names a (fictional) commander per power, with a silhouette
+  portrait in the nation's light until painted portraits exist.
+- **Demo** (`?demo=1`, `menu/Demo.tsx`): captions over the real game driven through the store and
+  the arena hook: title, campaign, operation, turn, battle, air strike, end card.
+- Styles for all of this live in `menu/front.css`, outside `index.css`.

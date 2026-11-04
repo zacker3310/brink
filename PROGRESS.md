@@ -381,6 +381,16 @@ Updated 2026-11-04 (the staff after an operation, AI at sea, ruleset 2.6.0). Mil
   the same rules marked earned. New `support` test hook and `arena-sorties.spec.ts`: red's Su-34,
   Kalibr and Geran-2 brought down by the Gepard and Stinger, getting through, the Tornado-G, blue's
   HIMARS, and the F-35A and Tomahawk kill cams on The Crossing, all looked at in screenshots.
+- Front door and the first ten minutes: the guided first turn is five steps that teach by doing
+  (move, let the staff plan the rest, end the turn, watch, what next), each with one highlighted
+  action; its e2e fits 120 s on a loaded machine (about 100 s at load 30, was over 140 s). The title
+  has a cold open (letterbox, logo resolve, light sweep), missiles arcing between rival cities, a
+  LIVE wire of the theatre's crises, Quick Battle (the open skirmish with the fewest stars, straight
+  to its brief) and Settings (sound, radio, battle quality, motion, colours, map, haptics, hand,
+  staff plan, replay, guided turn, install). The campaign briefing names a fictional commander per
+  power; a deploy screen covers the world build and the game fades up from it. PWA: launch
+  shortcuts (?quick=1, ?continue=1), an HTML boot splash. `?demo=1` plays an investor film through
+  the real game (title, operation, turn, battle, air strike, end card). `menu.spec.ts` covers it.
 
 ## Outstanding
 

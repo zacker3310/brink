@@ -18,9 +18,17 @@
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <style>
+      /* The splash while the bundle loads (React replaces it): the title's wordmark on the theatre's dark sea. */
+      .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: radial-gradient(ellipse 80% 60% at 50% 42%, #0f2a38, #04080b 75%); padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+      .boot b { font: 900 clamp(56px, 16vw, 120px) / 1 Cinzel, Georgia, 'Times New Roman', serif; letter-spacing: 0.06em; background: linear-gradient(180deg, #fffaf0, #f3dc9a 38%, #b98a38 52%, #6e4c1c 58%, #e9cd86 78%, #fff1c8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .boot i { width: 120px; height: 2px; background: rgb(240 232 214 / 0.12); overflow: hidden; position: relative; }
+      .boot i::after { content: ''; position: absolute; inset: 0; width: 40%; background: #e3c27a; animation: boot 1.1s ease-in-out infinite; }
+      @keyframes boot { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot" aria-label="Loading Brink"><b>BRINK</b><i></i></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-// The guided first match: a first-time player is offered it first, and every step finishes
-// when they actually do the thing, then it hands over a real campaign.
+// The guided first match: a first-time player is offered it first, and it teaches the first turn
+// by doing in five steps (move, let the staff plan the rest, end the turn, watch it, what next),
+// each finishing when they actually do the thing, then hands over a real campaign.
 test('a first-time player is coached through a real turn', async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
@@ -10,49 +11,41 @@ test('a first-time player is coached through a real turn', async ({ page }) => {
     if (m.type() === 'error') errors.push(m.text());
   });
   const coach = page.getByTestId('coach');
-  const at = (id: string) => expect(coach).toHaveAttribute('data-step', id, { timeout: 15000 });
+  const at = (id: string, timeout = 15_000) => expect(coach).toHaveAttribute('data-step', id, { timeout });
 
   await page.goto('./');
   await expect(page.locator('[data-testid^="menu-"]').first()).toHaveAttribute('data-testid', 'menu-tutorial');
-  await page.getByTestId('menu-tutorial').click();
-  await expect(page.getByTestId('top-bar')).toContainText('United States');
+  // The number keys pick from the menu, as its key hints say.
+  await page.keyboard.press('1');
+  await expect(page.getByTestId('top-bar')).toContainText('United States', { timeout: 30_000 });
 
-  await at('brief');
-  await expect(coach).toContainText('United States');
-  await page.getByTestId('coach-next').click();
-
-  // Move: right-click a reachable hex.
+  // 1. Move: the brief and the first order in one step. Right-click a reachable hex.
   await at('move');
+  await expect(coach).toContainText('United States');
+  await expect(page.getByTestId('coach-action')).toContainText('blue hex');
   const target = await page.evaluate(() => window.__brink!.reachable().at(-1)!);
   const p = await page.evaluate((k) => window.__brink!.hexToClient(k), target);
   await page.mouse.click(p.x, p.y, { button: 'right' });
-  await at('all');
+
+  // 2. The staff drafts orders for everyone still waiting (it never does while the coach is on
+  // unless asked): P, as the coach says.
+  await at('plan');
   await expect(coach).toContainText('wait for orders');
-  await page.getByTestId('coach-skip').click();
+  await expect(page.getByTestId('coach-show')).toHaveText('Let the staff plan');
+  await page.keyboard.press('p');
 
-  // Build: the coach opens the capital; picking a unit finishes the step.
-  await at('build');
-  await page.getByTestId('coach-show').click();
-  await page.getByTestId('build-infantry').click();
-  await page.getByTestId('close-city').click();
-
+  // 3. End the turn with the keys the coach shows: Ctrl+Enter opens the review, Enter commits.
   await at('end');
-  await page.getByTestId('end-turn').click();
-  await page.getByTestId('commit-turn').click();
-  await at('watch');
-  await at('report');
-  await page.getByTestId('coach-show').click();
-  await expect(page.getByTestId('report')).toBeVisible();
-  await page.getByTestId('close-report').click();
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('commit-turn')).toBeVisible();
+  await page.keyboard.press('Enter');
 
-  await at('threat');
-  await page.keyboard.press('v');
-  await at('attack');
-  await page.getByTestId('coach-skip').click();
-  await at('diplomacy');
-  await page.keyboard.press('5');
-  await at('done');
-  await page.getByTestId('coach-next').click();
+  // 4. The replay plays; 5. the coach names what comes next and hands over.
+  await at('watch');
+  await at('done', 45_000);
+  await expect(coach).toContainText('whole loop');
+  await expect(page.getByTestId('coach-next')).toBeVisible();
+  await page.keyboard.press('Enter');
   await expect(coach).toHaveCount(0);
   await expect(page.getByTestId('turn')).toContainText('2 / 20');
 

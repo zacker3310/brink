@@ -69,11 +69,13 @@ export function TitleScene({ className = '' }: { className?: string }) {
     let life: MapLife | null = null;
     const textures: Texture[] = [];
     const app = new Application();
-    void app.init({ resizeTo: el, background: 0x0a2433, antialias: true, autoDensity: true, resolution: Math.min(window.devicePixelRatio || 1, 2) }).then(() => {
+    void app.init({ resizeTo: el, background: 0x0a2433, antialias: true, autoDensity: true, resolution: Math.min(window.devicePixelRatio || 1, 1.5) }).then(() => {
       if (dead) {
         app.destroy(true);
         return;
       }
+      // A backdrop under a shade: 30 frames a second is smooth enough and halves the GPU's work.
+      app.ticker.maxFPS = 30;
       el.appendChild(app.canvas);
       app.canvas.setAttribute('aria-hidden', 'true');
       const world = new Container();
@@ -125,10 +127,78 @@ export function TitleScene({ className = '' }: { className?: string }) {
       const maxY = Math.max(...pts.map((p) => p.y));
       const cx = (minX + maxX) / 2;
       const cy = (minY + maxY) / 2;
-      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'reduced';
+      // Strikes: missiles arc between rival cities, a hot head over a trail in the launcher's
+      // colour, and a flash and a ring where they land.
+      const strikes = new Graphics();
+      world.addChild(strikes);
+      const targets = Object.values(v.sites)
+        .filter((s) => s.owner && (s.kind === 'capital' || s.kind === 'city'))
+        .sort((a, b) => (a.id < b.id ? -1 : 1));
+      const flights: { a: Point; b: Point; c: Point; color: number; born: number; dur: number }[] = [];
+      let nextLaunch = 1.6;
+      let shot = 0;
+      const bez = (f: (typeof flights)[number], u: number): Point => ({
+        x: (1 - u) * (1 - u) * f.a.x + 2 * (1 - u) * u * f.c.x + u * u * f.b.x,
+        y: (1 - u) * (1 - u) * f.a.y + 2 * (1 - u) * u * f.c.y + u * u * f.b.y,
+      });
+      const launch = (now: number) => {
+        for (let tries = 0; tries < 12; tries++) {
+          shot += 1;
+          const from = targets[Math.floor(hash(`from${shot}`) * targets.length)];
+          const to = targets[Math.floor(hash(`to${shot}`) * targets.length)];
+          if (!from || !to || from.owner === to.owner) continue;
+          const a = center(from.key);
+          const b = center(to.key);
+          const d = Math.hypot(b.x - a.x, b.y - a.y);
+          if (d < SIZE * 6 || d > SIZE * 40) continue;
+          const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - d * 0.42 };
+          flights.push({ a, b, c, color: hex(v.nations[from.owner!]?.color ?? '#ffffff'), born: now, dur: 1.8 + d / (SIZE * 22) });
+          return;
+        }
+      };
+      const drawStrikes = (now: number) => {
+        strikes.clear();
+        for (let i = flights.length - 1; i >= 0; i--) {
+          const f = flights[i]!;
+          const u = (now - f.born) / f.dur;
+          if (u > 1.6) {
+            flights.splice(i, 1);
+            continue;
+          }
+          const head = Math.min(1, u);
+          // The trail: the last stretch of the arc, fading toward its tail (and away after impact).
+          const fade = u > 1 ? Math.max(0, 1 - (u - 1) / 0.6) : 1;
+          const tail = Math.max(0, head - 0.28);
+          const N = 14;
+          for (let k = 0; k < N; k++) {
+            const p = bez(f, tail + ((head - tail) * k) / N);
+            const q = bez(f, tail + ((head - tail) * (k + 1)) / N);
+            const w = (k + 1) / N;
+            strikes.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 1 + 3 * w, color: f.color, alpha: 0.55 * w * fade, cap: 'round' });
+          }
+          if (u < 1) {
+            const p = bez(f, head);
+            strikes.circle(p.x, p.y, 7).fill({ color: f.color, alpha: 0.35 });
+            strikes.circle(p.x, p.y, 2.6).fill({ color: 0xfff6e0, alpha: 1 });
+          } else {
+            // Impact: a white flash, then an orange ring that spreads and fades.
+            const k = (u - 1) / 0.6;
+            strikes.circle(f.b.x, f.b.y, 6 + 26 * k).stroke({ width: 3, color: 0xffb347, alpha: 0.9 * (1 - k) });
+            if (k < 0.35) strikes.circle(f.b.x, f.b.y, 14 * (1 - k)).fill({ color: 0xfff1d0, alpha: 0.9 * (1 - k / 0.35) });
+          }
+        }
+      };
       let t = 0;
       app.ticker.add(() => {
         t += still ? 0 : app.ticker.deltaMS / 1000;
+        if (!still) {
+          if (t > nextLaunch && flights.length < 3) {
+            launch(t);
+            nextLaunch = t + 1.4 + hash(`gap${shot}`) * 2.2;
+          }
+          drawStrikes(t);
+        }
         const w = app.screen.width;
         const h = app.screen.height;
         const cover = Math.max(w / (maxX - minX), h / (maxY - minY));
