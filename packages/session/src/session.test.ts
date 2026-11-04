@@ -169,6 +169,33 @@ describe('GameSession', () => {
     expect(capital.development).toBeGreaterThan(0);
   });
 
+  it('resumes a 2.5.0 campaign under the current ruleset, its staff starting with a fresh memory', () => {
+    const s = GameSession.create(PACIFIC_ID, 12, 'china');
+    s.advance();
+    s.advance();
+    // What ruleset 2.5.0 wrote: no staff memory (the staff planned from an empty one every turn).
+    const old = JSON.parse(serializeSave(s.toSave('old', '2026-11-04T12:00:00Z')));
+    old.rulesetVersion = '2.5.0';
+    old.world.rulesetVersion = '2.5.0';
+    delete old.staffMemory;
+    old.hash = hashState(old.world);
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.migratedFrom).toBe('2.5.0');
+    expect(loaded.rulesetVersion).toBe(RULESET_VERSION);
+    expect(loaded.world.rulesetVersion).toBe(RULESET_VERSION);
+    expect(loaded.hash).toBe(hashState(loaded.world));
+    const resumed = GameSession.fromSave(loaded);
+    expect(resumed.staffMemory().objective).toBeUndefined();
+    for (let i = 0; i < 3; i++) {
+      const orders = resumed.suggest('china');
+      const r = resumed.advance(orders);
+      expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    }
+    // The staff has learned from the turns since: it holds an objective, and saves it.
+    expect(resumed.staffMemory().objective).toBeDefined();
+    expect(resumed.toSave('again', '2026-11-04T13:00:00Z').staffMemory!.china!.objective).toBe(resumed.staffMemory().objective);
+  });
+
   it('runs any campaign length from 5 turns to a 250-turn Total War', () => {
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 45 }).snapshot().maxTurns).toBe(45);
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 999 }).snapshot().maxTurns).toBe(250);

@@ -203,7 +203,7 @@ Checked every turn in this order; the first that applies ends the campaign.
    signing (three of four powers start with about two thirds of the map). The member with the most
    VP leads it; every member wins.
 4. **Supremacy** (from turn 8): one nation's average share of victory points, army strength and
-   output (resources plus industry) reaches 31%, about 1.25 times a fair share across all three at
+   output (resources plus industry) reaches 29% (31% before ruleset 2.6.0), about 1.2 times a fair share across all three at
    once, with stability of at least 35.
 5. **Score**: at the turn limit, the highest standing (the same average) wins; victory points break
    ties.
@@ -236,13 +236,13 @@ declares war on you and accepts your peace; half again your starting stockpile; 
 keeps the ally unless it sets the two at war), Normal (everyone at war from turn 1), Hard (each AI power starts with a fifth more stockpile, `HARD_AI_STOCKPILE`). The
 AI plays at full strength on every level; Easy and Normal give the human seats a command edge
 (`DIFFICULTY_EDGE`): Easy +70% income, +60% industry, +50% attack, +50% home defence, units 30%
-cheaper; Normal +30% income and industry, +20% attack, +25% home defence, units 15% cheaper.
+cheaper; Normal (ruleset 2.6.0) +15% income and industry, +10% attack, +15% home defence, units 10% cheaper.
 Measured on the retired Meridian theatre (ruleset 1.6.0) with the AI's own planner in the human seat
 (32 campaigns each, 30 turns): Easy wins 88% (66% playing only defensively), Normal 56% (13%), Hard
 25%. On the Pacific (12 campaigns each, 30 turns, Japan played by the staff, with the opening
 crisis a new campaign deals): Easy wins 11 of 12, Normal 4 of 12. Ruleset 2.5.0, on the Pacific
 (`pnpm test:difficulty`: the planner in each of the four seats in turn, 30 turns, no crisis): Easy
-88% (32 campaigns), Normal 59% (32), Hard 31% (48). In tactical battles the enemy
+88% (32 campaigns), Normal 59% (32), Hard 31% (48); ruleset 2.6.0: Easy 84%, Normal 59%, Hard 25% (32 each). In tactical battles the enemy
 also reads less well on Easy (lower skill).
 Theatre: the Pacific, the only one since ruleset 2.0.0 (the Meridian, Highland Front and Varn Delta
 were retired; their saves are refused with a message). The seed fixes the ground texture and every

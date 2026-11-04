@@ -29,7 +29,7 @@ import { jointOpTarget, leaderDiplomacy, type Offer } from './diplomacy-ai';
 
 export { planCards } from './doctrine';
 export * from './diplomacy-ai';
-export { proposeOperations, operationById, type Operation, type OperationPhase } from './operations';
+export { proposeOperations, operationById, ODDS_WORDS, type Operation, type OperationPhase } from './operations';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
 // order it writes goes through the same validator as a human's. Two layers:
@@ -66,14 +66,18 @@ function recentContacts(view: NationView): Contact[] {
 
 function threatsTo(view: NationView, contacts: Contact[]): Map<string, number> {
   const out = new Map<string, number>();
+  const land = landmasses(view);
   for (const id of sortedKeys(view.sites)) {
     const s = view.sites[id]!;
     if (s.owner !== view.self.id) continue;
     // A minor state's militia never leaves its own ground: it is a prize to take, not a threat to
     // guard against. Counting it pinned whole armies to the border cities next to Canada or Korea.
+    // An army across the water is no threat until it has ships: troops in Korea do not march on
+    // Fukuoka (they pinned Japan's whole army to its coast). A landing is one before it lands: an
+    // enemy amphibious group off the coast counts as the troops it can carry.
     const t = contacts
-      .filter((c) => UNITS[c.unitClass].ground && keyDistance(c.key, s.key) <= 3 && !view.nations[c.owner]?.minor)
-      .reduce((a, c) => a + c.estimatedStrength, 0);
+      .filter((c) => keyDistance(c.key, s.key) <= 3 && !view.nations[c.owner]?.minor)
+      .reduce((a, c) => a + (UNITS[c.unitClass].ground ? (land.get(c.key) === land.get(s.key) ? c.estimatedStrength : 0) : UNITS[c.unitClass].carries === 'ground' ? (UNITS[c.unitClass].capacity ?? 0) * 1000 : 0), 0);
     if (t > 0) out.set(id, t);
   }
   return out;
@@ -81,6 +85,12 @@ function threatsTo(view: NationView, contacts: Contact[]): Map<string, number> {
 
 /** Each hex of march off a target's worth: near prizes first, a foothold before the deep strike. */
 const DISTANCE_WEIGHT = 6;
+
+/** A prize within this many hexes of one of our ports is a short hop, as good as a walk. */
+const STRAIT = 2;
+
+/** Hexes a fleet goes out of its way to catch an enemy amphibious group. */
+const HUNT_RANGE = 6;
 
 /** A city is stormed by this many formations at once, or not at all. */
 const STORM_TOGETHER = 2;
@@ -90,6 +100,16 @@ const ASSAULT_GROUP = 8;
 
 /** A walk is cheaper than a landing: what the army can reach on foot scores this much higher. */
 const OVERLAND_BONUS = 40;
+
+/**
+ * Strength seen guarding a prize (0..1000 a formation) per point of its score: a full formation in
+ * the way costs as much as four hexes of march. (At 100 a capital held by two divisions still drew
+ * the army off a city held by none.)
+ */
+const GUARD_WEIGHT = 40;
+
+/** The garrison assumed in a great power's site out of sight, 0..1000 a formation. */
+const UNSEEN_GARRISON: Partial<Record<SiteView['kind'], number>> = { capital: 2000, city: 1000 };
 
 /** What the objective already marched on is worth over a fresh one: about ten hexes of march. */
 const STICKY_OBJECTIVE = 60;
@@ -110,19 +130,39 @@ function chooseTarget(view: NationView, memory: AiMemory, contacts: Contact[], o
     if (l !== undefined) count.set(l, (count.get(l) ?? 0) + 1);
   }
   const home = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
+  const ports = sortedKeys(view.sites)
+    .map((id) => view.sites[id]!)
+    .filter((p) => p.owner === view.self.id && view.tiles[p.key]?.port)
+    .map((p) => p.key);
   let best: SiteView | null = null;
   let bestScore = -Infinity;
   for (const id of sortedKeys(view.sites)) {
     const s = view.sites[id]!;
     if (s.owner === view.self.id) continue;
     if (s.owner !== null && !isHostile(view, s.owner)) continue;
-    const guard = contacts.filter((c) => keyDistance(c.key, s.key) <= 1).reduce((a, c) => a + c.estimatedStrength, 0);
+    // What guards it: the enemies seen in and around it, or, for a great power's city out of sight,
+    // the garrison such a city has. (Unseen, a capital looked unguarded, and armies sailed for Tokyo
+    // and Beijing past cities they could take.)
+    const seen = contacts.filter((c) => keyDistance(c.key, s.key) <= 1).reduce((a, c) => a + c.estimatedStrength, 0);
+    const prior = view.tiles[s.key]?.visibility !== 'visible' && s.owner && !view.nations[s.owner]?.minor ? (UNSEEN_GARRISON[s.kind] ?? 0) : 0;
+    const guard = Math.max(seen, prior);
     const grudge = s.owner && memory.aggressors[s.owner] !== undefined ? 3 : 0;
     const weak = s.owner && view.nations[s.owner] ? -view.nations[s.owner]!.victoryPoints / 10 : 0;
-    const walk = home !== undefined && land.get(s.key) === home ? OVERLAND_BONUS : 0;
+    // A strait is as good as a road: a prize a short hop from one of our ports is shuttled to as
+    // fast as it is walked to (Busan from Fukuoka, Taipei from Fuzhou), so an island power looks
+    // across its strait before it looks across an ocean.
+    const overland = home !== undefined && land.get(s.key) === home;
+    const walk = overland || ports.some((k) => keyDistance(k, s.key) <= STRAIT) ? OVERLAND_BONUS : 0;
+    // An expedition under way (troops aboard, or ashore near it) holds to its prize until the war
+    // stalls: turning a convoy round mid-sea throws away the voyage (Japan's sailed for Taipei,
+    // then Honolulu, then Beijing, and landed nowhere for long).
+    const expedition = !overland && own.some((f) => UNITS[f.unitClass].ground && (!!f.aboard || (land.get(f.key) === land.get(s.key) && keyDistance(f.key, s.key) <= 4)));
     // The prize already marched on keeps the army, unless the war there has stood still too long.
-    const kept = s.id === memory.objective && stalled(view, memory) < STALL_TURNS ? STICKY_OBJECTIVE : 0;
-    const score = (s.victoryPoints + grudge) * 10 - centroid(s.key) * DISTANCE_WEIGHT - guard / 100 + weak + walk + kept;
+    // The hold fades as the war stands still: a prize not taken in a few turns is let go before
+    // the whole war counts as stalled (a staff that sat eight turns off Tokyo took nothing).
+    const since = stalled(view, memory);
+    const kept = s.id !== memory.objective ? 0 : expedition ? (since < STALL_TURNS ? STICKY_OBJECTIVE : 0) : Math.floor((STICKY_OBJECTIVE * Math.max(0, STALL_TURNS - since)) / STALL_TURNS);
+    const score = (s.victoryPoints + grudge) * 10 - centroid(s.key) * DISTANCE_WEIGHT - guard / GUARD_WEIGHT + weak + walk + kept;
     if (score > bestScore || (score === bestScore && best && s.id < best.id)) {
       best = s;
       bestScore = score;
@@ -250,8 +290,16 @@ function planRecruitment(view: NationView, memory: AiMemory, own: Formation[], c
     let c = wantedClass(memory, own, queued, overseas);
     // Ships are built only in ports.
     if (UNITS[c].naval && !view.tiles[s.key]?.port) c = 'infantry';
+    // The reserve is kept of what the unit costs: a nation out of energy can still raise infantry,
+    // which burns none. (Held to every reserve, a power that ran out of energy raised nothing for
+    // the rest of the war: Japan from turn 6.) What cannot be paid for gives way to infantry.
+    const short = (k: UnitClass) => {
+      const cost = recruitCost(view.self, k);
+      return RESOURCES.some((r) => cost[r] > 0 && left[r] - cost[r] < reserve[r]);
+    };
+    if (short(c)) c = 'infantry';
+    if (short(c)) continue;
     const cost = recruitCost(view.self, c);
-    if (RESOURCES.some((r) => left[r] - cost[r] < reserve[r])) continue;
     for (const r of RESOURCES) left[r] -= cost[r];
     queued.push(c);
     out.push({ siteId: s.id, unitClass: c });
@@ -586,12 +634,14 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   // turn after turn until the mass can storm it.
   const goal0 = plan.target?.key ?? null;
   const siege = (k: HexKey) => (k === plan.target?.key ? 100_000 : 0) + siteVp(k) * 1000;
+  // An enemy amphibious group is the best target there is: its troops go down with it.
+  const prey = (c: Contact) => siege(c.key) + (UNITS[c.unitClass].carries === 'ground' ? 50_000 : 0) + c.estimatedStrength;
   for (const f of own) {
     const def = UNITS[f.unitClass];
     if (def.range === 0 || committed.has(f.id) || (f.aboard && def.ground)) continue;
     const inRange = contacts
       .filter((c) => keyDistance(c.key, f.key) >= 1 && keyDistance(c.key, f.key) <= def.range && c.confirmed)
-      .sort((a, b) => siege(b.key) + b.estimatedStrength - (siege(a.key) + a.estimatedStrength) || (a.formation < b.formation ? -1 : 1));
+      .sort((a, b) => prey(b) - prey(a) || (a.formation < b.formation ? -1 : 1));
     // Guns on the march do not stop for every patrol: with the objective out of their reach and
     // no city or threat in range, they keep moving up to it.
     const marching = def.ground && goal0 !== null && keyDistance(f.key, goal0) > def.range && inRange[0] !== undefined && siege(inRange[0].key) === 0 && keyDistance(inRange[0].key, f.key) > 1;
@@ -831,6 +881,15 @@ function planSea(
   const room = (c: Formation) => (UNITS[c.unitClass].capacity ?? 0) - own.filter((p) => p.aboard === c.id).length;
   const isWater = (k: HexKey) => view.tiles[k]?.terrain === 'water';
   const hostile = (k: HexKey) => avoid.has(k);
+  // An enemy's city or port is held whether or not its garrison is seen: a garrison among the
+  // buildings is out of sight from the sea, and troops sent to walk ashore into it only bump into
+  // it, turn after turn (Japan's brigade sat off Honolulu for twenty turns). It is stormed, or the
+  // troops land beside it.
+  const held = (k: HexKey) => {
+    if (hostile(k)) return true;
+    const t = view.tiles[k];
+    return !!t?.siteId && !!t.owner && plan.enemies.has(t.owner);
+  };
 
   // The beach: a land hex on the goal's landmass, next to the sea, nearest the goal, no enemy on it.
   const beaches = sortedKeys(view.tiles)
@@ -873,8 +932,8 @@ function planSea(
       .sort((a, b) => keyDistance(a, goal) - keyDistance(b, goal) || (a < b ? -1 : 1));
     // Nowhere to land here and no assault worth making: try the open beach instead of waiting
     // off a defended shore forever.
-    const open = shore.some((k) => !hostile(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT);
-    const storm = shore.find((k) => hostile(k));
+    const open = shore.some((k) => !held(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT);
+    const storm = shore.find((k) => held(k));
     const worth = storm ? (previewAssault(view, aboard.map((x) => x.id), storm)?.share[0] ?? 0) >= 450 : false;
     if (shore.length > 0 && !open && !worth && offshore && offshore !== t.key) {
       sail(t, offshore);
@@ -883,8 +942,8 @@ function planSea(
     if (shore.length > 0) {
       for (const p of aboard) {
         // A beach this passenger can reach in one step this turn (mountains may be too much).
-        const free = shore.find((k) => !hostile(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT && (enterCost(view.tiles[k], p.unitClass) ?? Infinity) <= movementAllowance(p));
-        const enemy = shore.find((k) => hostile(k));
+        const free = shore.find((k) => !held(k) && (plan.ends.get(k) ?? 0) < STACK_LIMIT && (enterCost(view.tiles[k], p.unitClass) ?? Infinity) <= movementAllowance(p));
+        const enemy = shore.find((k) => held(k));
         if (free) {
           orders[p.id] = { type: 'move', path: [free] };
           endAt(plan, p.key, free);
@@ -967,9 +1026,14 @@ function planSea(
       committed.add(c.id);
     } else if (offshore) sail(c, offshore);
   }
+  // Fleets hunt enemy amphibious groups within a few hexes (sinking one drowns its troops), and
+  // otherwise escort toward the goal's coast.
+  const convoys = plan.contacts.filter((c) => UNITS[c.unitClass].carries === 'ground' && plan.enemies.has(c.owner));
   for (const s of ships) {
     if (committed.has(s.id)) continue;
-    if (offshore && UNITS[s.unitClass].carries === undefined) sail(s, offshore);
+    const hunt = UNITS[s.unitClass].carries === undefined ? convoys.filter((c) => keyDistance(c.key, s.key) <= HUNT_RANGE).sort((a, b) => keyDistance(a.key, s.key) - keyDistance(b.key, s.key) || (a.formation < b.formation ? -1 : 1))[0] : undefined;
+    if (hunt) sail(s, hunt.key);
+    else if (offshore && UNITS[s.unitClass].carries === undefined) sail(s, offshore);
     else {
       orders[s.id] = { type: 'hold' };
       committed.add(s.id);

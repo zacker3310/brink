@@ -35,7 +35,10 @@ import { warRequest, warSaveFor } from './arena/resume';
 import type { Mode } from './planning';
 import type { Response } from './protocol';
 import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type ActiveOperation, type MapStyle, type SlotInfo } from './saves';
-import { operationById, type Operation } from '@brink/ai';
+import { operationById, proposeOperations, type Operation } from '@brink/ai';
+
+/** The diplomacy the staff may sign for the player on its own: what calms a front and costs nothing. */
+const STAFF_DIPLOMACY: ReadonlySet<DiplomaticAction> = new Set<DiplomaticAction>(['propose_peace', 'propose_ceasefire', 'propose_nonaggression', 'propose_trade']);
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy' | 'generals';
 
@@ -247,12 +250,16 @@ export const useGame = create<State>((set, get) => {
       const op = readOperation(r.view);
       if (op && !operationById(r.view, op.id, op.kind)) {
         const site = r.view.sites[op.id.slice(5)];
-        get().notify(site?.owner === r.view.self.id ? `${op.codename} complete: ${site.name} is yours` : `${op.codename} called off: ${op.name.replace('Take ', '')} is out of reach`);
+        // The staff carries on toward its own next objective; the best next operation is named.
+        const next = proposeOperations(r.view, 1)[0];
+        const then = next ? `. Staff suggests next: ${next.name} (Operations)` : '';
+        get().notify(site?.owner === r.view.self.id ? `${op.codename} complete: ${site.name} is yours${then}` : `${op.codename} called off: ${op.name.replace('Take ', '')} is out of reach${then}`);
         writeOperation(r.view, null);
         set({ operation: null });
       } else set({ operation: op });
       // Staff plan mode (or a running operation): every turn opens with the staff's plan drafted; the player changes what they like.
-      if ((get().staffPlan || get().operation) && !r.view.victory) void get().autoCommand(true);
+      // An operation that just ended drafts this turn too, so the army is not left standing.
+      if ((get().staffPlan || get().operation || op) && !r.view.victory) void get().autoCommand(true);
       // A war won opens the next theatre.
       if (wonCampaign(r.view)) recordWarWon(r.view.scenarioId);
       // A battle the page was closed in on this turn waits for the same attack (arena/resume.ts).
@@ -517,6 +524,16 @@ export const useGame = create<State>((set, get) => {
         n += 1;
       }
       if (next.research === undefined && !view.self.research.current && r.orders.research) next.research = r.orders.research;
+      // The staff's diplomacy too: peace with a power it is not fighting for, pacts and trade, so a
+      // war on every front at once does not pin the army to its borders. Only what calms a front:
+      // never a war, an alliance (it can carry one), an embargo, an ultimatum or a payment of the
+      // player's stockpile. Those are the player's to make. A nation the player already has an order
+      // for is left alone.
+      for (const d of r.orders.diplomacy) {
+        if (!STAFF_DIPLOMACY.has(d.action) || next.diplomacy.some((x) => x.target === d.target)) continue;
+        next.diplomacy.push(d);
+        n += 1;
+      }
       // A turn that moved on while the staff was thinking keeps the new turn's draft. The guided
       // first match teaches giving orders by hand: no plan while the coach is on.
       if (get().view !== view || (auto && useCoach.getState().active)) return;

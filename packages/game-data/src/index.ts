@@ -15,7 +15,7 @@ export * from './research';
 export * from './cities';
 export * from './leaders';
 
-export const RULESET_VERSION = '2.7.0';
+export const RULESET_VERSION = '2.8.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -352,16 +352,20 @@ export interface GovernmentDef {
  */
 export const DIFFICULTY_EDGE: Record<Difficulty, Modifiers> = {
   easy: { income: { credits: 70, energy: 70, materials: 70, food: 70 }, industry: 60, research: 40, stability: 15, attack: 50, homeDefense: 50, recruitDiscount: 30, supplyCapacity: 30, ranged: 20 },
-  normal: { income: { credits: 30, energy: 30, materials: 30, food: 30 }, industry: 30, research: 20, stability: 5, attack: 20, homeDefense: 25, recruitDiscount: 15, supplyCapacity: 10 },
+  // Ruleset 2.6.0 halved Normal's edge (+30% income and industry, +20% attack, +25% home defence,
+  // 15% cheaper units before): with the staff fighting at sea and supremacy at 29%, the old edge won
+  // 78% of Normal campaigns.
+  normal: { income: { credits: 15, energy: 15, materials: 15, food: 15 }, industry: 15, research: 10, stability: 5, attack: 10, homeDefense: 15, recruitDiscount: 10, supplyCapacity: 5 },
   hard: {},
 };
 
 /**
  * Percent of its starting stockpile each AI power gets on Hard ("the AI starts richer"). 150 until
  * ruleset 2.5.0, when the AI learned to finish its sieges and Hard fell to 16% for the AI's own
- * planner in the human seat.
+ * planner in the human seat; 120 until 2.6.0, when the AI learned to fight at sea and Hard fell to
+ * 19%.
  */
-export const HARD_AI_STOCKPILE = 120;
+export const HARD_AI_STOCKPILE = 105;
 
 export const GOVERNMENTS: Record<GovernmentId, GovernmentDef> = {
   commonwealth: {
@@ -506,7 +510,7 @@ export const VICTORY = {
    * Supremacy: average of a nation's percent shares of victory points, army strength and gross
    * income, with stability at least `supremacyStability`, from `supremacyFromTurn` on.
    */
-  supremacyShare: 31,
+  supremacyShare: 29,
   supremacyStability: 35,
   supremacyFromTurn: 8,
 } as const;

@@ -95,7 +95,8 @@ export function planCityBuilds(view: NationView, memory: AiMemory): BuildOrder[]
     const f = wantedFacility(view, memory, site);
     if (!f) continue;
     const cost = facilityCost(view.self, f);
-    if (RESOURCES.some((r) => view.self.stockpile[r] - cost[r] < reserve[r])) return [];
+    // A reserve of what it costs: a power plant needs no energy to build, and is most wanted at none.
+    if (RESOURCES.some((r) => cost[r] > 0 && view.self.stockpile[r] - cost[r] < reserve[r])) return [];
     return [{ siteId: site.id, facility: f }];
   }
   return [];

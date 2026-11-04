@@ -1,5 +1,5 @@
 import type { Formation, GovernmentId, HexKey, Nation, NationId, Site, SiteKind, Terrain, Tile, UnitClass, WorldState, Yields } from '@brink/contracts';
-import { RULESET_VERSION, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { RULES, RULESET_VERSION, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { hexKey, keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { computeVision, emptyIntel, grossYields, initDoctrine, mulberry32, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
@@ -515,6 +515,21 @@ function parity(world: WorldState, raise: (n: NationSpec, c: UnitClass, site: st
     // What the rounding lost (or gained) the capital's industry makes up, so the totals match exactly.
     const capital = world.sites[`${p}-capital`]!;
     capital.yields.industry = Math.max(0, capital.yields.industry + outTarget - output(p));
+  }
+
+  // Land pays too: a credit a turn for every `RULES.hexesPerCredit` hexes held. The United States,
+  // Russia and China hold eight to ten times Japan's ground, which left the island power a quarter
+  // poorer in credits than its rivals for all the parity above (ruleset 2.6.0). Every power below
+  // the best-landed is paid the difference on its cities' treasuries, the remainder on its capital;
+  // nobody's is cut.
+  const land = (p: NationId) => Math.floor(Object.values(world.tiles).filter((t) => t.owner === p).length / RULES.hexesPerCredit);
+  const most = Math.max(...powers.map(land));
+  for (const p of powers) {
+    const gap = most - land(p);
+    const towns = sitesOf(p).filter((s) => s.kind === 'city');
+    const each = towns.length ? Math.floor(gap / (towns.length + 1)) : 0;
+    for (const s of towns) s.yields.credits += each;
+    world.sites[`${p}-capital`]!.yields.credits += gap - each * towns.length;
   }
 
   // Army: the lighter powers raise garrisons (infantry, then mechanized, then artillery) in their

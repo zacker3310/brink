@@ -622,6 +622,12 @@ export interface SaveFile {
   /** Per-nation reports for replay, keyed by turn. Player reports only in a single-player save. */
   reports: TurnReport[];
   aiMemory: Record<NationId, AiMemory>;
+  /**
+   * What each human seat's staff (the planner drafting orders for the player) remembers: the
+   * objective it marches on and how long since the last capture. Absent in older saves: the staff
+   * starts afresh.
+   */
+  staffMemory?: Record<NationId, AiMemory>;
   hash: string;
   /** Every human seat, `playerNation` first. Absent in single-player saves. */
   humans?: NationId[];
