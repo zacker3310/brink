@@ -1,4 +1,4 @@
-import type { Commander, CommandAssignment, CommanderId, FormationId, NationOrders, NationView } from '@brink/contracts';
+import type { Commander, CommandAssignment, CommanderEvent, CommanderId, FormationId, NationOrders, NationView } from '@brink/contracts';
 import { COMMANDER_RANKS, COMMANDER_RULES, COMMANDER_TRAITS, PERKS, UNITS } from '@brink/game-data';
 
 // The generals as the player sees them this turn: who leads what once the draft's postings take
@@ -78,4 +78,46 @@ export function traitLine(c: Pick<Commander, 'traits'>): string {
 
 export function perkName(id: string): string {
   return PERKS[id]?.name ?? id;
+}
+
+/**
+ * A general's news in plain words for the debrief and the report: who, what happened, and where;
+ * null for a change the player made themselves (a posting they ordered says nothing new).
+ */
+export function commanderNote(view: NationView, e: CommanderEvent): { tone: 'good' | 'bad' | 'info'; title: string; text: string; at?: string } | null {
+  const f = e.formation ? view.formations[e.formation] : undefined;
+  const of = f ? ` ${f.name}` : e.formation ? ' the formation' : '';
+  const at = f ? { at: f.key } : {};
+  switch (e.change) {
+    case 'level_up':
+      return { tone: 'good', title: `${e.name} promoted`, text: `Now ${rankTitle(e.level ?? 1)}. Choose a perk for the new rank.` };
+    case 'perk':
+      return { tone: 'good', title: `${e.name} learns ${perkName(e.perk ?? '')}`, text: PERKS[e.perk ?? '']?.summary ?? 'A new perk.' };
+    case 'wounded':
+      return { tone: 'bad', title: `${e.name} wounded`, text: `Carried off the field when${of || ' the command'} fell back. Out of action for a few turns, then back in the reserve.`, ...at };
+    case 'killed':
+      return { tone: 'bad', title: `${e.name} killed in action`, text: `Fell with${of || ' the command'}. The perks and experience are lost.` };
+    case 'recovered':
+      return { tone: 'good', title: `${e.name} back from hospital`, text: 'Recovered and waiting in the reserve: select a formation to give them a command.' };
+    case 'relieved':
+      // A formation lost from under its general: they escaped. A recall the player ordered is no news.
+      return e.formation && !f ? { tone: 'info', title: `${e.name} escaped`, text: 'Their formation was destroyed; the general made it back to the reserve.' } : null;
+    case 'assigned':
+      return f ? { tone: 'info', title: `${e.name} takes command`, text: `Now leads ${f.name}.`, ...at } : null;
+  }
+}
+
+/**
+ * The formation a reserve general would do most good leading: the operation's strongest assault
+ * formation without a general, else the strongest land formation without one; null when none is free.
+ */
+export function suggestedPost(view: NationView, draft: NationOrders | null, preferred: readonly FormationId[] = []): FormationId | null {
+  const post = postings(view, draft);
+  const led = new Set(Object.values(post).filter((f): f is FormationId => !!f));
+  const free = (id: FormationId) => canLead(view, id) && !led.has(id) && !view.formations[id]!.aboard;
+  const best = (ids: FormationId[]) =>
+    ids
+      .filter(free)
+      .sort((a, b) => view.formations[b]!.strength - view.formations[a]!.strength || (a < b ? -1 : 1))[0] ?? null;
+  return best(preferred.filter((id) => view.formations[id])) ?? best(Object.keys(view.formations).filter((id) => UNITS[view.formations[id]!.unitClass].ground));
 }

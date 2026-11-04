@@ -860,6 +860,14 @@ body {
   line-height: 1.2;
   color: #fff;
 }
+/* How the chosen power plays: its own voice, under the doctrine quote. */
+.wr-blurb {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #e6e8ea;
+}
+
 .wr-trait {
   display: inline-flex;
   align-items: baseline;

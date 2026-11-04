@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { operationById, proposeOperations, type Operation, type OperationPhase } from '@brink/ai';
 import { Icon } from './icons';
+import { operationSpot } from './opspot';
 import { useGame } from './store';
 
 // Operations: the staff's campaign plans. The sheet offers the best few, each with its phases,
@@ -199,5 +200,70 @@ export function OperationStrip({ className = '' }: { className?: string }) {
         ))}
       </span>
     </button>
+  );
+}
+
+/**
+ * The phone's operation row, the top of the command card: where the running operation stands and
+ * what it does this turn, with a button to the place on the map; or, with none running, the way in.
+ */
+export function OperationRow() {
+  const view = useGame((s) => s.view);
+  const active = useGame((s) => s.operation);
+  const setOpen = useGame((s) => s.setOpsOpen);
+  const focusOn = useGame((s) => s.focusOn);
+  const op = useMemo(() => (view && active ? operationById(view, active.id, active.kind) : null), [view, active]);
+  if (!view || view.victory) return null;
+  if (!op || !active) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-signal/70 bg-signal/10 px-3 py-2 text-left active:bg-signal/20"
+        data-testid="operations-open"
+      >
+        <Icon name="objective" className="h-5 w-5 shrink-0 text-signal" />
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="font-display block text-[15px] font-extrabold tracking-wide text-signal uppercase">Plan an operation</span>
+          <span className="block text-[12px] text-muted">Pick a prize: the staff marches, sails and storms it for you.</span>
+        </span>
+        <Icon name="next" className="h-4 w-4 shrink-0 text-signal" />
+      </button>
+    );
+  }
+  const now = op.phases.find((p) => p.state === 'now');
+  const done = op.phases.filter((p) => p.state === 'done').length;
+  return (
+    <div className="flex items-stretch gap-2">
+      <button type="button" onClick={() => setOpen(true)} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-signal/60 bg-ink-850 px-3 py-2 text-left active:bg-ink-800" data-testid="operation-strip">
+        <Icon name="objective" className="h-5 w-5 shrink-0 text-signal" />
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="flex items-center gap-2">
+            <span className="truncate font-mono text-[11px] tracking-wide text-signal uppercase">
+              {active.codename} · {done}/{op.phases.length}
+            </span>
+            <span className="flex shrink-0 gap-0.5" aria-hidden>
+              {op.phases.map((p) => (
+                <span key={p.id} className={`h-1.5 w-2.5 rounded-full ${p.state === 'done' ? 'bg-good' : p.state === 'now' ? 'bg-signal' : 'bg-ink-600'}`} />
+              ))}
+            </span>
+          </span>
+          <span className="block truncate text-[14px] font-semibold">
+            {op.name}: {now ? now.title : 'Assault'} · ~{op.turns} turn{op.turns === 1 ? '' : 's'}
+          </span>
+          {now && (
+            <span className="block truncate text-[12px] text-muted" data-testid="operation-now">
+              {now.detail}
+            </span>
+          )}
+        </span>
+      </button>
+      <button type="button" onClick={() => focusOn(operationSpot(view, op)?.key ?? op.at)} aria-label="Show this phase on the map" className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-ink-850 text-muted active:bg-ink-800" data-testid="operation-show">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <path d="M12 21s-6-5.5-6-10a6 6 0 1112 0c0 4.5-6 10-6 10z" />
+          <circle cx="12" cy="11" r="2.2" />
+        </svg>
+      </button>
+    </div>
   );
 }

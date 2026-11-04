@@ -4,7 +4,8 @@ import type { Commander, FormationId, NationView } from '@brink/contracts';
 import { COMMANDER_TRAITS, PERKS } from '@brink/game-data';
 import { Label } from './chrome';
 import { useGame } from './store';
-import { available, canLead, generalsOf, leaderAfter, perkName, postings, rankTitle, traitLine, xpProgress } from './generals';
+import { available, canLead, generalsOf, leaderAfter, perkName, postings, rankTitle, suggestedPost, traitLine, xpProgress } from './generals';
+import { operationById } from '@brink/ai';
 
 // Generals: the commander row on a formation's card, the roster (Command, Generals), and the
 // promotion modal that deals two perk cards on a level-up.
@@ -146,8 +147,15 @@ export function GeneralsRoster() {
   const selectFormation = useGame((s) => s.selectFormation);
   const focusOn = useGame((s) => s.focusOn);
   const show = usePromotion((s) => s.show);
+  const setPosting = useGame((s) => s.setPosting);
+  const resolving = useGame((s) => s.resolving);
+  const operation = useGame((s) => s.operation);
   const all = generalsOf(view);
   const post = postings(view, draft);
+  // A general in reserve gets a command in one tap: the operation's assault force first.
+  const army = operation ? (operationById(view, operation.id, operation.kind)?.army ?? []) : [];
+  const fit = suggestedPost(view, draft, army);
+  const fitted = fit ? view.formations[fit] : undefined;
   const seen = Object.entries(view.enemyCommanders ?? {}).sort((a, b) => (a[0] < b[0] ? -1 : 1));
   return (
     <div data-testid="generals-roster">
@@ -190,8 +198,20 @@ export function GeneralsRoster() {
                   <span className={`text-[13px] ${s.tone}`}>{s.text}</span>
                   <span className="flex gap-1.5">
                     {c.offer && (
-                      <button type="button" onClick={() => show(c.id)} className="h-9 rounded-md bg-signal px-2.5 text-[11px] font-bold tracking-wide text-ink-950 uppercase" data-testid={`promote-${c.id}`}>
+                      <button type="button" onClick={() => show(c.id)} className="h-11 rounded-md bg-signal px-2.5 text-[11px] font-bold tracking-wide text-ink-950 uppercase" data-testid={`promote-${c.id}`}>
                         {answered === undefined ? 'Choose perk' : 'Perk chosen'}
+                      </button>
+                    )}
+                    {!at && c.status === 'active' && fitted && (
+                      <button
+                        type="button"
+                        disabled={resolving}
+                        onClick={() => setPosting(c.id, fitted.id)}
+                        className="h-11 max-w-[11rem] truncate rounded-md border border-signal/60 px-2.5 text-[11px] font-semibold tracking-wide text-signal uppercase disabled:opacity-40"
+                        title={`${army.includes(fitted.id) ? `${operation!.codename}'s` : 'Your'} strongest formation without a general`}
+                        data-testid={`post-${c.id}`}
+                      >
+                        Lead {fitted.name.replace(/^.*?(\d)/, '$1')}
                       </button>
                     )}
                     {f && (
@@ -201,7 +221,7 @@ export function GeneralsRoster() {
                           selectFormation(f.id);
                           focusOn(f.key);
                         }}
-                        className="h-9 rounded-md border border-line px-2.5 text-[11px] font-semibold tracking-wide text-muted uppercase"
+                        className="h-11 rounded-md border border-line px-2.5 text-[11px] font-semibold tracking-wide text-muted uppercase"
                       >
                         Show
                       </button>
@@ -212,7 +232,7 @@ export function GeneralsRoster() {
             );
           })}
         </ul>
-        <p className="mt-2.5 text-[11px] leading-snug text-faint">Select a land or air formation to give it a general. Every general adds 5% attack and defence; they earn experience fighting, striking and taking cities, and each rank brings a perk.</p>
+        <p className="mt-2.5 text-[11px] leading-snug text-faint">Lead sends a general in reserve to {army.length ? 'the operation’s' : 'your'} strongest formation without one; or select any land or air formation to choose. Every general adds 5% attack and defence; they earn experience fighting, striking and taking cities, and each rank brings a perk.</p>
       </section>
       {seen.length > 0 && (
         <section className="px-3 py-3" data-testid="enemy-generals">

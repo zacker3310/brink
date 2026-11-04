@@ -8,6 +8,10 @@ interface Window {
     scale(): number;
     siteToClient(siteId: string): { x: number; y: number };
     targets(): string[];
+    /** Hexes the armed doctrine card is shown to be aimable at. */
+    cardTargets(): string[];
+    /** The running operation's current place on the map (port, beach), if it is not the prize. */
+    opSpot(): { key: string; label: string } | null;
   };
   // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.
   __arena?: {

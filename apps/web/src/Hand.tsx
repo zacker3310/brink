@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { CardId, CardPlay, NationView } from '@brink/contracts';
 import { CARDS, DOCTRINE, describeCard, type CardDef } from '@brink/game-data';
 import { cpIncome } from '@brink/simulation';
+import { operationById } from '@brink/ai';
 import { hexLabel } from './insight';
 import { useGame } from './store';
 
@@ -42,8 +43,8 @@ export function CardFace({ def, cp, played, armed, compact }: { def: CardDef; cp
         <span className="font-mono text-[9px] tracking-wide text-faint uppercase">{TARGET_HINT[def.target]}</span>
       </div>
       <div className={`font-display mt-1 leading-[1.05] font-extrabold uppercase ${compact ? 'text-[13px]' : 'text-[15px]'}`}>{def.name}</div>
-      <div className="mt-0.5 text-[10px] leading-snug text-faint italic">{def.flavour}</div>
-      <div className={`mt-auto pt-1 leading-[1.3] text-text ${compact ? 'text-[10.5px]' : 'text-[11.5px]'}`}>{describeCard(def)}</div>
+      {!compact && <div className="mt-0.5 text-[10px] leading-snug text-faint italic">{def.flavour}</div>}
+      <div className={`mt-auto overflow-hidden pt-1 leading-[1.3] text-text ${compact ? 'line-clamp-6 text-[11px]' : 'text-[11.5px]'}`}>{describeCard(def)}</div>
       {played && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid={`stamp-${def.id}`}>
           <span className="font-display -rotate-[14deg] rounded-md border-[3px] border-good bg-ink-950/80 px-2 py-0.5 text-center text-[15px] leading-tight font-black tracking-[0.08em] text-good uppercase shadow-lg">
@@ -57,7 +58,14 @@ export function CardFace({ def, cp, played, armed, compact }: { def: CardDef; cp
 }
 
 /** The hand with the turn's plays: each card once per copy, a play matched to its copy. */
-function handSlots(view: NationView, plays: readonly CardPlay[]): { id: CardId; key: string; play?: CardPlay; index?: number }[] {
+interface Slot {
+  id: CardId;
+  key: string;
+  play?: CardPlay;
+  index?: number;
+}
+
+function handSlots(view: NationView, plays: readonly CardPlay[]): Slot[] {
   const left = plays.map((p, i) => ({ p, i }));
   return (view.self.doctrine?.hand ?? []).map((id, n) => {
     const at = left.findIndex((x) => x.p.card === id);
@@ -76,9 +84,6 @@ function Fan({ width, onPicked, spread = 0.78 }: { width: number; onPicked?: () 
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft);
   const aiming = useGame((s) => s.aimingCard);
-  const playCard = useGame((s) => s.playCard);
-  const unplayCard = useGame((s) => s.unplayCard);
-  const resolving = useGame((s) => s.resolving);
   const [open, setOpen] = useState<string | null>(null);
   const plays = draft?.play ?? [];
   const cp = cpLeft(view, plays);
@@ -87,8 +92,10 @@ function Fan({ width, onPicked, spread = 0.78 }: { width: number; onPicked?: () 
   const rivals = Object.values(view.nations).filter((x) => x.id !== view.self.id && !x.minor && !x.eliminated);
   if (n === 0) return <p className="px-4 py-6 text-center text-[13px] text-muted">No cards in hand. You draw back to {DOCTRINE.handSize} at the end of the turn.</p>;
   const height = Math.round(width * 1.55);
+  const picked = slots.find((x) => x.key === open);
   return (
-    <div className="relative mx-auto" style={{ width: width + (n - 1) * width * spread, height: height + 18 }} data-testid="hand-fan">
+    <div>
+      <div className="relative mx-auto" style={{ width: width + (n - 1) * width * spread, height: height + 18 }} data-testid="hand-fan">
       {slots.map((s, i) => {
         const def = CARDS[s.id];
         if (!def) return null;
@@ -110,47 +117,83 @@ function Fan({ width, onPicked, spread = 0.78 }: { width: number; onPicked?: () 
             >
               <CardFace def={def} cp={s.play ? def.cost : cp} played={s.play} armed={aiming === s.id} compact={width < 130} />
             </button>
-            {open === s.key && !resolving && (
-              <div className="absolute inset-x-1 -bottom-1 flex flex-col gap-1">
-                {s.play ? (
-                  <button type="button" className="h-9 rounded-lg border border-line bg-ink-950/95 text-[12px] font-semibold text-muted" onClick={() => unplayCard(s.index!)} data-testid="unplay-card">
-                    Take back
-                  </button>
-                ) : def.target === 'nation' ? (
-                  rivals.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      className="h-8 rounded-lg bg-signal text-[12px] font-extrabold text-ink-950 uppercase disabled:opacity-40"
-                      disabled={def.cost > cp}
-                      onClick={() => {
-                        playCard(s.id, r.id);
-                        setOpen(null);
-                      }}
-                    >
-                      {r.name}
-                    </button>
-                  ))
-                ) : (
-                  <button
-                    type="button"
-                    className="font-display h-9 rounded-lg bg-signal text-[14px] font-extrabold tracking-wide text-ink-950 uppercase disabled:bg-ink-700 disabled:text-faint"
-                    disabled={def.cost > cp}
-                    onClick={() => {
-                      playCard(s.id);
-                      setOpen(null);
-                      if (def.target !== 'none') onPicked?.();
-                    }}
-                    data-testid="play-card"
-                  >
-                    {def.cost > cp ? `Needs ${def.cost} CP` : def.target === 'none' ? 'Play' : 'Aim'}
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         );
       })}
+      </div>
+      {picked && <CardDetail slot={picked} cp={cp} rivals={rivals} onDone={() => setOpen(null)} onPicked={onPicked} />}
+    </div>
+  );
+}
+
+/** The card you tapped, in full: what it does, what the running operation wants of it, and Play or Aim. */
+function CardDetail({ slot, cp, rivals, onDone, onPicked }: { slot: Slot; cp: number; rivals: NationView['nations'][string][]; onDone: () => void; onPicked?: () => void }) {
+  const view = useGame((s) => s.view)!;
+  const operation = useGame((s) => s.operation);
+  const playCard = useGame((s) => s.playCard);
+  const unplayCard = useGame((s) => s.unplayCard);
+  const resolving = useGame((s) => s.resolving);
+  const def = CARDS[slot.id]!;
+  // The operation names the card it wants and when: "Play Joint Island Landing on the landing turn".
+  const op = operation ? operationById(view, operation.id, operation.kind) : null;
+  const wanted = op?.why.find((w) => w.includes(def.name));
+  const landing = op?.phases.find((p) => p.id === 'land');
+  const early = !!wanted && !!landing && landing.state === 'next';
+  return (
+    <div className="mx-auto mt-2 max-w-[420px] rounded-xl border border-line bg-ink-900 p-3" data-testid="card-detail">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-display text-[17px] leading-tight font-extrabold tracking-wide uppercase">{def.name}</span>
+        <span className="shrink-0 font-mono text-[11px] text-faint uppercase">
+          {def.cost} CP · {TARGET_HINT[def.target]}
+        </span>
+      </div>
+      <p className="mt-1 text-[14px] leading-snug text-text">{describeCard(def)}</p>
+      <p className="mt-0.5 text-[12px] leading-snug text-faint italic">{def.flavour}</p>
+      {wanted && (
+        <p className={`mt-1.5 text-[13px] leading-snug ${early ? 'text-signal' : 'text-good'}`} data-testid="card-operation-hint">
+          {operation!.codename}: {early ? 'save it for the landing turn, which has not come yet. Played then, the troops go ashore with no beach penalty.' : `${wanted}.`}
+        </p>
+      )}
+      {!resolving && (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {slot.play ? (
+            <button type="button" className="h-11 rounded-lg border border-line bg-ink-950 text-[14px] font-semibold text-muted" onClick={() => unplayCard(slot.index!)} data-testid="unplay-card">
+              Take back
+            </button>
+          ) : def.target === 'nation' ? (
+            <div className="grid grid-cols-3 gap-1.5">
+              {rivals.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className="h-11 rounded-lg bg-signal px-1 text-[12px] font-extrabold text-ink-950 uppercase disabled:opacity-40"
+                  disabled={def.cost > cp}
+                  onClick={() => {
+                    playCard(slot.id, r.id);
+                    onDone();
+                  }}
+                >
+                  {r.name.split(' ').at(-1)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="font-display h-11 rounded-lg bg-signal text-[15px] font-extrabold tracking-wide text-ink-950 uppercase disabled:bg-ink-700 disabled:text-faint"
+              disabled={def.cost > cp}
+              onClick={() => {
+                playCard(slot.id);
+                onDone();
+                if (def.target !== 'none') onPicked?.();
+              }}
+              data-testid="play-card"
+            >
+              {def.cost > cp ? `Needs ${def.cost} CP` : def.target === 'none' ? (early ? 'Play now anyway' : 'Play') : 'Aim on the map'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
