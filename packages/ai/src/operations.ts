@@ -1,5 +1,5 @@
 import type { Formation, FormationId, HexKey, NationView, SiteId, SiteView, UnitClass } from '@brink/contracts';
-import { STACK_LIMIT, UNITS } from '@brink/game-data';
+import { CARDS, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { findPath, keyDistance, neighborKeys } from '@brink/map';
 import { enterCost, movementAllowance, previewAssault, sortedKeys } from '@brink/simulation';
 import { landmasses } from './land';
@@ -218,6 +218,9 @@ function judge(view: NationView, site: SiteView, land: Map<HexKey, number>, pref
     if (enemyShips > 0) warnings.push(`${plural(enemyShips, 'enemy fleet')} near ${name}: escort the convoy or it is stopped at sea`);
     if (fleets.length + carriers.length === 0) warnings.push('No warships: no naval gunfire or carrier jets in the battle');
     why.push(`${site.victoryPoints} VP across the sea; the staff will run the whole crossing for you`);
+    // A card in hand that lifts the beach penalty: say when to play it.
+    const beachCard = (view.self.doctrine?.hand ?? []).map((id) => CARDS[id]).find((c) => c?.effects.some((e) => e.kind === 'amphibious'));
+    if (beachCard && !landed) why.push(`Play ${beachCard.name} on the landing turn: no beach penalty for the troops going ashore`);
   } else {
     const t = Math.max(0, ...stormers.map((f) => marchTurns(view, f, site.key) ?? 0));
     const adjacent = t === 0;
