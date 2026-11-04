@@ -32,6 +32,8 @@ const SPREAD = 1.35;
 /** Closest and default camera distances (world units). */
 const MIN_DIST = 3.5;
 const PLAY_DIST = 11.5;
+/** How far back the film stands for a strike coming in by air (the sky over the target in frame). */
+const SUPPORT_DIST = 17;
 /** Closer than this, a soldier's weapon swaying at rest shows: idle soldiers count as moving. */
 const SWAY_DIST = 6;
 
@@ -125,9 +127,9 @@ const SHAKE_SWAY = 0.012;
 const wave = (t: number, seed: number) => (Math.sin(t * 37.7 + seed) + 0.6 * Math.sin(t * 61.3 + seed * 2.3) + 0.3 * Math.sin(t * 91.1 + seed * 4.1)) / 1.9;
 const shares = (a: { keys: string[] }, b: { keys: string[] }) => a.keys.some((k) => b.keys.includes(k));
 
-/** Off-map support the film flies in (the rockets fly as rockets). */
-type FlownSupport = Extract<SupportId, 'strike_jet' | 'cruise_missile' | 'naval_gun' | 'kamikaze'>;
-const FLOWN = new Set<string>(['strike_jet', 'cruise_missile', 'naval_gun', 'kamikaze']);
+/** Off-map support the film flies in from beyond the field (every kind there is). */
+type FlownSupport = Extract<SupportId, 'strike_jet' | 'cruise_missile' | 'naval_gun' | 'kamikaze' | 'himars' | 'tornado'>;
+const FLOWN = new Set<string>(['strike_jet', 'cruise_missile', 'naval_gun', 'kamikaze', 'himars', 'tornado']);
 
 /** The mission a beat opens with, when it is one the film flies in. */
 function supportOf(beat: Beat): FlownSupport | null {
@@ -345,6 +347,8 @@ export class BattleStage {
   private cam: { from: THREE.Vector3; at: THREE.Vector3; t: number; dur: number; track?: (t: number, from: THREE.Vector3, at: THREE.Vector3) => void } | null = null;
   /** Tests: the film holds still when its clock reaches this (screenshots mid-flight). */
   private pauseAt = Infinity;
+  /** The zoom to go back to once a strike filmed wide has come down. */
+  private unwide: number | null = null;
   private readonly preset;
   /** Frame timing (ms of our own work per frame), for the performance probe. */
   private readonly frameMs: number[] = [];
@@ -476,7 +480,16 @@ export class BattleStage {
     this.audio = new BattleAudio({ radio: opts.settings.radio });
     this.audio.setNight(night);
     this.audio.ambience(battle.conditions.biome, battle.conditions.weather);
-    this.sorties = new Sorties(this.scene, this.fx, this.audio, (x, z) => this.world.heightAt(x, z), { w: W, h: H });
+    this.sorties = new Sorties(this.scene, this.fx, this.audio, (x, z) => this.world.heightAt(x, z), { w: W, h: H }, () => this.world.seaLevel);
+    // The jet's run is laid clear of where the camera will stand while it watches the target.
+    this.sorties.viewAt = (x, z) => {
+      const cam = this.solveCam;
+      cam.copy(this.camera, false);
+      // Where the focus can go: the film centres on the target, held inside the field.
+      pose(cam, { ...this.view(), fx: Math.max(0, Math.min(W, x)), fz: Math.max(0, Math.min(H, z)), dist: this.wantDist, tilt: this.wantTilt }, this.groundAt);
+      cam.updateProjectionMatrix();
+      return cam;
+    };
 
     const tileGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     const tile = (color: THREE.Color, opacity: number, n: number) => {
@@ -2488,7 +2501,7 @@ export class BattleStage {
     const name = supportName({ id, faction }, true);
     const outcomes: (Outcome & { gun?: string })[] = [];
     const intercepted = beat.events.some((e) => e.type === 'intercept' && e.unit === head.unit);
-    const approach = id === 'strike_jet' ? (intercepted ? 1.7 : 2.1) : id === 'cruise_missile' ? 1.9 : id === 'naval_gun' ? 2.3 : 2.7;
+    const approach = id === 'strike_jet' ? (intercepted ? 1.7 : 2.1) : id === 'cruise_missile' ? 1.9 : id === 'naval_gun' ? 2.3 : id === 'himars' ? 2.0 : id === 'tornado' ? 1.8 : 2.7;
     const first = clip.steps.length;
     const elapsed = () => {
       let t = 0;
@@ -2498,15 +2511,28 @@ export class BattleStage {
     const aim = { x: head.to.x + 0.5, z: head.to.y + 0.5 };
     // A blue run that kills a vehicle gets a short cinematic cut (with action cams and full motion).
     const kills = side === 'blue' && beat.events.some((e) => e.type === 'destroyed' && e.seen && e.how !== 'expended' && this.views.get(e.unit)?.side === 'red' && this.views.get(e.unit)?.t.mobility !== 'foot');
+    // What comes in by air is filmed wide: from the close play view the sky over the target is out of
+    // the frame. The zoom goes back to where it was once the run has played.
+    const wide = clip.cam && id !== 'naval_gun';
+    let before: number | null = null;
     this.step(approach, {
       start: () => {
         this.show(clip, aim.x, aim.z, true);
+        if (wide && this.wantDist < SUPPORT_DIST && !this.held) {
+          before = this.wantDist;
+          this.wantDist = SUPPORT_DIST;
+        }
         for (const o of outcomes) o.by = o.gun ? this.interceptor(o.gun, id) : null;
         const plan: Plan = { side, faction, outcomes, approach };
         let flight: Flight | null = null;
         if (id === 'strike_jet') flight = this.sorties.jet(plan);
         else if (id === 'cruise_missile') flight = this.sorties.cruise(plan);
         else if (id === 'kamikaze') flight = this.sorties.swarm(plan);
+        else if (id === 'himars' || id === 'tornado') {
+          // Blue's own launcher: a cut to the edge to watch the salvo climb out, then the dive.
+          const r = this.sorties.rockets(plan, id);
+          if (side === 'blue') this.gunCam(r.from, r.from.clone().add(new THREE.Vector3(0, 9, 0)), aim, 1.25);
+        }
         else {
           const at = this.sorties.naval(plan, this.scene.fog instanceof THREE.Fog ? this.scene.fog.color : null);
           if (side === 'blue') this.gunCam(at.ship, at.gun, aim);
@@ -2533,6 +2559,10 @@ export class BattleStage {
       }
       this.queue(e);
     }
+    // Back to the zoom it had once everything in the air has come down (unless someone zoomed meanwhile).
+    this.now(() => {
+      if (before !== null) this.unwide = before;
+    });
   }
 
   /** The gun that brought a mission down, as the film shows it: its muzzle and whether it fires shells or a missile. */
@@ -2546,14 +2576,14 @@ export class BattleStage {
     return { from: this.muzzleOf(v), guns: useGun, calibre: useGun ? gun!.calibre : 'manpads' };
   }
 
-  /** A cut to the ship on the horizon as its gun fires, then back to the target for the fall of shot. */
-  private gunCam(ship: THREE.Vector3, gun: THREE.Vector3, aim: { x: number; z: number }): void {
+  /** A cut to the ship on the horizon (or the rocket launcher off the edge) as it fires, then back to the target for the fall of shot. */
+  private gunCam(ship: THREE.Vector3, gun: THREE.Vector3, aim: { x: number; z: number }, dur = 1.5): void {
     if (!this.feel.actionCams || this.feel.motion !== 'full' || this.cam) return;
     // From the edge of the field nearest the ship, low, looking out to it.
     const ex = Math.max(2, Math.min(W - 2, gun.x * 0.25 + aim.x * 0.75));
     const ez = gun.z > H ? H + 1.5 : -1.5;
     const eye = new THREE.Vector3(ex, this.ground(Math.max(0, Math.min(W, ex)), Math.max(0, Math.min(H, ez))) + 1.6, ez);
-    this.cam = { from: eye, at: new THREE.Vector3(ship.x, gun.y * 0.6 + ship.y * 0.4, ship.z), t: 0, dur: 1.5 };
+    this.cam = { from: eye, at: new THREE.Vector3(ship.x, gun.y * 0.6 + ship.y * 0.4, ship.z), t: 0, dur };
   }
 
   /**
@@ -2786,6 +2816,10 @@ export class BattleStage {
     this.insight.tick(real, { yaw: this.yaw, perPx: (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / Math.max(1, this.host.clientHeight), cinematic: this.cam !== null });
     this.world.update(dt, this.camera);
     this.sorties.update(dt);
+    if (this.unwide !== null && !this.sorties.busy) {
+      if (this.wantDist === SUPPORT_DIST) this.wantDist = this.unwide;
+      this.unwide = null;
+    }
     this.fx.update(dt, this.camera);
     this.crowd.update(dt);
     this.audio.setListener({ x: this.focus.x - 0.5, y: this.focus.z - 0.5, zoom: Math.min(1, this.dist / this.maxDist) });

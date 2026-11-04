@@ -75,5 +75,7 @@ interface Window {
     reach(): number[];
     /** The unit a press at this point would take. */
     unitAt(x: number, y: number): string | null;
+    /** Call an off-map mission for either side now; `want` searches the stream for a roll that brings it down, lands it, or lands it on a vehicle and knocks it out. */
+    support(side: 'blue' | 'red', id: 'himars' | 'tornado' | 'naval_gun' | 'cruise_missile' | 'strike_jet' | 'kamikaze', x: number, y: number, want?: 'intercept' | 'land' | 'kill'): boolean;
   };
 }

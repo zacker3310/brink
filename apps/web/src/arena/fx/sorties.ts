@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AIR_LENGTH, NOZZLES, SHIP_GUNS, WINGTIP, buildAircraft, shipGeometry, type AirKind, type ShipKind } from '../models3d/aircraft';
+import { AIR_LENGTH, NOZZLES, SHIP_GUNS, SHIP_LENGTH, WINGTIP, buildAircraft, shipGeometry, type AirKind, type ShipKind } from '../models3d/aircraft';
 import type { BattleAudio } from '../audio';
 import type { Effects } from './effects';
 import type { Side } from './palette';
@@ -7,10 +7,12 @@ import type { Side } from './palette';
 // Off-map support as the film flies it (docs/arena-v2.md, section 14): strike jets that run in from
 // their side's edge, drop two bombs and pull away (or take a missile, burn and fall away off the
 // field), cruise missiles that skim in low and pop up to dive, a ship on the horizon walking 5-inch
-// shells over the target, and a kamikaze swarm of three one-way drones weaving in, each one shot at
-// on its own. The stage gives each mission its timeline: when each blast or interception happens,
-// measured from the start of the run, so what flies arrives exactly when the film's blast plays.
-// Everything here is presentation: it reads the plan and decides nothing.
+// shells over the target, a kamikaze swarm of three one-way drones weaving in, each one shot at on
+// its own, and the rocket artillery: GMLRS climbing out from beyond the edge and diving onto the cell,
+// or a Tornado-G ripple of 122 mm rockets arcing over and drenching the area. The stage gives each
+// mission its timeline: when each blast or interception happens, measured from the start of the run,
+// so what flies arrives exactly when the film's blast plays. Everything here is presentation: it
+// reads the plan and decides nothing.
 
 export type Faction = 'west' | 'east';
 
@@ -48,16 +50,32 @@ export interface Field {
   h: number;
 }
 
-const JET_SCALE = 2.2;
-const MISSILE_SCALE = 3;
-const BOMB_SCALE = 2.6;
-const DRONE_SCALE = 3.4;
+/**
+ * Sizes on the field. Units are drawn at figure scale (1 cell = 10 m, docs/arena-v2.md section 2);
+ * what flies in is drawn a little larger so it reads at the battle camera's distance, the jet only
+ * a quarter over (an F-35A is two cells long, about two and a half tanks).
+ */
+const JET_SCALE = 1.25;
+const MISSILE_SCALE = 1.9;
+const BOMB_SCALE = 1.7;
+const DRONE_SCALE = 2.1;
+const ROCKET_SCALE = 1.8;
 /** Ships are shown at their real size, far out. */
 const SHIP_OFF = 26;
 const UP = new THREE.Vector3(0, 1, 0);
-const JET_SPEED = 15;
+const JET_SPEED = 13;
+/** The jet's bombing run: its height over the target (24 m at figure scale, low enough to stay in the battle camera's frame) and how much higher it starts. */
+const RUN_ALT = 2.4;
+const RUN_DESCENT = 0.35;
+/** How close to the camera the jet's path may come before it fills the lens. */
+const CLEAR = 6;
 /** Seconds a bomb falls from release to its blast. */
-const BOMB_FALL = 0.8;
+const BOMB_FALL = 0.85;
+/** The motion blur behind the jet: how far back each ghost trails (seconds of flight) and how faint. */
+const GHOSTS: [number, number][] = [
+  [0.018, 0.34],
+  [0.036, 0.16],
+];
 
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
@@ -78,13 +96,55 @@ function orient(o: THREE.Object3D, pos: THREE.Vector3, dir: THREE.Vector3, roll:
   if (roll) o.rotateZ(roll);
 }
 
+/** A cubic Bezier point. */
+function bezier(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3, u: number, out: THREE.Vector3): THREE.Vector3 {
+  const v = 1 - u;
+  const a = v * v * v;
+  const b = 3 * v * v * u;
+  const c = 3 * v * u * u;
+  const d = u * u * u;
+  return out.set(a * p0.x + b * p1.x + c * p2.x + d * p3.x, a * p0.y + b * p1.y + c * p2.y + d * p3.y, a * p0.z + b * p1.z + c * p2.z + d * p3.z);
+}
+
+/** A soft round alpha spot (white in the middle, clear at the rim) for the sea under a ship and its wake. */
+function spotTexture(): THREE.DataTexture {
+  const n = 64;
+  const data = new Uint8Array(n * n * 4);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const dx = (x + 0.5) / n - 0.5;
+      const dy = (y + 0.5) / n - 0.5;
+      const r = Math.min(1, Math.hypot(dx, dy) * 2);
+      const a = Math.round(255 * (1 - r * r) ** 1.6);
+      const i = (y * n + x) * 4;
+      data[i] = data[i + 1] = data[i + 2] = a;
+      data[i + 3] = 255;
+    }
+  const t = new THREE.DataTexture(data, n, n);
+  t.needsUpdate = true;
+  return t;
+}
+
 export class Sorties {
   private readonly acts: Act[] = [];
   private readonly shipMat: THREE.MeshBasicMaterial;
+  private readonly shipUniforms = { uSea: { value: new THREE.Color() }, uSeat: { value: 0.2 } };
+  private readonly seaMat: THREE.MeshBasicMaterial;
+  private readonly wakeMat: THREE.MeshBasicMaterial;
+  private readonly spot: THREE.DataTexture;
+  private readonly seaGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  /** The jet's motion-blur ghosts: lit like it, see-through. */
+  private readonly ghostMats: THREE.MeshStandardMaterial[];
   private seq = 0;
   private seed = 1;
   /** Missions flown so far (tests wait on it). */
   launched = 0;
+  /**
+   * The battle camera as it will stand while it watches a point (a posed camera, used at once): the
+   * jet's run is laid so it crosses the frame where it can be seen and never fills the lens. Null
+   * flies the plain slant.
+   */
+  viewAt: ((x: number, z: number) => THREE.Camera) | null = null;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -92,8 +152,23 @@ export class Sorties {
     private readonly audio: BattleAudio,
     private readonly heightAt: (x: number, z: number) => number,
     private readonly field: Field,
+    /** The level of the plain beyond the field under the haze: the sea the ships sit in. */
+    private readonly seaLevel: () => number = () => 0,
   ) {
     this.shipMat = new THREE.MeshBasicMaterial({ color: 0x3d4247, fog: false });
+    // The hull's foot melts into the sea it sits in, so the waterline is soft, not a cut-out's edge.
+    this.shipMat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, this.shipUniforms);
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying float vShipY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvShipY = position.y;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vShipY;\nuniform vec3 uSea;\nuniform float uSeat;')
+        .replace('#include <opaque_fragment>', 'outgoingLight = mix(outgoingLight, uSea, smoothstep(uSeat, 0.0, vShipY) * 0.85);\n#include <opaque_fragment>');
+    };
+    this.shipMat.customProgramCacheKey = () => 'brink-ship';
+    this.spot = spotTexture();
+    this.seaMat = new THREE.MeshBasicMaterial({ color: 0x3d4247, alphaMap: this.spot, transparent: true, depthWrite: false, fog: false });
+    this.wakeMat = new THREE.MeshBasicMaterial({ color: 0xf2f3f0, alphaMap: this.spot, transparent: true, depthWrite: false, fog: false, opacity: 0.85 });
+    this.ghostMats = GHOSTS.map(([, a]) => new THREE.MeshStandardMaterial({ color: 0x737b82, roughness: 0.5, metalness: 0.2, transparent: true, opacity: a, depthWrite: false }));
   }
 
   /** Anything still flying, sailing or falling. */
@@ -148,9 +223,96 @@ export class Sorties {
   dispose(): void {
     this.clear();
     this.shipMat.dispose();
+    this.seaMat.dispose();
+    this.wakeMat.dispose();
+    this.spot.dispose();
+    this.seaGeo.dispose();
+    for (const m of this.ghostMats) m.dispose();
   }
 
   // --- Strike jet --------------------------------------------------------------------------------
+
+  /**
+   * The run as flown: in level (easing down onto its bombing height) along `h`, through `ref` at
+   * `tRef`; after `tOut` it pulls up into a climbing turn of `bank`. Stepped, so the film and the
+   * planning walk the same path.
+   */
+  private jetPath(ref: THREE.Vector3, tRef: number, alt: number, slant: number, hz: number, bank: number, tOut: number) {
+    const h = new THREE.Vector3(Math.sin(slant), 0, hz * Math.cos(slant));
+    const runIn = (t: number, out: THREE.Vector3) => {
+      out.copy(ref).addScaledVector(h, JET_SPEED * (t - tRef));
+      out.y = alt + Math.max(0, tRef - t) * RUN_DESCENT;
+      return out;
+    };
+    /** One step of the pull-out from `pos` with heading state `turn`; returns the new turn. */
+    const pull = (t: number, dt: number, turn: number, pos: THREE.Vector3, dir: THREE.Vector3) => {
+      const k = t - tOut;
+      const next = turn + bank * dt * 0.95;
+      dir.set(Math.sin(slant + next), Math.min(0.5, k * 0.6), hz * Math.cos(slant + next)).normalize();
+      pos.addScaledVector(dir, JET_SPEED * 1.08 * dt);
+      return next;
+    };
+    /** One step of the fall once hit: the way it had, bleeding off, nosing down ever steeper, turning away. */
+    const fall = (dt: number, turn: number, pos: THREE.Vector3, vel: THREE.Vector3) => {
+      const next = turn + bank * dt * 1.5;
+      const flat = Math.hypot(vel.x, vel.z) * (1 - dt * 0.9);
+      vel.x = Math.sin(slant + next) * flat;
+      vel.z = hz * Math.cos(slant + next) * flat;
+      vel.y -= 8 * dt;
+      pos.addScaledVector(vel, dt);
+      return next;
+    };
+    return { h, runIn, pull, fall };
+  }
+
+  /** The slant and turn that keep the run clear of the camera watching `aim` (and a little random). */
+  private layRun(aim: THREE.Vector3, ref: (slant: number) => THREE.Vector3, tRef: number, alt: number, hz: number, tOut: number, shot: boolean): { slant: number; bank: number } {
+    const plain = { slant: (this.r() - 0.5) * 0.7, bank: this.r() < 0.5 ? 1 : -1 };
+    const cam = this.viewAt?.(aim.x, aim.z);
+    if (!cam) return plain;
+    const eye = cam.position;
+    let best = plain;
+    let score = -Infinity;
+    const p = new THREE.Vector3();
+    const d = new THREE.Vector3();
+    const ndc = new THREE.Vector3();
+    for (let s = -0.8; s <= 0.801; s += 0.1) {
+      for (const bank of [1, -1]) {
+        const path = this.jetPath(ref(s), tRef, alt, s, hz, bank, tOut);
+        // How close it comes to the lens while in frame, and how long it is in frame.
+        let near = Infinity;
+        let seen = 0;
+        const look = (q: THREE.Vector3, count = true) => {
+          ndc.copy(q).project(cam);
+          if (ndc.z > 1 || Math.abs(ndc.x) > 1.15 || Math.abs(ndc.y) > 1.15) return;
+          if (count) seen += 0.05;
+          near = Math.min(near, q.distanceTo(eye));
+        };
+        for (let t = 0; t <= tOut; t += 0.05) look(path.runIn(t, p));
+        path.runIn(tOut, p);
+        let turn = 0;
+        if (!shot) {
+          for (let t = tOut; t < tOut + 2.2; t += 0.05) {
+            turn = path.pull(t, 0.05, turn, p, d);
+            look(p);
+          }
+        } else {
+          d.copy(path.h).multiplyScalar(JET_SPEED * 0.85).setY(-0.6);
+          for (let t = 0; t < 1.6 && p.y > aim.y; t += 0.05) {
+            turn = path.fall(0.05, turn, p, d);
+            look(p, false);
+          }
+        }
+        // In frame as long as it can be, never closer than the clearance; a little noise between equals.
+        const v = Math.min(near, CLEAR) * 1.5 + Math.min(seen, 1.2) * 4 + this.r() * 0.4 - Math.abs(s) * 0.2;
+        if (v > score) {
+          score = v;
+          best = { slant: s, bank };
+        }
+      }
+    }
+    return best;
+  }
 
   /** A strike sortie: F-35A or Su-34 running in at low level from its side's edge. */
   jet(plan: Plan): Flight {
@@ -162,26 +324,34 @@ export class Sorties {
     const shot = plan.outcomes.find((o) => o.kind === 'intercept') ?? null;
     const booms = plan.outcomes.filter((o) => o.kind === 'boom');
     const aim = booms[0] ?? shot ?? plan.outcomes[0]!;
-    // Run in on a slant, not straight down the field.
-    const slant = (this.r() - 0.5) * 0.7;
-    const h = new THREE.Vector3(Math.sin(slant), 0, hz * Math.cos(slant)).normalize();
     const gy = this.heightAt(aim.x, aim.z);
-    const alt = gy + 4.6;
+    const alt = gy + RUN_ALT;
     // Bombs keep most of the jet's way: release short of the target.
     const tRelease = booms.length ? booms[0]!.at - BOMB_FALL : Infinity;
     const lead = JET_SPEED * 0.55 * BOMB_FALL;
-    const release = new THREE.Vector3(aim.x, alt, aim.z).addScaledVector(h, -lead);
-    // Where it is at time t while it runs in (level, easing down onto its bombing height).
     const tRef = Number.isFinite(tRelease) ? tRelease : shot!.at;
-    const refPoint = Number.isFinite(tRelease) ? release : new THREE.Vector3(aim.x, alt, aim.z).addScaledVector(h, -JET_SPEED * 0.4);
-    const runIn = (t: number, out: THREE.Vector3) => {
-      out.copy(refPoint).addScaledVector(h, JET_SPEED * (t - tRef));
-      out.y = alt + Math.max(0, tRef - t) * 0.9;
-      return out;
+    const refFor = (slant: number) => {
+      const h = new THREE.Vector3(Math.sin(slant), 0, hz * Math.cos(slant));
+      // Brought down just short of its target, where the guns defending it reach and the camera looks.
+      return new THREE.Vector3(aim.x, alt, aim.z).addScaledVector(h, Number.isFinite(tRelease) ? -lead : -JET_SPEED * 0.12);
     };
+    const tOut = Number.isFinite(tRelease) ? tRelease + 0.15 : tRef;
+    // Run in on a slant, not straight down the field, and never through the lens.
+    const { slant, bank } = this.layRun(new THREE.Vector3(aim.x, gy, aim.z), refFor, tRef, alt, hz, tOut, !!shot);
+    const path = this.jetPath(refFor(slant), tRef, alt, slant, hz, bank, tOut);
+    const h = path.h;
     const root = buildAircraft(kind);
     root.scale.setScalar(JET_SCALE);
     this.scene.add(root);
+    // Motion blur: faint copies trailing it (not on Low).
+    const body = root.children[0] as THREE.Mesh;
+    const ghosts = this.fx.density >= 0.5 ? GHOSTS.map(([lag], i) => {
+      const g = new THREE.Mesh(body.geometry, this.ghostMats[i]!);
+      g.scale.setScalar(JET_SCALE);
+      g.renderOrder = 2;
+      this.scene.add(g);
+      return { g, lag };
+    }) : [];
     const s = JET_SCALE * 0.1;
     const nozzles = NOZZLES[kind].map(([x, y, z]) => new THREE.Vector3(x * s, y * s, z * s));
     const tip = WINGTIP[kind];
@@ -194,13 +364,12 @@ export class Sorties {
     const bdir = new THREE.Vector3();
     const bscratch = new THREE.Vector3();
     const m4 = new THREE.Matrix4();
-    runIn(0, pos);
+    path.runIn(0, pos);
     let t = 0;
     let phase: 'in' | 'out' | 'hit' = 'in';
     let roll = 0;
     let rollV = 0;
     let turn = 0;
-    const bank = this.r() < 0.5 ? 1 : -1;
     let trail = 0;
     let samSent = false;
     let sonic = false;
@@ -223,11 +392,13 @@ export class Sorties {
         t += dt;
         const prev = tmp2.copy(pos);
         if (phase === 'in') {
-          runIn(t, pos);
+          path.runIn(t, pos);
+          // A shallow bank into the run, levelling for the drop.
+          roll = -bank * 0.35 * smooth(tRef, tRef - 1.2, t);
           if (shot && !samSent && t >= shot.at - 0.95) {
             samSent = true;
             // The interceptor's missile (or a stream of shells) meets the jet where it will be.
-            const meet = runIn(shot.at, new THREE.Vector3());
+            const meet = path.runIn(shot.at, new THREE.Vector3());
             this.engage(shot, meet, 0.95, 'jet', plan.side);
           }
           if (shot && t >= shot.at) {
@@ -235,37 +406,53 @@ export class Sorties {
             fx.shatter(pos, vel.copy(h).multiplyScalar(JET_SPEED), 1.3);
             fx.explosion(pos, 0.55, 'airburst');
             audio.impact('he', pos.x - 0.5, pos.z - 0.5);
+            vel.copy(h).multiplyScalar(JET_SPEED * 0.85).setY(-0.6);
             rollV = bank * 2.6;
           }
           for (; dropped < booms.length && t >= tRelease + dropped * 0.12; dropped++) dropBomb(booms[dropped]!, dropped);
-          if (t >= tRelease + 0.15 && !shot) phase = 'out';
+          if (t >= tOut && !shot) phase = 'out';
           dir.copy(h);
         } else if (phase === 'out') {
-          // Pull up and break away, banked hard.
-          const k = t - tRelease;
-          turn += bank * dt * 0.55;
-          dir.set(Math.sin(slant + turn), Math.min(0.55, k * 0.5), hz * Math.cos(slant + turn)).normalize();
-          pos.addScaledVector(dir, JET_SPEED * 1.08 * dt);
-          roll = -bank * Math.min(1.25, k * 2.2);
+          // Pull up and break away, banked hard, on afterburner.
+          turn = path.pull(t, dt, turn, pos, dir);
+          roll = -bank * Math.min(1.25, (t - tOut) * 2.4);
         } else {
-          // Hit: it rolls over, noses down and trails fire and smoke off the field.
-          vel.y -= 1.1 * dt;
-          turn += bank * dt * 0.4;
-          vel.x = Math.sin(slant + turn) * JET_SPEED * 0.85;
-          vel.z = hz * Math.cos(slant + turn) * JET_SPEED * 0.85;
-          pos.addScaledVector(vel, dt);
+          // Hit: it rolls over, noses down trailing fire and smoke, and goes into the ground.
+          turn = path.fall(dt, turn, pos, vel);
           dir.copy(vel).normalize();
           roll += rollV * dt;
+          const ground = this.heightAt(pos.x, pos.z);
+          if (pos.y <= ground + 0.1) {
+            pos.y = ground + 0.05;
+            fx.explosion(pos, 1.1, 'he');
+            for (let i = 0; i < 6; i++) fx.trailPuff(pos.x + (this.r() - 0.5) * 0.8, pos.y + 0.2, pos.z + (this.r() - 0.5) * 0.8, 'burning', 1.6);
+            audio.impact('bombs', pos.x - 0.5, pos.z - 0.5);
+            gone = true;
+            this.scene.remove(root);
+            audio.stop(id);
+            return false;
+          }
         }
         if (!sonic && Number.isFinite(tRelease) && t >= tRelease + BOMB_FALL * 0.5) {
           sonic = true;
           audio.sonic(pos.x - 0.5, pos.z - 0.5);
         }
         orient(root, pos, dir, roll, m4, tmp);
+        for (const { g, lag } of ghosts) {
+          g.position.copy(pos).addScaledVector(dir, -JET_SPEED * lag);
+          g.quaternion.copy(root.quaternion);
+          g.visible = phase !== 'hit';
+        }
         // Engines: afterburner in the run and the climb, a dying glow once hit.
         root.updateMatrixWorld(true);
         const step = prev.distanceTo(pos);
-        if (phase !== 'hit') for (const n of nozzles) fx.exhaust(root.localToWorld(tmp.copy(n).divideScalar(JET_SCALE)), dir, 1.25, phase === 'out' ? 'afterburner' : 'jet');
+        if (phase !== 'hit') {
+          for (const n of nozzles) fx.exhaust(root.localToWorld(tmp.copy(n).divideScalar(JET_SCALE)), dir, 1, phase === 'out' ? 'afterburner' : 'jet');
+          // Speed lines off the wingtips and down the spine.
+          const len = Math.min(1.6, step * 5);
+          for (const w of tips) fx.speedStreak(root.localToWorld(tmp.copy(w).divideScalar(JET_SCALE)), dir, len, 0.014);
+          fx.speedStreak(root.localToWorld(tmp.set(0, 0.12, -0.4)), dir, len * 0.8, 0.02, 0.6);
+        }
         trail += step;
         const spacing = (phase === 'hit' ? 0.35 : 0.55) / Math.max(0.3, fx.density);
         while (trail >= spacing) {
@@ -276,12 +463,12 @@ export class Sorties {
             const n = nozzles[0];
             if (n) {
               root.localToWorld(tmp.copy(n).divideScalar(JET_SCALE));
-              fx.trailPuff(tmp.x, tmp.y, tmp.z, 'contrail', 0.8);
+              fx.trailPuff(tmp.x, tmp.y, tmp.z, 'contrail', 0.6);
             }
             // Vapour off the wingtips in the pull.
             if (phase === 'out') for (const w of tips) {
               root.localToWorld(tmp.copy(w).divideScalar(JET_SCALE));
-              fx.trailPuff(tmp.x, tmp.y, tmp.z, 'contrail', 0.45);
+              fx.trailPuff(tmp.x, tmp.y, tmp.z, 'contrail', 0.35);
             }
           }
         }
@@ -309,6 +496,7 @@ export class Sorties {
       dispose: () => {
         gone = true;
         this.scene.remove(root);
+        for (const { g } of ghosts) this.scene.remove(g);
         for (const b of bombs) this.scene.remove(b.o);
         audio.stop(id);
       },
@@ -372,7 +560,7 @@ export class Sorties {
     const o = plan.outcomes[0]!;
     const shot = o.kind === 'intercept';
     // Shot down at the top of its climb, where the guns see it best.
-    const T = shot ? o.at / 0.86 : o.at;
+    const T = shot ? o.at / 0.93 : o.at;
     const hz = this.heading(plan.side);
     const slant = (this.r() - 0.5) * 0.6;
     const span = 26;
@@ -383,10 +571,10 @@ export class Sorties {
       const g = this.heightAt(out.x, out.z);
       // Sea-skimming over the ground, the pop-up, then the dive onto the cell.
       const skim = g + 0.45;
-      const top = Math.max(g, end.y) + 3.4;
-      if (u < 0.7) out.y = skim;
-      else if (u < 0.88) out.y = skim + (top - skim) * smooth(0.7, 0.88, u);
-      else out.y = top + (end.y - top) * ((u - 0.88) / 0.12) ** 1.6;
+      const top = Math.max(g, end.y) + 2.6;
+      if (u < 0.78) out.y = skim;
+      else if (u < 0.9) out.y = skim + (top - skim) * smooth(0.78, 0.9, u);
+      else out.y = top + (end.y - top) * ((u - 0.9) / 0.1) ** 1.6;
       return out;
     };
     const root = buildAircraft(kind);
@@ -435,12 +623,14 @@ export class Sorties {
           const boosting = t < BOOST && !!booster;
           const n = boosting ? tmp.set(0, 0, -(AIR_LENGTH[kind] / 2 + 0.75) * 0.1) : tmp.copy(nozzle);
           root.localToWorld(n);
-          this.fx.exhaust(n, dir, boosting ? 1.4 : 0.8, boosting ? 'booster' : 'motor');
-          trail += tmp2.distanceTo(pos);
+          this.fx.exhaust(n, dir, boosting ? 1.2 : 0.7, boosting ? 'booster' : 'motor');
+          const step = tmp2.distanceTo(pos);
+          this.fx.speedStreak(n, dir, Math.min(1.2, step * 5), 0.012, 0.7);
+          trail += step;
           const spacing = 0.32 / Math.max(0.3, this.fx.density);
           while (trail >= spacing) {
             trail -= spacing;
-            this.fx.trailPuff(n.x, n.y, n.z, 'missile', boosting ? 1.2 : 0.7);
+            this.fx.trailPuff(n.x, n.y, n.z, 'missile', boosting ? 1.1 : 0.6);
           }
           this.audio.flyer(id, 'cruise', pos.x - 0.5, pos.z - 0.5);
           if (shot && !engaged && t >= o.at - 0.8) {
@@ -491,18 +681,38 @@ export class Sorties {
     const kind: ShipKind = plan.faction === 'west' ? 'burke' : 'slava';
     const hz = this.heading(plan.side);
     const mesh = new THREE.Mesh(shipGeometry(kind), this.shipMat);
-    // Grey on grey in the haze: the ship is a silhouette on the horizon.
+    // Grey on grey in the haze: the ship is a silhouette on the horizon, sitting in a darker sea.
     this.shipMat.color.setHex(0x434a50);
-    if (fog) this.shipMat.color.lerp(fog, 0.42);
+    const sea = this.shipUniforms.uSea.value.setHex(0x4c5559);
+    if (fog) {
+      this.shipMat.color.lerp(fog, 0.42);
+      sea.lerp(fog, 0.55);
+    }
+    this.seaMat.color.copy(sea).multiplyScalar(0.94);
     const cx = this.field.w / 2 + (this.r() - 0.5) * 14;
     const cz = this.edge(plan.side) - hz * SHIP_OFF;
     // Broadside on, bow toward one side, its gun trained on the field.
     const bow = this.r() < 0.5 ? 1 : -1;
-    // Its waterline a little under the plain beyond the field (the ground at the field's edge).
-    mesh.position.set(cx, this.heightAt(Math.min(this.field.w, Math.max(0, cx)), this.edge(plan.side)) - 0.6, cz);
+    // Seated in the sea: the waterline a little under the level of the plain beyond the field (the
+    // haze's floor), never above it, so the hull stands out of the water rather than over it.
+    const level = Math.min(this.seaLevel(), this.heightAt(Math.min(this.field.w, Math.max(0, cx)), this.edge(plan.side)));
+    mesh.position.set(cx, level - 0.12, cz);
     mesh.rotation.y = bow > 0 ? Math.PI / 2 : -Math.PI / 2;
     mesh.updateMatrixWorld(true);
     this.scene.add(mesh);
+    // The sea round it (a darker patch fading into the haze), a bow wave and a wake down its side.
+    const len = SHIP_LENGTH[kind] * 0.1;
+    const water = new THREE.Mesh(this.seaGeo, this.seaMat);
+    water.scale.set(len * 3.2, 1, len * 1.1);
+    water.position.set(cx, level + 0.01, cz);
+    water.renderOrder = -1;
+    const wake = new THREE.Mesh(this.seaGeo, this.wakeMat);
+    wake.scale.set(len * 1.25, 1, 2.2);
+    wake.position.set(cx - bow * len * 0.08, level + 0.02, cz);
+    const bowWave = new THREE.Mesh(this.seaGeo, this.wakeMat);
+    bowWave.scale.set(len * 0.18, 1, 2.6);
+    bowWave.position.set(cx + bow * len * 0.47, level + 0.025, cz);
+    this.scene.add(water, wake, bowWave);
     const guns = SHIP_GUNS[kind].map(([x, y, z]) => mesh.localToWorld(new THREE.Vector3(x * 0.1, y * 0.1, z * 0.1)));
     const gun = guns[0]!;
     const toField = new THREE.Vector3(0, 0, -hz);
@@ -531,7 +741,7 @@ export class Sorties {
         return t < last + 2.5;
       },
       dispose: () => {
-        this.scene.remove(mesh);
+        this.scene.remove(mesh, water, wake, bowWave);
       },
     });
     return { ship: mesh.position.clone(), gun };
@@ -555,11 +765,11 @@ export class Sorties {
       const T = shot ? dur / 0.82 : dur;
       const target = new THREE.Vector3(o.x, this.heightAt(o.x, o.z) + 0.05, o.z);
       const span = 20 + i * 2;
-      const side = (i - 1) * 3.5 + (this.r() - 0.5) * 2;
+      const side = (i - 1) * 1.3 + (this.r() - 0.5) * 0.6;
       const start = new THREE.Vector3(o.x + side, 0, o.z - hz * span);
       const dive = target.clone().add(new THREE.Vector3(0, 0, -hz * 1.6));
       const phase = this.r() * Math.PI * 2;
-      const weave = 0.5 + this.r() * 0.4;
+      const weave = 0.3 + this.r() * 0.25;
       const DIVE = Math.min(0.42, T * 0.2) / T;
       const at = (u: number, out: THREE.Vector3) => {
         if (u < 1 - DIVE) {
@@ -625,5 +835,122 @@ export class Sorties {
       });
     });
     return lead;
+  }
+
+  // --- Rocket artillery --------------------------------------------------------------------------
+
+  /**
+   * HIMARS (west) or Tornado-G (east) from off the map. The launcher stands well beyond its side's
+   * edge: each rocket climbs out of the haze there as a bright streak, arcs over and comes down on
+   * time. GMLRS flies a pair, high, then pitches over into its near-vertical terminal dive onto the
+   * cell; the Tornado-G ripples a salvo of 122 mm rockets on lower arcs, spread over the blasts.
+   */
+  rockets(plan: Plan, launcher: 'himars' | 'tornado'): { flight: Flight; from: THREE.Vector3 } {
+    this.launched++;
+    const kind: AirKind = launcher === 'himars' ? 'gmlrs' : 'grad';
+    const hz = this.heading(plan.side);
+    const booms = plan.outcomes.filter((o) => o.kind === 'boom');
+    const first = booms[0] ?? plan.outcomes[0]!;
+    const lead: Flight = { pos: new THREE.Vector3(), dir: new THREE.Vector3(0, -1, 0), alive: true };
+    // The launcher: off the edge behind its own side, a little to one side of the target.
+    const lx = Math.min(this.field.w + 6, Math.max(-6, first.x + (this.r() - 0.5) * 16));
+    const lz = this.edge(plan.side) - hz * 22;
+    const base = Math.min(this.seaLevel(), this.heightAt(Math.min(this.field.w, Math.max(0, lx)), this.edge(plan.side)));
+    const salvo: { to: THREE.Vector3; arrive: number; fly: number }[] = [];
+    if (launcher === 'himars') {
+      for (let i = 0; i < 2; i++) {
+        const o = booms[Math.min(i, booms.length - 1)] ?? first;
+        salvo.push({ to: new THREE.Vector3(o.x + (i ? 0.25 : 0), 0, o.z + (i ? -0.2 : 0)), arrive: o.at + i * 0.1, fly: Math.min(o.at, 2.2) });
+      }
+    } else {
+      // A ripple: one rocket every few hundredths of a second, fewer drawn on Low.
+      const n = Math.round(10 + 10 * this.fx.density);
+      for (let i = 0; i < n; i++) {
+        const o = booms[i % Math.max(1, booms.length)] ?? first;
+        const a = this.r() * Math.PI * 2;
+        const d = Math.sqrt(this.r()) * 1.1;
+        const arrive = Math.max(0.6, o.at - 0.12 + (this.r() - 0.5) * 0.3);
+        salvo.push({ to: new THREE.Vector3(o.x + Math.cos(a) * d, 0, o.z + Math.sin(a) * d), arrive, fly: Math.min(arrive, 1.9) });
+      }
+      salvo.sort((a, b) => a.arrive - b.arrive);
+    }
+    this.audio.incoming(first.x - 0.5, first.z - 0.5, Math.max(0.2, first.at));
+    const nozzle = new THREE.Vector3(...NOZZLES[kind][0]!).multiplyScalar(0.1);
+    salvo.forEach((r, i) => {
+      r.to.y = this.heightAt(r.to.x, r.to.z) + 0.03;
+      const launch = r.arrive - r.fly;
+      const from = new THREE.Vector3(lx + (this.r() - 0.5) * 0.8, base + 0.3, lz);
+      const dist = Math.hypot(r.to.x - from.x, r.to.z - from.z);
+      const p0 = from;
+      let p1: THREE.Vector3;
+      let p2: THREE.Vector3;
+      if (kind === 'gmlrs') {
+        // Steep out of the pod, high over, then straight down onto the cell.
+        const apex = Math.min(16, Math.max(10, dist * 0.3));
+        p1 = from.clone().add(new THREE.Vector3((r.to.x - from.x) * 0.15, apex, (r.to.z - from.z) * 0.15));
+        p2 = r.to.clone().add(new THREE.Vector3(0, apex * 0.95, 0));
+      } else {
+        const apex = Math.min(9, Math.max(5, dist * 0.18));
+        p1 = from.clone().add(new THREE.Vector3((r.to.x - from.x) * 0.3, apex, (r.to.z - from.z) * 0.3));
+        p2 = from.clone().add(new THREE.Vector3((r.to.x - from.x) * 0.8, apex * 0.7, (r.to.z - from.z) * 0.8));
+      }
+      const root = buildAircraft(kind);
+      root.scale.setScalar(ROCKET_SCALE);
+      root.visible = false;
+      this.scene.add(root);
+      const pos = new THREE.Vector3();
+      const prev = new THREE.Vector3();
+      const dir = new THREE.Vector3();
+      const tmp = new THREE.Vector3();
+      const m4 = new THREE.Matrix4();
+      let t = 0;
+      let trail = 0;
+      // Not every 122 mm rocket smokes on Low: every rocket's trail would be the whole budget.
+      const smokes = kind === 'gmlrs' || i % (this.fx.density >= 0.7 ? 1 : 2) === 0;
+      this.add({
+        update: (dt) => {
+          t += dt;
+          if (t < launch) return true;
+          // The curve's own spacing gives the pace: slow over the top, fast down onto the cell.
+          const k = Math.min(1, (t - launch) / r.fly);
+          const u = k;
+          prev.copy(pos);
+          bezier(p0, p1, p2, r.to, Math.min(1, u), pos);
+          bezier(p0, p1, p2, r.to, Math.min(1, u + 0.01), dir).sub(pos);
+          if (dir.lengthSq() < 1e-8) dir.set(0, -1, 0);
+          dir.normalize();
+          if (!root.visible) {
+            root.visible = true;
+            prev.copy(pos);
+            // The launch: a flash and a puff of the motor's smoke at the rail.
+            if (i === 0 || kind === 'gmlrs' || i % 4 === 0) this.fx.farFlash(from, dir, kind === 'gmlrs' ? 0.5 : 0.3);
+          }
+          orient(root, pos, dir, 0, m4, tmp);
+          root.updateMatrixWorld(true);
+          root.localToWorld(tmp.copy(nozzle));
+          const step = prev.distanceTo(pos);
+          this.fx.exhaust(tmp, dir, kind === 'gmlrs' ? 0.6 : 0.45, k < 0.25 ? 'booster' : 'motor');
+          this.fx.speedStreak(tmp, dir, Math.min(2.2, step * 4), kind === 'gmlrs' ? 0.03 : 0.02);
+          if (smokes) {
+            trail += step;
+            const spacing = (kind === 'gmlrs' ? 0.38 : 0.6) / Math.max(0.3, this.fx.density);
+            while (trail >= spacing) {
+              trail -= spacing;
+              this.fx.trailPuff(tmp.x, tmp.y, tmp.z, 'missile', kind === 'gmlrs' ? 0.9 : 0.55);
+            }
+          }
+          if (i === 0) {
+            lead.pos.copy(pos);
+            lead.dir.copy(dir);
+          }
+          if (k >= 1) return false;
+          return true;
+        },
+        dispose: () => {
+          this.scene.remove(root);
+        },
+      });
+    });
+    return { flight: lead, from: new THREE.Vector3(lx, base, lz) };
   }
 }

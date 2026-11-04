@@ -29,6 +29,8 @@ export interface World {
   group: THREE.Group;
   /** Ground height in world units at a world point (bridge decks and the river's surface count). */
   heightAt(x: number, z: number): number;
+  /** The level of the plain beyond the field, under the haze (where an offshore ship's waterline sits). */
+  readonly seaLevel: number;
   /** The top of whatever stands in a cell (building roof, tree crown) for placing effects. */
   topAt(cx: number, cy: number): number;
   /** Re-draw a cell after it changed (building to rubble, tree knocked down, wall broken). */
@@ -321,6 +323,7 @@ export function buildWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ma
     focus,
     grade,
     heightAt,
+    seaLevel: far.position.y,
     topAt(cx, cy) {
       const i = cy * map.w + cx;
       const c = rendered[i];
