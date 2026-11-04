@@ -407,34 +407,45 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
     }
   }
 
-  // 3. Brushwork: grass tufts, rock flecks, cobbles.
-  for (const key of known) {
-    const t = terrain(key)!;
-    if (t === 'water') continue;
-    const r = rng(`dab${key}`);
-    const p = c(key);
-    for (let i = 0; i < 34; i++) {
-      const a = r() * Math.PI * 2;
-      const d = Math.sqrt(r()) * size * 0.95;
-      const x = p.x + Math.cos(a) * d;
-      const y = p.y + Math.sin(a) * d;
-      if (t === 'mountains') {
-        g.fillStyle = rgba(r() < 0.5 ? P.mountains.dark : P.mountains.light, 0.35);
-        g.fillRect(x, y, 1.6, 1.1);
-      } else if (t === 'urban') {
-        g.fillStyle = rgba(r() < 0.5 ? P.urban.dark : P.urban.light, 0.4);
-        g.fillRect(x - 1.2, y - 0.8, 2.4, 1.6);
-      } else {
-        const col = r() < 0.6 ? P[t].tuft : P[t].dark;
-        g.strokeStyle = rgba(col, 0.55);
-        g.lineWidth = 0.6;
-        g.beginPath();
-        g.moveTo(x, y);
-        g.lineTo(x - 1 + r() * 0.6, y - 2.4 - r());
-        g.moveTo(x, y);
-        g.lineTo(x + 1 + r() * 0.6, y - 2.2 - r());
-        g.stroke();
+  // 3. Brushwork: grass tufts, rock flecks, cobbles. Tens of thousands of marks, gathered into one
+  // path per colour and drawn in a handful of calls (one call a mark took seconds on a slow device).
+  {
+    const fills = new Map<string, Path2D>();
+    const strokes = new Map<string, Path2D>();
+    const bucket = (m: Map<string, Path2D>, style: string) => {
+      let path = m.get(style);
+      if (!path) m.set(style, (path = new Path2D()));
+      return path;
+    };
+    for (const key of known) {
+      const t = terrain(key)!;
+      if (t === 'water') continue;
+      const r = rng(`dab${key}`);
+      const p = c(key);
+      for (let i = 0; i < 34; i++) {
+        const a = r() * Math.PI * 2;
+        const d = Math.sqrt(r()) * size * 0.95;
+        const x = p.x + Math.cos(a) * d;
+        const y = p.y + Math.sin(a) * d;
+        if (t === 'mountains') bucket(fills, rgba(r() < 0.5 ? P.mountains.dark : P.mountains.light, 0.35)).rect(x, y, 1.6, 1.1);
+        else if (t === 'urban') bucket(fills, rgba(r() < 0.5 ? P.urban.dark : P.urban.light, 0.4)).rect(x - 1.2, y - 0.8, 2.4, 1.6);
+        else {
+          const path = bucket(strokes, rgba(r() < 0.6 ? P[t].tuft : P[t].dark, 0.55));
+          path.moveTo(x, y);
+          path.lineTo(x - 1 + r() * 0.6, y - 2.4 - r());
+          path.moveTo(x, y);
+          path.lineTo(x + 1 + r() * 0.6, y - 2.2 - r());
+        }
       }
+    }
+    for (const [style, path] of fills) {
+      g.fillStyle = style;
+      g.fill(path);
+    }
+    g.lineWidth = 0.6;
+    for (const [style, path] of strokes) {
+      g.strokeStyle = style;
+      g.stroke(path);
     }
   }
 
