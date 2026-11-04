@@ -1,5 +1,5 @@
 import { ABILITIES } from './rules';
-import { H, W, type Action, type Point } from './types';
+import { H, SUPPORT_IDS, W, type Action, type Point, type SupportId } from './types';
 
 // The shape of an order, checked before the rules look at it: the engine refuses anything else
 // (an unknown kind, a facing that is not a number, called fire aimed between cells) without touching
@@ -26,7 +26,7 @@ export function wellFormed(a: unknown): a is Action {
     case 'strike':
       return isId(x.unit) && isCell(x.at) && isId(x.weapon) && isFlag(x.smoke);
     case 'support':
-      return (x.asset === 'himars' || x.asset === 'tornado') && isCell(x.at);
+      return typeof x.asset === 'string' && SUPPORT_IDS.includes(x.asset as SupportId) && isCell(x.at);
     case 'overwatch':
     case 'hunker':
     case 'hold':

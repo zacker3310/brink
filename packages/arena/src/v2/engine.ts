@@ -1,6 +1,6 @@
 import { pickConditions } from './conditions';
 import { wellFormed } from './orders';
-import { blast, blueSees, bestFire, difficultyPart, fireInfo, fitMen, freeCellNear, kill, rankAim, roll, shoot, suppLevel, suppress, usableWeapons, woundedMen, type FireInfo } from './combat';
+import { areaDefenders, areaInterceptChance, blast, blueSees, bestFire, difficultyPart, fireInfo, fitMen, freeCellNear, kill, rankAim, roll, shoot, suppLevel, suppress, usableWeapons, woundedMen, type FireInfo } from './combat';
 import { buildForce, type UnitSeed } from './forces';
 import { canStep, passable, buildMap } from './map';
 import { startingLoad, typeOf } from './roster';
@@ -36,6 +36,9 @@ import {
   type Unit,
   type UnitType,
   type Weapon,
+  type WeaponKind,
+  type SupportId,
+  FACTION_OF,
 } from './types';
 import { deploy, playSide } from './ai';
 
@@ -134,7 +137,7 @@ export function createBattle(setup: ArenaSetup): Battle {
     skill: battleSkill(setup.skill, difficulty),
     difficulty,
     abilities,
-    support: [...blue.support.map((s) => ({ ...s, side: 'blue' as const })), ...red.support.map((s) => ({ ...s, side: 'red' as const }))],
+    support: [...blue.support.map((s) => ({ ...s, side: 'blue' as const, faction: FACTION_OF[setup.arsenal.blue] })), ...red.support.map((s) => ({ ...s, side: 'red' as const, faction: FACTION_OF[setup.arsenal.red] }))],
     precision: 0,
     sweepUntil: -1,
     smoke: [],
@@ -514,27 +517,95 @@ function strike(b: Battle, u: Unit, cell: Point, w: Weapon, smoke: boolean): voi
   if (u.side === 'blue') b.events.push({ type: 'radio', side: 'blue', call: smoke ? 'smoke' : 'splash', unit: u.id });
 }
 
-/** Off-map rockets: HIMARS lands where it is told when the cell is watched; Tornado-G drenches the area. */
-export function supportChance(b: Battle, side: Side, id: 'himars' | 'tornado', cell: Point): number {
+/** How hard each interceptable strike is to bring down (0 easy .. 1 impossible). */
+const HARD: Partial<Record<SupportId, number>> = { cruise_missile: 0.45, strike_jet: 0.35, kamikaze: 0 };
+
+const BASE_CHANCE: Record<SupportId, [number, number]> = {
+  himars: [95, 50],
+  tornado: [60, 40],
+  naval_gun: [70, 45],
+  cruise_missile: [95, 85],
+  strike_jet: [90, 55],
+  kamikaze: [80, 60],
+};
+
+/**
+ * Off-map support's chance to land where it is told: HIMARS when the cell is watched; Tornado-G
+ * drenches the area; naval guns walk in on an observed cell; cruise missiles fly to coordinates;
+ * jets need eyes on the target; kamikaze drones find their own way in.
+ */
+export function supportChance(b: Battle, side: Side, id: SupportId, cell: Point): number {
   const obs = observation(b, side, cell);
-  const base = id === 'himars' ? (obs ? 95 : 50) : obs ? 60 : 40;
-  return Math.max(5, Math.min(95, base + difficultyAim(b.difficulty, side)));
+  const [seen, blind] = BASE_CHANCE[id];
+  return Math.max(5, Math.min(95, (obs ? seen : blind) + difficultyAim(b.difficulty, side)));
 }
 
-function callSupport(b: Battle, side: Side, id: 'himars' | 'tornado', cell: Point): void {
+/**
+ * Chance (0..1) the other side's air defence brings down one incoming strike of `id` aimed at
+ * `cell` (each drone of a swarm rolls on its own). `known`: count only the guns `side` knows of
+ * (the card and the AI); the roll counts them all.
+ */
+export function supportIntercept(b: Battle, side: Side, id: SupportId, cell: Point, known?: Set<string>): number {
+  const hard = HARD[id];
+  if (hard === undefined) return 0;
+  return areaInterceptChance(b, other(side), cell, id !== 'cruise_missile', hard, known);
+}
+
+/** Cells (Chebyshev) a support mission's damage reaches around where it is aimed: what the card outlines and the AI weighs. */
+export const SUPPORT_REACH: Record<SupportId, number> = { himars: 1, tornado: 2, naval_gun: 2, cruise_missile: 0, strike_jet: 2, kamikaze: 2 };
+
+function callSupport(b: Battle, side: Side, id: SupportId, cell: Point): void {
   const asset = b.support.find((s) => s.side === side && s.id === id)!;
   asset.missions--;
   const chance = supportChance(b, side, id, cell);
-  const hit = roll(b) * 100 < chance;
-  const land = hit ? cell : scatter(b, cell, 1);
   const from = { x: Math.floor(W / 2), y: side === 'blue' ? H - 1 : 0 };
-  b.events.push({ type: 'fire', unit: `support:${id}`, weapon: id, kind: 'rocket', calibre: id === 'himars' ? '227' : '122', from, to: land, target: null, hit, chance, overwatch: false, seen: true, shooterSeen: side === 'blue' });
-  if (id === 'himars') blast(b, land, { lethality: 4, pen: 300, supp: 50, demo: 80, radius: 1, crater: true, kind: 'rockets' }, side);
-  else {
-    // A 40-rocket salvo spreads over five by five cells.
-    for (const p of [land, scatter(b, land, 1), scatter(b, land, 2), scatter(b, land, 1)]) blast(b, p, { lethality: 1.6, pen: 40, supp: 45, demo: 15, radius: 1, crater: true, kind: 'rockets' }, side);
+  const unit = `support:${id}`;
+  const fired = (to: Point, hit: boolean, kind: WeaponKind, calibre: string) =>
+    b.events.push({ type: 'fire', unit, weapon: id, kind, calibre, from, to, target: null, hit, chance, overwatch: false, seen: true, shooterSeen: side === 'blue' });
+  // Air defence on the way in: the gun that fired is named only when blue can see it.
+  const shotDown = (p: Point): boolean => {
+    if (!(roll(b) < supportIntercept(b, side, id, p))) return false;
+    const gun = areaDefenders(b, other(side), p, id !== 'cruise_missile')[0];
+    b.events.push({ type: 'intercept', unit, by: gun && (gun.side === 'blue' || blueSees(b, gun)) ? gun.id : unit, x: p.x, y: p.y, seen: true });
+    return true;
+  };
+  if (id === 'himars' || id === 'tornado') {
+    const hit = roll(b) * 100 < chance;
+    const land = hit ? cell : scatter(b, cell, 1);
+    fired(land, hit, 'rocket', id === 'himars' ? '227' : '122');
+    if (id === 'himars') blast(b, land, { lethality: 4, pen: 300, supp: 50, demo: 80, radius: 1, crater: true, kind: 'rockets' }, side);
+    else {
+      // A 40-rocket salvo spreads over five by five cells.
+      for (const p of [land, scatter(b, land, 1), scatter(b, land, 2), scatter(b, land, 1)]) blast(b, p, { lethality: 1.6, pen: 40, supp: 45, demo: 15, radius: 1, crater: true, kind: 'rockets' }, side);
+    }
+  } else if (id === 'naval_gun') {
+    // A ripple of 5-inch shells walks over the area.
+    const hit = roll(b) * 100 < chance;
+    const land = hit ? cell : scatter(b, cell, 1);
+    fired(land, hit, 'howitzer', '155');
+    for (const p of [land, scatter(b, land, 1), scatter(b, land, 2)]) blast(b, p, { lethality: 1.5, pen: 60, supp: 50, demo: 30, radius: 1, crater: true, kind: 'shell' }, side);
+  } else if (id === 'cruise_missile') {
+    const hit = roll(b) * 100 < chance;
+    const land = hit ? cell : scatter(b, cell, 1);
+    fired(land, hit, 'rocket', 'rocket');
+    if (!shotDown(land)) blast(b, land, { lethality: 6, pen: 600, supp: 80, demo: 220, radius: 0, crater: true, kind: 'bombs' }, side);
+  } else if (id === 'strike_jet') {
+    const hit = roll(b) * 100 < chance;
+    const land = hit ? cell : scatter(b, cell, 1);
+    fired(land, hit, 'rocket', 'rocket');
+    // Driven off by the guns, the jet jettisons and goes home.
+    if (!shotDown(land)) for (const p of [land, scatter(b, land, 1)]) blast(b, p, { lethality: 3.5, pen: 200, supp: 70, demo: 100, radius: 1, crater: true, kind: 'bombs' }, side);
+  } else {
+    // Three one-way drones: one on the cell, two around it; each runs the gauntlet on its own.
+    for (let i = 0; i < 3; i++) {
+      const hit = roll(b) * 100 < chance;
+      const aim = i === 0 ? cell : scatter(b, cell, 1);
+      const land = hit ? aim : scatter(b, aim, 1);
+      fired(land, hit, 'loiter', 'fpv');
+      if (!shotDown(land)) blast(b, land, { lethality: 2, pen: 220, supp: 45, demo: 40, radius: 0, crater: false, kind: 'he' }, side);
+    }
   }
-  if (side === 'blue') b.events.push({ type: 'radio', side: 'blue', call: 'splash', unit: `support:${id}` });
+  if (side === 'blue') b.events.push({ type: 'radio', side: 'blue', call: 'splash', unit });
 }
 
 // --- Actions -------------------------------------------------------------------------------------

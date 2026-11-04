@@ -33,6 +33,11 @@ import {
   submit,
   suppLevel,
   supportChance,
+  supportIntercept,
+  supportName,
+  SUPPORT,
+  SUPPORT_REACH,
+  FACTION_OF,
   typeOf,
   unitAt,
   usableWeapons,
@@ -54,6 +59,7 @@ import {
   type StrikeInfo,
   type Unit,
   type Weapon,
+  type SupportId,
 } from '@brink/arena';
 import { UnitGlyph } from '../glyphs';
 import { AfterAction } from './AfterAction';
@@ -502,14 +508,19 @@ function Brief({ req, onDifficulty, onFight, onQuick, onBack }: { req: BattleReq
             );
           })}
           {mine.support.map((x) => (
-            <li key={x.id} className="px-4 py-3">
-              <div className="text-[15px] font-semibold">{x.id === 'himars' ? 'HIMARS' : 'Tornado-G'}</div>
+            <li key={x.id} className="px-4 py-3" data-testid={`brief-support-${x.id}`}>
+              <div className="text-[15px] font-semibold">{supportName({ id: x.id, faction: FACTION_OF[s.arsenal.blue] })}</div>
               <div className="text-[14px] text-muted">
-                Rockets on call, {x.missions} {x.missions === 1 ? 'mission' : 'missions'}
+                {SUPPORT_ROLE[x.id]} on call, {x.missions} {x.missions === 1 ? 'mission' : 'missions'}
               </div>
             </li>
           ))}
         </ul>
+        {theirs.support.length > 0 && (
+          <p className="mt-2 px-1 text-[14px] text-signal" data-testid="brief-enemy-support">
+            Enemy fire support seen nearby: {theirs.support.map((x) => `${x.missions}x ${supportName({ id: x.id, faction: FACTION_OF[s.arsenal.red] }, true)}`).join(', ')}. Spread out and bring air defence.
+          </p>
+        )}
         <div className="mt-5 text-[13px] font-semibold text-muted">What Scouts Report</div>
         <div className="mt-1.5 rounded-2xl bg-ink-900 px-4 py-3" data-testid="arena-intel">
           <div className="text-[15px] font-semibold">About {theirs.units.length} units, dug in toward the far edge</div>
@@ -593,8 +604,11 @@ function Verdict({ result, req, battle, onDone }: { result: ArenaResult; req: Ba
   );
 }
 
-type Mode = { kind: 'none' } | { kind: 'strike'; smoke: boolean } | { kind: 'face' } | { kind: 'breach' } | { kind: 'mine' } | { kind: 'support'; asset: 'himars' | 'tornado' } | { kind: 'ability'; id: AbilityId };
-type Card = { kind: 'fire'; target: string; weapon: string } | { kind: 'strike'; at: Point; smoke: boolean } | { kind: 'support'; asset: 'himars' | 'tornado'; at: Point } | { kind: 'move'; at: Point; dash: boolean } | null;
+/** What each off-map asset is, for the brief. */
+const SUPPORT_ROLE: Record<SupportId, string> = { himars: 'Rockets', tornado: 'Rockets', naval_gun: 'Naval gunfire', cruise_missile: 'Cruise missiles', strike_jet: 'Air strikes', kamikaze: 'Kamikaze drones' };
+
+type Mode = { kind: 'none' } | { kind: 'strike'; smoke: boolean } | { kind: 'face' } | { kind: 'breach' } | { kind: 'mine' } | { kind: 'support'; asset: SupportId } | { kind: 'ability'; id: AbilityId };
+type Card = { kind: 'fire'; target: string; weapon: string } | { kind: 'strike'; at: Point; smoke: boolean } | { kind: 'support'; asset: SupportId; at: Point } | { kind: 'move'; at: Point; dash: boolean } | null;
 
 function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: Battle) => void }) {
   const host = useRef<HTMLDivElement>(null);
@@ -1074,8 +1088,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       const aim = card?.kind === 'strike' ? card.at : mode.kind === 'strike' && hover ? hover : null;
       if (aim && indirect) o.area = { at: aim, r: Math.max(1, indirect.blast) };
     }
-    if (myTurn && (mode.kind === 'support' || (mode.kind === 'ability' && mode.id === 'airstrike')) && hover) o.area = { at: hover, r: mode.kind === 'support' && mode.asset === 'tornado' ? 2 : 1 };
-    if (card?.kind === 'support') o.area = { at: card.at, r: card.asset === 'tornado' ? 2 : 1 };
+    if (myTurn && (mode.kind === 'support' || (mode.kind === 'ability' && mode.id === 'airstrike')) && hover) o.area = { at: hover, r: mode.kind === 'support' ? Math.max(1, SUPPORT_REACH[mode.asset]) : 1 };
+    if (card?.kind === 'support') o.area = { at: card.at, r: Math.max(1, SUPPORT_REACH[card.asset]) };
     s.setOverlay(o);
     drawn.current = { myTurn, selected: !!o.selected || !b.units.some((u) => u.side === 'blue' && u.alive && !u.acted && !u.carrier) };
   });
@@ -1607,8 +1621,8 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
           ...b.support
             .filter((s) => s.side === 'blue')
             .map((s) => (
-              <button key={s.id} type="button" disabled={s.missions <= 0} onClick={() => setMode(mode.kind === 'support' ? { kind: 'none' } : { kind: 'support', asset: s.id })} aria-pressed={mode.kind === 'support'} className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${mode.kind === 'support' && mode.asset === s.id ? 'bg-white text-black' : 'bg-ink-800'}`} data-testid={`support-${s.id}`}>
-                {s.id === 'himars' ? 'HIMARS' : 'Tornado-G'} {s.missions}
+              <button key={s.id} type="button" disabled={s.missions <= 0} onClick={() => setMode(mode.kind === 'support' && mode.asset === s.id ? { kind: 'none' } : { kind: 'support', asset: s.id })} aria-pressed={mode.kind === 'support' && mode.asset === s.id} className={`h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold disabled:opacity-35 ${mode.kind === 'support' && mode.asset === s.id ? 'bg-white text-black' : 'bg-ink-800'}`} data-testid={`support-${s.id}`}>
+                {supportName(s, true)} {s.missions}
               </button>
             )),
           ...(Object.keys(b.abilities) as AbilityId[])
@@ -1893,10 +1907,15 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
               ) : card.kind === 'support' ? (
                 <div>
                   <div className="flex items-baseline justify-between">
-                    <span className="text-[15px] font-semibold">{card.asset === 'himars' ? 'HIMARS · GMLRS' : 'Tornado-G · 122 mm salvo'}</span>
+                    <span className="text-[15px] font-semibold">{supportName(b.support.find((x) => x.side === 'blue' && x.id === card.asset) ?? { id: card.asset })}</span>
                     <span className="text-[32px] font-bold tabular-nums">{supportChance(b, 'blue', card.asset, card.at)}%</span>
                   </div>
-                  <p className="text-[13px] text-muted">{card.asset === 'himars' ? 'One guided rocket: on the cell when it is watched. Everything around it is hit too.' : 'Forty rockets over five by five cells.'}</p>
+                  <p className="text-[13px] text-muted">{SUPPORT[card.asset].text}</p>
+                  {SUPPORT[card.asset].interceptable && (
+                    <p className="text-[13px] text-muted" data-testid="support-intercept">
+                      Air defence you know of: {Math.round(supportIntercept(b, 'blue', card.asset, card.at, visible) * 100)}% chance {card.asset === 'kamikaze' ? 'each drone is' : 'it is'} shot down.
+                    </p>
+                  )}
                 </div>
               ) : null}
               <div className={`mt-2 flex gap-2 ${settings.leftHanded ? 'flex-row-reverse' : ''}`}>

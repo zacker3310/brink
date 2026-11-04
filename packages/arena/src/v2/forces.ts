@@ -118,6 +118,9 @@ const ENGINEER: Record<Faction, TypeId> = { west: 'engineer_w', east: 'engineer_
 const RECOVERY: Record<Faction, TypeId> = { west: 'm88', east: 'brem' };
 const SNIPER: Record<Faction, TypeId> = { west: 'sniper_w', east: 'sniper_e' };
 const SUPPORT_OF: Record<Faction, SupportAsset['id']> = { west: 'himars', east: 'tornado' };
+
+/** Missions of one kind a side can bring from the war map. */
+export const MAX_MISSIONS = 6;
 /** Units that ride in a carrier listed just before them. */
 const SQUAD_ROLES: ReadonlySet<UnitType['role']> = new Set(['rifle_squad', 'fireteam', 'engineer']);
 
@@ -321,5 +324,16 @@ export function buildForce(setup: ArenaSetup, side: Side): ForceSeeds {
 
   const guns = specs.filter((s) => s.cls === 'artillery').length;
   const id = SUPPORT_OF[faction];
-  return { units, support: guns ? [{ id, missions: guns * SUPPORT[id].missions }] : [] };
+  const support: ForceSeeds['support'] = guns ? [{ id, missions: guns * SUPPORT[id].missions }] : [];
+  // What the war map around the battle brings (ships offshore, air wings, drones): merged by id,
+  // whole missions only, at most MAX_MISSIONS of each.
+  for (const x of (side === 'blue' ? setup.support : setup.redSupport) ?? []) {
+    if (!x || !Object.hasOwn(SUPPORT, x.id)) continue;
+    const n = Math.max(0, Math.min(MAX_MISSIONS, Math.floor(Number.isFinite(x.missions) ? x.missions : 0)));
+    if (n === 0) continue;
+    const have = support.find((s) => s.id === x.id);
+    if (have) have.missions = Math.min(MAX_MISSIONS, have.missions + n);
+    else support.push({ id: x.id, missions: n });
+  }
+  return { units, support };
 }

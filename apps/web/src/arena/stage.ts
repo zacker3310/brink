@@ -2362,13 +2362,20 @@ export class BattleStage {
             if (s.shown || offMap || shownTo) this.audio.shot(s.f.calibre, (s.shown && v ? v.x : from.x) - 0.5, (s.shown && v ? v.z : from.z) - 0.5, { night: this.night });
             if (!s.shown && !shownTo && !offMap) continue;
             if (kind === 'atgm' || kind === 'manpads') this.fx.missile(from, to, kind === 'manpads' ? 'manpads' : s.f.weapon.toLowerCase().includes('hellfire') ? 'hellfire' : 'atgm', flight, { top: !!typeOf(v?.type ?? 'm1a2').weapons.find((w) => w.id === s.f.weapon)?.top });
-            else if (kind === 'rocket') this.fx.missile(from, to, 'rocket', flight);
+            else if (kind === 'rocket') {
+              this.fx.missile(from, to, 'rocket', flight);
+              // Off-map bombs and cruise missiles: a second weapon off the same jet, and the scream of it coming in.
+              if (offMap && s.f.weapon === 'strike_jet') this.fx.missile(from.clone().add(new THREE.Vector3(0.6, 0.4, 0)), to.clone().add(new THREE.Vector3(0.5, 0, 0.5)), 'rocket', flight);
+              if (offMap && (s.f.weapon === 'strike_jet' || s.f.weapon === 'cruise_missile')) this.audio.incoming(s.f.to.x, s.f.to.y, flight);
+            }
             else if (kind === 'mortar' || kind === 'howitzer') {
               this.fx.shell(from, to, flight);
               this.audio.incoming(s.f.to.x, s.f.to.y, flight);
             } else if (kind === 'fpv' || kind === 'loiter') {
-              const model = buildProjectile(s.f.weapon.includes('switch') || v?.type === 'switchblade' ? 'switchblade' : v?.type === 'lancet' ? 'lancet' : 'fpv');
-              this.fx.drone(from, to, flight, v?.type === 'switchblade' ? 'switchblade' : v?.type === 'lancet' ? 'lancet' : 'fpv', model);
+              // Off-map kamikaze swarms fly the larger one-way airframe.
+              const dk = s.f.weapon === 'kamikaze' || v?.type === 'lancet' ? 'lancet' : s.f.weapon.includes('switch') || v?.type === 'switchblade' ? 'switchblade' : 'fpv';
+              const model = buildProjectile(dk);
+              this.fx.drone(from, to, flight, dk, model);
               this.audio.drone(`d${this.clock}`, 'fpv', s.f.to.x, s.f.to.y);
             } else {
               const bursts = kind === 'mg' || kind === 'small_arms' ? 5 : kind === 'autocannon' ? 3 : 1;
