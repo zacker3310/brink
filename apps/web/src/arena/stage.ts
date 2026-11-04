@@ -471,7 +471,9 @@ export class BattleStage {
     };
 
     const lib = opts.lib;
-    this.world = buildWorld(this.renderer, this.scene, battle.map, battle.conditions, opts.quality, battle.seed, lib ? { hesco: lib.hesco } : undefined);
+    // The war is in the Pacific: temperate and urban ground there is paddy, palm and tin roof.
+    const tropical = battle.map.biome === 'temperate' || battle.map.biome === 'urban';
+    this.world = buildWorld(this.renderer, this.scene, battle.map, battle.conditions, opts.quality, battle.seed, lib ? { hesco: lib.hesco } : undefined, { tropical });
     // The sky's light arrives after the first frames: draw again when it does.
     this.world.ready.then(
       () => this.invalidate(),
