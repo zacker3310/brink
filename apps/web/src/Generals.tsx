@@ -256,10 +256,11 @@ export function GeneralsRoster() {
 }
 
 /** A level-up: two perk cards dealt face up; pick one. Unanswered, the first stands at the end of next turn. */
-export function PromotionModal() {
+export function PromotionModal({ hold = false }: { hold?: boolean }) {
   const view = useGame((s) => s.view);
   const draft = useGame((s) => s.draft);
-  const busy = useGame((s) => s.resolving || s.playback !== null || s.showReport || s.battle !== null || s.review);
+  // `hold`: something the player should read first is up (the phone's debrief, which names the promotion).
+  const busy = useGame((s) => s.resolving || s.playback !== null || s.showReport || s.battle !== null || s.review) || hold;
   const { open, later, show } = usePromotion();
   const waiting = view ? generalsOf(view).filter((c) => c.offer && draft?.commanders?.perks?.[c.id] === undefined && !later.includes(`${c.id}@${c.offer.turn}`)) : [];
   const auto = waiting[0]?.id ?? null;

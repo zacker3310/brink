@@ -961,7 +961,8 @@ export function PhoneGame() {
   const playback = useGame((s) => s.playback);
   const fid = useGame((s) => s.selectedFormation);
   const city = useGame((s) => s.selectedCity);
-  const selectedHex = useGame((s) => s.selectedHex);
+  // A hex the camera moved to (Next, a debrief line) is not a question about that hex: no card for it.
+  const selectedHex = useGame((s) => (s.hexFromFocus ? null : s.selectedHex));
   const event = useGame((s) => s.view?.self.event);
   const resolving = useGame((s) => s.resolving);
   const [menu, setMenu] = useState(false);
@@ -1060,7 +1061,7 @@ export function PhoneGame() {
       )}
       <OperationsSheet />
       {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
-      <PromotionModal />
+      <PromotionModal hold={debrief} />
       {howTo && <HowToWin onClose={() => setHowTo(false)} />}
       <VictoryOverlay />
       {showReport && <Report />}

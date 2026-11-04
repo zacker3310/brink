@@ -258,7 +258,9 @@ export function OperationRow() {
           )}
         </span>
       </button>
-      <button type="button" onClick={() => focusOn(operationSpot(view, op)?.key ?? op.at)} aria-label="Show this phase on the map" className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-ink-850 text-muted active:bg-ink-800" data-testid="operation-show">
+      <button type="button" onClick={() => {
+          focusOn(operationSpot(view, op)?.key ?? op.at);
+        }} aria-label="Show this phase on the map" className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-ink-850 text-muted active:bg-ink-800" data-testid="operation-show">
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
           <path d="M12 21s-6-5.5-6-10a6 6 0 1112 0c0 4.5-6 10-6 10z" />
           <circle cx="12" cy="11" r="2.2" />

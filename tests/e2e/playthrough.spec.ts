@@ -65,7 +65,7 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
   await page.getByTestId('nation-china').tap();
   // The dossier says how the power plays, in its own words.
   await expect(page.getByTestId('dossier-blurb')).toContainText('rockets to reach across the strait');
-  await page.getByTestId('dossier-blurb').scrollIntoViewIfNeeded();
+  await page.getByTestId('dossier-blurb').evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot(page, 'dossier');
   await page.getByTestId('seed').fill('1');
   await page.getByTestId('crisis-none').tap();
@@ -76,7 +76,7 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
   // The first turn's brief points at Operations, and goes straight there.
   await expect(page.getByTestId('how-to-win')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('how-to-ops')).toContainText('Or let the staff run it');
-  await page.getByTestId('how-to-ops').scrollIntoViewIfNeeded();
+  await page.getByTestId('how-to-ops').evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot(page, 'how-to-win');
   await page.getByTestId('how-to-operations').tap();
   const sheet = page.getByTestId('operations');
