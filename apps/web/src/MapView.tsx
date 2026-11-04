@@ -277,6 +277,8 @@ export function MapView() {
   const gridRef = useRef<Graphics | null>(null);
   /** Counts paints of the ground: a paint under way stops when a newer one starts. */
   const paintJob = useRef(0);
+  /** When the map last had something to show at full rate. */
+  const wokeAt = useRef(0);
   const groundTextures = useRef<Texture[]>([]);
   const reachCache = useRef<{ view: NationView; id: string; plays: unknown; reach: Record<HexKey, Reach> } | null>(null);
   const view = useGame((s) => s.view);
@@ -328,6 +330,14 @@ export function MapView() {
       appRef.current = { app, world, layers, life };
       // Rotors turn and drone teams circle whether or not anything else changes.
       app.ticker.add(() => tickModels(performance.now()));
+      // Render on demand, in two speeds: full rate while the player touches the map, the camera
+      // moves, the board changes or a turn replays; once all is still for two seconds, only the
+      // map's ambient life moves (cloud, water, fronts), and it is drawn at 24 frames a second.
+      app.ticker.add(() => {
+        const busy = useGame.getState().playback !== null || performance.now() - wokeAt.current < 2000;
+        const want = busy ? 0 : 24;
+        if (app.ticker.maxFPS !== want) app.ticker.maxFPS = want;
+      });
       // The city banners and other overlays are HTML laid over the canvas from the published camera.
       // Whatever moves or resizes the map (a gesture, a resize Pixi handles on its own, the phone's
       // toolbar sliding away), they follow it within a frame: republish whenever the real transform
@@ -405,9 +415,17 @@ export function MapView() {
     return useGame.getState().view?.tiles[key] ? key : null;
   }
 
+  /** Back to full frame rate for a while (see the ticker in the setup). */
+  function wake() {
+    wokeAt.current = performance.now();
+    const a = appRef.current;
+    if (a && a.app.ticker.maxFPS !== 0) a.app.ticker.maxFPS = 0;
+  }
+
   function publish() {
     const a = appRef.current;
     if (!a) return;
+    wake();
     useCamera.setState({ camera: { x: a.world.x, y: a.world.y, scale: a.world.scale.x, width: a.app.screen.width, height: a.app.screen.height } });
     setModelZoom(a.world.scale.x);
     fadeByZoom();
@@ -510,6 +528,7 @@ export function MapView() {
       dragged = false;
     };
     canvas.addEventListener('pointerdown', (e) => {
+      wake();
       // The first finger of a new touch (or any mouse press): every earlier pointer has ended.
       if (e.isPrimary && pts.size > 0) reset();
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -524,6 +543,7 @@ export function MapView() {
       } else if (pts.size === 2) startPinch();
     });
     canvas.addEventListener('pointermove', (e) => {
+      wake();
       if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // A mouse with no button down, or a touch the map never saw start: no gesture is under way.
       if (e.pointerType === 'mouse' && e.buttons === 0 && (down || pinch)) reset();
@@ -998,6 +1018,7 @@ export function MapView() {
   }
 
   function redraw() {
+    wake();
     const a = appRef.current;
     const s = useGame.getState();
     // While a turn replays, the board shows the world it was planned against.
@@ -1035,9 +1056,6 @@ export function MapView() {
             overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 11, color, alpha: 0.18, cap: 'round' });
             overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 5.5, color, alpha: 0.45, cap: 'round' });
             overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.2, color: lighten(color), alpha: 1, cap: 'round' });
-            // Inside the border, a band of the nation's colour fading into its land.
-            const [p2, q2] = edge(key, n, 8);
-            overlay.moveTo(p2.x, p2.y).lineTo(q2.x, q2.y).stroke({ width: 9, color, alpha: 0.12, cap: 'round' });
           }
         } else {
           overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.2 : 0.12 });

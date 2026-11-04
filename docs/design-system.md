@@ -166,9 +166,11 @@ of ink so land and water still part, laid on a dark table (`TABLE`) instead of t
 
 Over it, in Pixi: each nation's land under a 10 % wash of its colour (exact hex polygons in one path
 per nation, so no seams and no doubled edges), borders that glow (11 px at 18 %, 5.5 px at 45 %, a
-2.2 px core lifted toward white) with a 9 px band of the colour inside them, and ground only
-remembered under a cool 30 % haze. **Level of detail**: the hex grid fades in from zoom 0.8 to 1.7;
-nation names in Cinzel fade in below zoom 1.0; counters grow when zoomed far out (`counters.ts`).
+2.2 px core lifted toward white), and ground only remembered under a cool 30 % haze. **Level of
+detail**: the hex grid fades in from zoom 0.8 to 1.7; nation names in Cinzel fade in below zoom 1.0;
+counters grow when zoomed far out (`counters.ts`). **Frame rate**: full rate while the player
+touches the map, the camera moves, the board changes or a turn replays; after two still seconds only
+the ambient life moves, drawn at 24 frames a second.
 
 `apps/web/src/paint/life.ts` keeps it alive (decoration only, never game state):
 
