@@ -332,6 +332,22 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
   (`__arena.pauseFilm`). Gate: typecheck, lint, unit (web 73), matrix 0 genuine failures, arena e2e 20
   passed / 5 skipped. Not done: HIMARS and Tornado-G still fly as plain rockets.
 
+- Arena film polish and tabletop cards (docs/arena-v2.md sections 14.1 and 14.2): the strike jet read
+  as a flat grey slab because it flew at 2.2x scale through the camera; it now flies at 1.25x (two
+  cells long) at 2.4 cells, its slant and break chosen against the camera that will watch it (in
+  frame as long as possible, never nearer than 6 cells), with motion-blur ghosts and speed streaks
+  (not on Low). F-35A and Su-34 rebuilt with panel seams, coated edges, intakes, framed canopies, the
+  Su-34's two-tone scheme and red stars. Air strikes are filmed wide (17 cells back) and the zoom
+  comes back once all is down. An intercepted jet now crashes in a fireball instead of flying on
+  toward the camera. HIMARS (a GMLRS pair, terminal dive) and Tornado-G (a ripple of 15 to 20 122 mm
+  rockets) launch from beyond the edge, blue's with a cut to the launch. The ship sits in a darker sea
+  patch with a bow wave and wake, its waterline under the haze floor. Kamikaze drones fly tighter and
+  the cruise missile pops up closer, both so a portrait frame holds them. The brief is a mission card
+  (counters, support chits with mission pips, star rules) and the verdict an after-action card with
+  the same rules marked earned. New `support` test hook and `arena-sorties.spec.ts`: red's Su-34,
+  Kalibr and Geran-2 brought down by the Gepard and Stinger, getting through, the Tornado-G, blue's
+  HIMARS, and the F-35A and Tomahawk kill cams on The Crossing, all looked at in screenshots.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
