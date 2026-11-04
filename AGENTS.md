@@ -19,6 +19,7 @@ Run from the repo root. Node 22+, pnpm 10.
 | difficulty | `pnpm test:difficulty` (human win rate per level, the AI's own planner in the human seat; `DIFFICULTY_MATCHES=32` a level, `DIFFICULTY_LEVELS=hard` for one) |
 | e2e | `pnpm test:e2e` (builds the web app, serves it on :4173, runs Chromium) |
 | build | `pnpm build` (web bundle in `apps/web/dist`) |
+| maps | `pnpm map:check` (validates every `*.map.json`, `docs/mapgen.md`) |
 
 First e2e run on a machine: `pnpm --filter @brink/tests exec playwright install chromium`.
 Arena frame time on an emulated iPhone 13: `ARENA_PERF=1 pnpm test:e2e arena-perf`.
