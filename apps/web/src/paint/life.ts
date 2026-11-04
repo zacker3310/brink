@@ -59,7 +59,7 @@ export class MapLife {
   private fronts: Front[] = [];
   private fires: { p: Point; next: number }[] = [];
   private glints: { s: Sprite; phase: number; speed: number }[] = [];
-  private fogs: { s: Sprite; x: number; y: number; phase: number }[] = [];
+  private fogs: { s: Sprite; x: number; y: number; phase: number; a: number; drift: number }[] = [];
   private shadows: { s: Sprite; vx: number }[] = [];
   private bounds = { x: 0, y: 0, w: 1, h: 1 };
   private clock = 0;
@@ -92,20 +92,39 @@ export class MapLife {
     this.bounds = { x: minX - size, y: minY - size, w: Math.max(...pts.map((p) => p.x)) - minX + size * 2, h: Math.max(...pts.map((p) => p.y)) - minY + size * 2 };
     const tex = softTexture();
 
-    // Fog: banks of cloud over every hex nobody has seen, gently heaving.
+    // Fog: banks of cloud over every hex nobody has seen, gently heaving. Each hex is a dark body
+    // of cloud with lighter billows on top, lit from the north-west like the land, and at the edge of
+    // what is known the bank thins into wisps over the ground instead of stopping at a hex line.
     this.fogLayer.removeChildren().forEach((c) => c.destroy());
     this.fogs = [];
-    for (const k of keys) {
-      if (v.tiles[k]!.visibility !== 'unknown') continue;
-      const p = center(k);
+    const puff = (x: number, y: number, r: number, tint: number, alpha: number, phase: number, drift: number) => {
       const s = new Sprite(tex);
       s.anchor.set(0.5);
-      s.tint = 0x26313a;
-      s.alpha = 0.95;
-      s.scale.set((size * 3.2) / 128);
-      s.position.set(p.x, p.y);
+      s.tint = tint;
+      s.alpha = alpha;
+      s.scale.set((r * 2) / 128, (r * 1.6) / 128);
+      s.position.set(x, y);
       this.fogLayer.addChild(s);
-      this.fogs.push({ s, x: p.x, y: p.y, phase: hash(k) * Math.PI * 2 });
+      this.fogs.push({ s, x, y, phase, a: alpha, drift });
+    };
+    const unknown = keys.filter((k) => v.tiles[k]!.visibility === 'unknown');
+    for (const k of unknown) {
+      const p = center(k);
+      const h = hash(k);
+      puff(p.x, p.y, size * 1.7, 0x1e2a33, 0.93, h * 6.3, 2);
+    }
+    for (const k of unknown) {
+      const p = center(k);
+      const h = hash(k);
+      const h2 = hash(`${k}b`);
+      puff(p.x + (h - 0.5) * size * 0.6, p.y - size * 0.25, size * (0.9 + h2 * 0.5), 0x4a5a66, 0.42, h2 * 6.3, 3);
+      if (h < 0.55) puff(p.x - size * 0.35 + h2 * size * 0.3, p.y - size * 0.45, size * (0.55 + h * 0.3), 0x8b9aa4, 0.26, h * 9, 4);
+      // Wisps that reach out over known ground at the edge of the bank.
+      for (const n of neighborKeys(k)) {
+        if (!v.tiles[n] || v.tiles[n]!.visibility === 'unknown' || hash(k + n) > 0.5) continue;
+        const q = center(n);
+        puff(p.x + (q.x - p.x) * 0.55, p.y + (q.y - p.y) * 0.55, size * 0.8, 0x56656f, 0.35, hash(n + k) * 6.3, 5);
+      }
     }
 
     // Cloud shadows: a few, made once, drifting west to east forever.
@@ -284,8 +303,8 @@ export class MapLife {
     this.clock += dt;
     const t = this.clock;
     for (const f of this.fogs) {
-      f.s.position.set(f.x + Math.sin(t * 0.25 + f.phase) * 3, f.y + Math.cos(t * 0.2 + f.phase) * 2);
-      f.s.alpha = 0.88 + Math.sin(t * 0.4 + f.phase) * 0.07;
+      f.s.position.set(f.x + Math.sin(t * 0.25 + f.phase) * f.drift, f.y + Math.cos(t * 0.2 + f.phase) * f.drift * 0.6);
+      f.s.alpha = f.a * (0.93 + Math.sin(t * 0.4 + f.phase) * 0.07);
     }
     if (this.still) return;
     for (const s of this.shadows) {

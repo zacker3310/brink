@@ -200,8 +200,8 @@ function MenuSheet({ onClose, onHowTo }: { onClose: () => void; onHowTo: () => v
       >
         Sound <span className={muted ? 'text-faint' : 'text-signal'}>{muted ? 'Off' : 'On'}</span>
       </button>
-      <button type="button" className={row} onClick={() => setMapStyle(mapStyle === 'painted' ? 'atlas' : mapStyle === 'atlas' ? 'satellite' : 'painted')} data-testid="toggle-map-style">
-        Map style <span className="text-signal">{mapStyle === 'painted' ? 'Painted' : mapStyle === 'atlas' ? 'Clean' : 'Satellite'}</span>
+      <button type="button" className={row} onClick={() => setMapStyle(mapStyle === 'painted' ? 'paper' : mapStyle === 'paper' ? 'atlas' : mapStyle === 'atlas' ? 'satellite' : 'painted')} data-testid="toggle-map-style">
+        Map style <span className="text-signal">{mapStyle === 'painted' ? 'Painted' : mapStyle === 'paper' ? 'Paper' : mapStyle === 'atlas' ? 'Clean' : 'Satellite'}</span>
       </button>
       <button
         type="button"

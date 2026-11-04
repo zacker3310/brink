@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
+import { Application, BlurFilter, CanvasSource, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
@@ -20,7 +20,7 @@ import { operationById } from '@brink/ai';
 import type { ActiveOperation } from './saves';
 import { groupOrders, oddsFor, ODDS_TAG, type Odds } from './odds';
 import { useGame } from './store';
-import { paintTheatre } from './paint/ground';
+import { paintTheatre, SEA, sizeClass } from './paint/ground';
 import { MapLife } from './paint/life';
 
 /** Region names on the painted map: an engraved serif, like a printed atlas of a fantasy world. */
@@ -273,6 +273,8 @@ export function MapView() {
   /** Removes the map's page-level input listeners. */
   const inputOff = useRef<(() => void) | null>(null);
   const groundSig = useRef('');
+  /** The painted map's hex grid, faded in with zoom. */
+  const gridRef = useRef<Graphics | null>(null);
   const groundTextures = useRef<Texture[]>([]);
   const reachCache = useRef<{ view: NationView; id: string; plays: unknown; reach: Record<HexKey, Reach> } | null>(null);
   const view = useGame((s) => s.view);
@@ -406,8 +408,25 @@ export function MapView() {
     if (!a) return;
     useCamera.setState({ camera: { x: a.world.x, y: a.world.y, scale: a.world.scale.x, width: a.app.screen.width, height: a.app.screen.height } });
     setModelZoom(a.world.scale.x);
-    // Zoomed out, the map becomes a political map: nation names across their land.
-    a.layers.labels!.visible = a.world.scale.x < 0.95;
+    fadeByZoom();
+  }
+
+  /**
+   * Level of detail. Zoomed out, the map becomes a political map: nation names across their land,
+   * fading in as the land shrinks. Zoomed in, the hex grid fades up so every hex can be counted.
+   */
+  function fadeByZoom() {
+    const a = appRef.current;
+    if (!a) return;
+    const z = a.world.scale.x;
+    const names = Math.max(0, Math.min(1, (1.0 - z) / 0.12));
+    a.layers.labels!.alpha = names;
+    a.layers.labels!.visible = names > 0;
+    const grid = gridRef.current;
+    if (grid && !grid.destroyed) {
+      grid.alpha = Math.max(0, Math.min(1, (z - 0.8) / 0.9));
+      grid.visible = grid.alpha > 0;
+    }
   }
 
   function zoomAt(px: number, py: number, factor: number) {
@@ -805,12 +824,18 @@ export function MapView() {
   function drawGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: string[]) {
     const style = useGame.getState().mapStyle;
     const atlas = style === 'atlas';
-    const painted = style === 'painted';
+    // Paper is the painted map printed on parchment: the same land, the same overlays.
+    const painted = style === 'painted' || style === 'paper';
     const art = atlas || painted ? null : getArt();
     // The painted canvas only changes when land is explored; seen-versus-visible shading is drawn
     // over it, so a new turn does not repaint the theatre.
     const vis = (k: HexKey) => (painted ? (v.tiles[k]!.visibility === 'unknown' ? 'u' : 'k') : v.tiles[k]!.visibility[0]);
-    const sig = `${style}${art ? 1 : 0}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
+    // Towns are painted as big as their people and with what has been built there: repaint when that changes.
+    const sites = Object.keys(v.sites)
+      .sort()
+      .map((id) => `${id}${sizeClass(v.sites[id]!)}${v.sites[id]!.facilities.join('')}`)
+      .join(',');
+    const sig = `${style}${art ? 1 : 0}|${sites}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
     if (groundSig.current === sig) return;
     groundSig.current = sig;
     const layer = a.layers.terrain!;
@@ -823,19 +848,27 @@ export function MapView() {
       return;
     }
     // Beyond the painted canvas the open sea runs on.
-    a.app.renderer.background.color = painted ? 0x0a2433 : SURFACE.ink950;
+    a.app.renderer.background.color = painted ? SEA : SURFACE.ink950;
     if (painted) {
       // One hand-painted canvas for the whole theatre, baked into a single texture.
       // Instrumented: `brink:paint` in the browser's performance timeline.
       performance.mark('brink:paint-start');
-      const p = paintTheatre(v, keys, SIZE);
+      const p = paintTheatre(v, keys, SIZE, { paper: style === 'paper' });
       performance.measure('brink:paint', 'brink:paint-start');
-      const tex = Texture.from(p.canvas);
+      // Mipmapped, so the whole theatre seen from afar stays smooth instead of shimmering.
+      const tex = new Texture({ source: new CanvasSource({ resource: p.canvas, autoGenerateMipmaps: true }) });
       made.push(tex);
       const ground = new Sprite(tex);
       ground.position.set(p.x, p.y);
       ground.scale.set(p.unit);
       layer.addChild(ground);
+      // The hex grid, faint, drawn only close in (see `fadeByZoom`): far out the land reads as land.
+      const grid = new Graphics();
+      for (const k of keys) if (v.tiles[k]!.visibility !== 'unknown') grid.poly(poly(k));
+      grid.stroke({ width: 1, color: 0x1c1a10, alpha: 0.32 });
+      gridRef.current = grid;
+      layer.addChild(grid);
+      fadeByZoom();
       return;
     }
     // Terrain: satellite-style ground mapped in world space, so the landscape runs on across hexes.
@@ -938,7 +971,7 @@ export function MapView() {
     }
     const keys = Object.keys(v.tiles).sort();
     const art = getArt();
-    const paintedMap = s.mapStyle === 'painted';
+    const paintedMap = s.mapStyle === 'painted' || s.mapStyle === 'paper';
     drawGround(a, v, keys);
     a.life.update(v, s.report, !replaying);
 
@@ -964,6 +997,9 @@ export function MapView() {
             overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 11, color, alpha: 0.18, cap: 'round' });
             overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 5.5, color, alpha: 0.45, cap: 'round' });
             overlay.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2.2, color: lighten(color), alpha: 1, cap: 'round' });
+            // Inside the border, a band of the nation's colour fading into its land.
+            const [p2, q2] = edge(key, n, 8);
+            overlay.moveTo(p2.x, p2.y).lineTo(q2.x, q2.y).stroke({ width: 9, color, alpha: 0.12, cap: 'round' });
           }
         } else {
           overlay.poly(poly(key, 1)).fill({ color, alpha: t.visibility === 'visible' ? 0.2 : 0.12 });
@@ -983,11 +1019,12 @@ export function MapView() {
     if (paintedMap) {
       const wash = new Graphics();
       for (const [owner, list] of [...washes].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
-        for (const k of list) wash.poly(poly(k, -0.6));
+        for (const k of list) wash.poly(poly(k));
         wash.fill({ color: hex(v.nations[owner]?.color ?? '#888888'), alpha: 0.1 });
       }
-      for (const k of stale) wash.poly(poly(k, -0.6));
-      if (stale.length) wash.fill({ color: 0x0a0c0b, alpha: 0.36 });
+      // Ground only remembered lies under a cool haze: still readable, plainly not seen now.
+      for (const k of stale) wash.poly(poly(k));
+      if (stale.length) wash.fill({ color: 0x1b2a36, alpha: 0.4 });
       a.layers.overlay!.addChild(wash);
     }
     a.layers.overlay!.addChild(overlay);
@@ -1032,7 +1069,7 @@ export function MapView() {
       label.alpha = 0.92;
       a.layers.labels!.addChild(label);
     }
-    a.layers.labels!.visible = a.world.scale.x < 0.95;
+    fadeByZoom();
 
     // Threat: where seen enemies could hit next turn, darker where more of them could.
     if (s.showThreat && !replaying) {

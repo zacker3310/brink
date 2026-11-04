@@ -1,9 +1,9 @@
-import { Graphics, Sprite, Text, type Application, type Container, type Texture } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, type Application, type Texture } from 'pixi.js';
 import { create } from 'zustand';
 import type { HexKey, UnitClass } from '@brink/contracts';
 import type { Point } from '@brink/map';
 import { getArt } from './art';
-import { addUnit, affiliationOf, slotOffsets, type CounterLook, type UnitModel } from './counters';
+import { addUnit, affiliationOf, keepScreenSize, slotOffsets, type CounterLook, type UnitModel } from './counters';
 import type { Affiliation } from './counters';
 import { AFFILIATION, FONT_DISPLAY } from './design/tokens';
 import type { Playback } from './store';
@@ -69,7 +69,8 @@ export interface Timeline {
   actors: Actor[];
   battles: Battle[];
   strikes: Strike[];
-  captures: { at: HexKey; color: number }[];
+  /** Sites that changed hands: where, the new owner's colour, the site's and the new owner's name. */
+  captures: { at: HexKey; color: number; name?: string; by?: string }[];
   /** Phase boundaries in ms. */
   move: [number, number];
   combat: [number, number];
@@ -138,7 +139,7 @@ export function buildTimeline(pb: Playback): Timeline {
     } else byHex.set(at, { at, ours, theirs, delay });
   };
   const strikes: Strike[] = [];
-  const captures: { at: HexKey; color: number }[] = [];
+  const captures: Timeline['captures'] = [];
   let hasMove = false;
   let hasAfter = false;
 
@@ -212,7 +213,7 @@ export function buildTimeline(pb: Playback): Timeline {
         break;
       }
       case 'site_captured':
-        captures.push({ at: e.key, color: colorOf(e.to) });
+        captures.push({ at: e.key, color: colorOf(e.to), name: before.sites[e.site]?.name ?? after.sites[e.site]?.name, by: before.nations[e.to]?.name });
         hasAfter = true;
         break;
     }
@@ -292,6 +293,32 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     if (b.ours) mk(`−${b.ours}`, AFFILIATION.hostile, b.theirs ? -14 : 0);
     if (b.theirs) mk(`−${b.theirs}`, 0x6fbf8e, b.ours ? 14 : 0);
   }
+  // A captured town raises a banner in its new owner's colour: the name, and who took it.
+  const banners: { box: Container; at: Point }[] = [];
+  for (const c of tl.captures) {
+    const box = new Container();
+    const title = new Text({ text: (c.name ?? 'Captured').toUpperCase(), resolution: 3, style: { fontFamily: FONT_DISPLAY, fontSize: 13, fontWeight: '800', fill: 0xffffff, letterSpacing: 0.6 } });
+    const sub = new Text({ text: c.by ? `TAKEN BY ${c.by.toUpperCase()}` : 'CAPTURED', resolution: 3, style: { fontFamily: FONT_DISPLAY, fontSize: 8.5, fontWeight: '700', fill: 0xffffff, letterSpacing: 0.8 } });
+    title.anchor.set(0.5, 1);
+    sub.anchor.set(0.5, 0);
+    title.position.set(0, -1);
+    sub.position.set(0, 1);
+    sub.alpha = 0.85;
+    const w = Math.max(title.width, sub.width) + 16;
+    const flag = new Graphics()
+      .moveTo(0, 30)
+      .lineTo(0, 0)
+      .stroke({ width: 1.5, color: 0x0d1114 })
+      .poly([-w / 2, -16, w / 2, -16, w / 2, 12, 6, 12, 0, 18, -6, 12, -w / 2, 12])
+      .fill({ color: c.color })
+      .stroke({ width: 1.5, color: 0x0d1114 });
+    const sheen = new Graphics().rect(-w / 2 + 2, -14, w - 4, 3).fill({ color: 0xffffff, alpha: 0.25 });
+    box.addChild(flag, sheen, title, sub);
+    box.alpha = 0;
+    layer.addChild(box);
+    keepScreenSize(box);
+    banners.push({ box, at: center(c.at) });
+  }
   const routes = new Map(tl.actors.map((a) => [a.id, a.route.map(center)]));
   const heard = new Set<string>();
   const impact = (id: string, kind: 'strike' | 'battle' | 'destroyed') => {
@@ -350,6 +377,26 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
     fx.clear();
     used = 0;
 
+    // Where each moving formation has come from: a fading wake in its colour behind it.
+    if (pm > 0 && pm < 1.2) {
+      for (const a of tl.actors) {
+        const route = routes.get(a.id)!;
+        if (route.length < 2 || !a.confirmed) continue;
+        const head = along(route, pm);
+        const segs = route.length - 1;
+        const upto = Math.min(segs, Math.floor(pm * segs));
+        const fadeOut = 1 - span(t, tl.after);
+        fx.moveTo(route[0]!.x, route[0]!.y);
+        for (let i = 1; i <= upto; i++) fx.lineTo(route[i]!.x, route[i]!.y);
+        fx.lineTo(head.x, head.y);
+        fx.stroke({ width: 5, color: 0x070b12, alpha: 0.28 * fadeOut, cap: 'round', join: 'round' });
+        fx.moveTo(route[0]!.x, route[0]!.y);
+        for (let i = 1; i <= upto; i++) fx.lineTo(route[i]!.x, route[i]!.y);
+        fx.lineTo(head.x, head.y);
+        fx.stroke({ width: 2.4, color: a.color, alpha: 0.55 * fadeOut, cap: 'round', join: 'round' });
+      }
+    }
+
     // Formations.
     for (const a of tl.actors) {
       let pos = along(routes.get(a.id)!, pm);
@@ -399,9 +446,24 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       const mid = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - size * 1.6 };
       const pt = (u: number) => ({ x: (1 - u) ** 2 * a.x + 2 * (1 - u) * u * mid.x + u * u * b.x, y: (1 - u) ** 2 * a.y + 2 * (1 - u) * u * mid.y + u * u * b.y });
       const head = pt(q);
-      const tail = pt(Math.max(0, q - 0.22));
-      fx.moveTo(tail.x, tail.y).quadraticCurveTo((tail.x + head.x) / 2, (tail.y + head.y) / 2 - 2, head.x, head.y).stroke({ width: 2, color: s.color, alpha: 0.9 });
-      fx.circle(head.x, head.y, 3).fill({ color: 0xfff1c9 });
+      // The missile's shadow runs straight along the ground beneath its arc.
+      const ground = lerp(a, b, q);
+      fx.ellipse(ground.x, ground.y, 4, 2).fill({ color: 0x000000, alpha: 0.3 });
+      // A smoke trail behind it, thickening and fading, then the bright motor.
+      for (let i = 6; i >= 1; i--) {
+        const u0 = Math.max(0, q - i * 0.05);
+        const u1 = Math.max(0, q - (i - 1) * 0.05);
+        const p0 = pt(u0);
+        const p1 = pt(u1);
+        fx.moveTo(p0.x, p0.y).lineTo(p1.x, p1.y).stroke({ width: 1.5 + i * 0.9, color: 0xd9d4c8, alpha: 0.32 * (1 - i / 7), cap: 'round' });
+      }
+      const tail = pt(Math.max(0, q - 0.12));
+      fx.moveTo(tail.x, tail.y).quadraticCurveTo((tail.x + head.x) / 2, (tail.y + head.y) / 2 - 1, head.x, head.y).stroke({ width: 2, color: s.color, alpha: 0.9 });
+      fx.circle(head.x, head.y, 5).fill({ color: 0xffb347, alpha: 0.45 });
+      fx.circle(head.x, head.y, 2.6).fill({ color: 0xfff1c9 });
+      // The aim point, closing in as the strike comes down.
+      const ring = size * (0.25 + 0.6 * (1 - q));
+      fx.circle(b.x, b.y, ring).stroke({ width: 1.6, color: AFFILIATION.hostile, alpha: 0.4 + 0.5 * q });
     }
     // Impacts: a fireball where each strike lands, then drifting smoke.
     for (const s of tl.strikes) {
@@ -452,6 +514,13 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
         if (q <= 0 || q >= 1) continue;
         fx.circle(p0.x, p0.y, size * (0.4 + 1.2 * q)).stroke({ width: 3, color: c.color, alpha: 1 - q });
       }
+    }
+
+    for (const bn of banners) {
+      const q = clamp(pa / 0.35);
+      const rise = ease(q);
+      bn.box.alpha = q <= 0 ? 0 : Math.min(1, q * 2) * (t > tl.end - 200 ? Math.max(0, (tl.end - t) / 200) : 1);
+      bn.box.position.set(bn.at.x, bn.at.y - size * 0.9 - 10 * rise);
     }
 
     for (let i = used; i < pool.length; i++) pool[i]!.visible = false;
