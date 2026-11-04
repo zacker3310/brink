@@ -328,10 +328,17 @@ export interface GovernmentDef {
  * commander still learning the war. Hard has none (the AI gets the stockpile bonus instead).
  */
 export const DIFFICULTY_EDGE: Record<Difficulty, Modifiers> = {
-  easy: { income: { credits: 70, energy: 70, materials: 70, food: 70 }, industry: 60, research: 40, stability: 15, attack: 40, homeDefense: 50, recruitDiscount: 30, supplyCapacity: 30, ranged: 20 },
+  easy: { income: { credits: 70, energy: 70, materials: 70, food: 70 }, industry: 60, research: 40, stability: 15, attack: 50, homeDefense: 50, recruitDiscount: 30, supplyCapacity: 30, ranged: 20 },
   normal: { income: { credits: 30, energy: 30, materials: 30, food: 30 }, industry: 30, research: 20, stability: 5, attack: 20, homeDefense: 25, recruitDiscount: 15, supplyCapacity: 10 },
   hard: {},
 };
+
+/**
+ * Percent of its starting stockpile each AI power gets on Hard ("the AI starts richer"). 150 until
+ * ruleset 2.5.0, when the AI learned to finish its sieges and Hard fell to 16% for the AI's own
+ * planner in the human seat.
+ */
+export const HARD_AI_STOCKPILE = 120;
 
 export const GOVERNMENTS: Record<GovernmentId, GovernmentDef> = {
   commonwealth: {

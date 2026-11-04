@@ -7,11 +7,12 @@ import { GameSession } from '@brink/session';
 // How hard each difficulty is, measured with the AI's own planner in the human seat: the seat
 // plays exactly as an AI would (with its own memory), but with the level's command edge and setup.
 // `DIFFICULTY_MATCHES` campaigns per level (default 32), the human seat rotating over the four
-// powers. `pnpm test:difficulty`. Targets: Easy 85%+, Normal about 55%, Hard 25-35%.
+// powers; `DIFFICULTY_LEVELS=hard` measures one level. `pnpm test:difficulty`. Targets: Easy 85%+,
+// Normal about 55%, Hard 25-35%.
 
 const MATCHES = Number(process.env.DIFFICULTY_MATCHES ?? 32);
 const POWERS: NationId[] = ['china', 'japan', 'russia', 'usa'];
-const LEVELS: Difficulty[] = ['easy', 'normal', 'hard'];
+const LEVELS = (process.env.DIFFICULTY_LEVELS ?? 'easy,normal,hard').split(',') as Difficulty[];
 
 function campaign(seed: number, human: NationId, difficulty: Difficulty): { won: boolean; reason: string; turn: number; rejected: number } {
   const s = GameSession.create(PACIFIC_ID, seed, human, [], { difficulty });
@@ -54,7 +55,9 @@ describe(`difficulty with the AI in the human seat (${MATCHES} campaigns a level
     console.log('human win rates', rates, 'rejected orders', rejected);
     expect(rejected).toBe(0);
     // Each level is harder than the one below it.
-    expect(rates.easy!).toBeGreaterThan(rates.normal!);
-    expect(rates.normal!).toBeGreaterThan(rates.hard!);
+    if (LEVELS.length === 3) {
+      expect(rates.easy!).toBeGreaterThan(rates.normal!);
+      expect(rates.normal!).toBeGreaterThan(rates.hard!);
+    }
   });
 });

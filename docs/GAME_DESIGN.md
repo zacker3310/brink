@@ -193,14 +193,16 @@ every city and the whole country is yours.
 Difficulty: Easy (your natural ally fights beside you, Japan with the United States and Russia with
 China, sharing sight and supply; one front, the nearest power of the other side; the AI never
 declares war on you and accepts your peace; half again your starting stockpile; an opening crisis
-keeps the ally unless it sets the two at war), Normal (everyone at war from turn 1), Hard (the AI starts with the bonus). The
+keeps the ally unless it sets the two at war), Normal (everyone at war from turn 1), Hard (each AI power starts with a fifth more stockpile, `HARD_AI_STOCKPILE`). The
 AI plays at full strength on every level; Easy and Normal give the human seats a command edge
-(`DIFFICULTY_EDGE`): Easy +70% income, +60% industry, +40% attack, +50% home defence, units 30%
+(`DIFFICULTY_EDGE`): Easy +70% income, +60% industry, +50% attack, +50% home defence, units 30%
 cheaper; Normal +30% income and industry, +20% attack, +25% home defence, units 15% cheaper.
 Measured on the retired Meridian theatre (ruleset 1.6.0) with the AI's own planner in the human seat
 (32 campaigns each, 30 turns): Easy wins 88% (66% playing only defensively), Normal 56% (13%), Hard
 25%. On the Pacific (12 campaigns each, 30 turns, Japan played by the staff, with the opening
-crisis a new campaign deals): Easy wins 11 of 12, Normal 4 of 12. In tactical battles the enemy
+crisis a new campaign deals): Easy wins 11 of 12, Normal 4 of 12. Ruleset 2.5.0, on the Pacific
+(`pnpm test:difficulty`: the planner in each of the four seats in turn, 30 turns, no crisis): Easy
+88% (32 campaigns), Normal 59% (32), Hard 31% (48). In tactical battles the enemy
 also reads less well on Easy (lower skill).
 Theatre: the Pacific, the only one since ruleset 2.0.0 (the Meridian, Highland Front and Varn Delta
 were retired; their saves are refused with a message). The seed fixes the ground texture and every

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SAVE_VERSION } from '@brink/contracts';
-import { CARDS, RULESET_VERSION } from '@brink/game-data';
+import { CARDS, HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { hashState } from '@brink/simulation';
 import { parseSave, SaveError, serializeSave } from './save';
@@ -271,11 +271,15 @@ describe('GameSession', () => {
     expect(s.view().relations[enemy]).toBe('peace');
   });
 
-  it('hard gives every AI half again its stockpile', () => {
+  it('hard gives every AI power a richer start (HARD_AI_STOCKPILE), minor states none', () => {
     const normal = GameSession.create(PACIFIC_ID, 5, 'usa');
     const hard = GameSession.create(PACIFIC_ID, 5, null, [], { difficulty: 'hard' });
     expect(hard.difficulty).toBe('hard');
     expect(normal.difficulty).toBe('normal');
+    const [n, h] = [normal.snapshot().nations, hard.snapshot().nations];
+    expect(HARD_AI_STOCKPILE).toBeGreaterThan(100);
+    expect(h.china!.stockpile.credits).toBe(Math.floor((n.china!.stockpile.credits * HARD_AI_STOCKPILE) / 100));
+    expect(h.taiwan!.stockpile).toEqual(n.taiwan!.stockpile);
   });
 
   it('gives human seats the command edge of their level, and the AI none', () => {

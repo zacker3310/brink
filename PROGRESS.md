@@ -337,8 +337,11 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
   Safari/WebKit; verify on a device (audio unlock, safe areas, standalone launch).
 
-- Balance: of 100 soak matches, 38 end by domination, 19 by supremacy, 43 on score at the turn
-  limit (median turn 28). Next lever: AI deadlock-breaking (concentration, artillery before assaults).
+- Balance (ruleset 2.5.0): of 40 soak matches, 17 end by supremacy, 2 by domination, 21 on score at
+  the turn limit (median turn 30; 2.4.0: all 40 at the limit). China wins most decisive ones (its
+  ring of minor states); Japan almost never does. Human win rates (`pnpm test:difficulty`): Easy 88%,
+  Normal 59%, Hard 31% (2.4.0: 100, 38, 6). Next levers: amphibious AI for Japan and the US, and
+  minor-state garrisons that make up a third of the victory points and still mostly hold at turn 30.
 - Arena v2.3 defects, by priority (detail in `docs/architecture.md`, Battles):
   1. Nothing measured on a real iPhone: GPU frame time, gestures on glass, haptics, memory pressure.
   2. Replay across JavaScript engines is unproven: facings are doubles from `Math.atan2`, and
