@@ -527,12 +527,13 @@ html[data-motion='reduced'] .home-letterbox {
   place-items: center;
 }
 .deploy-ring::before {
+  /* A radar sweep drawn as a ring with one bright quarter: a transform-only spin, cheap to composite. */
   content: '';
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: conic-gradient(from 0deg, color-mix(in srgb, var(--deploy, #e3c27a) 70%, transparent), transparent 28%);
-  mask: radial-gradient(circle, transparent 54px, #000 55px);
+  border: 2px solid transparent;
+  border-top-color: var(--deploy, #e3c27a);
   animation: deploy-sweep 1.4s linear infinite;
 }
 @keyframes deploy-sweep {
