@@ -17,6 +17,7 @@ import type {
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, FACILITIES, FACILITY_SLOTS, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
+import { lockCommanderOrders } from './commanders';
 import { canPropose } from './diplomacy';
 import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
@@ -376,6 +377,11 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
           (locked.battles ??= []).push({ target: b.target, attackers: [...b.attackers].sort(), defenders: [...b.defenders].sort(), kept: { ...b.kept }, won: b.won });
         }
       }
+    }
+
+    if (sub.commanders !== undefined) {
+      const c = lockCommanderOrders(world, nation, sub.commanders, reject);
+      if (c) locked.commanders = c;
     }
   }
   return { orders, rejected };

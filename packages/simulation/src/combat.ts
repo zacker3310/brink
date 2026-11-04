@@ -1,4 +1,5 @@
-import type { Formation, NationId, Terrain } from '@brink/contracts';
+import type { Formation, FormationId, NationId, Terrain } from '@brink/contracts';
+import type { LeaderEffect } from './commanders';
 import { AMPHIBIOUS_ASSAULT_PENALTY, RIVER_ASSAULT_PENALTY, RULES, TERRAIN, UNITS } from '@brink/game-data';
 import { clamp, pct, type FullModifiers } from './rules';
 
@@ -43,6 +44,8 @@ export interface AssaultContext {
   defenderMods: (owner: NationId) => FullModifiers;
   /** Formations under a defend order. */
   defending: (id: string) => boolean;
+  /** What the general leading a formation adds, if one does. */
+  leader?: (id: FormationId) => LeaderEffect | undefined;
 }
 
 export interface Power {
@@ -56,11 +59,12 @@ export function attackerPower(attackers: readonly Formation[], defenders: readon
   const terrain = TERRAIN[ctx.terrain];
   let total = 0;
   for (const a of attackers) {
+    const lead = ctx.leader?.(a.id);
     let v = condition(a, attackStat(a, hardness) * a.strength);
-    v = pct(v, 100 + ctx.attackerMods.attack);
+    v = pct(v, 100 + ctx.attackerMods.attack + (lead?.attack ?? 0));
     if (a.unitClass === 'armor' || a.unitClass === 'mechanized') v = pct(v, 100 - terrain.armorPenalty);
-    // Storming a beach from a ship.
-    if (a.aboard) v = pct(v, 100 - AMPHIBIOUS_ASSAULT_PENALTY);
+    // Storming a beach from a ship (a general who knows beaches takes some or all of the sting out).
+    if (a.aboard) v = pct(v, 100 - pct(AMPHIBIOUS_ASSAULT_PENALTY, 100 - (lead?.amphibious ?? 0)));
     total += v;
   }
   if (ctx.river) total = pct(total, 100 - RIVER_ASSAULT_PENALTY);
@@ -86,6 +90,8 @@ export function defenderPower(defenders: readonly Formation[], ctx: AssaultConte
     if (ctx.defending(d.id)) v = pct(v, 120);
     if (ctx.tileOwner === d.owner) v = pct(v, 100 + mods.homeDefense);
     if (d.unitClass === 'armor' || d.unitClass === 'mechanized') v = pct(v, 100 + mods.armorDefense);
+    const lead = ctx.leader?.(d.id);
+    if (lead?.defense) v = pct(v, 100 + lead.defense);
     total += v;
   }
   return Math.floor(total / 100);
@@ -127,13 +133,15 @@ export interface StrikeContext {
   terrain: Terrain;
   spotted: boolean;
   sourceMods: FullModifiers;
+  /** What the general leading the source adds, if one does. */
+  sourceLeader?: LeaderEffect;
 }
 
 /** Strength one ranged strike takes off one victim. */
 export function strikeLoss(source: Formation, victim: Formation, ctx: StrikeContext, swing: number): number {
   const hardness = UNITS[victim.unitClass].hardness;
   let v = condition(source, attackStat(source, hardness) * source.strength);
-  v = pct(v, 100 + ctx.sourceMods.ranged);
+  v = pct(v, 100 + ctx.sourceMods.ranged + (ctx.sourceLeader?.strike ?? 0));
   if (!ctx.spotted) v = pct(v, 50);
   v = Math.floor((v * 100) / (100 + TERRAIN[ctx.terrain].defense));
   v = pct(v, 100 - Math.floor(victim.entrenchment / 2));

@@ -18,6 +18,7 @@ import type {
 } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { engine } from './engine';
+import { withPosting } from './generals';
 import { idleFormations, netChange, selfLedger, wonCampaign } from './insight';
 import { recommendedTech, recruitCostFor } from './rules-view';
 import { movementAllowance } from '@brink/simulation';
@@ -33,7 +34,7 @@ import type { Response } from './protocol';
 import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type ActiveOperation, type MapStyle, type SlotInfo } from './saves';
 import { operationById, type Operation } from '@brink/ai';
 
-export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy';
+export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy' | 'generals';
 
 export interface Playback {
   /** The view the turn was planned against; the map shows it while the turn replays. */
@@ -163,6 +164,10 @@ interface State {
   setBudget(budget: Budget): void;
   setResearch(tech: TechId | null): void;
   setEventChoice(choice: 0 | 1): void;
+  /** Post a general to a formation (null: the reserve) when the turn resolves. */
+  setPosting(commander: string, formation: FormationId | null): void;
+  /** Answer a general's promotion: which of the two perks. */
+  setPerkChoice(commander: string, choice: 0 | 1): void;
   setDiplomacy(target: NationId, action: DiplomaticAction | null): void;
   setPriority(id: FormationId, p: SupplyPriority): void;
   submit(): Promise<void>;
@@ -567,6 +572,11 @@ export const useGame = create<State>((set, get) => {
     setBudget: (budget) => editDraft((d) => ({ ...d, budget })),
     setResearch: (tech) => editDraft((d) => ({ ...d, research: tech })),
     setEventChoice: (choice) => editDraft((d) => ({ ...d, eventChoice: choice })),
+    setPosting: (commander, formation) => {
+      const view = get().view;
+      if (view) editDraft((d) => ({ ...d, commanders: { ...d.commanders, assign: withPosting(view, d, commander, formation) } }));
+    },
+    setPerkChoice: (commander, choice) => editDraft((d) => ({ ...d, commanders: { ...d.commanders, perks: { ...d.commanders?.perks, [commander]: choice } } })),
     setDiplomacy: (target, action) =>
       editDraft((d) => {
         d.diplomacy = d.diplomacy.filter((x) => x.target !== target);

@@ -1,7 +1,8 @@
 import type { ArenaBattle, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { keyDistance } from '@brink/map';
-import { abilitiesFor, ARSENAL_OF, rankOf, SUPPORT_IDS, type ArenaResult, type ArenaSetup, type Battle, type BattleEvent, type SiteKind, type SupportId, type UnitSpec } from '@brink/arena';
+import { leaderEffects, leaderOf } from '@brink/simulation';
+import { abilitiesFor, ARSENAL_OF, RANKS, rankOf, SUPPORT_IDS, type ArenaResult, type ArenaSetup, type Battle, type BattleEvent, type SiteKind, type SupportId, type UnitSpec } from '@brink/arena';
 
 // A battle request: the stack you sent at a hex and the enemies you can see there, set up as an
 // arena fight. Each formation becomes a detachment of a company (docs/arena-v2.md, section 5).
@@ -93,10 +94,18 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
   if (fighters.length === 0 || enemies.length === 0) return null;
   const tile = view.tiles[target];
   const site = tile?.siteId ? view.sites[tile.siteId] : undefined;
+  // A formation with a general at its head fights a rank above its experience (more with Veteran Cadre).
+  const leaders = leaderEffects(view.commanders);
   const attackers: UnitSpec[] = fighters.map((id) => {
     const f = view.formations[id]!;
-    return { id, cls: f.unitClass, strength: f.strength, name: f.name, color: view.self.color, rank: rankOf(f.experience) };
+    const lead = leaders[id];
+    const rank = lead ? Math.min(RANKS.length - 1, rankOf(f.experience) + 1 + lead.rank) : rankOf(f.experience);
+    return { id, cls: f.unitClass, strength: f.strength, name: f.name, color: view.self.color, rank };
   });
+  const general = fighters
+    .map((id) => leaderOf(view.commanders, id))
+    .filter((c): c is NonNullable<typeof c> => !!c)
+    .sort((a, b) => b.level - a.level || (a.id < b.id ? -1 : 1))[0];
   const veteranEnemy = view.turn > view.maxTurns * 0.6 ? 1 : 0;
   const defenders: UnitSpec[] = enemies.map((c) => ({
     id: c.formation,
@@ -113,7 +122,7 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
   return {
     target,
     orders,
-    title: site ? `Assault on ${site.name}` : `Battle for ${place}`,
+    title: `${site ? `Assault on ${site.name}` : `Battle for ${place}`}${general ? ` under ${general.name}` : ''}`,
     setup: {
       seed: hash(`${view.turn}|${target}|${fighters.join(',')}`),
       terrain: tile?.terrain ?? 'plains',

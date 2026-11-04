@@ -13,6 +13,7 @@ import type {
 } from '@brink/contracts';
 import { TERRAIN, victoryBars } from '@brink/game-data';
 import { rangeKeys } from '@brink/map';
+import { leaderEffects, leaderOf } from './commanders';
 import { clone, nationModifiers, relationOf, sortedKeys, visionRadius } from './rules';
 import { supremacyStanding } from './victory';
 
@@ -38,6 +39,7 @@ export function computeVision(world: WorldState, nation: NationId, reconActive: 
   const visible = new Set<HexKey>();
   const detect = new Set<HexKey>();
   const eyes = new Set(sharers(world, nation));
+  const leaders = leaderEffects(world.commanders);
   const add = (key: HexKey, detecting: boolean) => {
     if (!world.tiles[key]) return;
     visible.add(key);
@@ -58,7 +60,7 @@ export function computeVision(world: WorldState, nation: NationId, reconActive: 
     if (!eyes.has(f.owner)) continue;
     const mods = nationModifiers(world.nations[f.owner]!);
     const onRecon = reconActive.has(id);
-    const radius = visionRadius(f.unitClass, mods, onRecon);
+    const radius = visionRadius(f.unitClass, mods, onRecon) + (leaders[id]?.vision ?? 0);
     const sharpEyed = f.unitClass === 'recon' || onRecon;
     for (const k of rangeKeys(f.key, radius)) add(k, sharpEyed);
     // Everyone sees into their own hex; only reconnaissance sees into cover beyond it.
@@ -230,6 +232,19 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     };
   }
 
+  // Your own generals in full; a foreign one only by name and rank, leading a contact seen now.
+  const commanders: NonNullable<NationView['commanders']> = {};
+  const enemyCommanders: NonNullable<NationView['enemyCommanders']> = {};
+  for (const id of sortedKeys(world.commanders ?? {})) {
+    const c = world.commanders![id]!;
+    if (c.nation === nation) commanders[id] = clone(c);
+  }
+  for (const id of sortedKeys(contacts)) {
+    if (!contacts[id]!.confirmed) continue;
+    const c = leaderOf(world.commanders, id);
+    if (c && c.nation !== nation) enemyCommanders[id] = { name: c.name, level: c.level, nation: c.nation };
+  }
+
   // The scoreboard is public by design: victory points are announced, like an election count.
   const vp = victoryPoints(world);
   const nations: Record<NationId, PublicNation> = {};
@@ -260,5 +275,6 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     difficulty: world.difficulty ?? 'normal',
     ...(world.crisis ? { crisis: world.crisis } : {}),
     supremacy: supremacyStanding(world),
+    ...(world.commanders ? { commanders, enemyCommanders } : {}),
   };
 }

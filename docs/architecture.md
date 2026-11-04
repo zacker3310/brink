@@ -141,6 +141,29 @@ shows as a cell a vehicle cannot enter. Reckoning it on the observation would sh
 and the move would then be refused by the rules; the clean fix is a rule (a move stops short at an
 obstacle it meets), not a filter.
 
+## Commanders (ruleset 2.3)
+
+Named generals a power grows over a campaign. State: `WorldState.commanders` (contracts
+`commanders.ts`); data: game-data `commanders.ts` (traits, 11 perks, ranks, XP table, the generic roster
+by government and `NATION_ROSTERS`, where a country file is one import and one entry); logic:
+simulation `commanders.ts`. Each power starts with three (`seedCommanders`, run by `createScenario` and
+by save migration); minor states have none.
+
+- Orders: `NationOrders.commanders` posts a general to an own land or air formation (or the reserve)
+  and answers a promotion. Postings are validated as one reshuffle (swaps allowed); where two would
+  lead one formation the one staying put keeps it, else the lowest id. Applied in phase 1b, before
+  anything moves, so a new general leads this turn's fighting.
+- Effects (`leaderEffects`, read from the commanders as they stood when the phase began): every
+  general +5% attack and defence; traits and perks add assault, defence, strike, amphibious, sight
+  (fog), supply (after logistics, phase 4b), and morale, readiness and entrenchment at the end of
+  the turn. The arena gives a led formation +1 rank (`battleFor`).
+- Phase 11b, after eliminations: wounds heal; experience for engagements, strikes and captures;
+  a destroyed formation's general may be killed or wounded, a beaten one wounded
+  (`roll(seed, turn, 'commander-fate', id)`); a level-up offers two perks
+  (`roll(seed, turn, 'perk', id)`), and an offer left unanswered since an earlier turn takes its first.
+- Fog: own generals in full; a foreign general leading a contact seen this turn by name and level
+  only (`NationView.enemyCommanders`). Commander events go to their own nation only.
+
 ## Rejected alternatives
 
 - A tick per movement point: forces every unit onto one speed grid. The event clock handles mixed speeds.

@@ -1,6 +1,9 @@
 // Shared data contracts. Everything here is plain JSON-serializable data: no classes,
 // no functions, no Maps or Sets, so world state can be hashed, saved and posted to a worker.
 
+import type { Commander, CommanderEvent, CommanderId, CommanderOrders, CommanderSighting } from './commanders';
+export * from './commanders';
+
 export type NationId = string;
 export type FormationId = string;
 export type SiteId = string;
@@ -279,6 +282,8 @@ export interface NationOrders {
   eventChoice?: 0 | 1;
   /** Battles fought in the arena this turn, one per target. */
   battles?: ArenaBattle[];
+  /** Generals to assign or relieve, and level-up perk choices. */
+  commanders?: CommanderOrders;
 }
 
 export interface LastKnownContact {
@@ -344,6 +349,8 @@ export interface WorldState {
   difficulty?: Difficulty;
   /** The Opening Crisis the campaign began with (`@brink/scenarios` CRISES), if any. */
   crisis?: string;
+  /** Every power's generals. Absent in worlds made before commanders (saves gain them on load). */
+  commanders?: Record<CommanderId, Commander>;
 }
 
 // ---------------------------------------------------------------------------
@@ -434,7 +441,8 @@ export type GameEvent =
   | { kind: 'world_event'; nation: NationId; event: WorldEventId; choice: 0 | 1 | null }
   | { kind: 'elimination'; nation: NationId; /** Who took the whole country: the holder of most of its cities. */ annexedBy?: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
-  | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string };
+  | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string }
+  | CommanderEvent;
 
 export interface TurnReport {
   turn: number;
@@ -523,6 +531,10 @@ export interface NationView {
   crisis?: string;
   /** Each nation's standing toward Supremacy, percent: average share of VP, army and income. */
   supremacy: Record<NationId, number>;
+  /** Your own generals, in full. */
+  commanders?: Record<CommanderId, Commander>;
+  /** Foreign generals leading contacts seen this turn, by formation: name and level only. */
+  enemyCommanders?: Record<FormationId, CommanderSighting>;
 }
 
 export interface TurnResult {

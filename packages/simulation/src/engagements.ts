@@ -22,6 +22,7 @@ import {
   type AssaultContext,
   type AssaultOutcome,
 } from './combat';
+import { leaderEffects } from './commanders';
 import { canDetect, type Vision } from './fog';
 import { rollRange } from './rng';
 import { clamp, enterCost, fortressFloor, isAir, isNaval, nationModifiers, passengersOf, relationOf, sameLayer, sortedKeys } from './rules';
@@ -137,6 +138,7 @@ export function resolveStrikes(
 ): Support {
   const support: Support = { air: new Set(), artillery: new Set() };
   const book = new EffectBook();
+  const leaders = leaderEffects(world.commanders);
   for (const nation of sortedKeys(orders)) {
     for (const id of sortedKeys(orders[nation]!.formations)) {
       const order = orders[nation]!.formations[id]!;
@@ -149,7 +151,7 @@ export function resolveStrikes(
       if (keyDistance(f.key, order.target) > def.range) continue;
       const victims = hostilesAt(world, nation, order.target);
       const spotted = canDetect(world, vision[nation]!, order.target);
-      const ctx = { terrain: world.tiles[order.target]!.terrain, spotted, sourceMods: nationModifiers(world.nations[nation]!) };
+      const ctx = { terrain: world.tiles[order.target]!.terrain, spotted, sourceMods: nationModifiers(world.nations[nation]!), sourceLeader: leaders[id] };
       const hits: { formation: FormationId; owner: NationId; strengthLoss: number }[] = [];
       for (const v of victims) {
         const swing = rollRange(100 - RULES.combatSwing, 100 + RULES.combatSwing, seed, world.turn, 'strike', id, v.id);
@@ -219,6 +221,8 @@ export function resolveEngagements(
   engaged: Set<FormationId>,
 ): EngagementResult {
   const book = new EffectBook();
+  const leaders = leaderEffects(world.commanders);
+  const leader = (fid: FormationId) => leaders[fid];
   const mustRetreat = new Map<FormationId, HexKey[]>();
   const claims = new Map<HexKey, { nation: NationId; candidates: Formation[] }[]>();
   const claim = (key: HexKey, nation: NationId, candidates: Formation[]) => claims.set(key, [...(claims.get(key) ?? []), { nation, candidates }]);
@@ -276,6 +280,7 @@ export function resolveEngagements(
       attackerMods: nationModifiers(world.nations[a.nation]!),
       defenderMods: (owner) => nationModifiers(world.nations[owner]!),
       defending: (fid) => defendingIds.has(fid),
+      leader,
     };
     const power = { attack: attackerPower(a.attackers, defenders, ctx), defense: defenderPower(defenders, ctx) };
     const res = assaultLosses(power, swing(id, 'attacker'), swing(id, 'defender'));
@@ -324,6 +329,7 @@ export function resolveEngagements(
       attackerMods: nationModifiers(world.nations[self.owner]!),
       defenderMods: () => nationModifiers(world.nations[other.owner]!),
       defending: () => false,
+      leader,
     });
     // Both sides attack; each side's power is its attack against the other.
     const power = { attack: attackerPower([a], [b], ctxFor(a, b)), defense: attackerPower([b], [a], ctxFor(b, a)) };

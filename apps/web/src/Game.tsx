@@ -17,6 +17,7 @@ import { Report } from './Report';
 import { SLOT_NAMES } from './saves';
 import { useGame, type Tab } from './store';
 import { TurnControls, UnitPanel } from './UnitPanel';
+import { GeneralsRoster, PromotionModal } from './Generals';
 import { Meter, powersOf, signed, Swatch } from './ui';
 import { Icon } from './icons';
 import { sfx } from './sfx';
@@ -196,6 +197,7 @@ const TABS: [Tab, string, string][] = [
   ['economy', 'Economy', 'M4 20V10 M10 20V4 M16 20v-7 M22 20H2'],
   ['research', 'Research', 'M9 3h6 M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3'],
   ['diplomacy', 'Diplomacy', 'M3 12l5-5 4 4 4-4 5 5-9 9z'],
+  ['generals', 'Generals', 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z'],
 ];
 
 function LeftRail() {
@@ -257,6 +259,7 @@ function SidePanel() {
       {tab === 'economy' && <Economy />}
       {tab === 'research' && <Research />}
       {tab === 'diplomacy' && <Diplomacy />}
+      {tab === 'generals' && <GeneralsRoster />}
     </aside>
   );
 }
@@ -439,6 +442,7 @@ export function Game() {
           </div>
           <OperationsSheet />
           <VictoryOverlay />
+          <PromotionModal />
         </div>
       </div>
       {showReport && <Report />}

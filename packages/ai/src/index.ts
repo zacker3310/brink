@@ -1,6 +1,7 @@
 import type {
   AiMemory,
   BuildOrder,
+  CommanderOrders,
   Budget,
   Contact,
   FacilityId,
@@ -20,7 +21,7 @@ import type {
   UnitClass,
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { AIR_REBASE_RANGE, EVENTS, FACILITIES, FACILITY_SLOTS, STACK_LIMIT, TECHS, UNITS, type EventEffect } from '@brink/game-data';
+import { AIR_REBASE_RANGE, EVENTS, FACILITIES, FACILITY_SLOTS, PERKS, STACK_LIMIT, TECHS, UNITS, type CommanderEffect, type EventEffect } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
 import { enterCost, isNaval, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
 
@@ -728,7 +729,61 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   if (budget) out.budget = budget;
   const eventChoice = chooseEvent(view);
   if (eventChoice !== undefined) out.eventChoice = eventChoice;
+  const commanders = planCommanders(view, orders);
+  if (commanders) out.commanders = commanders;
   return out;
+}
+
+/** What a perk is worth to a general leading `f`: punch first, then staying power. */
+function perkValue(e: CommanderEffect, ranged: boolean): number {
+  return (
+    (e.attack ?? 0) * 3 +
+    (e.defense ?? 0) * 2 +
+    (ranged ? (e.strike ?? 0) * 3 : 0) +
+    Math.floor((e.amphibious ?? 0) / 10) +
+    (e.entrench ?? 0) +
+    (e.supply ?? 0) +
+    (e.morale ?? 0) * 2 +
+    (e.readiness ?? 0) +
+    (e.vision ?? 0) * 10 +
+    Math.floor((e.xp ?? 0) / 5) +
+    Math.floor((e.survival ?? 0) / 10)
+  );
+}
+
+/**
+ * Generals lead the strongest assault formations: one in reserve takes the best unled one, and one
+ * whose formation is spent moves to it. Promotions take the perk worth more. Only what the
+ * validator accepts: an active general, an own land formation nobody leads, one assignment each.
+ */
+function planCommanders(view: NationView, orders: Record<FormationId, FormationOrder>): CommanderOrders | undefined {
+  const all = view.commanders;
+  if (!all) return undefined;
+  const ids = sortedKeys(all);
+  const led = new Set(ids.map((id) => all[id]!.formation).filter((f): f is FormationId => !!f));
+  const punch = (f: Formation) => Math.floor(((UNITS[f.unitClass].softAttack + UNITS[f.unitClass].hardAttack) * f.strength) / 1000) + (orders[f.id]?.type === 'attack' ? 20 : 0);
+  const open = sortedKeys(view.formations)
+    .map((id) => view.formations[id]!)
+    .filter((f) => UNITS[f.unitClass].ground && UNITS[f.unitClass].range === 0 && f.unitClass !== 'recon' && !led.has(f.id) && f.strength >= 500)
+    .sort((a, b) => punch(b) - punch(a) || (a.id < b.id ? -1 : 1));
+  const assign: NonNullable<CommanderOrders['assign']> = [];
+  const perks: Record<string, 0 | 1> = {};
+  for (const id of ids) {
+    const c = all[id]!;
+    if (c.offer) {
+      const lf = c.formation ? view.formations[c.formation] : undefined;
+      const ranged = !!lf && UNITS[lf.unitClass].range > 0;
+      const [a, b] = c.offer.options;
+      perks[id] = perkValue(PERKS[b]?.effect ?? {}, ranged) > perkValue(PERKS[a]?.effect ?? {}, ranged) ? 1 : 0;
+    }
+    if (c.status !== 'active') continue;
+    const spent = c.formation ? (view.formations[c.formation]?.strength ?? 0) < 300 : true;
+    if (!spent) continue;
+    const next = open.shift();
+    if (next) assign.push({ commander: id, formation: next.id });
+  }
+  if (assign.length === 0 && Object.keys(perks).length === 0) return undefined;
+  return { ...(assign.length ? { assign } : {}), ...(Object.keys(perks).length ? { perks } : {}) };
 }
 
 /**
