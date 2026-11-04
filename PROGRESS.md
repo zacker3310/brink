@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
+Updated 2026-11-04 (the staff after an operation, AI at sea, ruleset 2.6.0). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -350,11 +350,31 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
   Safari/WebKit; verify on a device (audio unlock, safe areas, standalone launch).
 
-- Balance (ruleset 2.5.0): of 40 soak matches, 17 end by supremacy, 2 by domination, 21 on score at
-  the turn limit (median turn 30; 2.4.0: all 40 at the limit). China wins most decisive ones (its
-  ring of minor states); Japan almost never does. Human win rates (`pnpm test:difficulty`): Easy 88%,
-  Normal 59%, Hard 31% (2.4.0: 100, 38, 6). Next levers: amphibious AI for Japan and the US, and
-  minor-state garrisons that make up a third of the victory points and still mostly hold at turn 30.
+- Balance (ruleset 2.6.0): of 40 soak matches, 21 end by supremacy, 19 on score at the turn limit
+  (2.5.0: 19 decisive). Decisive wins China 13, Russia 4, USA 3, Japan 1 (2.5.0: China 17, Russia
+  1, USA 1, Japan 0); on score USA 7, Russia 6, China 5, Japan 1. Human win rates
+  (`pnpm test:difficulty`, 32 a level): Easy 84%, Normal 59%, Hard 25% (2.5.0: 88, 59, 28). Japan
+  in the human seat is still the weakest (3 of 8 on Easy, 0 of 8 on Normal). Next levers: Japan's
+  lift (two amphibious groups carry four formations; the home army mostly waits for them), and the
+  energy deficit every power runs from turn 1 (upkeep about 70 a turn against 45 to 56 income).
+- The staff after an operation (ruleset 2.6.0; playtest: China took Taipei on turn 4, then sat on
+  53 VP from turn 5 to turn 9): the staff planned every turn from an empty memory, so it chased a
+  different prize each turn (Tokyo, Busan, Seoul, Tokyo...), and the store dropped its diplomacy,
+  so the player stayed at war with all three powers and the army stood on its borders. Now the
+  session keeps a staff memory per human seat (`GameSession.staffMemory`, saved as
+  `SaveFile.staffMemory`; a 2.5.0 save starts it afresh), the store applies the staff's peace, pacts
+  and trade (never a declaration of war), and when an operation is won the staff carries on toward
+  its own next objective, names the best next operation in the notice, and the command card's
+  "Plan an operation" row says which. Test: `packages/session/src/staff.test.ts`.
+- AI at sea (2.6.0): a landing no longer walks into an enemy city whose garrison it cannot see (it
+  lands beside it or storms it); troops across the water are no threat to a coast, an enemy
+  amphibious group off it is; fleets hunt convoys within 6 hexes and guns and planes sink them
+  first; an expedition under way holds its prize; a prize two hexes from an own port is as good as
+  a walk; seen garrisons weigh more and a great power's unseen city is assumed held; a reserve is
+  kept only of what an item costs, so a power out of energy still raises infantry and builds power
+  plants (Japan raised nothing after turn 6). Data: parity now pays the small powers the land
+  income they lack (Japan 113 credits a turn against China's 148 before); supremacy at 29% (31%);
+  Normal's command edge halved; `HARD_AI_STOCKPILE` 105 (120).
 - Arena v2.3 defects, by priority (detail in `docs/architecture.md`, Battles):
   1. Nothing measured on a real iPhone: GPU frame time, gestures on glass, haptics, memory pressure.
   2. Replay across JavaScript engines is unproven: facings are doubles from `Math.atan2`, and

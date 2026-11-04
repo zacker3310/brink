@@ -49,10 +49,16 @@ describe('operations', () => {
     // Sendai, beside Tokyo. Tokyo itself fell to this landing only while Japan's AI emptied it to
     // guard its coast against Korean militia that never leave home (fixed in ruleset 2.5.0): with
     // its garrison in place the capital holds this one landing for 30 turns, as a capital should.
-    const usa = run(1, 'usa', 'Sendai', 16);
+    // Since ruleset 2.6.0 Japan meets a landing before it lands (an amphibious group off its coast
+    // is a threat, its fleets hunt convoys): Sendai holds out until turn 22 instead of falling by 16.
+    const usa = run(1, 'usa', 'Sendai', 24);
     expect(usa.rejected).toBe(0);
     expect(usa.fell).not.toBeNull();
-  }, 60_000);
+    // And the island power carries its own landing across the ocean.
+    const japan = run(1, 'japan', 'Seattle', 24);
+    expect(japan.rejected).toBe(0);
+    expect(japan.fell).not.toBeNull();
+  }, 300_000);
 
   it('keeps a landing a landing once troops are ashore, and ends when the prize is taken', () => {
     const w = createPacificScenario(1);
