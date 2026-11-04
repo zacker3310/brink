@@ -834,6 +834,32 @@ or sweeps), and Reset Turn.
 - The tests found eight defects; seven are fixed and one is kept as a stated rule (a seen tank's
   active protection shows as loaded). `docs/architecture.md` lists them, and the known gaps.
 
+## 14. War-map fire support (v2.4)
+
+What stands around the battle on the war map comes into it as off-map support, for both sides
+(`supportFor` in `apps/web/src/arena/battle.ts`; `ArenaSetup.support` and `redSupport`, merged by id
+with the artillery's rockets in `buildForce`, at most 6 missions of a kind). Blue counts its own
+formations; red counts the enemies blue has in sight this turn. Who fights in the battle is not
+counted twice.
+
+| War map | Brings | West / East | In the battle |
+|---|---|---|---|
+| Fleet within 2 hexes | 2 naval gunfire, 1 cruise missile | Mk 45 (Arleigh Burke), Tomahawk / AK-130 (Slava), Kalibr | Three 127 mm blasts walked over the area (70% observed, 45% blind); one 450 kg warhead on the cell (95 / 85%) |
+| Carrier within 3 | 2 strike sorties | F-35A, GBU-31 / Su-34, KAB-500 | Two heavy bombs on and beside the cell (90 / 55%) |
+| Air wing in strike range, or on a carrier within 3 | 1 strike sortie | as above | as above |
+| Drone company in range, or on a carrier within 3 | 1 kamikaze swarm | LUCAS / Geran-2 (Shahed-136) | Three one-way drones, one on the cell, two around it (80 / 60%) |
+
+- Air defence can bring the cruise missile, the jet and each kamikaze down on the way in: the
+  other side's working SPAA (55% each), air-capable autocannons (30%) and, against aircraft and
+  drones, loaded MANPADS teams (35%), within 5 cells of where it comes down, scaled by how hard
+  the weapon is to hit (cruise missile 0.45, jet 0.35, drone 0). Rolled on the seeded stream; an
+  intercepted jet drops nothing. Naval gunfire and rockets cannot be intercepted.
+- The card shows the chance to land and the chance it is shot down by the guns blue knows of; the
+  AI weighs both from its own picture (`supportIntercept` with its visible set) and calls a mission
+  only on a cluster worth it, never one the engine would refuse.
+- The film flies missiles and bombs in from the side's own edge, the swarm as three drones, and an
+  airburst where the guns get one.
+
 ## Sources
 
 Specifications: General Dynamics Land Systems (M1A2 SEPv3, M1126 Stryker, M10 Booker), Krauss-Maffei

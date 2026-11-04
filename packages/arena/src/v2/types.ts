@@ -347,10 +347,20 @@ export interface Ghost extends Point {
   now: boolean;
 }
 
+/**
+ * Off-map support. Artillery formations bring rockets (HIMARS, Tornado-G); the war map around the
+ * battle brings the rest: ships offshore (naval gunfire, cruise missiles), carriers and air wings
+ * (strike sorties), drone formations (one-way attack swarms).
+ */
+export type SupportId = 'himars' | 'tornado' | 'naval_gun' | 'cruise_missile' | 'strike_jet' | 'kamikaze';
+export const SUPPORT_IDS: readonly SupportId[] = ['himars', 'tornado', 'naval_gun', 'cruise_missile', 'strike_jet', 'kamikaze'];
+
 export interface SupportAsset {
-  id: 'himars' | 'tornado';
+  id: SupportId;
   side: Side;
   missions: number;
+  /** Whose kit it is, for its name (absent in older saves: the asset's own faction). */
+  faction?: Faction;
 }
 
 export interface Conditions {
@@ -433,6 +443,9 @@ export interface ArenaSetup {
   weather?: Weather;
   /** War-map theatre id, for the biome. */
   theatre?: string;
+  /** Off-map support the war map around the battle brings each side, beside the artillery's rockets. */
+  support?: { id: SupportId; missions: number }[];
+  redSupport?: { id: SupportId; missions: number }[];
 }
 
 export interface ArenaResult {

@@ -1123,11 +1123,18 @@ export interface SupportType {
   id: SupportAsset['id'];
   name: string;
   short: string;
+  /** Whose kit `name` is; `east` names the other side's version of the same mission. */
   faction: Faction;
-  /** Missions an artillery formation brings. */
+  /** Missions an artillery formation brings (war-map support: missions come with the setup). */
   missions: number;
   weapon: Weapon;
   specs: UnitType['specs'];
+  /** The eastern version (generic missions both sides fly). */
+  east?: { name: string; short: string; specs: UnitType['specs'] };
+  /** Air defence on the way in can bring it down. */
+  interceptable?: boolean;
+  /** One plain sentence for the card. */
+  text: string;
 }
 
 export const SUPPORT: Record<SupportAsset['id'], SupportType> = {
@@ -1139,6 +1146,7 @@ export const SUPPORT: Record<SupportAsset['id'], SupportType> = {
     missions: 2,
     weapon: wpn({ id: 'gmlrs', name: 'GMLRS · M31 unitary', kind: 'rocket', calibre: 'rocket', range: 45, aim: 95, pen: 300, round: 'he', top: true, lethality: 3, supp: 50, blast: 1, demo: 80, ammo: 2, guidance: 'fnf', indirect: true }),
     specs: { origin: 'USA, Lockheed Martin', weight: '16 t', speed: '85 km/h', note: 'off map; GPS guided' },
+    text: 'One guided rocket: on the cell when it is watched. Everything around it is hit too.',
   },
   tornado: {
     id: 'tornado',
@@ -1148,5 +1156,60 @@ export const SUPPORT: Record<SupportAsset['id'], SupportType> = {
     missions: 1,
     weapon: wpn({ id: 'salvo', name: '122 mm salvo · 9M22U', kind: 'rocket', calibre: 'rocket', range: 45, aim: 65, pen: 40, round: 'he', top: true, lethality: 2.5, supp: 60, blast: 2, demo: 20, ammo: 1, indirect: true, burst: 6 }),
     specs: { origin: 'Russia, Splav', weight: '24 t', speed: '90 km/h', note: 'off map; 5 x 5 saturation' },
+    text: 'Forty rockets over five by five cells.',
+  },
+  naval_gun: {
+    id: 'naval_gun',
+    name: 'Mk 45 5-inch · Arleigh Burke',
+    short: 'Naval gun',
+    faction: 'west',
+    missions: 2,
+    weapon: wpn({ id: 'naval_gun', name: 'Naval gunfire · 127 mm HE', kind: 'howitzer', calibre: '155', range: 45, aim: 70, pen: 60, round: 'he', top: true, lethality: 2, supp: 55, blast: 2, demo: 40, ammo: 2, indirect: true, burst: 4 }),
+    specs: { origin: 'USA, BAE Systems', weight: '22 t mount', speed: '20 rds/min', note: 'off map; a destroyer offshore' },
+    east: { name: 'AK-130 · Slava cruiser', short: 'Naval gun', specs: { origin: 'Russia, Arsenal', weight: '98 t mount', speed: '80 rds/min', note: 'off map; a cruiser offshore' } },
+    text: 'A destroyer offshore drops a salvo of shells over a wide area: suppresses everything, kills soft targets.',
+  },
+  cruise_missile: {
+    id: 'cruise_missile',
+    name: 'Tomahawk Block V',
+    short: 'Tomahawk',
+    faction: 'west',
+    missions: 1,
+    weapon: wpn({ id: 'cruise_missile', name: 'Cruise missile · 450 kg warhead', kind: 'rocket', calibre: 'rocket', range: 45, aim: 95, pen: 600, round: 'he', top: true, lethality: 5, supp: 70, blast: 1, demo: 200, ammo: 1, guidance: 'fnf', indirect: true }),
+    specs: { origin: 'USA, Raytheon', weight: '1.5 t', speed: '880 km/h', note: 'off map; ship launched, GPS guided' },
+    east: { name: '3M-14 Kalibr', short: 'Kalibr', specs: { origin: 'Russia, Novator', weight: '1.8 t', speed: '900 km/h', note: 'off map; ship launched' } },
+    interceptable: true,
+    text: 'One precise, heavy warhead on the cell: kills armour, levels a building. Air defence nearby can shoot it down.',
+  },
+  strike_jet: {
+    id: 'strike_jet',
+    name: 'F-35A · GBU-31 JDAM',
+    short: 'F-35A',
+    faction: 'west',
+    missions: 1,
+    weapon: wpn({ id: 'strike_jet', name: 'Air strike · 2 x 900 kg bombs', kind: 'rocket', calibre: 'rocket', range: 45, aim: 85, pen: 250, round: 'he', top: true, lethality: 4.5, supp: 75, blast: 1, demo: 120, ammo: 1, guidance: 'fnf', indirect: true }),
+    specs: { origin: 'USA, Lockheed Martin', weight: '13 t empty', speed: 'Mach 1.6', note: 'off map; a sortie from a carrier or airfield' },
+    east: { name: 'Su-34 · KAB-500', short: 'Su-34', specs: { origin: 'Russia, Sukhoi', weight: '22 t empty', speed: 'Mach 1.8', note: 'off map; a sortie from an airfield' } },
+    interceptable: true,
+    text: 'A jet drops two heavy bombs on the cell and around it. Air defence nearby can drive it off.',
+  },
+  kamikaze: {
+    id: 'kamikaze',
+    name: 'LUCAS one-way drone',
+    short: 'LUCAS',
+    faction: 'west',
+    missions: 1,
+    weapon: wpn({ id: 'kamikaze', name: 'One-way attack drones · 3', kind: 'loiter', calibre: 'fpv', range: 45, aim: 75, pen: 200, round: 'he', top: true, lethality: 1.8, supp: 45, blast: 1, demo: 40, ammo: 1, guidance: 'fnf', indirect: true, burst: 3 }),
+    specs: { origin: 'USA, SpektreWorks', weight: '80 kg', speed: '160 km/h', note: 'off map; a swarm of three' },
+    east: { name: 'Geran-2 (Shahed-136)', short: 'Geran-2', specs: { origin: 'Iran / Russia', weight: '200 kg', speed: '185 km/h', note: 'off map; a swarm of three' } },
+    interceptable: true,
+    text: 'Three kamikaze drones dive on and around the cell. Each one air defence shoots down is one less blast.',
   },
 };
+
+/** The name a side's support asset goes by: its faction's version of the mission. */
+export function supportName(a: { id: SupportAsset['id']; faction?: Faction }, short = false): string {
+  const t = SUPPORT[a.id];
+  const east = (a.faction ?? t.faction) === 'east' && t.east;
+  return short ? (east ? east.short : t.short) : east ? east.name : t.name;
+}

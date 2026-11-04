@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { rollLog, typeOf, type Battle, type LogEntry, type LogResult } from '@brink/arena';
+import { rollLog, SUPPORT, supportName, typeOf, type Battle, type LogEntry, type LogResult, type SupportId } from '@brink/arena';
 
 // The battle log: every roll you saw, newest first, grouped by round, so the chance on the card can
 // be checked against what came of it. It reads the battle as you know it (`rollLog`): enemies you
@@ -11,8 +11,10 @@ const article = (s: string) => (/^[AEIOU]/.test(s) ? 'an' : 'a');
 
 /** A unit as the log names it: yours by name, theirs by type ("a T-72B3"). */
 function nameOf(b: Battle, id: string): string {
-  if (id === 'support:himars') return 'HIMARS';
-  if (id === 'support:tornado') return 'Tornado-G';
+  if (id.startsWith('support:')) {
+    const sid = id.slice('support:'.length) as SupportId;
+    if (Object.hasOwn(SUPPORT, sid)) return supportName(b.support.find((s) => s.id === sid) ?? { id: sid }, true);
+  }
   const u = b.units.find((x) => x.id === id);
   if (!u) return 'a unit';
   if (u.side === 'blue') return u.name;

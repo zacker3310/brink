@@ -1,5 +1,9 @@
 import { bestFire, facingFrom, fitMen, penChance, shotValue, suppLevel, usableWeapons, woundedMen } from './combat';
-import { act, canAct, reachable, pathTo, safestCell, strikeInfo, supportChance, unitAt, unitById, whyNot } from './engine';
+import { act, canAct, reachable, pathTo, safestCell, strikeInfo, SUPPORT_REACH, supportChance, supportIntercept, unitAt, unitById, whyNot } from './engine';
+import type { SupportId } from './types';
+
+/** What a support mission must be worth (in unit value, after its odds) before the AI calls it. */
+const SUPPORT_BAR: Record<SupportId, number> = { himars: 8, tornado: 10, naval_gun: 9, cruise_missile: 7, strike_jet: 9, kamikaze: 7 };
 import { passable } from './map';
 import { typeOf } from './roster';
 import { cheb, crestAhead, dist, isFlying, lineOfSight, sightRange, visibleTo } from './sight';
@@ -719,12 +723,13 @@ export function decide(b: Battle, side: Side, skip: ReadonlySet<string> = new Se
     for (const e of v.enemies) {
       if (!e.now || isFlying(e.t)) continue;
       let value = 0;
-      for (const o of v.enemies) if (!isFlying(o.t) && Math.max(Math.abs(o.x - e.x), Math.abs(o.y - e.y)) <= (s.id === 'himars' ? 1 : 2)) value += o.t.value * (o.now ? 1 : 0.5);
-      if (v.friends.some((f) => cheb(f, e) <= 3)) continue;
-      value *= supportChance(b, side, s.id, e) / 100;
+      const reach = Math.max(1, SUPPORT_REACH[s.id]);
+      for (const o of v.enemies) if (!isFlying(o.t) && Math.max(Math.abs(o.x - e.x), Math.abs(o.y - e.y)) <= reach) value += o.t.value * (o.now ? 1 : 0.5);
+      if (v.friends.some((f) => cheb(f, e) <= reach + 1)) continue;
+      value *= (supportChance(b, side, s.id, e) / 100) * (1 - supportIntercept(b, side, s.id, e, v.visible));
       if (!best || value > best.value) best = { at: { x: e.x, y: e.y }, value };
     }
-    if (best && best.value >= (s.id === 'himars' ? 8 : 10)) return { type: 'support', asset: s.id, at: best.at };
+    if (best && best.value >= SUPPORT_BAR[s.id]) return { type: 'support', asset: s.id, at: best.at };
   }
   const order = b.units
     .filter((u) => u.side === side && u.alive && !u.carrier && !skip.has(u.id))

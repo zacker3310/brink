@@ -17,6 +17,7 @@ import {
   H,
   inside,
   ROUND_LIMIT,
+  SUPPORT_IDS,
   W,
   type AbilityId,
   type Action,
@@ -28,6 +29,7 @@ import {
   type Difficulty,
   type Point,
   type SiteKind,
+  type SupportId,
   type TimeOfDay,
   type TypeId,
   type Unit,
@@ -164,7 +166,19 @@ export function arenaSetup(seed: number, pick: SetupPick = {}): ArenaSetup {
     ...(biome ? { biome } : {}),
     ...(time ? { time } : {}),
     ...(weather ? { weather } : {}),
+    // Fire support from the war map around the battle (section 14), for either side, drawn last so
+    // the dimensions above stay what they were.
+    ...warSupport(r, 'support'),
+    ...warSupport(r, 'redSupport'),
   };
+}
+
+const WAR_SUPPORT: SupportId[] = ['naval_gun', 'cruise_missile', 'strike_jet', 'kamikaze'];
+
+function warSupport(r: Rng, key: 'support' | 'redSupport'): Partial<ArenaSetup> {
+  if (!r.chance(0.4)) return {};
+  const list = WAR_SUPPORT.filter(() => r.chance(0.5)).map((id) => ({ id, missions: 1 + r.int(2) }));
+  return list.length ? { [key]: list } : {};
 }
 
 /**
@@ -283,8 +297,8 @@ export function randomAction(b: Battle, u: Unit, r: Rng): Action | null {
       return w ? { type: 'strike', unit: u.id, at: aimCell(b, r), weapon: w.id, ...(r.chance(0.2) ? { smoke: true } : {}) } : null;
     }
     case 'support': {
-      const s = b.support.find((x) => x.side === 'blue');
-      return s ? { type: 'support', asset: s.id, at: aimCell(b, r) } : null;
+      const mine = b.support.filter((x) => x.side === 'blue' && x.missions > 0);
+      return mine.length ? { type: 'support', asset: r.pick(mine).id, at: aimCell(b, r) } : null;
     }
     case 'smoke':
       return t.engineer ? { type: 'smoke', unit: u.id, at: adjacent(u, r) } : { type: 'smoke', unit: u.id };
@@ -365,7 +379,10 @@ export function refusable(b: Battle, r: Rng): Refusable {
       return { cmd: { type: 'act', action: { type: 'move', unit: u.id, to: { x: i % W, y: Math.floor(i / W) } } }, why: 'out of reach' };
     },
     () => ({ cmd: { type: 'act', action: { type: 'move', unit: u.id, to: { x: u.x, y: u.y } } }, why: 'already there' }),
-    () => ({ cmd: { type: 'act', action: { type: 'support', asset: b.support.some((s) => s.side === 'blue' && s.id === 'himars') ? 'tornado' : 'himars', at: randomCell(r) } }, why: 'no such asset' }),
+    () => {
+      const missing = SUPPORT_IDS.filter((id) => !b.support.some((s) => s.side === 'blue' && s.id === id));
+      return missing.length ? { cmd: { type: 'act', action: { type: 'support', asset: r.pick(missing), at: randomCell(r) } }, why: 'no such asset' } : null;
+    },
     () =>
       r.pick([
         { cmd: bad({ type: 'act', action: { type: 'teleport', unit: u.id, to: { x: 3, y: 3 } } }), why: 'malformed: unknown order' },

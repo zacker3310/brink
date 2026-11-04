@@ -366,6 +366,36 @@ export function interceptors(b: Battle, target: Unit, known?: Set<string>): numb
   return 1 - miss;
 }
 
+/** Air defence reaches off-map strikes this many cells (Chebyshev) from where they come down. */
+export const AREA_DEFENCE_RANGE = 5;
+
+/**
+ * Air defence that can engage an off-map strike coming down on `p`: the `defender` side's working
+ * SPAA and air-capable autocannons (and, against aircraft and drones, MANPADS teams), sorted by id.
+ * `known`: only the units the attacking side knows about.
+ */
+export function areaDefenders(b: Battle, defender: Side, p: Point, manpads: boolean, known?: Set<string>): Unit[] {
+  return b.units
+    .filter((u) => u.side === defender && u.alive && !u.carrier && (!known || known.has(u.id)) && cheb(u, p) <= AREA_DEFENCE_RANGE)
+    .filter((u) => !u.firepowerKill && suppLevel(u.supp) !== 'broken')
+    .filter((u) => {
+      const t = typeOf(u.type);
+      return t.role === 'spaa' || t.weapons.some((w) => w.kind === 'autocannon' && w.air === 'yes') || (manpads && t.weapons.some((w) => w.kind === 'manpads' && (u.ammo[w.id] ?? 1) > 0));
+    })
+    .sort((m, n) => (m.id < n.id ? -1 : 1));
+}
+
+/** Chance (0..1) the defenders around `p` bring down one incoming off-map strike. `hard`: 0..1, how hard it is to hit. */
+export function areaInterceptChance(b: Battle, defender: Side, p: Point, manpads: boolean, hard: number, known?: Set<string>): number {
+  let miss = 1;
+  for (const u of areaDefenders(b, defender, p, manpads, known)) {
+    const t = typeOf(u.type);
+    const per = t.role === 'spaa' ? 0.55 : t.weapons.some((w) => w.kind === 'autocannon' && w.air === 'yes') ? 0.3 : 0.35;
+    miss *= 1 - per * (1 - hard);
+  }
+  return 1 - miss;
+}
+
 /** The best weapon this unit has against `target` from `from`, by expected effect. */
 export function bestFire(b: Battle, shooter: Unit, target: Unit, from: Point = shooter, overwatch = false, known?: Set<string>): FireInfo | null {
   let best: FireInfo | null = null;

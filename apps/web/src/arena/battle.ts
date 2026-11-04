@@ -1,6 +1,7 @@
 import type { ArenaBattle, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
-import { abilitiesFor, ARSENAL_OF, rankOf, type ArenaResult, type ArenaSetup, type Battle, type BattleEvent, type SiteKind, type UnitSpec } from '@brink/arena';
+import { keyDistance } from '@brink/map';
+import { abilitiesFor, ARSENAL_OF, rankOf, SUPPORT_IDS, type ArenaResult, type ArenaSetup, type Battle, type BattleEvent, type SiteKind, type SupportId, type UnitSpec } from '@brink/arena';
 
 // A battle request: the stack you sent at a hex and the enemies you can see there, set up as an
 // arena fight. Each formation becomes a detachment of a company (docs/arena-v2.md, section 5).
@@ -34,6 +35,53 @@ export function enemySkill(view: NationView, defenders: number): number {
   return Math.max(0.08, Math.min(0.95, base + (view.turn / Math.max(1, view.maxTurns)) * 0.3 + Math.max(0, defenders - 1) * 0.04));
 }
 
+type SupportList = { id: SupportId; missions: number }[];
+
+/** Ships within this many hexes of a battle fire on it: naval guns and cruise missiles. */
+export const NAVAL_REACH = 2;
+/** Carriers within this many hexes put strike sorties over it, from their own wing and what rides aboard. */
+export const CARRIER_REACH = 3;
+
+/**
+ * The off-map support the war map brings to a battle at `target`, each side's from what stands
+ * around it: fleets offshore (naval gunfire, a cruise missile each), carriers (two strike sorties
+ * each), air wings and drone companies in strike range (a sortie, a kamikaze swarm), from a base or
+ * a carrier deck nearby. Blue's from its own formations, red's from the enemies it has in sight.
+ * Who fights in the battle itself (`exclude`) is not counted twice.
+ */
+export function supportFor(view: NationView, target: HexKey, exclude: readonly string[] = []): { blue: SupportList; red: SupportList } {
+  const skip = new Set(exclude);
+  const blue = new Map<SupportId, number>();
+  const red = new Map<SupportId, number>();
+  const add = (m: Map<SupportId, number>, id: SupportId, n: number) => m.set(id, (m.get(id) ?? 0) + n);
+  const count = (m: Map<SupportId, number>, cls: string, d: number, deckNear: boolean) => {
+    if (cls === 'fleet' && d <= NAVAL_REACH) {
+      add(m, 'naval_gun', 2);
+      add(m, 'cruise_missile', 1);
+    } else if (cls === 'carrier' && d <= CARRIER_REACH) add(m, 'strike_jet', 2);
+    else if (cls === 'air' && (d <= UNITS.air.range || deckNear)) add(m, 'strike_jet', 1);
+    else if (cls === 'drone' && (d <= UNITS.drone.range || deckNear)) add(m, 'kamikaze', 1);
+  };
+  for (const id of Object.keys(view.formations).sort()) {
+    const f = view.formations[id]!;
+    if (skip.has(id)) continue;
+    const ship = f.aboard ? view.formations[f.aboard] : undefined;
+    // Aboard a transport, nothing flies; aboard a carrier near enough, the deck is the base.
+    if (f.aboard && (!ship || UNITS[ship.unitClass].carries !== 'air')) continue;
+    const deckNear = !!ship && keyDistance(ship.key, target) <= CARRIER_REACH;
+    count(blue, f.unitClass, f.aboard ? Infinity : keyDistance(f.key, target), deckNear);
+  }
+  for (const id of Object.keys(view.contacts).sort()) {
+    const c = view.contacts[id]!;
+    if (skip.has(c.formation) || !c.confirmed || view.relations[c.owner] !== 'war') continue;
+    // The garrison and its own aircraft in the hex are in the battle already.
+    if (c.key === target && !UNITS[c.unitClass].naval) continue;
+    count(red, c.unitClass, keyDistance(c.key, target), false);
+  }
+  const list = (m: Map<SupportId, number>): SupportList => SUPPORT_IDS.filter((x) => (m.get(x) ?? 0) > 0).map((x) => ({ id: x, missions: m.get(x)! }));
+  return { blue: list(blue), red: list(red) };
+}
+
 export function battleFor(view: NationView, target: HexKey, orders: Record<FormationId, FormationOrder>): BattleRequest | null {
   const fighters = Object.keys(orders)
     .filter((id) => orders[id]!.type === 'attack' && view.formations[id])
@@ -60,6 +108,7 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
   }));
   // The defenders' kit comes from the strongest power holding the hex.
   const owner = enemies[0]!.owner;
+  const support = supportFor(view, target, [...fighters, ...enemies.map((c) => c.formation)]);
   const place = site?.name ?? (tile?.terrain ? `the ${tile.terrain}` : 'the line');
   return {
     target,
@@ -78,6 +127,8 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
       difficulty: view.difficulty ?? 'normal',
       abilities: abilitiesFor(view.self.research.unlocked),
       theatre: view.scenarioId,
+      ...(support.blue.length ? { support: support.blue } : {}),
+      ...(support.red.length ? { redSupport: support.red } : {}),
     },
   };
 }
