@@ -1,5 +1,5 @@
 import type { Terrain } from '@brink/contracts';
-import type { AbilityId, Arsenal, Biome, SiteKind, TimeOfDay, TypeId, Weather } from '@brink/arena';
+import type { AbilityId, Arsenal, Biome, SiteKind, SupportId, TimeOfDay, TypeId, Weather } from '@brink/arena';
 import type { BattleRequest } from './battle';
 
 // Skirmish: hand-made battles off the war map, for practice and stars. Each one opens when your
@@ -23,6 +23,9 @@ export interface Skirmish {
   abilities: AbilityId[];
   /** Total stars needed to play it. */
   stars: number;
+  /** Off-map support on call for each side, as the war map would bring it (docs/arena-v2.md, section 14). */
+  support?: { id: SupportId; missions: number }[];
+  redSupport?: { id: SupportId; missions: number }[];
 }
 
 export const SKIRMISHES: readonly Skirmish[] = [
@@ -37,6 +40,7 @@ export const SKIRMISHES: readonly Skirmish[] = [
   { id: 'desert-raid', name: 'Desert Raid', text: 'Apaches and a Little Bird over open desert. Kill their air defence first, then the armour.', terrain: 'plains', river: false, site: 'depot', biome: 'desert', time: 'day', weather: 'clear', arsenal: { blue: 'us', red: 'legacy' }, yours: ['ah64e', 'ah64e', 'ah6', 'm1134', 'm1134', 'stryker', 'squad_w', 'raven', 'stinger', 'medic_w'], theirs: ['t72b3', 't72b3', 'bmp3', 'squad_e', 'igla', 'igla', 'tunguska', 'kornetd', 'squad_e', 'mortar_e'], skill: 0.3, abilities: [], stars: 3 },
   { id: 'air-assault', name: 'Air Assault', text: 'Black Hawks put two squads on the objective at dawn while the Apache covers them.', terrain: 'plains', river: false, site: 'objective', biome: 'temperate', time: 'dawn', weather: 'clear', arsenal: { blue: 'us', red: 'russia' }, yours: ['uh60', 'squad_w', 'uh60', 'squad_w', 'ah64e', 'ah6', 'javelin', 'gustaf', 'medic_w', 'mortar_w', 'm10'], theirs: ['squad_e', 'squad_e', 'bmp3', 'squad_e', 'igla', 'rpg', 'sniper_e', 'sprut', 'mortar_e', 'medic_e'], skill: 0.45, abilities: ['sweep'], stars: 8 },
   { id: 'night-raid', name: 'Night Raid', text: 'A tank raid across the steppe at night. Turn on the thermal view: their infantry cannot see you.', terrain: 'plains', river: false, site: null, biome: 'steppe', time: 'night', weather: 'clear', arsenal: { blue: 'us', red: 'legacy' }, yours: ['m1a2', 'm1a2', 'm1a2', 'm1a2', 'm2a3', 'squad_w', 'm2a3', 'squad_w', 'm88', 'medic_w', 'paladin'], theirs: ['t72b3', 't72b3', 't72b3', 'bmp3', 'squad_e', 'squad_e', 'rpg', 'kornet', 'msta', 'brem', 'medic_e'], skill: 0.48, abilities: ['missiles'], stars: 11 },
+  { id: 'fire-support', name: 'Fire Support', text: 'A destroyer offshore, strike jets, a cruise missile and a drone swarm on call. Find their air defence first: it can bring your strikes down.', terrain: 'plains', river: false, site: 'objective', biome: 'temperate', time: 'day', weather: 'clear', arsenal: { blue: 'us', red: 'russia' }, yours: ['m1a2', 'm1a2', 'm2a3', 'squad_w', 'm2a3', 'squad_w', 'raven', 'stinger', 'gepard', 'javelin', 'medic_w'], theirs: ['t90m', 't90m', 'bmp3', 'squad_e', 'bmp3', 'squad_e', 'tunguska', 'igla', 'kornet', 'msta', 'medic_e'], skill: 0.4, abilities: [], stars: 7, support: [{ id: 'naval_gun', missions: 2 }, { id: 'cruise_missile', missions: 1 }, { id: 'strike_jet', missions: 2 }, { id: 'kamikaze', missions: 1 }], redSupport: [{ id: 'strike_jet', missions: 1 }, { id: 'kamikaze', missions: 1 }] },
   { id: 'winter-line', name: 'Winter Line', text: 'Snow and a frozen front. Leopards and Challengers against T-80s that can outrun them.', terrain: 'hills', river: false, site: null, biome: 'winter', time: 'day', weather: 'snow', arsenal: { blue: 'europe', red: 'russia' }, yours: ['leo2a7', 'leo2a7', 'cr3', 'cv90', 'squad_w', 'cv90', 'squad_w', 'mortar_w', 'engineer_w', 'gepard', 'medic_w', 'm88', 'paladin'], theirs: ['t80bvm', 't80bvm', 't90m', 'bmp3', 'squad_e', 'bmp3', 'squad_e', 'kornet', 'tunguska', 'msta', 'ka52', 'medic_e'], skill: 0.55, abilities: ['repair', 'armor'], stars: 14 },
 ];
 
@@ -61,6 +65,8 @@ export function skirmishRequest(s: Skirmish, attempt: number): BattleRequest {
       defenders: [{ id: 'red', cls: 'infantry', strength: 1000, name: 'Enemy Company', color: '#c9733a', rank: s.skill > 0.6 ? 1 : 0, types: s.theirs }],
       skill: s.skill,
       abilities: s.abilities,
+      ...(s.support ? { support: s.support } : {}),
+      ...(s.redSupport ? { redSupport: s.redSupport } : {}),
     },
   };
 }

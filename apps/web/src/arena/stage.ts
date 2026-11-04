@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { expectedArea, H, W, typeOf, type Battle, type BattleEvent, type Effect, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
+import { expectedArea, FACTION_OF, H, supportName, W, typeOf, type Battle, type SupportId, type BattleEvent, type Effect, type Point, type Side, type TypeId, type Unit, type UnitType } from '@brink/arena';
 import { BattleAudio } from './audio';
 import { Effects } from './fx';
+import { Sorties, type Flight, type Outcome, type Plan } from './fx/sorties';
 import { buildModel, buildProjectile, kitFor, paintFor, rimOff, setOutline, setOutlineView, setRimLight, SoldierCrowd, stencilled, type OutlineRole, type UnitModel } from './models3d';
 import { palette, setPalette, teamColor, teamMaterial } from './palette';
 import { LEVEL, METRE, QUALITY, type ArenaSettings, type Motion, type Palette, type Quality } from './quality';
@@ -123,6 +124,16 @@ const SHAKE_SWAY = 0.012;
 /** Smooth noise in -1..1 for the shake: three waves that never line up, not a new random number each frame. */
 const wave = (t: number, seed: number) => (Math.sin(t * 37.7 + seed) + 0.6 * Math.sin(t * 61.3 + seed * 2.3) + 0.3 * Math.sin(t * 91.1 + seed * 4.1)) / 1.9;
 const shares = (a: { keys: string[] }, b: { keys: string[] }) => a.keys.some((k) => b.keys.includes(k));
+
+/** Off-map support the film flies in (the rockets fly as rockets). */
+type FlownSupport = Extract<SupportId, 'strike_jet' | 'cruise_missile' | 'naval_gun' | 'kamikaze'>;
+const FLOWN = new Set<string>(['strike_jet', 'cruise_missile', 'naval_gun', 'kamikaze']);
+
+/** The mission a beat opens with, when it is one the film flies in. */
+function supportOf(beat: Beat): FlownSupport | null {
+  const h = beat.events[0];
+  return h?.type === 'fire' && h.unit === `support:${h.weapon}` && FLOWN.has(h.weapon) ? (h.weapon as FlownSupport) : null;
+}
 
 interface View {
   id: string;
@@ -253,6 +264,8 @@ export class BattleStage {
   private readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
   private readonly world: World;
   private readonly fx: Effects;
+  /** Off-map support in the air and offshore: jets, cruise missiles, ships, kamikaze swarms. */
+  private readonly sorties: Sorties;
   private readonly crowd: SoldierCrowd;
   readonly audio: BattleAudio;
   private readonly views = new Map<string, View>();
@@ -329,7 +342,9 @@ export class BattleStage {
   private clock = 0;
   private thermal = false;
   /** An action cam in progress: where to look from and at, and for how long. */
-  private cam: { from: THREE.Vector3; at: THREE.Vector3; t: number; dur: number } | null = null;
+  private cam: { from: THREE.Vector3; at: THREE.Vector3; t: number; dur: number; track?: (t: number, from: THREE.Vector3, at: THREE.Vector3) => void } | null = null;
+  /** Tests: the film holds still when its clock reaches this (screenshots mid-flight). */
+  private pauseAt = Infinity;
   private readonly preset;
   /** Frame timing (ms of our own work per frame), for the performance probe. */
   private readonly frameMs: number[] = [];
@@ -461,6 +476,7 @@ export class BattleStage {
     this.audio = new BattleAudio({ radio: opts.settings.radio });
     this.audio.setNight(night);
     this.audio.ambience(battle.conditions.biome, battle.conditions.weather);
+    this.sorties = new Sorties(this.scene, this.fx, this.audio, (x, z) => this.world.heightAt(x, z), { w: W, h: H });
 
     const tileGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     const tile = (color: THREE.Color, opacity: number, n: number) => {
@@ -629,7 +645,7 @@ export class BattleStage {
       return 'playback';
     }
     // Scouted dots shrinking away (the insight layer) play out like the film's tail.
-    if (now < this.filmUntil || this.live || this.fx.busy || this.hudLayer.live || this.insight.animating) return 'playback';
+    if (now < this.filmUntil || this.live || this.fx.busy || this.sorties.busy || this.hudLayer.live || this.insight.animating) return 'playback';
     for (const v of this.views.values()) if (v.flash > 0 || (v.fall > 0 && v.fall < 1)) return 'playback';
     this.camState(this.camNow);
     let moved = false;
@@ -866,6 +882,8 @@ export class BattleStage {
     if (this.cam) {
       // An action cam: low and close, then back to the planning view.
       const c = this.cam;
+      // A moving shot follows what it films.
+      if (c.track) this.safely(() => c.track!(c.t, c.from, c.at));
       const p = Math.min(1, c.t / c.dur);
       const blend = p < 0.15 ? p / 0.15 : p > 0.85 ? (1 - p) / 0.15 : 1;
       this.placeCamera();
@@ -1228,7 +1246,7 @@ export class BattleStage {
    * the clock, the shake now; for measuring, film seconds played while busy, seconds queued, and where
    * turns began.
    */
-  filmState(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number; marks: { side: Side; planned: number; played: number }[] } {
+  filmState(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number; marks: { side: Side; planned: number; played: number }[]; flights: number } {
     const r = (v: number) => Math.round(v * 1000) / 1000;
     return {
       steps: [...this.playing, ...this.waiting].reduce((n, c) => n + c.steps.length, 0),
@@ -1241,6 +1259,7 @@ export class BattleStage {
       clock: this.clock,
       settled: this.settled,
       faults: this.faults,
+      flights: this.sorties.launched,
       camera: [this.focus.x, this.focus.y, this.focus.z, this.wantFocus.x, this.wantFocus.y, this.wantFocus.z, this.dist, this.wantDist, this.tilt, this.wantTilt, this.yaw, this.wantYaw].map(r),
     };
   }
@@ -1612,6 +1631,7 @@ export class BattleStage {
       this.building = clip;
       try {
         if (beat.volley) this.queueVolley(beat.volley);
+        else if (supportOf(beat)) this.queueSupport(beat, supportOf(beat)!);
         else for (const e of beat.events) this.queue(e);
       } catch (err) {
         this.fault(err);
@@ -1663,6 +1683,7 @@ export class BattleStage {
     }
     this.playing.length = 0;
     this.waiting.length = 0;
+    this.sorties.clear();
     this.cam = null;
     this.slow = 0;
     this.stop = 0;
@@ -2364,17 +2385,17 @@ export class BattleStage {
             if (kind === 'atgm' || kind === 'manpads') this.fx.missile(from, to, kind === 'manpads' ? 'manpads' : s.f.weapon.toLowerCase().includes('hellfire') ? 'hellfire' : 'atgm', flight, { top: !!typeOf(v?.type ?? 'm1a2').weapons.find((w) => w.id === s.f.weapon)?.top });
             else if (kind === 'rocket') {
               this.fx.missile(from, to, 'rocket', flight);
-              // Off-map bombs and cruise missiles: a second weapon off the same jet, and the scream of it coming in.
-              if (offMap && s.f.weapon === 'strike_jet') this.fx.missile(from.clone().add(new THREE.Vector3(0.6, 0.4, 0)), to.clone().add(new THREE.Vector3(0.5, 0, 0.5)), 'rocket', flight);
-              if (offMap && (s.f.weapon === 'strike_jet' || s.f.weapon === 'cruise_missile')) this.audio.incoming(s.f.to.x, s.f.to.y, flight);
             }
             else if (kind === 'mortar' || kind === 'howitzer') {
               this.fx.shell(from, to, flight);
               this.audio.incoming(s.f.to.x, s.f.to.y, flight);
             } else if (kind === 'fpv' || kind === 'loiter') {
-              // Off-map kamikaze swarms fly the larger one-way airframe.
-              const dk = s.f.weapon === 'kamikaze' || v?.type === 'lancet' ? 'lancet' : s.f.weapon.includes('switch') || v?.type === 'switchblade' ? 'switchblade' : 'fpv';
+              const dk = v?.type === 'lancet' ? 'lancet' : s.f.weapon.includes('switch') || v?.type === 'switchblade' ? 'switchblade' : 'fpv';
               const model = buildProjectile(dk);
+              model.scale.setScalar(SOLDIER_SCALE);
+              // The airframe flies in the scene for its flight, then goes.
+              this.scene.add(model);
+              this.sorties.after(flight + 0.05, () => this.scene.remove(model), true);
               this.fx.drone(from, to, flight, dk, model);
               this.audio.drone(`d${this.clock}`, 'fpv', s.f.to.x, s.f.to.y);
             } else {
@@ -2444,6 +2465,142 @@ export class BattleStage {
       });
     }
     for (const e of volley.rest) this.queue(e);
+  }
+
+  /** Tests: hold the film still once `seconds` more of it have played (null lets it run on). */
+  pauseFilm(seconds: number | null): void {
+    this.pauseAt = seconds === null ? Infinity : this.clock + Math.max(0, seconds);
+    this.invalidate();
+  }
+
+  /**
+   * An off-map mission from the war map (docs/arena-v2.md, section 14): the jet, the missile, the
+   * ship's shells or the swarm fly in from their side's edge during a run, timed so each arrives
+   * when the film's blast (or the interception) for it plays. The blasts and what they did play as
+   * ever, after the run. The gun that brought it down is shown only when blue can see it.
+   */
+  private queueSupport(beat: Beat, id: FlownSupport): void {
+    const clip = this.building!;
+    const head = beat.events[0] as FireEvent;
+    const side: Side = head.from.y > H / 2 ? 'blue' : 'red';
+    const asset = this.battle.support.find((s) => s.side === side && s.id === id);
+    const faction = asset?.faction ?? FACTION_OF[this.opts.arsenal[side]];
+    const name = supportName({ id, faction }, true);
+    const outcomes: (Outcome & { gun?: string })[] = [];
+    const intercepted = beat.events.some((e) => e.type === 'intercept' && e.unit === head.unit);
+    const approach = id === 'strike_jet' ? (intercepted ? 1.7 : 2.1) : id === 'cruise_missile' ? 1.9 : id === 'naval_gun' ? 2.3 : 2.7;
+    const first = clip.steps.length;
+    const elapsed = () => {
+      let t = 0;
+      for (let i = first; i < clip.steps.length; i++) t += clip.steps[i]!.dur;
+      return t;
+    };
+    const aim = { x: head.to.x + 0.5, z: head.to.y + 0.5 };
+    // A blue run that kills a vehicle gets a short cinematic cut (with action cams and full motion).
+    const kills = side === 'blue' && beat.events.some((e) => e.type === 'destroyed' && e.seen && e.how !== 'expended' && this.views.get(e.unit)?.side === 'red' && this.views.get(e.unit)?.t.mobility !== 'foot');
+    this.step(approach, {
+      start: () => {
+        this.show(clip, aim.x, aim.z, true);
+        for (const o of outcomes) o.by = o.gun ? this.interceptor(o.gun, id) : null;
+        const plan: Plan = { side, faction, outcomes, approach };
+        let flight: Flight | null = null;
+        if (id === 'strike_jet') flight = this.sorties.jet(plan);
+        else if (id === 'cruise_missile') flight = this.sorties.cruise(plan);
+        else if (id === 'kamikaze') flight = this.sorties.swarm(plan);
+        else {
+          const at = this.sorties.naval(plan, this.scene.fog instanceof THREE.Fog ? this.scene.fog.color : null);
+          if (side === 'blue') this.gunCam(at.ship, at.gun, aim);
+        }
+        if (flight && kills) this.flightCam(id, flight, aim, approach + 1.1);
+      },
+    });
+    for (const e of beat.events.slice(1)) {
+      if (e.type === 'fire' && e.unit === head.unit) continue;
+      if (e.type === 'boom') outcomes.push({ at: elapsed(), kind: 'boom', x: e.x + 0.5, z: e.y + 0.5 });
+      if (e.type === 'intercept' && e.unit === head.unit) {
+        outcomes.push({ at: elapsed(), kind: 'intercept', x: e.x + 0.5, z: e.y + 0.5, ...(e.by !== e.unit ? { gun: e.by } : {}) });
+        this.step(0.45, {
+          start: () => {
+            const gun = e.by !== e.unit ? this.views.get(e.by) : undefined;
+            const shown = !!gun && (gun.side === 'blue' || gun.holder.visible);
+            if (gun && shown) this.say(gun, id === 'kamikaze' ? 'Drone Down' : id === 'cruise_missile' ? 'Missile Down' : 'Shot Down', this.toneFor(gun), 'major');
+            const what = id === 'kamikaze' ? `${name} drone` : name;
+            if (side === 'blue') this.opts.onFeed?.(`Our ${what} was shot down`, 'bad');
+            else this.opts.onFeed?.(`${(gun && shown && this.battle.units.find((u) => u.id === gun.id && u.side === 'blue')?.name) || 'We'} shot down their ${what}`, 'good');
+          },
+        });
+        continue;
+      }
+      this.queue(e);
+    }
+  }
+
+  /** The gun that brought a mission down, as the film shows it: its muzzle and whether it fires shells or a missile. */
+  private interceptor(id: string, mission: FlownSupport): Outcome['by'] {
+    const v = this.views.get(id);
+    if (!v || !(v.side === 'blue' || v.holder.visible)) return null;
+    const ws = v.t.weapons;
+    const sam = ws.find((w) => w.kind === 'manpads');
+    const gun = ws.find((w) => w.kind === 'autocannon' && w.air !== 'no');
+    const useGun = !!gun && (mission === 'kamikaze' || !sam);
+    return { from: this.muzzleOf(v), guns: useGun, calibre: useGun ? gun!.calibre : 'manpads' };
+  }
+
+  /** A cut to the ship on the horizon as its gun fires, then back to the target for the fall of shot. */
+  private gunCam(ship: THREE.Vector3, gun: THREE.Vector3, aim: { x: number; z: number }): void {
+    if (!this.feel.actionCams || this.feel.motion !== 'full' || this.cam) return;
+    // From the edge of the field nearest the ship, low, looking out to it.
+    const ex = Math.max(2, Math.min(W - 2, gun.x * 0.25 + aim.x * 0.75));
+    const ez = gun.z > H ? H + 1.5 : -1.5;
+    const eye = new THREE.Vector3(ex, this.ground(Math.max(0, Math.min(W, ex)), Math.max(0, Math.min(H, ez))) + 1.6, ez);
+    this.cam = { from: eye, at: new THREE.Vector3(ship.x, gun.y * 0.6 + ship.y * 0.4, ship.z), t: 0, dur: 1.5 };
+  }
+
+  /**
+   * A moving shot of a blue run that kills: low beside the target watching the jet come in and the
+   * bombs go down, or chasing the missile in over the ground.
+   */
+  private flightCam(id: FlownSupport, flight: Flight, aim: { x: number; z: number }, dur: number): void {
+    if (!this.feel.actionCams || this.feel.motion !== 'full' || this.cam) return;
+    const target = new THREE.Vector3(aim.x, this.ground(aim.x, aim.z) + 0.3, aim.z);
+    const last = new THREE.Vector3().copy(flight.pos);
+    if (id === 'cruise_missile') {
+      const back = new THREE.Vector3();
+      this.cam = {
+        from: flight.pos.clone(),
+        at: target.clone(),
+        t: 0,
+        dur,
+        track: (_t, from, at) => {
+          if (flight.alive) last.copy(flight.pos);
+          back.copy(flight.dir).setY(0);
+          if (back.lengthSq() < 1e-6) back.set(0, 0, -1);
+          back.normalize();
+          // Behind and a little above it; after the hit, hold where it was looking.
+          from.copy(last).addScaledVector(back, -2.6);
+          from.y = Math.max(from.y + 0.7, this.ground(from.x, from.z) + 0.6);
+          at.copy(flight.alive ? last : target).addScaledVector(back, flight.alive ? 3 : 0);
+        },
+      };
+      return;
+    }
+    // Low and to one side of the target, the jet coming in over the camera's shoulder.
+    const side = new THREE.Vector3(flight.dir.z, 0, -flight.dir.x).normalize();
+    if (!Number.isFinite(side.x) || side.lengthSq() < 0.5) side.set(1, 0, 0);
+    const eye = target.clone().addScaledVector(side, 3.4).addScaledVector(flight.dir.clone().setY(0).normalize(), -1.2);
+    eye.y = Math.max(target.y + 1.1, this.ground(eye.x, eye.z) + 0.9);
+    this.cam = {
+      from: eye,
+      at: target.clone(),
+      t: 0,
+      dur,
+      track: (t, _from, at) => {
+        if (flight.alive) last.copy(flight.pos);
+        // Look between the jet and the target while it runs in, then settle on the target.
+        const w = flight.alive ? Math.max(0, 0.55 - (t / dur) * 0.9) : 0;
+        at.copy(target).lerp(last, w);
+      },
+    };
   }
 
   /** A line for the kill feed: who got whom, as far as we saw. */
@@ -2574,8 +2731,12 @@ export class BattleStage {
       this.slow = Math.max(0, this.slow - real);
       dt *= 0.3;
     }
+    // Tests: hold the film where it was asked to stop.
+    const paused = this.clock + dt >= this.pauseAt;
+    if (paused) dt = Math.max(0, this.pauseAt - this.clock);
     this.clock += dt;
-    this.run(dt, real);
+    // A held film is not a stuck one: its steps do not age while it stands.
+    this.run(dt, paused ? dt : real);
     if (this.cam) {
       this.cam.t += dt;
       if (this.cam.t >= this.cam.dur) this.cam = null;
@@ -2624,6 +2785,7 @@ export class BattleStage {
     this.applyCamera(real);
     this.insight.tick(real, { yaw: this.yaw, perPx: (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / Math.max(1, this.host.clientHeight), cinematic: this.cam !== null });
     this.world.update(dt, this.camera);
+    this.sorties.update(dt);
     this.fx.update(dt, this.camera);
     this.crowd.update(dt);
     this.audio.setListener({ x: this.focus.x - 0.5, y: this.focus.z - 0.5, zoom: Math.min(1, this.dist / this.maxDist) });
@@ -2700,6 +2862,7 @@ export class BattleStage {
     this.sightProbe.dispose();
     this.hudLayer.dispose();
     this.audio.dispose();
+    this.sorties.dispose();
     this.fx.dispose();
     this.crowd.dispose();
     // Release what the renderer drew or compiled, and whatever is still in the scene or the models.

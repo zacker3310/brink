@@ -106,6 +106,8 @@ declare global {
       overlay: () => ReturnType<BattleStage['overlayCounts']> | null;
       /** The film's queue (steps waiting, action cam, clock). */
       film: () => ReturnType<BattleStage['filmState']> | null;
+      /** Tests: hold the film still once this many more seconds of it have played (null lets it go). */
+      pauseFilm: (seconds: number | null) => void;
       /** The field's palette and outlines. */
       look: () => ReturnType<BattleStage['lookState']> | null;
       /** The cells (y * w + x) the selected unit can be tapped to move to now. */
@@ -604,6 +606,16 @@ function Verdict({ result, req, battle, onDone }: { result: ArenaResult; req: Ba
   );
 }
 
+/** What the field asks for when an off-map asset is picked. */
+const SUPPORT_PROMPT: Record<SupportId, string> = {
+  himars: 'Tap a cell for the rockets',
+  tornado: 'Tap a cell for the rockets',
+  naval_gun: 'Tap a cell for the naval guns',
+  cruise_missile: 'Tap a cell for the missile',
+  strike_jet: 'Tap a cell for the bombs',
+  kamikaze: 'Tap a cell for the drones',
+};
+
 /** What each off-map asset is, for the brief. */
 const SUPPORT_ROLE: Record<SupportId, string> = { himars: 'Rockets', tornado: 'Rockets', naval_gun: 'Naval gunfire', cruise_missile: 'Cruise missiles', strike_jet: 'Air strikes', kamikaze: 'Kamikaze drones' };
 
@@ -951,6 +963,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         perf: (reset) => stageRef.current?.perf(reset) ?? null,
         overlay: () => stageRef.current?.overlayCounts() ?? null,
         film: () => stageRef.current?.filmState() ?? null,
+        pauseFilm: (seconds) => stageRef.current?.pauseFilm(seconds),
         look: () => stageRef.current?.lookState() ?? null,
         reach: () => reachNow.current,
         unitAt: (x, y) => stageRef.current?.unitNear(x, y, 30) ?? null,
@@ -1857,7 +1870,7 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
       {mode.kind !== 'none' && (
         <div className="pointer-events-none absolute inset-x-0 top-[30%] z-10 text-center">
           <span className="rounded-full bg-black/85 px-4 py-2 text-[15px] font-semibold text-white">
-            {mode.kind === 'strike' ? `Tap a cell to call ${mode.smoke ? 'smoke' : 'fire'}` : mode.kind === 'face' ? 'Tap where to face' : mode.kind === 'breach' ? 'Tap a cell next to it to breach or sweep for mines' : mode.kind === 'mine' ? 'Tap a cell next to it to mine' : mode.kind === 'support' ? 'Tap a cell for the rockets' : `Tap a cell: ${ABILITIES[mode.id].name}`}
+            {mode.kind === 'strike' ? `Tap a cell to call ${mode.smoke ? 'smoke' : 'fire'}` : mode.kind === 'face' ? 'Tap where to face' : mode.kind === 'breach' ? 'Tap a cell next to it to breach or sweep for mines' : mode.kind === 'mine' ? 'Tap a cell next to it to mine' : mode.kind === 'support' ? SUPPORT_PROMPT[mode.asset] : `Tap a cell: ${ABILITIES[mode.id].name}`}
           </span>
         </div>
       )}

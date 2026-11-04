@@ -76,8 +76,8 @@ export function beatsOf(events: readonly BattleEvent[]): Beat[] {
         fresh = !(head?.type === 'move' && head.unit === e.unit);
         break;
       case 'fire':
-        // Overwatch answers the move in progress.
-        fresh = !e.overwatch || !cur || cur.alone;
+        // Overwatch answers the move in progress; the drones of one kamikaze swarm fly in together.
+        fresh = (!e.overwatch || !cur || cur.alone) && !swarmGoesOn(cur, e);
         break;
       case 'dismount':
         // Passengers bailing out of a knocked-out carrier belong to the kill.
@@ -97,6 +97,17 @@ export function beatsOf(events: readonly BattleEvent[]): Beat[] {
     for (const k of keysOf(e)) if (!cur.keys.includes(k)) cur.keys.push(k);
   }
   return volleys(out);
+}
+
+/** Drones in one off-map kamikaze swarm (the engine launches three, one after another). */
+export const SWARM = 3;
+
+/** A kamikaze drone that joins the swarm the beat in progress started (up to `SWARM` of them). */
+function swarmGoesOn(cur: Beat | null, e: FireEvent): boolean {
+  if (!cur || cur.alone || e.unit !== 'support:kamikaze') return false;
+  const head = cur.events[0];
+  if (head?.type !== 'fire' || head.unit !== e.unit) return false;
+  return cur.events.filter((x) => x.type === 'fire').length < SWARM;
 }
 
 /** A beat that is one small-arms or machine-gun shot at a unit (and what it did), or null. */
