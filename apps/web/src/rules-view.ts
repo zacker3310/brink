@@ -33,7 +33,7 @@ export function researchPerTurn(view: NationView, share = view.self.budget.resea
 export function diplomacyBlocked(view: NationView, target: NationId, action: DiplomaticAction, terms?: DealTerms): string | null {
   const relations: Record<string, Relation> = {};
   for (const [n, r] of Object.entries(view.relations)) relations[pairKey(view.self.id, n)] = r;
-  return checkDiplomacy({ relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites }, view.self.id, target, action, terms);
+  return checkDiplomacy({ relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites, tiles: view.tiles }, view.self.id, target, action, terms);
 }
 
 /** Why `facility` cannot be started at `siteId`, ignoring cost, or null. Mirrors the engine's check. */

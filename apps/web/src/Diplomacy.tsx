@@ -229,7 +229,7 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
   };
   const enemiesOfMine = Object.keys(view.relations).filter((n) => view.relations[n] === 'war');
   const prizes = Object.values(view.sites)
-    .filter((s) => s.owner && s.owner !== me && s.owner !== nation && enemiesOfMine.includes(s.owner) && (s.kind === 'capital' || s.kind === 'city'))
+    .filter((s) => s.owner && s.owner !== me && s.owner !== nation && enemiesOfMine.includes(s.owner) && (s.kind === 'capital' || s.kind === 'city') && view.tiles[s.key]?.visibility === 'visible')
     .sort((a, b) => b.victoryPoints - a.victoryPoints || (a.name < b.name ? -1 : 1))
     .slice(0, 6);
   const thirdPowers = powersOf(view).filter((n) => n.id !== me && n.id !== nation && !n.eliminated);

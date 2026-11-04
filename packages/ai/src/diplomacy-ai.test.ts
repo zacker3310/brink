@@ -127,6 +127,11 @@ describe('leaders on the turn', () => {
     setRelation(w, 'b', 'c', 'war');
     expect(jointOpTarget(buildView(w, 'b'))).toBe('prize');
     expect(jointOpTarget(buildView(w, 'a'))).toBe('prize');
+    // A prize nobody sees now may have changed hands: no joint operation is agreed on it.
+    w.treaties = w.treaties.filter((t) => t.kind !== 'joint_op');
+    expect(buildView(w, 'b').tiles[hexKey(4, 3)]!.visibility).not.toBe('visible');
+    expect(consider(buildView(w, 'b'), emptyMemory(), { from: 'a', kind: 'joint_op', terms: { site: 'prize' } })).toEqual({ accept: false, reason: 'cannot' });
+    w.treaties.push({ kind: 'joint_op', a: 'a', b: 'b', from: 1, until: 5, site: 'prize' });
     // Once a partner holds it, the operation is done.
     w.sites.prize!.owner = 'a';
     expect(jointOpTarget(buildView(w, 'a'))).toBeUndefined();

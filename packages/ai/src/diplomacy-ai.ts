@@ -48,7 +48,7 @@ export function offerOf(from: NationId, d: DiplomacyOrder): Offer | null {
 function asWorld(view: NationView) {
   const relations: Record<string, Relation> = {};
   for (const n of sortedKeys(view.relations)) relations[pairKey(view.self.id, n)] = view.relations[n]!;
-  return { relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites };
+  return { relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites, tiles: view.tiles };
 }
 
 function powers(view: NationView): NationId[] {

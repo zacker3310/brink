@@ -233,6 +233,8 @@ export function checkDiplomacy(
     case 'propose_joint_op': {
       const site = world.sites?.[terms!.site!];
       if (!site) return 'no such prize';
+      const seen = world.tiles?.[site.key]?.visibility;
+      if (seen !== undefined && seen !== 'visible') return 'you cannot see that prize now: who holds it may have changed';
       if (!site.owner || site.owner === nation || site.owner === target) return 'a joint operation is against a third power';
       if (rel === 'war') return `at war with ${t.name}`;
       if (relationOf(world.relations, nation, site.owner) !== 'war') return 'a joint operation needs you at war with its holder';

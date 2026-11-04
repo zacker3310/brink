@@ -122,7 +122,9 @@ export function cleanTerms(action: DiplomaticAction, terms: DealTerms | undefine
 /** What diplomacy reads: a world, or a view's public facts recast as one. */
 export type DiplomacyWorld = Pick<WorldState, 'relations' | 'treaties' | 'turn'> & {
   nations?: Record<NationId, { eliminated: boolean; minor?: boolean }>;
-  sites?: Record<SiteId, { owner: NationId | null }>;
+  sites?: Record<SiteId, { owner: NationId | null; key: string }>;
+  /** A view's tiles: a joint operation is only offered on a prize seen now (its holder may have changed). */
+  tiles?: Record<string, { key: string; visibility?: 'visible' | 'observed' | 'unknown' }>;
 };
 
 /** A treaty in force between `a` and `b` that forbids war: a non-aggression pact or a ceasefire. */
