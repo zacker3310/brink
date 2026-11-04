@@ -4,6 +4,7 @@ import { RESOURCES } from '@brink/contracts';
 import { CARDS, CITY_GROWTH, COMMANDER_RULES, DOCTRINE, FACILITY_SLOTS, LEVEL_SLOT_AT, levelForXp, STACK_LIMIT, TECHS, UNITS } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { GameSession } from '@brink/session';
+import { handSizeOf } from '@brink/simulation';
 
 const MATCHES = Number(process.env.SOAK_MATCHES ?? 100);
 
@@ -17,7 +18,8 @@ function invariants(w: WorldState): string[] {
     const d = n.doctrine;
     if (d) {
       if (!Number.isInteger(d.cp) || d.cp < 0 || d.cp > DOCTRINE.cpCap) bad.push(`${n.id} cp ${d.cp}`);
-      if (d.hand.length > DOCTRINE.handSize) bad.push(`${n.id} holds ${d.hand.length} cards`);
+      // Ruleset 2.6: Staff College adds a card, so the bound is the nation's own hand size.
+      if (d.hand.length > handSizeOf(n)) bad.push(`${n.id} holds ${d.hand.length} cards`);
       for (const c of [...d.hand, ...d.deck, ...d.discard, ...d.effects.map((e) => e.card)]) if (!CARDS[c]) bad.push(`${n.id} unknown card ${c}`);
       if (d.effects.some((e) => e.until < e.from)) bad.push(`${n.id} malformed card effect`);
     } else if (!n.minor && !n.eliminated) bad.push(`${n.id} has no doctrine`);
