@@ -130,19 +130,22 @@ describe('victory paths', () => {
     setRelation(w, 'a', 'b', 'alliance');
     setRelation(w, 'a', 'c', 'alliance');
     setRelation(w, 'b', 'c', 'alliance');
-    w.sites.x1!.owner = 'a';
-    w.sites.x3!.owner = 'b';
-    // 65 of 100, short of the 80 three need.
+    // 60 of 100 (a 20, b 30, c 10), short of the 80 three need, and nobody at domination's 32
+    // alone. (Before ruleset 2.5.0 it was a 35 and b 20: a 35 now dominates on its own.)
+    w.sites.x1!.victoryPoints = 20;
+    w.sites.x2!.victoryPoints = 30;
+    w.sites.x3!.owner = 'a';
+    w.sites.x1!.owner = 'b';
     expect(coalitionShare(3)).toBe(80);
     expect(evaluateVictory(w)).toBeNull();
   });
 
   it('supremacy needs dominance in land, army and output together', () => {
     const w = four();
-    w.sites.x1!.owner = 'a';
+    w.sites.x3!.owner = 'a';
     for (let i = 0; i < 6; i++) unit(w, `a${i}`, 'a', 'armor', k(0, 1));
     unit(w, 'b1', 'b', 'infantry', k(9, 7));
-    // 35% of the land, short of domination, but the army and the output carry it.
+    // 20% of the land, short of domination (32%), but the army and the output carry it.
     expect(supremacyStanding(w).a).toBeGreaterThanOrEqual(VICTORY.supremacyShare);
     expect(evaluateVictory(w)).toMatchObject({ reason: 'supremacy', winner: 'a' });
     // Not with a nation in turmoil, and not before its turn.

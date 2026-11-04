@@ -217,6 +217,9 @@ importers:
 
   tests:
     dependencies:
+      '@brink/ai':
+        specifier: workspace:*
+        version: link:../packages/ai
       '@brink/arena':
         specifier: workspace:*
         version: link:../packages/arena

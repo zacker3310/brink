@@ -8,9 +8,11 @@
     "lint": "eslint soak e2e",
     "soak": "vitest run --config vitest.soak.config.ts",
     "matrix": "vitest run --config vitest.matrix.config.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "difficulty": "vitest run --config vitest.difficulty.config.ts"
   },
   "dependencies": {
+    "@brink/ai": "workspace:*",
     "@brink/arena": "workspace:*",
     "@brink/contracts": "workspace:*",
     "@brink/game-data": "workspace:*",

@@ -46,7 +46,10 @@ describe('operations', () => {
     const china = run(1, 'china', 'Taipei', 12);
     expect(china.rejected).toBe(0);
     expect(china.fell).not.toBeNull();
-    const usa = run(1, 'usa', 'Tokyo', 16);
+    // Sendai, beside Tokyo. Tokyo itself fell to this landing only while Japan's AI emptied it to
+    // guard its coast against Korean militia that never leave home (fixed in ruleset 2.5.0): with
+    // its garrison in place the capital holds this one landing for 30 turns, as a capital should.
+    const usa = run(1, 'usa', 'Sendai', 16);
     expect(usa.rejected).toBe(0);
     expect(usa.fell).not.toBeNull();
   }, 60_000);

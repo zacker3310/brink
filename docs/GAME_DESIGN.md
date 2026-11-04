@@ -157,14 +157,14 @@ breaks out over a shared hex, the side not on its own ground falls back.
 Checked every turn in this order; the first that applies ends the campaign.
 
 1. **Last standing**: the only nation left with a capital or city.
-2. **Domination**: one nation holds 40% of all victory points.
+2. **Domination**: one nation holds 32% of all victory points (about twice a power's opening share).
 3. **Coalition** (from turn 8): a bloc of two or more nations, each pair allied, holds 20% plus 20%
    per member of all victory points: 60% for two, 80% for three. It scales so allies cannot win by
    signing (three of four powers start with about two thirds of the map). The member with the most
    VP leads it; every member wins.
 4. **Supremacy** (from turn 8): one nation's average share of victory points, army strength and
-   output (resources plus industry) reaches 38%, about 1.5 times a fair share across all three at
-   once, with stability of at least 45.
+   output (resources plus industry) reaches 31%, about 1.25 times a fair share across all three at
+   once, with stability of at least 35.
 5. **Score**: at the turn limit, the highest standing (the same average) wins; victory points break
    ties.
 

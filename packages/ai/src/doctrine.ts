@@ -23,6 +23,12 @@ function enemyHexes(view: NationView): Map<HexKey, number> {
   return out;
 }
 
+/** Victory points of the site in a hex, or 0. */
+function siteAt(view: NationView, key: HexKey): number {
+  const id = view.tiles[key]?.siteId;
+  return id ? (view.sites[id]?.victoryPoints ?? 0) : 0;
+}
+
 /** The best target hex for a card from a list scored by `score`, legal on this view. */
 function bestHex(view: NationView, card: CardDef, scored: Map<HexKey, number>): Candidate | null {
   let best: Candidate | null = null;
@@ -58,8 +64,9 @@ function candidate(view: NationView, card: CardDef, orders: Record<FormationId, 
       return leader ? { play: { card: card.id, nation: leader }, value: 3 } : null;
     }
     case 'card_strike':
-      // Worth it on a big target: about one full formation seen there.
-      return bestHex(view, card, new Map([...enemies].filter(([, s]) => s >= 600).map(([k, s]) => [k, Math.floor(s / 100)])));
+      // Worth it on a big target, about one full formation seen there, or on a garrison holding a
+      // city: every strike on it brings the day it can be stormed closer.
+      return bestHex(view, card, new Map([...enemies].filter(([k, s]) => s >= 600 || (siteAt(view, k) && s >= 300)).map(([k, s]) => [k, Math.floor(s / 100) + siteAt(view, k)])));
     case 'sabotage':
       return bestHex(view, card, new Map([...enemies].filter(([, s]) => s >= 1000).map(([k, s]) => [k, Math.floor(s / 200)])));
     case 'entrench': {

@@ -597,4 +597,9 @@ export interface AiMemory {
   aggressors: Record<NationId, number>;
   /** Turn this nation last captured a site; absent until it does. Measures a stalled war. */
   lastGain?: number;
+  /**
+   * The site the army is marching on, kept from turn to turn so the army does not turn round every
+   * time another prize scores a little higher. Absent in older saves: the first turn picks one.
+   */
+  objective?: SiteId;
 }

@@ -69,8 +69,10 @@ function threatsTo(view: NationView, contacts: Contact[]): Map<string, number> {
   for (const id of sortedKeys(view.sites)) {
     const s = view.sites[id]!;
     if (s.owner !== view.self.id) continue;
+    // A minor state's militia never leaves its own ground: it is a prize to take, not a threat to
+    // guard against. Counting it pinned whole armies to the border cities next to Canada or Korea.
     const t = contacts
-      .filter((c) => UNITS[c.unitClass].ground && keyDistance(c.key, s.key) <= 3)
+      .filter((c) => UNITS[c.unitClass].ground && keyDistance(c.key, s.key) <= 3 && !view.nations[c.owner]?.minor)
       .reduce((a, c) => a + c.estimatedStrength, 0);
     if (t > 0) out.set(id, t);
   }
@@ -83,8 +85,19 @@ const DISTANCE_WEIGHT = 6;
 /** A city is stormed by this many formations at once, or not at all. */
 const STORM_TOGETHER = 2;
 
+/** Formations thrown at one hex in a combined assault: two hexes' worth, not one. */
+const ASSAULT_GROUP = 8;
+
 /** A walk is cheaper than a landing: what the army can reach on foot scores this much higher. */
 const OVERLAND_BONUS = 40;
+
+/** What the objective already marched on is worth over a fresh one: about ten hexes of march. */
+const STICKY_OBJECTIVE = 60;
+
+/** Turns since this nation last captured a site or started a war. */
+function stalled(view: NationView, memory: AiMemory): number {
+  return view.turn - (memory.lastGain ?? 0);
+}
 
 function chooseTarget(view: NationView, memory: AiMemory, contacts: Contact[], own: Formation[]): SiteView | null {
   if (own.length === 0) return null;
@@ -107,7 +120,9 @@ function chooseTarget(view: NationView, memory: AiMemory, contacts: Contact[], o
     const grudge = s.owner && memory.aggressors[s.owner] !== undefined ? 3 : 0;
     const weak = s.owner && view.nations[s.owner] ? -view.nations[s.owner]!.victoryPoints / 10 : 0;
     const walk = home !== undefined && land.get(s.key) === home ? OVERLAND_BONUS : 0;
-    const score = (s.victoryPoints + grudge) * 10 - centroid(s.key) * DISTANCE_WEIGHT - guard / 100 + weak + walk;
+    // The prize already marched on keeps the army, unless the war there has stood still too long.
+    const kept = s.id === memory.objective && stalled(view, memory) < STALL_TURNS ? STICKY_OBJECTIVE : 0;
+    const score = (s.victoryPoints + grudge) * 10 - centroid(s.key) * DISTANCE_WEIGHT - guard / 100 + weak + walk + kept;
     if (score > bestScore || (score === bestScore && best && s.id < best.id)) {
       best = s;
       bestScore = score;
@@ -379,6 +394,13 @@ export function updateMemory(memory: AiMemory, view: NationView, events: readonl
     if (e.kind === 'site_captured' && e.to === view.self.id) m.lastGain = view.turn;
     if (e.kind === 'diplomacy' && e.relation === 'war' && (e.a === view.self.id || e.b === view.self.id)) m.lastGain = view.turn;
   }
+  // The objective next turn's plan will hold to (the view is the one that plan will see).
+  if (!view.self.minor) {
+    const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
+    const target = chooseTarget(view, m, recentContacts(view), own);
+    if (target) m.objective = target.id;
+    else delete m.objective;
+  }
   return m;
 }
 
@@ -391,9 +413,16 @@ export function updateMemory(memory: AiMemory, view: NationView, events: readonl
 /** Turns without a capture after which a war counts as stalled. */
 const STALL_TURNS = 8;
 
+/** Turns without a capture before a stalled army lowers its bar for storming a city... */
+const STALL_PATIENCE = 2;
+/** ...by this much (of the 1000 share) for every further turn... */
+const STALL_DISCOUNT = 15;
+/** ...down to at most this much below the usual bar. */
+const STALL_DISCOUNT_MAX = 90;
+
 /** From this turn, a power this many points of standing ahead of the others is everyone's enemy. */
 const RUNAWAY_FROM_TURN = 8;
-const RUNAWAY_GAP = 6;
+const RUNAWAY_GAP = 8;
 
 function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory, spare: readonly NationId[]): NationOrders['diplomacy'] {
   const self = view.self.id;
@@ -420,7 +449,7 @@ function planDiplomacy(view: NationView, plan: Plan, memory: AiMemory, spare: re
   }
   // A stalled war is a war to get out of: settle with the enemy we are stuck on and turn on the
   // weakest power instead.
-  if (view.turn >= 10 && view.turn - (memory.lastGain ?? 0) >= STALL_TURNS && enemies.length > 0) {
+  if (view.turn >= 10 && stalled(view, memory) >= STALL_TURNS && enemies.length > 0) {
     const facing = new Map<NationId, number>();
     for (const c of plan.contacts) facing.set(c.owner, (facing.get(c.owner) ?? 0) + c.estimatedStrength);
     const stuck = [...enemies].sort((a, b) => (facing.get(b) ?? 0) - (facing.get(a) ?? 0) || vp(b) - vp(a) || (a < b ? -1 : 1))[0]!;
@@ -519,9 +548,10 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   const threatened = [...plan.threats.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
   for (const [siteId, threat] of threatened) {
     const site = view.sites[siteId]!;
-    // With an operation running, the threat next to its prize is the prize's own garrison: the
-    // answer is the assault, not a garrison sat in the city next door.
-    if (forced && keyDistance(site.key, forced.key) <= 3) continue;
+    // The threat next to the prize (an operation's, or the army's own objective) is the prize's own
+    // garrison: the answer is the assault, not a garrison sat in the city next door.
+    const prize = forced ?? plan.target;
+    if (prize && keyDistance(site.key, prize.key) <= 3) continue;
     let assigned = own.filter((f) => committed.has(f.id) && f.key === site.key).reduce((a, f) => a + f.strength, 0);
     const pool = own
       .filter((f) => !committed.has(f.id) && UNITS[f.unitClass].ground && !f.aboard && f.unitClass !== 'recon')
@@ -568,7 +598,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
       )
       .sort((a, b) => keyDistance(a.key, key) - keyDistance(b.key, key) || (a.id < b.id ? -1 : 1));
     for (const f of pool) {
-      if (group.length >= 4) break;
+      if (group.length >= ASSAULT_GROUP) break;
       if (areAdjacent(f.key, key)) {
         group.push({ f, path: [] });
         continue;
@@ -596,7 +626,10 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
         keyDistance(f.key, key) >= 1 &&
         keyDistance(f.key, key) <= UNITS[f.unitClass].range,
     );
-    const bar = 520 - (support.some((f) => f.unitClass === 'artillery') ? 40 : 0) - (support.some((f) => !UNITS[f.unitClass].ground) ? 50 : 0);
+    // A city that has held out while the war stood still is worth a dearer assault: the bar falls
+    // with every turn without a capture, so a siege ends in a storm instead of a standing army.
+    const resolve = siteVp(key) > 0 ? Math.min(STALL_DISCOUNT_MAX, Math.max(0, stalled(view, memory) - STALL_PATIENCE) * STALL_DISCOUNT) : 0;
+    const bar = 520 - resolve - (support.some((f) => f.unitClass === 'artillery') ? 40 : 0) - (support.some((f) => !UNITS[f.unitClass].ground) ? 50 : 0);
     if (Math.floor((preview.share[0] + preview.share[1]) / 2) < bar) continue;
     for (const { f, path } of group) {
       orders[f.id] = { type: 'attack', target: key, path };
@@ -610,14 +643,21 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     for (const [k, n] of ends) plan.ends.set(k, n);
   }
 
-  // Ranged: strike the most valuable contact in range (guns in a ship's hold cannot fire).
+  // Ranged: strike the most valuable contact in range (guns in a ship's hold cannot fire). A
+  // garrison in a city comes first, the objective's above all: guns and planes soften a siege
+  // turn after turn until the mass can storm it.
+  const goal0 = plan.target?.key ?? null;
+  const siege = (k: HexKey) => (k === plan.target?.key ? 100_000 : 0) + siteVp(k) * 1000;
   for (const f of own) {
     const def = UNITS[f.unitClass];
     if (def.range === 0 || committed.has(f.id) || (f.aboard && def.ground)) continue;
     const inRange = contacts
       .filter((c) => keyDistance(c.key, f.key) >= 1 && keyDistance(c.key, f.key) <= def.range && c.confirmed)
-      .sort((a, b) => b.estimatedStrength - a.estimatedStrength || (a.formation < b.formation ? -1 : 1));
-    if (inRange[0] && f.ammunition >= def.ammoPerAttack) {
+      .sort((a, b) => siege(b.key) + b.estimatedStrength - (siege(a.key) + a.estimatedStrength) || (a.formation < b.formation ? -1 : 1));
+    // Guns on the march do not stop for every patrol: with the objective out of their reach and
+    // no city or threat in range, they keep moving up to it.
+    const marching = def.ground && goal0 !== null && keyDistance(f.key, goal0) > def.range && inRange[0] !== undefined && siege(inRange[0].key) === 0 && keyDistance(inRange[0].key, f.key) > 1;
+    if (inRange[0] && f.ammunition >= def.ammoPerAttack && !marching) {
       orders[f.id] = { type: 'attack', target: inRange[0].key, path: [] };
       committed.add(f.id);
     }

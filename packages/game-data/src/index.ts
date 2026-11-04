@@ -10,7 +10,7 @@ import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, Si
 export * from './commanders';
 export * from './doctrine';
 
-export const RULESET_VERSION = '2.4.0';
+export const RULESET_VERSION = '2.5.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -511,7 +511,7 @@ export const TREATIES = {
 
 export const VICTORY = {
   /** Domination: percent of all victory points held by one nation. */
-  dominationShare: 40,
+  dominationShare: 32,
   /**
    * Coalition: an all-allied bloc of two or more holds `coalitionBase + coalitionPerMember x members`
    * percent of all victory points (two: 60, three: 80). It scales so allies cannot win by signing:
@@ -523,8 +523,8 @@ export const VICTORY = {
    * Supremacy: average of a nation's percent shares of victory points, army strength and gross
    * income, with stability at least `supremacyStability`, from `supremacyFromTurn` on.
    */
-  supremacyShare: 38,
-  supremacyStability: 45,
+  supremacyShare: 31,
+  supremacyStability: 35,
   supremacyFromTurn: 8,
 } as const;
 
@@ -574,7 +574,7 @@ export const RULES = {
   /** Random swing on combat losses, percent either way. */
   combatSwing: 15,
   /** Kept for the view and older callers; equal to `VICTORY.dominationShare`. */
-  victoryShare: 40,
+  victoryShare: 32,
   baseStability: 60,
   /** Credits per this many owned hexes. */
   hexesPerCredit: 4,

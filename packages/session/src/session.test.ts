@@ -116,6 +116,30 @@ describe('GameSession', () => {
     expect(r.reports.japan!.events).toContainEqual({ kind: 'card_played', nation: 'japan', card });
   });
 
+  it('resumes a 2.4.0 campaign under the 2.5.0 bars, its AIs picking an objective afresh', () => {
+    const s = GameSession.create(PACIFIC_ID, 12, 'russia');
+    s.advance();
+    s.advance();
+    // What ruleset 2.4.0 wrote: AI memories without a remembered objective.
+    const old = JSON.parse(serializeSave(s.toSave('old', '2026-11-03T12:00:00Z')));
+    old.rulesetVersion = '2.4.0';
+    old.world.rulesetVersion = '2.4.0';
+    for (const m of Object.values(old.aiMemory) as Record<string, unknown>[]) delete m.objective;
+    old.hash = hashState(old.world);
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.migratedFrom).toBe('2.4.0');
+    expect(loaded.rulesetVersion).toBe(RULESET_VERSION);
+    expect(loaded.world.rulesetVersion).toBe(RULESET_VERSION);
+    expect(loaded.hash).toBe(hashState(loaded.world));
+    const resumed = GameSession.fromSave(loaded);
+    for (let i = 0; i < 3; i++) {
+      const r = resumed.advance();
+      expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    }
+    // The AIs that lost their memory of an objective have one again.
+    expect(resumed.toSave('again', '2026-11-04T12:00:00Z').aiMemory.china!.objective).toBeDefined();
+  });
+
   it('runs any campaign length from 5 turns to a 250-turn Total War', () => {
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 45 }).snapshot().maxTurns).toBe(45);
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 999 }).snapshot().maxTurns).toBe(250);
