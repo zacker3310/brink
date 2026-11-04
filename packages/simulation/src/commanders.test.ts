@@ -200,6 +200,27 @@ describe('commanders: in battle', () => {
     expect([...seen].sort()).toEqual(['active', 'killed', 'wounded']);
   });
 
+  it('a general killed in the battle that earned a level still stands at the level the experience gives', () => {
+    // Found by the soak (seed 13): the experience of the last fight was counted, the level was not.
+    let checked = 0;
+    for (let seed = 1; seed <= 40 && checked === 0; seed++) {
+      const w = front();
+      w.seed = seed;
+      w.formations.b1!.strength = 150;
+      w.formations.b1!.organization = 10;
+      gen(w, 'b-gen-1').formation = 'b1';
+      gen(w, 'b-gen-1').xp = COMMANDER_RULES.levelXp[1]! - 1;
+      const r = resolveTurn(w, [orders(w, 'a', { a1: { type: 'attack', target: k(3, 2), path: [] }, a2: { type: 'attack', target: k(3, 2), path: [] } }), orders(w, 'b')]);
+      const c = r.world.commanders!['b-gen-1']!;
+      if (c.status !== 'killed') continue;
+      expect(c.xp).toBeGreaterThanOrEqual(COMMANDER_RULES.levelXp[1]!);
+      expect(c.level).toBe(levelForXp(c.xp));
+      expect(c.offer).toBeNull();
+      checked += 1;
+    }
+    expect(checked).toBe(1);
+  });
+
   it('a wound heals after its turns, and the general can lead again', () => {
     const w = front();
     gen(w, 'a-gen-1').status = 'wounded';
