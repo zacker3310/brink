@@ -20,7 +20,7 @@ import { operationById } from '@brink/ai';
 import type { ActiveOperation } from './saves';
 import { groupOrders, oddsFor, ODDS_TAG, type Odds } from './odds';
 import { useGame } from './store';
-import { paintTheatre, SEA, sizeClass } from './paint/ground';
+import { paintSteps, SEA, sizeClass, TABLE } from './paint/ground';
 import { MapLife } from './paint/life';
 
 /** Region names on the painted map: an engraved serif, like a printed atlas of a fantasy world. */
@@ -275,6 +275,8 @@ export function MapView() {
   const groundSig = useRef('');
   /** The painted map's hex grid, faded in with zoom. */
   const gridRef = useRef<Graphics | null>(null);
+  /** Counts paints of the ground: a paint under way stops when a newer one starts. */
+  const paintJob = useRef(0);
   const groundTextures = useRef<Texture[]>([]);
   const reachCache = useRef<{ view: NationView; id: string; plays: unknown; reach: Record<HexKey, Reach> } | null>(null);
   const view = useGame((s) => s.view);
@@ -820,6 +822,59 @@ export function MapView() {
     layer.addChild(g);
   }
 
+  /**
+   * The painted ground: one hand-painted canvas for the whole theatre, baked into a single texture.
+   * It paints a little each frame (about 12 ms at a time), so opening the map or exploring land never
+   * holds the page still; the ground it replaces stays until it is done, and the new one fades in.
+   * Instrumented: `brink:paint` in the browser's performance timeline, from first stroke to install.
+   */
+  function paintGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: HexKey[], paper: boolean, job: number) {
+    performance.mark('brink:paint-start');
+    const steps = paintSteps(v, keys, SIZE, { paper });
+    const run = () => {
+      if (job !== paintJob.current || !appRef.current) return;
+      const t0 = performance.now();
+      let r = steps.next();
+      while (!r.done && performance.now() - t0 < 12) r = steps.next();
+      if (!r.done) {
+        setTimeout(run, 0);
+        return;
+      }
+      const p = r.value;
+      performance.measure('brink:paint', 'brink:paint-start');
+      const layer = a.layers.terrain!;
+      layer.removeChildren().forEach((c) => c.destroy());
+      for (const t of groundTextures.current) t.destroy(true);
+      // Beyond the canvas the open sea runs on (or the table under the paper).
+      a.app.renderer.background.color = p.background;
+      // Mipmapped, so the whole theatre seen from afar stays smooth instead of shimmering.
+      const tex = new Texture({ source: new CanvasSource({ resource: p.canvas, autoGenerateMipmaps: true }) });
+      groundTextures.current = [tex];
+      const ground = new Sprite(tex);
+      ground.position.set(p.x, p.y);
+      ground.scale.set(p.unit);
+      layer.addChild(ground);
+      // The hex grid, faint, drawn only close in (see `fadeByZoom`): far out the land reads as land.
+      const grid = new Graphics();
+      for (const k of keys) if (v.tiles[k]!.visibility !== 'unknown') grid.poly(poly(k));
+      grid.stroke({ width: 1, color: 0x1c1a10, alpha: 0.32 });
+      gridRef.current = grid;
+      layer.addChild(grid);
+      fadeByZoom();
+      // Fade the new ground in over what was there (the open sea on the first paint).
+      ground.alpha = 0;
+      const fade = () => {
+        if (ground.destroyed) return a.app.ticker.remove(fade);
+        ground.alpha = Math.min(1, ground.alpha + a.app.ticker.deltaMS / 250);
+        if (ground.alpha >= 1) a.app.ticker.remove(fade);
+      };
+      a.app.ticker.add(fade);
+    };
+    // Until the first paint lands, the sea.
+    if (groundTextures.current.length === 0) a.app.renderer.background.color = paper ? TABLE : SEA;
+    run();
+  }
+
   /** The ground: rebuilt only when what the viewer knows of the land changes, not on every click. */
   function drawGround(a: NonNullable<typeof appRef.current>, v: NationView, keys: string[]) {
     const style = useGame.getState().mapStyle;
@@ -839,6 +894,12 @@ export function MapView() {
     if (groundSig.current === sig) return;
     groundSig.current = sig;
     const layer = a.layers.terrain!;
+    // A paint still under way is for ground that is no longer current.
+    paintJob.current += 1;
+    if (painted) {
+      paintGround(a, v, keys, style === 'paper', paintJob.current);
+      return;
+    }
     layer.removeChildren().forEach((c) => c.destroy());
     for (const t of groundTextures.current) t.destroy(true);
     const made: Texture[] = [];
@@ -847,31 +908,7 @@ export function MapView() {
       layer.addChild(atlasGround(v, keys));
       return;
     }
-    // Beyond the painted canvas the open sea runs on.
-    a.app.renderer.background.color = painted ? SEA : SURFACE.ink950;
-    if (painted) {
-      // One hand-painted canvas for the whole theatre, baked into a single texture.
-      // Instrumented: `brink:paint` in the browser's performance timeline.
-      performance.mark('brink:paint-start');
-      const p = paintTheatre(v, keys, SIZE, { paper: style === 'paper' });
-      a.app.renderer.background.color = p.background;
-      performance.measure('brink:paint', 'brink:paint-start');
-      // Mipmapped, so the whole theatre seen from afar stays smooth instead of shimmering.
-      const tex = new Texture({ source: new CanvasSource({ resource: p.canvas, autoGenerateMipmaps: true }) });
-      made.push(tex);
-      const ground = new Sprite(tex);
-      ground.position.set(p.x, p.y);
-      ground.scale.set(p.unit);
-      layer.addChild(ground);
-      // The hex grid, faint, drawn only close in (see `fadeByZoom`): far out the land reads as land.
-      const grid = new Graphics();
-      for (const k of keys) if (v.tiles[k]!.visibility !== 'unknown') grid.poly(poly(k));
-      grid.stroke({ width: 1, color: 0x1c1a10, alpha: 0.32 });
-      gridRef.current = grid;
-      layer.addChild(grid);
-      fadeByZoom();
-      return;
-    }
+    a.app.renderer.background.color = SURFACE.ink950;
     // Terrain: satellite-style ground mapped in world space, so the landscape runs on across hexes.
     const terrain = new Graphics();
     const crisp = new Graphics();

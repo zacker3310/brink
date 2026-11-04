@@ -128,9 +128,12 @@ hover combat card) and gets the same map.
 ## Painted map (v3)
 
 `apps/web/src/paint/ground.ts` paints the whole theatre procedurally into one canvas, baked into a
-single mipmapped texture (repainted only when land is explored or a town grows or builds). No canvas
-blur filters, which Safari lacks: soft edges come from stamped radial gradients, and every stroke is
-seeded per hex so the land never changes between paints. In order:
+single mipmapped texture (repainted only when land is explored or a town grows or builds). The map
+paints it in steps (`paintSteps`, about 12 ms a frame), keeps the old ground until the new one is
+done and fades it in, so a paint never holds the page still; the menu backdrop paints it in one go
+(`paintTheatre`). Marks of one colour (tufts, flecks) go down as one path. No canvas blur filters,
+which Safari lacks: soft edges come from stamped radial gradients, and every stroke is seeded per
+hex so the land never changes between paints. In order:
 
 1. **Coastline**: every edge between land and anything else is traced into closed loops, roughened
    (three seeded points per edge, fixed at the corners) and smoothed twice by corner cutting, so the
@@ -171,8 +174,8 @@ nation names in Cinzel fade in below zoom 1.0; counters grow when zoomed far out
 
 | Layer | What |
 |---|---|
-| Fog | Banks of cloud over unexplored hexes: a dark body, lighter billows lit from the north-west, wisps reaching over known ground at the edge, gently heaving |
-| Mist | A pale veil over ground seen but not seen now, in four banks that breathe out of step |
+| Fog | Banks of cloud over unexplored hexes: a dark body, lighter billows lit from the north-west, wisps reaching over known ground at the edge, gently heaving. Fog and mist are baked at quarter resolution into four textures (rebuilt only when what is seen changes), so each frame draws four sprites, not thousands of puffs |
+| Mist | A pale veil over ground seen but not seen now, in two banks that breathe out of step |
 | Cloud shadows | Six soft shadows drifting west to east |
 | Water | Glints that twinkle on the sea and rivers |
 | Fronts | Wherever your stack stands next to an enemy at war: an ember glow on the contested edge, and both sides firing (muzzle flash, tracer, shell burst, smoke), up to 16 fronts |

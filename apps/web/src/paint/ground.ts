@@ -168,7 +168,20 @@ export interface PaintOptions {
   paper?: boolean;
 }
 
+/** Paint the theatre in one go (the menu's backdrop, tests). The map paints in steps instead. */
 export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: PaintOptions = {}): Painted {
+  const steps = paintSteps(v, keys, size, opts);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+
+/**
+ * The painting as a sequence of steps: it pauses between stages (and every few hundred props), so
+ * the map can paint a little each frame and never hold the page still for the whole of it.
+ */
+export function* paintSteps(v: NationView, keys: HexKey[], size: number, opts: PaintOptions = {}): Generator<void, Painted, void> {
   const known = keys.filter((k) => v.tiles[k]!.terrain && v.tiles[k]!.visibility !== 'unknown');
   const centers = new Map<HexKey, Point>(keys.map((k) => [k, hexToPixel(parseKey(k), size)]));
   const xs = keys.map((k) => centers.get(k)!.x);
@@ -230,6 +243,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
   const land = new Set(landKeys);
   const coast = coastPath(land, c, size);
 
+  yield;
   // 1. The sea: deep at the margins, fading to exactly the open sea beyond the canvas.
   const sea = g.createRadialGradient(x0 + w / 2, y0 + h / 2, Math.min(w, h) * 0.2, x0 + w / 2, y0 + h / 2, Math.max(w, h) * 0.62);
   sea.addColorStop(0, '#1a5f7a');
@@ -278,6 +292,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
       g.stroke();
     }
   }
+  yield;
   // Shallows: bands of lighter water stepping out from the shore, then a ring of surf.
   g.lineJoin = 'round';
   g.lineCap = 'round';
@@ -294,6 +309,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
     g.stroke(coast);
   }
 
+  yield;
   // 2. The land, painted on a sheet of its own and then cut out along the coastline in one go:
   // clipping thousands of strokes to the coast one by one is many times slower.
   const sheet = document.createElement('canvas');
@@ -376,6 +392,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
       g.fill();
     }
   }
+  yield;
   // Hillshade: every hex lit by how its ground slopes toward the light in the north-west, so
   // ranges stand up off the map with a bright face and a shadowed one.
   {
@@ -407,6 +424,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
     }
   }
 
+  yield;
   // 3. Brushwork: grass tufts, rock flecks, cobbles. Tens of thousands of marks, gathered into one
   // path per colour and drawn in a handful of calls (one call a mark took seconds on a slow device).
   {
@@ -449,6 +467,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
     }
   }
 
+  yield;
   // 5. Roads on developed ground, then rivers over them (with fords where they cross).
   for (const key of known) {
     const t = v.tiles[key]!;
@@ -521,6 +540,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
   g.lineWidth = 0.7;
   g.stroke(coast);
 
+  yield;
   // 6. Props, painted back to front so nearer ones overlap: trees, peaks, hills, towns, castles.
   // They keep to the rim of the hex; the middle is a clearing where the army counter stands.
   const props: Prop[] = [];
@@ -592,6 +612,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
   }
 
   // Only what stands on land: the shore wanders, and a tree must not stand in the surf.
+  yield;
   // Asking the path itself point by point is far too slow for thousands of props: read a small
   // mask of the land instead (one pixel per two world units).
   const mw = Math.ceil(w / 2);
@@ -611,8 +632,12 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
   };
   const standing = props.filter((pr) => pr.x === undefined || ashore(pr.x, pr.y));
   standing.sort((a, b) => a.y - b.y);
-  for (const pr of standing) pr.draw(g);
+  for (let i = 0; i < standing.length; i++) {
+    standing[i]!.draw(g);
+    if (i % 600 === 599) yield;
+  }
 
+  yield;
   // Beyond the theatre, the land sinks into shadow ring by ring.
   for (const [key, b] of [...beyond].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
     const p = c(key);
