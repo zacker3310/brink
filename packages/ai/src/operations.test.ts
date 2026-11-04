@@ -69,6 +69,18 @@ describe('operations', () => {
     expect(operationById(buildView(w, 'china'), id)).toBeNull();
   });
 
+  it('tells the player to play a beach-landing card in hand on the landing turn', () => {
+    const w = createPacificScenario(1);
+    const id = `take:${siteNamed(w, 'Taipei').id}`;
+    const tip = (o: { why: string[] }) => o.why.filter((l) => l.includes('landing turn'));
+    w.nations.china!.doctrine = { cp: 3, hand: ['dig_in', 'requisition'], deck: [], discard: [], effects: [] };
+    expect(tip(operationById(buildView(w, 'china'), id)!)).toEqual([]);
+    w.nations.china!.doctrine!.hand = ['dig_in', 'joint_island_landing'];
+    expect(tip(operationById(buildView(w, 'china'), id)!)).toEqual(['Play Joint Island Landing on the landing turn: no beach penalty for the troops going ashore']);
+    // Overland operations never mention it.
+    for (const o of proposeOperations(buildView(w, 'china'), 4)) if (o.kind === 'overland') expect(tip(o)).toEqual([]);
+  });
+
   it('asks for an amphibious group when there is none, at a port it holds', () => {
     const w = createPacificScenario(1);
     for (const f of Object.values(w.formations)) {
