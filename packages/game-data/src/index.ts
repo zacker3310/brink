@@ -13,8 +13,9 @@ export * from './doctrine';
 export * from './blurbs';
 export * from './research';
 export * from './cities';
+export * from './leaders';
 
-export const RULESET_VERSION = '2.6.0';
+export const RULESET_VERSION = '2.7.0';
 
 export const HOURS_PER_TURN = 6;
 

@@ -25,8 +25,10 @@ import { enterCost, isNaval, movementAllowance, previewAssault, recruitCost, rol
 import { planCards } from './doctrine';
 import { landmasses } from './land';
 import { chooseResearch, planCityBuilds } from './research';
+import { jointOpTarget, leaderDiplomacy, type Offer } from './diplomacy-ai';
 
 export { planCards } from './doctrine';
+export * from './diplomacy-ai';
 export { proposeOperations, operationById, type Operation, type OperationPhase } from './operations';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
@@ -438,12 +440,12 @@ function planMinor(view: NationView): NationOrders {
  * legal against the authoritative world by construction: every path runs over terrain the
  * nation has seen, within the formation's allowance.
  */
-export function planOrders(view: NationView, memory: AiMemory, seed: number, opts: { spare?: readonly NationId[]; target?: SiteId } = {}): NationOrders {
+export function planOrders(view: NationView, memory: AiMemory, seed: number, opts: { spare?: readonly NationId[]; target?: SiteId; incoming?: readonly Offer[] } = {}): NationOrders {
   if (view.self.minor) return planMinor(view);
   const self = view.self.id;
   const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
   const contacts = recentContacts(view);
-  const forced = forcedTarget(view, opts.target);
+  const forced = forcedTarget(view, opts.target ?? jointOpTarget(view));
   const plan: Plan = {
     enemies: new Set(Object.keys(view.relations).filter((n) => isHostile(view, n) && !view.nations[n]!.eliminated)),
     contacts,
@@ -711,7 +713,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   if (commanders) out.commanders = commanders;
   const play = planCards(view, orders);
   if (play.length) out.play = play;
-  return out;
+  return leaderDiplomacy(view, memory, out, opts);
 }
 
 /** What a perk is worth to a general leading `f`: punch first, then staying power. */

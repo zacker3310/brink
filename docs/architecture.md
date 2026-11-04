@@ -30,7 +30,7 @@ It clones its input, never reads the clock, and throws if the ruleset version di
 | # | Phase | What happens |
 |---|---|---|
 | 1 | validate | `lockOrders` checks every submission against the start-of-turn world. Illegal parts become `order_rejected` events; every formation without a legal order holds. Duplicate or stale submissions are dropped whole. |
-| 2 | diplomacy | War declarations apply at once (tearing up a peace or alliance costs the declarer stability in the economy phase: perfidy); units of the new enemies sharing a hex separate (the side not on its own ground falls back). Peace or alliance applies when both sides have proposed it (this turn or within 2 turns). |
+| 2 | diplomacy | War declarations apply at once (tearing up a peace or alliance costs the declarer stability in the economy phase: perfidy); units of the new enemies sharing a hex separate (the side not on its own ground falls back). An offer applies when both sides have made it in kind (`mirrors`: the same kind, terms mirrored; this turn or within 2 turns): peace, alliance (against a common enemy: both go to war with it), ceasefire (peace plus a binding truce), treaties, exchanges and tribute (resources move at once, all or nothing; a deal's gift is reserved at validation after recruits and buildings). A demand unpaid for its lifetime lapses (`proposal_lapsed`). |
 | 2c | doctrine | Doctrine cards (`simulation/src/doctrine.ts`, data in `game-data/src/doctrine.ts`): spent effects retire; each locked play (checked in phase 1 by `checkPlays`: in hand, paid in Command Points, at most 2, a legal target) pays and goes to the discard; instant effects (card strikes, Dig In, Rally, stockpiles, stability) are computed from one snapshot and committed; lasting ones are kept on the nation with their last turn and read where they apply (movement, strikes, logistics, vision, landings, hand-fought battles). Then Command Points are gained and every hand is drawn back to three, each draw `roll(seed, turn, 'draw', nation, n)` over the sorted deck. Plays are public (`card_played`); rivals see Command Points and hand size only. |
 | 3 | production | Recruit costs, reserved at validation, are **consumed here** as items enter the queue. Last settlement's industrial capacity is spent down the queue; finished formations appear at their site. |
 | 4 | logistics | Dijkstra from cities and depots through own or allied ground; enemy hexes block and adjacency costs extra. Capacity is shared by priority tier, proportionally within a tier. Fuel and ammunition refills **consume** energy and materials now. |
@@ -42,6 +42,7 @@ It clones its input, never reads the clock, and throws if the ruleset version di
 | 10 | economy | Income, then upkeep, then discretionary budget spending. Unpaid upkeep is a shortage with a stated penalty; stockpiles never go negative. Recovery, entrenchment, reinforcement. Then world events: a pending event resolves with the submitted `eventChoice` (option 0 if none), and a nation that answered nothing may draw a new one (`roll(seed, turn, 'event', nation)`, 20%). Effects pay what they can; nothing goes below zero. |
 | 10b | development | Capitals and cities grow (`simulation/src/progression.ts`, data in `game-data/src/cities.ts`): a city taken this turn keeps half its development; every held one grows unless its owner is in unrest or went hungry; a new level is told to its owner. Each site reads only itself and its owner: one snapshot. |
 | 11 | victory | Eliminations (no capital or city), then victory points (32%), last standing, or turn limit. |
+| 11 | victory | Eliminations (no capital or city), generals (11b), then 11c: joint operations whose prize a partner holds end (`fulfilled`), and every leader records memories from the turn's events (`recordMemories`, `simulation/src/leaders.ts`; faded ones and all but the newest three of a kind are dropped). Then victory points (32%), last standing, or turn limit. |
 | 12 | reports | Final vision, intel update (observed hexes, last-known contacts), a `NationView` and a filtered report per nation, and the state hash. |
 
 ## Simultaneity and determinism
@@ -165,6 +166,24 @@ by save migration); minor states have none.
   (`roll(seed, turn, 'perk', id)`), and an offer left unanswered since an earlier turn takes its first.
 - Fog: own generals in full; a foreign general leading a contact seen this turn by name and level
   only (`NationView.enemyCommanders`). Commander events go to their own nation only.
+
+## Leaders and diplomacy (ruleset 2.6)
+
+Every power's head of government: data in game-data `leaders.ts` (`LEADERS`, `NATION_LEADERS`, a
+generic leader per government, `LEADER_TUNING`); memory in `WorldState.memories` (contracts
+`leaders.ts`), written in phase 11c from the turn's public events; mood computed, never stored, by
+`attitude` in simulation `leaders.ts` from relations, treaties, sites, the standing and the memories.
+
+- Fog: `NationView.moods` is every rival leader's attitude toward the viewer (with its reasons: the
+  envoys make no secret of it), `NationView.attitudes` the viewer's own toward each rival (the AI
+  decides by it). Neither tells a third party's feelings.
+- AI: `leaderDiplomacy` (ai `diplomacy-ai.ts`) post-processes `planOrders`: it answers every offer
+  with `consider`, seeks its own deals, restrains the war plan, checks every order with the engine's
+  `checkDiplomacy`, and drops recruits to make room for what it hands over, so nothing is refused.
+- Asking a leader: `GameSession.negotiate` runs `consider` on the AI's own view and memory; at turn
+  end `aiOrders` passes the human's offers to the same function (`incoming`), so the screen's answer
+  is the answer at resolution.
+- Saves before 2.6 gain `memories: {}` on load (keyed on the field being absent).
 
 ## Rejected alternatives
 

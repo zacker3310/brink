@@ -4,6 +4,7 @@ import type {
   CardId,
   CardPlay,
   Difficulty,
+  DealTerms,
   DiplomaticAction,
   FacilityId,
   FormationId,
@@ -172,7 +173,7 @@ interface State {
   setPosting(commander: string, formation: FormationId | null): void;
   /** Answer a general's promotion: which of the two perks. */
   setPerkChoice(commander: string, choice: 0 | 1): void;
-  setDiplomacy(target: NationId, action: DiplomaticAction | null): void;
+  setDiplomacy(target: NationId, action: DiplomaticAction | null, terms?: DealTerms): void;
   setPriority(id: FormationId, p: SupplyPriority): void;
   /** A doctrine card waiting for its target: the next hex tap aims it (a rival power's card takes `nation`). */
   aimingCard: CardId | null;
@@ -609,10 +610,10 @@ export const useGame = create<State>((set, get) => {
       if (view) editDraft((d) => ({ ...d, commanders: { ...d.commanders, assign: withPosting(view, d, commander, formation) } }));
     },
     setPerkChoice: (commander, choice) => editDraft((d) => ({ ...d, commanders: { ...d.commanders, perks: { ...d.commanders?.perks, [commander]: choice } } })),
-    setDiplomacy: (target, action) =>
+    setDiplomacy: (target, action, terms) =>
       editDraft((d) => {
         d.diplomacy = d.diplomacy.filter((x) => x.target !== target);
-        if (action) d.diplomacy.push({ target, action });
+        if (action) d.diplomacy.push({ target, action, ...(terms ? { terms } : {}) });
         return d;
       }),
     setPriority: (id, p) => editDraft((d) => ({ ...d, supplyPriority: { ...(d.supplyPriority ?? {}), [id]: p } })),

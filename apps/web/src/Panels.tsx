@@ -11,6 +11,7 @@ import { useGame } from './store';
 import { shortName } from '@brink/scenarios';
 import { Button, costText, Meter, powersOf, Stat, Swatch } from './ui';
 import { Icon } from './icons';
+import { PROPOSAL_TEXT } from './leaders';
 
 function Section({ title, children, right }: { title: ReactNode; children: ReactNode; right?: ReactNode }) {
   return (
@@ -366,6 +367,7 @@ const RELATION_TEXT: Record<string, { label: string; tone: string; means: string
 };
 
 const OFFER_TEXT: Record<ProposalKind, string> = {
+  ...PROPOSAL_TEXT,
   peace: 'peace',
   alliance: 'an alliance',
   nonaggression: `a non-aggression pact (${TREATIES.nonaggressionTurns} turns, no war either way)`,

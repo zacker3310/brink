@@ -60,6 +60,8 @@ export function migrateSave(save: SaveFile): SaveFile {
   const world = seedCommanders({ ...s.world, rulesetVersion: RULESET_VERSION, nations: clone(s.world.nations), sites: clone(s.world.sites) });
   initDoctrine(world);
   initProgression(world);
+  // Ruleset 2.6: leaders remember. A campaign begun before them starts with clean slates.
+  world.memories ??= {};
   return { ...s, world, rulesetVersion: RULESET_VERSION, hash: hashState(world), ...(from !== RULESET_VERSION ? { migratedFrom: from } : {}) };
 }
 

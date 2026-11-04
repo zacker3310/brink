@@ -36,6 +36,16 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
   The AI's research and build choices live in `ai/src/research.ts`. Phone: the Research screen
   (`Research.tsx`, branch chips and tree cards) and the city build panel (`CityBuild.tsx`, level,
   growth, slots, build queue); e2e `progression.spec.ts`. Older saves gain development 0 on load.
+- Leaders and diplomacy (ruleset 2.6.0), the "living rivals" pass: each power is run by an invented
+  leader (Caleb Wainwright, Gao Yiran, Haruka Tsujimoto, Oleg Severin; a generic one per government)
+  with a temperament, an agenda and lines that react to events. Leaders remember betrayals, wars,
+  cities taken, peace, deals, tribute and defiance; their mood toward you is itemised Civ-style.
+  New deals on the treaty system: ceasefire (binding truce), resource exchange, tribute demands
+  (ultimatums that lapse into defiance; hawks go to war over it), alliance against a common enemy,
+  joint operations (both AIs march on the prize). The AI's leader layer is `packages/ai/src/diplomacy-ai.ts`;
+  a leader answers on the spot (`GameSession.negotiate`) exactly as at resolution. UI: a Leaders
+  screen (`apps/web/src/Diplomacy.tsx`) replaces the old Diplomacy panel on phone and desktop, and
+  leader quotes join the debrief and the report. Old saves gain empty memories.
 
 - Doctrine cards (ruleset 2.3.0): every power holds a hand of three national cards drawn from a deck
   (by government now; `game-data/src/nations/<id>.ts` plus one map entry adds a nation's own), paid

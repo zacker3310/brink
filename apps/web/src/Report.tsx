@@ -7,6 +7,8 @@ import { UnitGlyph } from './glyphs';
 import { arenaNote, atPlace, describeEffect, hexLabel, netChange, toPlace, treatyText, turnClock, VICTORY_HOW } from './insight';
 import { useGame } from './store';
 import { Swatch } from './ui';
+import { LeaderQuotes } from './Diplomacy';
+import { dealText, stockText } from './leaders';
 
 interface Row {
   text: ReactNode;
@@ -165,7 +167,16 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
         out.Diplomacy!.push({ tone: e.relation === 'war' && (e.a === me || e.b === me) ? 'bad' : undefined, text: `${nation(view, e.a)} and ${nation(view, e.b)} are now at ${e.relation}.` });
         break;
       case 'proposal':
-        out.Diplomacy!.push({ text: `${nation(view, e.from)} proposes ${e.proposal === 'nonaggression' ? 'a non-aggression pact' : e.proposal} to ${nation(view, e.to)}.` });
+        out.Diplomacy!.push({ text: `${nation(view, e.from)} proposes ${dealText(view, e.proposal, e.terms)} to ${nation(view, e.to)}.` });
+        break;
+      case 'proposal_lapsed':
+        out.Diplomacy!.push({ tone: 'bad', text: `${nation(view, e.to)} let ${nation(view, e.from)}'s demand lapse: ${dealText(view, e.proposal, e.terms)} defied.` });
+        break;
+      case 'exchange':
+        out.Diplomacy!.push({
+          tone: e.void ? 'bad' : e.a === me || e.b === me ? 'good' : undefined,
+          text: e.void ? `The deal between ${nation(view, e.a)} and ${nation(view, e.b)} fell through: one side could not pay.` : e.tribute ? `${nation(view, e.a)} paid ${nation(view, e.b)} tribute: ${stockText(e.aGave)}.` : `${nation(view, e.a)} gave ${stockText(e.aGave)} to ${nation(view, e.b)} for ${stockText(e.bGave)}.`,
+        });
         break;
       case 'treaty':
       case 'treaty_ended':
@@ -363,6 +374,7 @@ export function Report() {
             <Kpi label="Inflicted" value={totals.dealt} sub={`${totals.theirDestroyed} enemy destroyed`} tone={totals.dealt ? 'text-good' : ''} />
           </div>
 
+          <LeaderQuotes view={view} report={report} max={3} />
           <div className="mt-3 border border-line/60 bg-ink-900 p-3">
             <div className="mb-1.5 flex justify-between">
               <Label>Victory race</Label>

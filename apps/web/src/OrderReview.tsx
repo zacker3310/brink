@@ -8,19 +8,13 @@ import { usePhone } from './phone';
 import { recommendedTech, recruitCostFor } from './rules-view';
 import { useGame } from './store';
 import { costText } from './ui';
+import { ACTION_TEXT } from './leaders';
 
 // The order review: what the turn commits before it commits it. Built from the draft, the engine's
 // own legality check and last turn's ledger. Nothing here changes the orders; Commit sends them.
 
 const ORDER_NAME: Record<OrderType, string> = { move: 'Move', attack: 'Attack', defend: 'Dig in', hold: 'Hold', recon: 'Scout', withdraw: 'Withdraw', embark: 'Board' };
-const ACTION_NAME: Record<DiplomaticAction, string> = {
-  declare_war: 'Declare war on',
-  propose_peace: 'Offer peace to',
-  propose_alliance: 'Offer an alliance to',
-  propose_nonaggression: 'Offer a non-aggression pact to',
-  propose_trade: 'Offer trade to',
-  embargo: 'Embargo',
-};
+const ACTION_NAME: Record<DiplomaticAction, string> = ACTION_TEXT;
 const RES_NAME: Record<Resource, string> = { credits: 'Credits', energy: 'Energy', materials: 'Materials', food: 'Food' };
 
 type Warning = { tone: 'bad' | 'warn'; text: string };

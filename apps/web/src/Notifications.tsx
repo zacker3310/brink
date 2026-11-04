@@ -2,6 +2,7 @@ import type { HexKey, NationView, TurnReport } from '@brink/contracts';
 import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { arenaNote, atPlace, describeEffect, hexLabel, treatyText } from './insight';
 import { commanderNote } from './generals';
+import { dealText, stockText, TREATY_TEXT } from './leaders';
 import { useGame } from './store';
 
 // Civ-style turn notifications: a column of icons on the right edge of the map. Hover to read,
@@ -131,13 +132,14 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
         }
         break;
       case 'proposal':
-        if (e.to === me) out.push({ id, icon: 'scroll', tone: 'info', title: `${nation(e.from)} offers ${PROPOSAL_NAME[e.proposal]}`, text: 'Answer in Diplomacy: offer it back to accept.' });
+        if (e.to === me && e.proposal === 'tribute' && e.terms?.get) out.push({ id, icon: 'scroll', tone: 'bad', title: `${nation(e.from)} demands ${stockText(e.terms.get)}`, text: 'An ultimatum: pay it in Diplomacy, or defy it.' });
+        else if (e.to === me) out.push({ id, icon: 'scroll', tone: 'info', title: `${nation(e.from)} offers ${PROPOSAL_NAME[e.proposal] ?? dealText(view, e.proposal, e.terms)}`, text: 'Answer in Diplomacy: offer it back to accept.' });
         break;
       case 'treaty':
       case 'treaty_ended':
         if (e.a === me || e.b === me) {
-          const bad = (e.kind === 'treaty' && e.treaty === 'embargo') || (e.kind === 'treaty_ended' && e.treaty !== 'embargo');
-          const title = e.kind === 'treaty_ended' ? 'Treaty ended' : e.treaty === 'embargo' ? 'Embargo' : e.treaty === 'trade' ? 'Trade agreement signed' : 'Non-aggression pact signed';
+          const bad = (e.kind === 'treaty' && e.treaty === 'embargo') || (e.kind === 'treaty_ended' && e.treaty !== 'embargo' && e.reason !== 'fulfilled');
+          const title = e.kind === 'treaty_ended' ? (e.reason === 'fulfilled' ? 'Joint operation won' : 'Treaty ended') : e.treaty === 'embargo' ? 'Embargo' : `${TREATY_TEXT[e.treaty].charAt(0).toUpperCase()}${TREATY_TEXT[e.treaty].slice(1)} signed`;
           out.push({ id, icon: 'scroll', tone: bad ? 'bad' : 'good', title, text: treatyText(view, e) });
         }
         break;

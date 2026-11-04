@@ -5,6 +5,8 @@ import type { Commander, CommanderEvent, CommanderId, CommanderOrders, Commander
 export * from './commanders';
 import type { CardPlay, CardPlayedEvent, DoctrineState, PublicDoctrine } from './doctrine';
 export * from './doctrine';
+import type { Attitude, DealTerms, LeaderMemory } from './leaders';
+export * from './leaders';
 
 export type NationId = string;
 export type FormationId = string;
@@ -91,15 +93,34 @@ export const FACILITY_IDS: readonly FacilityId[] = ['factory', 'power_plant', 'f
 
 export type Relation = 'war' | 'peace' | 'alliance';
 
-export type DiplomaticAction = 'declare_war' | 'propose_peace' | 'propose_alliance' | 'propose_nonaggression' | 'propose_trade' | 'embargo';
+export type DiplomaticAction =
+  | 'declare_war'
+  | 'propose_peace'
+  | 'propose_alliance'
+  | 'propose_nonaggression'
+  | 'propose_trade'
+  | 'embargo'
+  /** War to peace with a binding truce (`LEADER_TUNING.ceasefireTurns`). */
+  | 'propose_ceasefire'
+  /** Swap resources once: `terms.give` for `terms.get`. */
+  | 'propose_exchange'
+  /** An ultimatum: `terms.get` from the target, or else. */
+  | 'demand_tribute'
+  /** Answer a demand: hand over `terms.give`. */
+  | 'pay_tribute'
+  /** Both march on `terms.site` (`LEADER_TUNING.jointOpTurns`). */
+  | 'propose_joint_op';
 
-export type ProposalKind = 'peace' | 'alliance' | 'nonaggression' | 'trade';
+/** Tribute is one kind both ways: a demand (`get`) is met by a payment (`give`) that mirrors it. */
+export type ProposalKind = 'peace' | 'alliance' | 'nonaggression' | 'trade' | 'ceasefire' | 'exchange' | 'tribute' | 'joint_op';
 
 export interface Proposal {
   from: NationId;
   to: NationId;
   kind: ProposalKind;
   turn: number;
+  /** Exchanges, tribute, an alliance against a common enemy, a joint operation. */
+  terms?: DealTerms;
 }
 
 /**
@@ -107,7 +128,7 @@ export interface Proposal {
  * Non-aggression: neither may declare war on the other while it lasts. Trade: both gain income;
  * war ends it. Embargo: declared by `by`; ends any trade and bars a new one while it lasts.
  */
-export type TreatyKind = 'nonaggression' | 'trade' | 'embargo';
+export type TreatyKind = 'nonaggression' | 'trade' | 'embargo' | 'ceasefire' | 'joint_op';
 
 export interface Treaty {
   kind: TreatyKind;
@@ -118,6 +139,8 @@ export interface Treaty {
   until: number;
   /** Embargoes only: who imposed it. */
   by?: NationId;
+  /** Joint operations only: the prize both march on. */
+  site?: SiteId;
 }
 
 export interface Budget {
@@ -258,6 +281,7 @@ export interface BuildOrder {
 export interface DiplomacyOrder {
   target: NationId;
   action: DiplomaticAction;
+  terms?: DealTerms;
 }
 
 /**
@@ -362,6 +386,8 @@ export interface WorldState {
   crisis?: string;
   /** Every power's generals. Absent in worlds made before commanders (saves gain them on load). */
   commanders?: Record<CommanderId, Commander>;
+  /** What each power's leader remembers of the others. Absent before leaders (saves gain it on load). */
+  memories?: Record<NationId, LeaderMemory[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -443,9 +469,16 @@ export type GameEvent =
   | { kind: 'research'; nation: NationId; tech: TechId }
   /** `broke` is the treaty a declaration of war tore up, if any. */
   | { kind: 'diplomacy'; a: NationId; b: NationId; relation: Relation; proposedBy: NationId; broke?: 'peace' | 'alliance' }
-  | { kind: 'proposal'; from: NationId; to: NationId; proposal: ProposalKind }
-  | { kind: 'treaty'; treaty: TreatyKind; a: NationId; b: NationId; until: number; by?: NationId }
-  | { kind: 'treaty_ended'; treaty: TreatyKind; a: NationId; b: NationId; reason: 'expired' | 'war' | 'embargo' }
+  | { kind: 'proposal'; from: NationId; to: NationId; proposal: ProposalKind; terms?: DealTerms }
+  /** An offer that waited its full time unanswered. A lapsed demand is an ultimatum defied. */
+  | { kind: 'proposal_lapsed'; from: NationId; to: NationId; proposal: ProposalKind; terms?: DealTerms }
+  | { kind: 'treaty'; treaty: TreatyKind; a: NationId; b: NationId; until: number; by?: NationId; site?: SiteId }
+  | { kind: 'treaty_ended'; treaty: TreatyKind; a: NationId; b: NationId; reason: 'expired' | 'war' | 'embargo' | 'fulfilled' }
+  /**
+   * Resources changed hands by agreement: `a` handed `aGave` to `b`, `b` handed `bGave` to `a`.
+   * `tribute`: `a` paid `b` on demand. `void`: one side could no longer pay, so nothing moved.
+   */
+  | { kind: 'exchange'; a: NationId; b: NationId; aGave: Partial<Stockpile>; bGave: Partial<Stockpile>; tribute?: true; void?: true }
   | { kind: 'construction_queued'; nation: NationId; item: string; site: SiteId; facility: FacilityId }
   | { kind: 'construction_cancelled'; nation: NationId; item: string; site: SiteId; facility: FacilityId; reason: string }
   | { kind: 'facility_built'; nation: NationId; site: SiteId; facility: FacilityId }
@@ -553,6 +586,10 @@ export interface NationView {
   commanders?: Record<CommanderId, Commander>;
   /** Foreign generals leading contacts seen this turn, by formation: name and level only. */
   enemyCommanders?: Record<FormationId, CommanderSighting>;
+  /** How each rival power's leader feels about you, with the reasons: what their envoys let you see. */
+  moods?: Record<NationId, Attitude>;
+  /** How your own leader feels about each rival power (the AI decides by it). */
+  attitudes?: Record<NationId, Attitude>;
 }
 
 export interface TurnResult {

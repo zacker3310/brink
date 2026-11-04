@@ -32,6 +32,8 @@ function handle(req: Request): Response {
       return { type: 'suggested', orders: session.suggest(req.nation, req.target) };
     case 'check':
       return { type: 'checked', rejected: session.check(req.orders) };
+    case 'negotiate':
+      return { type: 'verdict', verdict: session.negotiate(req.from, req.to, { kind: req.kind, ...(req.terms ? { terms: req.terms } : {}) }) };
     case 'previewAssault':
       return { type: 'assault', preview: previewAssault(session.view(), req.attackers, req.target) };
     case 'previewStrike':

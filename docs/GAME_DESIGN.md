@@ -27,7 +27,7 @@ One turn is six hours. You see only what your units and cities can see.
 | # | Phase | What happens |
 |---|---|---|
 | 1 | Validate | Every submission is checked against the start-of-turn world. Illegal orders are dropped with a stated reason; a formation without a legal order holds. Recruits and buildings reserve from one shared budget, in site order, so nothing is overspent. |
-| 2 | Diplomacy | Treaties past their last turn lapse. Declarations of war, then embargoes, take effect at once. Mutual offers take effect. New enemies sharing a hex separate. |
+| 2 | Diplomacy | Treaties past their last turn lapse. Declarations of war, then embargoes, take effect at once. A demand left unpaid lapses (defied). Mutual offers take effect: relations, treaties, exchanges and tribute. New enemies sharing a hex separate. |
 | 3 | Production | Work at sites that changed hands is cancelled without refund. New recruits and buildings are paid and queued. Industry goes to construction first, then units. |
 | 4 | Logistics | Supply flows from capitals, cities and depots. |
 | 5 | Reconnaissance | Vision is computed. |
@@ -36,7 +36,7 @@ One turn is six hours. You see only what your units and cities can see.
 | 8 | Engagements | Assaults and head-on meetings from the post-movement snapshot, committed together. Hand-fought battles apply here. |
 | 9 | Territory | Beaten defenders retreat, winners advance, hexes and sites change hands. |
 | 10 | Economy | Income, upkeep, budget, research, stability, entrenchment, reinforcement. |
-| 11 | Victory | Eliminations, then the victory paths in fixed order. |
+| 11 | Victory | Eliminations, generals, a joint operation whose prize a partner took ends, leaders remember the turn, then the victory paths in fixed order. |
 | 12 | Reports | Each nation gets the events it is entitled to see. |
 
 ### Simultaneity rules
@@ -166,6 +166,28 @@ resolution. Declarations of war and embargoes take effect at once.
 | Offer non-aggression pact | Peace | For 6 turns neither side may declare war on the other: the validator refuses it. |
 | Offer trade | Not at war, no embargo | For 8 turns both gain 14 credits and 6 materials a turn. Renew by offering again in its last turn. Ends at war. |
 | Embargo | No embargo of yours in force | Ends trade at once; no trade between the two for 5 turns. |
+| Offer a ceasefire | War | Peace when both offer, and for 3 turns neither may declare war. |
+| Offer an exchange | Not at war, no embargo | Resources change hands once (up to 400 of each), when the other side offers the mirror. What you give is reserved like a recruit's cost. |
+| Demand tribute | Peace | An ultimatum: paid when they offer the payment back. Unpaid after two turns, it lapses: they defied you. |
+| Alliance against X | Not at war with each other; no pact or ceasefire with X | Allies, and whichever of you is not yet at war with X goes to war (perfidy applies). |
+| Joint operation | Not at war with each other; you at war with the prize's holder | For 5 turns both march on one city; ends when either takes it. |
+
+### Leaders
+
+Every power is run by an invented leader (`game-data/src/leaders.ts`; no real head of state by name
+or likeness): a temperament (hawk, dove, opportunist), an agenda (Balance of Power, Open Seas, A Word
+Kept, Iron Respect, Lost Provinces) and lines for every occasion. Leaders remember what was done to
+them (betrayals, wars declared, cities taken, peace, deals, tribute, defiance, joint victories), each
+memory fading over its own span; hawks hold grudges at 150%, doves at 70%. Their mood toward each
+rival, from -100 to 100, is the sum of those memories and how things stand now (war, alliance,
+treaties, a common enemy, fear of a runaway leader, the agenda), and it is shown itemised, Civ-style.
+
+A leader answers an offer at once on the diplomacy screen with the same judgement they make when the
+turn resolves (`packages/ai/src/diplomacy-ai.ts`): mood, temperament, how their war goes and the terms.
+They also seek deals of their own: a dove far behind asks for a ceasefire, a hawk far ahead sends a
+weaker power an ultimatum and goes to war when defied, friends propose joint operations, the short of
+a resource offer a swap. A dove will not declare war on a power it feels warmly about, and nobody
+trades with a power they detest.
 
 Treaties are public: every power sees every agreement. Nations at peace may share ground; when war
 breaks out over a shared hex, the side not on its own ground falls back.

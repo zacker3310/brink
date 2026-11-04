@@ -1,39 +1,183 @@
-import type { GameEvent, NationId, NationOrders, Proposal, ProposalKind, Treaty, TreatyKind, WorldState } from '@brink/contracts';
-import { TREATIES } from '@brink/game-data';
+import type { DealTerms, DiplomaticAction, GameEvent, NationId, NationOrders, Proposal, ProposalKind, SiteId, Stockpile, Treaty, TreatyKind, WorldState } from '@brink/contracts';
+import { RESOURCES } from '@brink/contracts';
+import { LEADER_TUNING, TREATIES } from '@brink/game-data';
 import { pairKey, relationOf, sortedKeys, treatyIn } from './rules';
 
 /** Pending proposals lapse after this many turns. */
-const PROPOSAL_LIFETIME = 2;
+export const PROPOSAL_LIFETIME = 2;
+
+/** The proposal each offering action makes. Tribute is one kind: a demand and the payment that meets it. */
+export const PROPOSAL_OF: Partial<Record<DiplomaticAction, ProposalKind>> = {
+  propose_peace: 'peace',
+  propose_alliance: 'alliance',
+  propose_nonaggression: 'nonaggression',
+  propose_trade: 'trade',
+  propose_ceasefire: 'ceasefire',
+  propose_exchange: 'exchange',
+  demand_tribute: 'tribute',
+  pay_tribute: 'tribute',
+  propose_joint_op: 'joint_op',
+};
+
+/** The terms the other side offers to agree to `t`: what one gives the other gets. */
+export function mirrorTerms(t: DealTerms | undefined): DealTerms | undefined {
+  if (!t) return undefined;
+  const out: DealTerms = {};
+  if (t.get) out.give = { ...t.get };
+  if (t.give) out.get = { ...t.give };
+  if (t.against) out.against = t.against;
+  if (t.site) out.site = t.site;
+  return out;
+}
+
+/** The order that answers `p` in kind: a payment meets a demand, anything else is offered back. */
+export function answerTo(p: Pick<Proposal, 'from' | 'kind' | 'terms'>): { target: NationId; action: DiplomaticAction; terms?: DealTerms } {
+  const terms = mirrorTerms(p.terms);
+  const action: DiplomaticAction =
+    p.kind === 'tribute' ? (stockTotal(p.terms?.get) > 0 ? 'pay_tribute' : 'demand_tribute') : (Object.keys(PROPOSAL_OF) as DiplomaticAction[]).find((a) => PROPOSAL_OF[a] === p.kind)!;
+  return { target: p.from, action, ...(terms ? { terms } : {}) };
+}
+
+/** Total of a partial stockpile. */
+export function stockTotal(s: Partial<Stockpile> | undefined): number {
+  return s ? RESOURCES.reduce((a, r) => a + (s[r] ?? 0), 0) : 0;
+}
+
+function sameStock(a: Partial<Stockpile> | undefined, b: Partial<Stockpile> | undefined): boolean {
+  return RESOURCES.every((r) => (a?.[r] ?? 0) === (b?.[r] ?? 0));
+}
+
+/** Whether `q` answers `p`: the reverse direction, the same kind, the mirrored terms. */
+export function mirrors(p: Pick<Proposal, 'from' | 'to' | 'kind' | 'terms'>, q: Pick<Proposal, 'from' | 'to' | 'kind' | 'terms'>): boolean {
+  if (q.from !== p.to || q.to !== p.from || q.kind !== p.kind) return false;
+  if (p.kind === 'exchange' || p.kind === 'tribute') return sameStock(p.terms?.give, q.terms?.get) && sameStock(p.terms?.get, q.terms?.give);
+  if (p.kind === 'alliance') return (p.terms?.against ?? null) === (q.terms?.against ?? null);
+  if (p.kind === 'joint_op') return p.terms?.site === q.terms?.site;
+  return true;
+}
 
 /**
- * Whether `from` may still offer `kind` to `to`: peace needs a war, an alliance or a pact needs
- * peace, trade needs no war and no embargo. A pact or trade already running cannot be offered
- * again until its last turn (an offer then renews it).
+ * Why a deal's terms are malformed for `action`, or null. Amounts are whole, at least zero and at
+ * most `LEADER_TUNING.dealMax` of a resource; an exchange names both sides, a demand only what it
+ * asks, a payment only what it hands over, a joint operation its prize.
  */
-export function canPropose(world: Pick<WorldState, 'relations' | 'treaties' | 'turn'>, from: NationId, to: NationId, kind: ProposalKind): boolean {
+export function termsProblem(action: DiplomaticAction, terms: DealTerms | undefined): string | null {
+  const stock = (s: Partial<Stockpile> | undefined): string | null => {
+    if (s === undefined) return null;
+    if (!s || typeof s !== 'object') return 'malformed terms';
+    for (const [k, v] of Object.entries(s)) {
+      if (!(RESOURCES as readonly string[]).includes(k)) return `unknown resource ${k}`;
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > LEADER_TUNING.dealMax) return `a deal moves 0 to ${LEADER_TUNING.dealMax} of a resource`;
+    }
+    return null;
+  };
+  if (terms !== undefined && (!terms || typeof terms !== 'object')) return 'malformed terms';
+  const bad = stock(terms?.give) ?? stock(terms?.get);
+  if (bad) return bad;
+  const give = stockTotal(terms?.give);
+  const get = stockTotal(terms?.get);
+  switch (action) {
+    case 'propose_exchange':
+      return give > 0 && get > 0 ? null : 'an exchange gives something and asks for something';
+    case 'demand_tribute':
+      return get > 0 && give === 0 ? null : 'a demand names only what it asks for';
+    case 'pay_tribute':
+      return give > 0 && get === 0 ? null : 'a payment names only what it hands over';
+    case 'propose_joint_op':
+      return typeof terms?.site === 'string' ? null : 'a joint operation names its prize';
+    case 'propose_alliance':
+      return terms?.against === undefined || typeof terms.against === 'string' ? null : 'malformed terms';
+    default:
+      return null;
+  }
+}
+
+/** Only the parts of `terms` that `action` uses, copied; undefined when it uses none. */
+export function cleanTerms(action: DiplomaticAction, terms: DealTerms | undefined): DealTerms | undefined {
+  if (!terms) return undefined;
+  const pick = (s: Partial<Stockpile> | undefined): Partial<Stockpile> | undefined => {
+    if (!s) return undefined;
+    const out: Partial<Stockpile> = {};
+    for (const r of RESOURCES) if ((s[r] ?? 0) > 0) out[r] = s[r]!;
+    return Object.keys(out).length ? out : undefined;
+  };
+  const give = pick(terms.give);
+  const get = pick(terms.get);
+  switch (action) {
+    case 'propose_exchange':
+      return { ...(give ? { give } : {}), ...(get ? { get } : {}) };
+    case 'demand_tribute':
+      return get ? { get } : undefined;
+    case 'pay_tribute':
+      return give ? { give } : undefined;
+    case 'propose_joint_op':
+      return terms.site ? { site: terms.site } : undefined;
+    case 'propose_alliance':
+      return terms.against ? { against: terms.against } : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** What diplomacy reads: a world, or a view's public facts recast as one. */
+export type DiplomacyWorld = Pick<WorldState, 'relations' | 'treaties' | 'turn'> & {
+  nations?: Record<NationId, { eliminated: boolean; minor?: boolean }>;
+  sites?: Record<SiteId, { owner: NationId | null; key: string }>;
+  /** A view's tiles: a joint operation is only offered on a prize seen now (its holder may have changed). */
+  tiles?: Record<string, { key: string; visibility?: 'visible' | 'observed' | 'unknown' }>;
+};
+
+/** A treaty in force between `a` and `b` that forbids war: a non-aggression pact or a ceasefire. */
+export function bindingTreaty(world: Pick<WorldState, 'treaties' | 'turn'>, a: NationId, b: NationId): Treaty | undefined {
+  return treatyIn(world.treaties, 'nonaggression', a, b, world.turn) ?? treatyIn(world.treaties, 'ceasefire', a, b, world.turn);
+}
+
+/**
+ * Whether `from` may still offer `kind` to `to`: peace or a ceasefire needs a war, an alliance or a
+ * pact needs peace, trade and exchanges need no war and no embargo, a demand needs peace. A pact,
+ * trade or joint operation already running cannot be offered again until its last turn (an offer
+ * then renews it). An alliance against a common enemy needs no war between the two and no pact or
+ * ceasefire with the enemy; a joint operation needs the proposer at war with the prize's holder.
+ */
+export function canPropose(world: DiplomacyWorld, from: NationId, to: NationId, kind: ProposalKind, terms?: DealTerms): boolean {
   const rel = relationOf(world.relations, from, to);
-  const running = (k: TreatyKind) => {
+  function running(k: TreatyKind): boolean {
     const t = treatyIn(world.treaties, k, from, to, world.turn);
     return !!t && t.until > world.turn;
-  };
+  }
   switch (kind) {
     case 'peace':
+    case 'ceasefire':
       return rel === 'war';
-    case 'alliance':
-      return rel === 'peace';
+    case 'alliance': {
+      const x = terms?.against;
+      if (x === undefined) return rel === 'peace';
+      const foe = world.nations?.[x];
+      if (x === from || x === to || (world.nations && (!foe || foe.eliminated || foe.minor))) return false;
+      return rel !== 'war' && !bindingTreaty(world, from, x) && !bindingTreaty(world, to, x);
+    }
     case 'nonaggression':
       return rel === 'peace' && !running('nonaggression');
     case 'trade':
       return rel !== 'war' && !treatyIn(world.treaties, 'embargo', from, to, world.turn) && !running('trade');
+    case 'exchange':
+      return rel !== 'war' && !treatyIn(world.treaties, 'embargo', from, to, world.turn);
+    case 'tribute':
+      return rel === 'peace';
+    case 'joint_op': {
+      const owner = terms?.site ? world.sites?.[terms.site]?.owner : undefined;
+      if (!owner || owner === from || owner === to || world.nations?.[owner]?.eliminated) return false;
+      return rel !== 'war' && relationOf(world.relations, from, owner) === 'war' && !running('joint_op');
+    }
   }
 }
 
-function sign(world: WorldState, kind: TreatyKind, a: NationId, b: NationId, turns: number, events: GameEvent[], by?: NationId): void {
+function sign(world: WorldState, kind: TreatyKind, a: NationId, b: NationId, turns: number, events: GameEvent[], by?: NationId, site?: SiteId): void {
   const [x, y] = a < b ? [a, b] : [b, a];
   world.treaties = world.treaties.filter((t) => !(t.kind === kind && t.a === x && t.b === y));
-  const t: Treaty = { kind, a: x, b: y, from: world.turn, until: world.turn + turns - 1, ...(by ? { by } : {}) };
+  const t: Treaty = { kind, a: x, b: y, from: world.turn, until: world.turn + turns - 1, ...(by ? { by } : {}), ...(site ? { site } : {}) };
   world.treaties.push(t);
-  events.push({ kind: 'treaty', treaty: kind, a: x, b: y, until: t.until, ...(by ? { by } : {}) });
+  events.push({ kind: 'treaty', treaty: kind, a: x, b: y, until: t.until, ...(by ? { by } : {}), ...(site ? { site } : {}) });
 }
 
 function end(world: WorldState, kinds: readonly TreatyKind[], a: NationId, b: NationId, reason: 'war' | 'embargo', events: GameEvent[]): void {
@@ -44,16 +188,54 @@ function end(world: WorldState, kinds: readonly TreatyKind[], a: NationId, b: Na
   world.treaties = world.treaties.filter((t) => !(t.a === x && t.b === y && kinds.includes(t.kind)));
 }
 
+/** War between `declarer` and `target`, at once: it ends trade and any pact, truce or joint operation between them. */
+function goToWar(world: WorldState, declarer: NationId, target: NationId, events: GameEvent[]): void {
+  const was = relationOf(world.relations, declarer, target);
+  world.relations[pairKey(declarer, target)] = 'war';
+  events.push({ kind: 'diplomacy', a: declarer, b: target, relation: 'war', proposedBy: declarer, ...(was === 'peace' || was === 'alliance' ? { broke: was } : {}) });
+  end(world, ['trade', 'nonaggression', 'ceasefire', 'joint_op'], declarer, target, 'war', events);
+}
+
+/** Hand over what each side agreed to give, if both still can: all or nothing. */
+function settleDeal(world: WorldState, p: Proposal, events: GameEvent[]): void {
+  const tribute = p.kind === 'tribute';
+  // `a` hands over `aGives`: the proposer's `give`, or the payer of a demand.
+  const demand = tribute && stockTotal(p.terms?.get) > 0;
+  const a = demand ? p.to : p.from;
+  const b = demand ? p.from : p.to;
+  const aGives: Partial<Stockpile> = { ...(demand ? p.terms?.get : p.terms?.give) };
+  const bGives: Partial<Stockpile> = demand ? {} : { ...p.terms?.get };
+  const sa = world.nations[a]!.stockpile;
+  const sb = world.nations[b]!.stockpile;
+  const can = RESOURCES.every((r) => sa[r] >= (aGives[r] ?? 0) && sb[r] >= (bGives[r] ?? 0));
+  if (can) {
+    for (const r of RESOURCES) {
+      sa[r] += (bGives[r] ?? 0) - (aGives[r] ?? 0);
+      sb[r] += (aGives[r] ?? 0) - (bGives[r] ?? 0);
+    }
+  }
+  events.push({ kind: 'exchange', a, b, aGave: aGives, bGave: bGives, ...(tribute ? { tribute: true as const } : {}), ...(can ? {} : { void: true as const }) });
+}
+
+/** A deep copy of terms: they ride in events and proposals and are never shared. */
+function copyTerms(t: DealTerms): DealTerms {
+  return JSON.parse(JSON.stringify(t)) as DealTerms;
+}
+
 /**
  * Phase 2, in this order:
  * 1. Treaties past their last turn lapse, and any with an eliminated party go.
- * 2. Declarations of war take effect at once and end trade (and, defensively, any pact) between
- *    the two. Validation already refuses war on a pact partner, so a pact is binding.
+ * 2. Declarations of war take effect at once and end trade (and, defensively, any pact, ceasefire
+ *    or joint operation) between the two. Validation already refuses war on a pact or ceasefire
+ *    partner, so both are binding.
  * 3. Embargoes take effect at once: trade between the two ends and is barred while it lasts.
- * 4. Proposals: peace, alliance, a non-aggression pact or trade takes effect when both sides have
- *    offered it, this turn or within the offer's lifetime; who offered first does not matter. A
- *    pair that went to war this turn ignores offers until next turn. Everything agreed is in force
- *    from this turn's resolution on.
+ * 4. A demand that waited its whole lifetime unpaid lapses: an ultimatum defied.
+ * 5. Proposals: anything agreed takes effect when both sides have offered it in kind (mirrored
+ *    terms), this turn or within the offer's lifetime; who offered first does not matter. A pair that
+ *    went to war this turn ignores offers until next turn. Peace and alliances change the relation
+ *    (an alliance against a common enemy takes both to war with it), a ceasefire makes peace and
+ *    binds it for a few turns, exchanges and tribute move resources at once (all or nothing), the
+ *    rest are timed treaties. Everything agreed is in force from this turn's resolution on.
  */
 export function resolveDiplomacy(world: WorldState, orders: Record<NationId, NationOrders>, events: GameEvent[]): void {
   const keep: Treaty[] = [];
@@ -72,10 +254,7 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
       const key = pairKey(nation, d.target);
       if (declared.has(key)) continue;
       declared.add(key);
-      const was = relationOf(world.relations, nation, d.target);
-      world.relations[key] = 'war';
-      events.push({ kind: 'diplomacy', a: nation, b: d.target, relation: 'war', proposedBy: nation, ...(was === 'peace' || was === 'alliance' ? { broke: was } : {}) });
-      end(world, ['trade', 'nonaggression'], nation, d.target, 'war', events);
+      goToWar(world, nation, d.target, events);
     }
   }
 
@@ -87,37 +266,74 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
     }
   }
 
-  const KINDS: Record<string, ProposalKind> = { propose_peace: 'peace', propose_alliance: 'alliance', propose_nonaggression: 'nonaggression', propose_trade: 'trade' };
   const fresh: Proposal[] = [];
   for (const nation of sortedKeys(orders)) {
     for (const d of orders[nation]!.diplomacy) {
-      const kind = KINDS[d.action];
-      if (kind) fresh.push({ from: nation, to: d.target, kind, turn: world.turn });
+      const kind = PROPOSAL_OF[d.action];
+      if (kind) fresh.push({ from: nation, to: d.target, kind, turn: world.turn, ...(d.terms ? { terms: copyTerms(d.terms) } : {}) });
     }
   }
 
   const stillValid = (p: Proposal) =>
-    !declared.has(pairKey(p.from, p.to)) && !world.nations[p.from]!.eliminated && !world.nations[p.to]!.eliminated && canPropose(world, p.from, p.to, p.kind);
+    !declared.has(pairKey(p.from, p.to)) && !world.nations[p.from]!.eliminated && !world.nations[p.to]!.eliminated && canPropose(world, p.from, p.to, p.kind, p.terms);
+  for (const p of world.proposals) {
+    if (world.turn - p.turn > PROPOSAL_LIFETIME && p.kind === 'tribute' && stockTotal(p.terms?.get) > 0 && stillValid(p)) {
+      events.push({ kind: 'proposal_lapsed', from: p.from, to: p.to, proposal: p.kind, ...(p.terms ? { terms: copyTerms(p.terms) } : {}) });
+    }
+  }
   const pending = world.proposals.filter((p) => world.turn - p.turn <= PROPOSAL_LIFETIME && stillValid(p));
   const all = [...pending, ...fresh.filter(stillValid)];
-  const has = (from: NationId, to: NationId, kind: Proposal['kind']) => all.some((p) => p.from === from && p.to === to && p.kind === kind);
+  const answered = (p: Proposal) => all.some((q) => mirrors(p, q));
 
   const accepted = new Set<string>();
-  for (const p of [...all].sort((a, b) => (pairKey(a.from, a.to) + a.kind < pairKey(b.from, b.to) + b.kind ? -1 : 1))) {
-    const key = `${pairKey(p.from, p.to)}|${p.kind}`;
-    if (accepted.has(key) || !has(p.to, p.from, p.kind) || !canPropose(world, p.from, p.to, p.kind)) continue;
+  const dealKey = (p: Proposal) => `${pairKey(p.from, p.to)}|${p.kind}`;
+  const order = (x: Proposal, y: Proposal) => {
+    const kx = dealKey(x);
+    const ky = dealKey(y);
+    return kx < ky ? -1 : kx > ky ? 1 : x.from < y.from ? -1 : x.from > y.from ? 1 : y.turn - x.turn;
+  };
+  for (const p of [...all].sort(order)) {
+    const key = dealKey(p);
+    if (accepted.has(key) || !answered(p) || !canPropose(world, p.from, p.to, p.kind, p.terms)) continue;
     accepted.add(key);
     const [a, b] = p.from < p.to ? [p.from, p.to] : [p.to, p.from];
-    if (p.kind === 'peace' || p.kind === 'alliance') {
-      world.relations[pairKey(a, b)] = p.kind;
-      events.push({ kind: 'diplomacy', a, b, relation: p.kind, proposedBy: a });
-    } else {
-      sign(world, p.kind, a, b, p.kind === 'nonaggression' ? TREATIES.nonaggressionTurns : TREATIES.tradeTurns, events);
+    switch (p.kind) {
+      case 'peace':
+      case 'alliance': {
+        world.relations[pairKey(a, b)] = p.kind;
+        events.push({ kind: 'diplomacy', a, b, relation: p.kind, proposedBy: a });
+        // An alliance against a common enemy: whichever partner is not yet at war with it goes to war.
+        const x = p.kind === 'alliance' ? p.terms?.against : undefined;
+        if (x) {
+          for (const n of [a, b]) {
+            if (relationOf(world.relations, n, x) === 'war') continue;
+            declared.add(pairKey(n, x));
+            goToWar(world, n, x, events);
+          }
+        }
+        break;
+      }
+      case 'ceasefire':
+        world.relations[pairKey(a, b)] = 'peace';
+        events.push({ kind: 'diplomacy', a, b, relation: 'peace', proposedBy: a });
+        sign(world, 'ceasefire', a, b, LEADER_TUNING.ceasefireTurns, events);
+        break;
+      case 'exchange':
+      case 'tribute':
+        settleDeal(world, p, events);
+        break;
+      case 'joint_op':
+        sign(world, 'joint_op', a, b, LEADER_TUNING.jointOpTurns, events, undefined, p.terms!.site!);
+        break;
+      case 'nonaggression':
+      case 'trade':
+        sign(world, p.kind, a, b, p.kind === 'nonaggression' ? TREATIES.nonaggressionTurns : TREATIES.tradeTurns, events);
+        break;
     }
   }
 
-  const remaining = all.filter((p) => !accepted.has(`${pairKey(p.from, p.to)}|${p.kind}`) && stillValid(p));
-  for (const p of fresh) if (remaining.includes(p)) events.push({ kind: 'proposal', from: p.from, to: p.to, proposal: p.kind });
+  const remaining = all.filter((p) => !accepted.has(dealKey(p)) && stillValid(p));
+  for (const p of fresh) if (remaining.includes(p)) events.push({ kind: 'proposal', from: p.from, to: p.to, proposal: p.kind, ...(p.terms ? { terms: copyTerms(p.terms) } : {}) });
   // One pending proposal per direction and kind.
   const dedup = new Map<string, Proposal>();
   for (const p of remaining) {
@@ -127,4 +343,15 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
   }
   world.proposals = [...dedup.keys()].sort().map((k) => dedup.get(k)!);
   world.treaties.sort((x, y) => (x.a + x.b + x.kind < y.a + y.b + y.kind ? -1 : x.a + x.b + x.kind > y.a + y.b + y.kind ? 1 : x.from - y.from));
+}
+
+/**
+ * Phase 11c, before memories: a joint operation whose prize one of its partners now holds is
+ * fulfilled and ends.
+ */
+export function resolveJointOps(world: WorldState, events: GameEvent[]): void {
+  const done = world.treaties.filter((t) => t.kind === 'joint_op' && !!t.site && (world.sites[t.site]?.owner === t.a || world.sites[t.site]?.owner === t.b));
+  if (done.length === 0) return;
+  for (const t of done) events.push({ kind: 'treaty_ended', treaty: 'joint_op', a: t.a, b: t.b, reason: 'fulfilled' });
+  world.treaties = world.treaties.filter((t) => !done.includes(t));
 }
