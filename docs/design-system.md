@@ -89,11 +89,11 @@ panel.
 
 ## Map
 
-- Ground, painted style (default): see "Painted map" below.
+- Ground, painted style (default) and paper style (menu): see "Painted map" below.
 - Ground, clean style (menu): flat terrain colours (`ATLAS` in `MapView.tsx`) with one small mark
   per terrain: three trees, two hill arcs, a snow-capped peak, city blocks, waves. Plains are bare.
 - Ground, satellite style (menu): Sentinel-2 imagery (credits in `public/art/CREDITS.md`), graded down by a dark wash.
-- Zoomed out (below 0.95), the map turns political: nation names in their colour across their land,
+- Zoomed out (names fade in below 1.0), the map turns political: nation names in their colour across their land,
   city banners hidden on a phone.
 - Territory: nation colour at 20 % (12 % where only remembered), 3.5 px borders on a dark keyline.
 - Reach: blue fill with a bright outer edge. Targets: red ring, plus an odds tag under the hex
@@ -128,37 +128,60 @@ hover combat card) and gets the same map.
 ## Painted map (v3)
 
 `apps/web/src/paint/ground.ts` paints the whole theatre procedurally into one canvas, baked into a
-single texture (about 90 ms; repainted only when land is explored). No canvas blur filters, which
-Safari lacks: soft edges come from stamped radial gradients, and every stroke is seeded per hex so
-the land never changes between paints. In order:
+single mipmapped texture (repainted only when land is explored or a town grows or builds). No canvas
+blur filters, which Safari lacks: soft edges come from stamped radial gradients, and every stroke is
+seeded per hex so the land never changes between paints. In order:
 
-1. **Sea** all round the land, deep at the margins, with shallows and surf along the coast.
-2. **Ground**: a base colour per hex, a soft disc of it spilling past each edge so neighbours blend,
-   jittered blobs for variation, then light and shade across many hexes (sunlit downs, dark valleys).
-3. **Brushwork**: grass tufts, rock flecks, cobbles, ripples.
-4. **Coasts, roads, rivers**: sand and surf where land meets water; dirt roads between developed
-   hexes; rivers in four strokes (bank, deep, shallow, glint).
-5. **Props**, back to front: round-canopied trees, rock peaks with snow, rounded hills, houses, walled
-   towns and castles, depot yards, standing stones on objectives. They keep to the rim of each hex:
-   the middle is a clearing for the army counter.
-6. **Light**: warm from the top left, a vignette, unexplored land kept dark.
+1. **Coastline**: every edge between land and anything else is traced into closed loops, roughened
+   (three seeded points per edge, fixed at the corners) and smoothed twice by corner cutting, so the
+   shore wanders a few pixels either side of the hex edge instead of following the grid. Land at the
+   theatre's rim runs on three hexes past it and sinks into shadow, so the map never ends in a ruled
+   coast.
+2. **Sea**: deeper the further from land (a breadth-first distance per water hex), broad patches of
+   lighter and darker swell, ripples; a shelf of shallows stepping out from the shore in twelve
+   low-contrast bands, then a ring of surf.
+3. **Ground**, painted on a sheet of its own and cut out along the coastline in one operation
+   (clipping each of thousands of strokes to the coast is many times slower): a base colour per
+   hex, a soft disc of it spilling past each edge, jittered blobs, paler lowland toward the beach,
+   light and shade across many hexes, then **hillshade**: every hex lit by how its ground slopes
+   toward the light in the north-west (heights: water −1, plains 0, forest 0.4, hills 1.3,
+   mountains 2.8), and high ground with a lit shoulder and a dark flank of its own.
+4. **Brushwork, roads, rivers**: tufts, flecks, cobbles; dirt roads between developed hexes; rivers
+   in four strokes. A sand beach along the whole shore.
+5. **Props**, back to front, only where the spot is land (read from a half-resolution mask of the
+   coast): trees, rock peaks with snow, hills, houses, standing stones, depot yards. **Towns grow
+   with their people** (one size step per 300 thousand, as on the banner): a wider wall, more
+   towers, streets from the gates to the square, suburbs spilling past the wall; a capital has a
+   keep with a pennant. **What is built shows**: smoking works (factory), a cooling tower (power
+   plant), strip fields (farm), a pithead (mine), a domed laboratory, a star fort (fortress); a port
+   has quays and boats on its seaward side. The middle of every hex stays a clearing for the counter.
+6. **Light**: warm from the top left; unexplored land dark under soft cloud; a vignette and margins
+   that fade to exactly the colour beyond the canvas; the faint grain of paper over everything.
 
-Over it, in Pixi: each nation's land under a 10 % wash of its colour (one path per nation, so no
-seams), and borders that glow (11 px at 18 %, 5.5 px at 45 %, a 2.2 px core lifted toward white).
-Zoomed out, nation names in Cinzel, cream with a dark keyline and a glow in the nation's colour.
+**Paper** (map style menu): the same map printed in sepia inks on parchment, the sea in a cool wash
+of ink so land and water still part, laid on a dark table (`TABLE`) instead of the open sea.
+
+Over it, in Pixi: each nation's land under a 10 % wash of its colour (exact hex polygons in one path
+per nation, so no seams and no doubled edges), borders that glow (11 px at 18 %, 5.5 px at 45 %, a
+2.2 px core lifted toward white) with a 9 px band of the colour inside them, and ground only
+remembered under a cool 30 % haze. **Level of detail**: the hex grid fades in from zoom 0.8 to 1.7;
+nation names in Cinzel fade in below zoom 1.0; counters grow when zoomed far out (`counters.ts`).
 
 `apps/web/src/paint/life.ts` keeps it alive (decoration only, never game state):
 
 | Layer | What |
 |---|---|
-| Fog | Banks of cloud over unexplored hexes, gently heaving |
+| Fog | Banks of cloud over unexplored hexes: a dark body, lighter billows lit from the north-west, wisps reaching over known ground at the edge, gently heaving |
+| Mist | A pale veil over ground seen but not seen now, in four banks that breathe out of step |
 | Cloud shadows | Six soft shadows drifting west to east |
 | Water | Glints that twinkle on the sea and rivers |
 | Fronts | Wherever your stack stands next to an enemy at war: an ember glow on the contested edge, and both sides firing (muzzle flash, tracer, shell burst, smoke), up to 16 fronts |
 | Fires | Smoke rising where last turn's battles and strikes landed |
 
-With reduced motion only the fog stays (still). Measured in Chromium: no frame-rate cost against the
-clean style, which draws thousands of vector shapes instead of one texture.
+With reduced motion only the fog and mist stay (still). The turn replay (`replay.ts`) draws a wake
+behind every moving formation, missiles on smoke trails with a ground shadow and a closing aim ring,
+shell bursts and shock rings over battles, and a banner in the new owner's colour over every
+captured town (its name, and who took it).
 
 ## Console (v3): text screens
 
