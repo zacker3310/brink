@@ -1250,6 +1250,28 @@ export class Effects {
   }
 
   /**
+   * A speed streak: a faint white line left hanging for a moment where something fast just was
+   * (a jet's wingtips and spine, a rocket's body), `len` long behind `at` along `dir`. It sells the
+   * speed a single frame cannot. Skipped on Low.
+   */
+  speedStreak(at: THREE.Vector3, dir: THREE.Vector3, len: number, width = 0.02, strength = 1): void {
+    if (this.budget.density < 0.5) return;
+    const g = this.gt;
+    g.reset(STREAK).colour(SMOKE_WHITE, 1);
+    g.ax = -dir.x;
+    g.ay = -dir.y;
+    g.az = -dir.z;
+    g.s0 = width;
+    g.s1 = width * 0.4;
+    g.lenMax = len;
+    g.life = 0.16;
+    g.fade = 1.5;
+    g.inten = (this.night ? 0.5 : 0.85) * strength;
+    g.imp = 0.6;
+    this.glow(at.x - dir.x * len * 0.5, at.y - dir.y * len * 0.5, at.z - dir.z * len * 0.5);
+  }
+
+  /**
    * One puff of a trail where something flies: a jet's thin white contrail, a missile's bright
    * smoke, the black smoke and fire of a burning airframe, the grey smoke of a drone hit.
    */

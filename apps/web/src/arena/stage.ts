@@ -125,9 +125,9 @@ const SHAKE_SWAY = 0.012;
 const wave = (t: number, seed: number) => (Math.sin(t * 37.7 + seed) + 0.6 * Math.sin(t * 61.3 + seed * 2.3) + 0.3 * Math.sin(t * 91.1 + seed * 4.1)) / 1.9;
 const shares = (a: { keys: string[] }, b: { keys: string[] }) => a.keys.some((k) => b.keys.includes(k));
 
-/** Off-map support the film flies in (the rockets fly as rockets). */
-type FlownSupport = Extract<SupportId, 'strike_jet' | 'cruise_missile' | 'naval_gun' | 'kamikaze'>;
-const FLOWN = new Set<string>(['strike_jet', 'cruise_missile', 'naval_gun', 'kamikaze']);
+/** Off-map support the film flies in from beyond the field (every kind there is). */
+type FlownSupport = Extract<SupportId, 'strike_jet' | 'cruise_missile' | 'naval_gun' | 'kamikaze' | 'himars' | 'tornado'>;
+const FLOWN = new Set<string>(['strike_jet', 'cruise_missile', 'naval_gun', 'kamikaze', 'himars', 'tornado']);
 
 /** The mission a beat opens with, when it is one the film flies in. */
 function supportOf(beat: Beat): FlownSupport | null {
@@ -476,7 +476,13 @@ export class BattleStage {
     this.audio = new BattleAudio({ radio: opts.settings.radio });
     this.audio.setNight(night);
     this.audio.ambience(battle.conditions.biome, battle.conditions.weather);
-    this.sorties = new Sorties(this.scene, this.fx, this.audio, (x, z) => this.world.heightAt(x, z), { w: W, h: H });
+    this.sorties = new Sorties(this.scene, this.fx, this.audio, (x, z) => this.world.heightAt(x, z), { w: W, h: H }, () => this.world.seaLevel);
+    // The jet's run is laid clear of where the camera will stand while it watches the target.
+    this.sorties.eyeAt = (x, z) => {
+      const v = { ...this.view(), fx: x, fz: z, dist: this.wantDist, tilt: this.wantTilt };
+      const { lx, lz, gy, h, r } = aim(v, this.camera.fov, this.groundAt);
+      return new THREE.Vector3(lx + Math.sin(v.yaw) * r, gy + h, lz + Math.cos(v.yaw) * r);
+    };
 
     const tileGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     const tile = (color: THREE.Color, opacity: number, n: number) => {
@@ -2488,7 +2494,7 @@ export class BattleStage {
     const name = supportName({ id, faction }, true);
     const outcomes: (Outcome & { gun?: string })[] = [];
     const intercepted = beat.events.some((e) => e.type === 'intercept' && e.unit === head.unit);
-    const approach = id === 'strike_jet' ? (intercepted ? 1.7 : 2.1) : id === 'cruise_missile' ? 1.9 : id === 'naval_gun' ? 2.3 : 2.7;
+    const approach = id === 'strike_jet' ? (intercepted ? 1.7 : 2.1) : id === 'cruise_missile' ? 1.9 : id === 'naval_gun' ? 2.3 : id === 'himars' ? 2.0 : id === 'tornado' ? 1.8 : 2.7;
     const first = clip.steps.length;
     const elapsed = () => {
       let t = 0;
@@ -2507,6 +2513,11 @@ export class BattleStage {
         if (id === 'strike_jet') flight = this.sorties.jet(plan);
         else if (id === 'cruise_missile') flight = this.sorties.cruise(plan);
         else if (id === 'kamikaze') flight = this.sorties.swarm(plan);
+        else if (id === 'himars' || id === 'tornado') {
+          // Blue's own launcher: a cut to the edge to watch the salvo climb out, then the dive.
+          const r = this.sorties.rockets(plan, id);
+          if (side === 'blue') this.gunCam(r.from, r.from.clone().add(new THREE.Vector3(0, 9, 0)), aim, 1.25);
+        }
         else {
           const at = this.sorties.naval(plan, this.scene.fog instanceof THREE.Fog ? this.scene.fog.color : null);
           if (side === 'blue') this.gunCam(at.ship, at.gun, aim);
@@ -2546,14 +2557,14 @@ export class BattleStage {
     return { from: this.muzzleOf(v), guns: useGun, calibre: useGun ? gun!.calibre : 'manpads' };
   }
 
-  /** A cut to the ship on the horizon as its gun fires, then back to the target for the fall of shot. */
-  private gunCam(ship: THREE.Vector3, gun: THREE.Vector3, aim: { x: number; z: number }): void {
+  /** A cut to the ship on the horizon (or the rocket launcher off the edge) as it fires, then back to the target for the fall of shot. */
+  private gunCam(ship: THREE.Vector3, gun: THREE.Vector3, aim: { x: number; z: number }, dur = 1.5): void {
     if (!this.feel.actionCams || this.feel.motion !== 'full' || this.cam) return;
     // From the edge of the field nearest the ship, low, looking out to it.
     const ex = Math.max(2, Math.min(W - 2, gun.x * 0.25 + aim.x * 0.75));
     const ez = gun.z > H ? H + 1.5 : -1.5;
     const eye = new THREE.Vector3(ex, this.ground(Math.max(0, Math.min(W, ex)), Math.max(0, Math.min(H, ez))) + 1.6, ez);
-    this.cam = { from: eye, at: new THREE.Vector3(ship.x, gun.y * 0.6 + ship.y * 0.4, ship.z), t: 0, dur: 1.5 };
+    this.cam = { from: eye, at: new THREE.Vector3(ship.x, gun.y * 0.6 + ship.y * 0.4, ship.z), t: 0, dur };
   }
 
   /**

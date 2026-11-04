@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { TypeId } from '@brink/arena/v2';
 import { METRE } from '../quality';
+import { AIR_LENGTH, buildAircraft, type AirKind } from './aircraft';
 import { DIMS, SoldierCrowd, buildModel, buildProjectile, modelTypes, type Paint, type Pose, type SoldierKit, type UnitModel } from './index';
 
 // Dev preview (models.html): every unit type on a ground plane under a sun and sky light, labels,
@@ -366,6 +367,26 @@ async function setup(): Promise<void> {
       scene.add(l);
     });
     frameTo(new THREE.Vector3(0, 0.2, 0), 25, 22, 3.4);
+  } else if (view === 'aircraft') {
+    // Off-map support close up: ?kinds=f35,su34&scale=1&yaw=&pitch=&dist=
+    scene.add(ground(40));
+    const kinds = (q.get('kinds') ?? 'f35,su34,tomahawk,kalibr,shahed,lucas,gbu31,kab500') as string;
+    const list = kinds.split(',') as AirKind[];
+    const sc = Number(q.get('scale') ?? 1);
+    let x = 0;
+    const widths = list.map((k) => AIR_LENGTH[k] * METRE * sc * 1.2);
+    const total = widths.reduce((a, b) => a + b, 0);
+    x = -total / 2;
+    list.forEach((k, i) => {
+      const o = buildAircraft(k);
+      o.scale.setScalar(sc);
+      o.position.set(x + widths[i]! / 2, Number(q.get('alt') ?? 0.6), 0);
+      o.rotation.y = Number(q.get('heading') ?? 0);
+      if (q.get('bank')) o.rotation.z = Number(q.get('bank'));
+      scene.add(o);
+      x += widths[i]!;
+    });
+    frameTo(new THREE.Vector3(0, Number(q.get('alt') ?? 0.6), 0), Number(q.get('yaw') ?? 30), Number(q.get('pitch') ?? 30), Number(q.get('dist') ?? total * 1.2));
   }
   const el = document.getElementById('stats')!;
   if (q.get('stats') !== '0') {

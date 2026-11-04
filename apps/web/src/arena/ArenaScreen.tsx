@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ABILITIES,
+  act,
   airThreats,
   BREAK_AT,
   DIFFICULTY,
@@ -114,6 +115,12 @@ declare global {
       reach: () => number[];
       /** The unit a press at this point would take: what a tap or long-press there reads as. */
       unitAt: (x: number, y: number) => string | null;
+      /**
+       * Tests: call an off-map mission for either side now (red's out of turn), so the film of each
+       * can be looked at. `want` searches the seeded stream for a roll that brings it down, lets it
+       * land, or lands it and knocks out a vehicle; true when one was found and flown.
+       */
+      support: (side: 'blue' | 'red', id: SupportId, x: number, y: number, want?: 'intercept' | 'land' | 'kill') => boolean;
     };
   }
 }
@@ -967,6 +974,30 @@ function Field({ req, onEnd }: { req: BattleRequest; onEnd: (r: ArenaResult, b: 
         look: () => stageRef.current?.lookState() ?? null,
         reach: () => reachNow.current,
         unitAt: (x, y) => stageRef.current?.unitNear(x, y, 30) ?? null,
+        support: (side, id, x, y, want) => {
+          const at = { x, y };
+          for (let i = 0; i < 2000; i++) {
+            const c = copyBattle(battle);
+            // A different roll each try: the stream is the battle's whole luck.
+            if (i) c.stream = (Math.imul(battle.stream ^ i, 0x9e3779b1) + i) >>> 0;
+            let asset = c.support.find((s) => s.side === side && s.id === id);
+            if (!asset) c.support.push((asset = { id, side, missions: 0, faction: FACTION_OF[arsenal[side]] }));
+            asset.missions = Math.max(1, asset.missions);
+            const turn = c.turn;
+            c.turn = side;
+            const ok = act(c, { type: 'support', asset: id, at }, side);
+            c.turn = turn;
+            if (!ok) return false;
+            const fresh = c.events.slice(battle.events.length);
+            const down = fresh.some((e) => e.type === 'intercept');
+            const killed = fresh.some((e) => e.type === 'destroyed' && e.seen && battle.units.find((u) => u.id === e.unit && u.side !== side && typeOf(u.type).mobility !== 'foot'));
+            if (want === 'intercept' ? !down : want === 'land' ? down : want === 'kill' ? down || !killed : false) continue;
+            Object.assign(battle, c);
+            flush();
+            return true;
+          }
+          return false;
+        },
       };
     });
     const onResize = () => stageRef.current?.resize();
