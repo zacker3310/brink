@@ -9,7 +9,9 @@ describe('victory bars by campaign length', () => {
   it('keeps the usual bars up to 60 turns and raises them for a Total War', () => {
     // Ruleset 2.5.0 lowered the usual bars (40% / 38% before): on the Pacific, with four level powers
     // and a third of the victory points in minor states, no campaign of 40 measured reached them.
-    expect(victoryBars(30)).toEqual({ dominationShare: 32, supremacyShare: 31, supremacyFromTurn: 8 });
+    // Ruleset 2.6.0 lowered supremacy to 29% (31% before): with the AI fighting the war at sea and
+    // across the straits, the leaders of 40 measured campaigns stood at 27 to 29% at turn 30.
+    expect(victoryBars(30)).toEqual({ dominationShare: 32, supremacyShare: 29, supremacyFromTurn: 8 });
     expect(victoryBars(60).dominationShare).toBe(32);
     expect(victoryBars(250)).toEqual({ dominationShare: 60, supremacyShare: 55, supremacyFromTurn: 50 });
   });

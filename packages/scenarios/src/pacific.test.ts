@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { UNIT_CLASSES } from '@brink/contracts';
-import { UNITS } from '@brink/game-data';
+import { RULES, UNITS } from '@brink/game-data';
 import { findPath, keyDistance, offsetToAxial, keyOf } from '@brink/map';
 import { enterCost, seedCommanders, sortedKeys } from '@brink/simulation';
 import { createPacificScenario, MINORS, NATIONS, PACIFIC_ID } from './pacific';
@@ -84,7 +84,12 @@ describe('The Pacific', () => {
 
   it('starts every power level: the same victory points, output and army weight, whatever its size', () => {
     const vp = (p: string) => Object.values(w.sites).filter((s) => s.owner === p).reduce((a, s) => a + s.victoryPoints, 0);
-    const out = (p: string) => Object.values(w.sites).filter((s) => s.owner === p).reduce((a, s) => a + s.yields.credits + s.yields.energy + s.yields.materials + s.yields.food + s.yields.industry, 0);
+    // Output is what the sites yield and what the land pays (a credit per RULES.hexesPerCredit
+    // hexes). Before ruleset 2.6.0 this measured the sites alone, so it called Japan level while
+    // its 16 hexes paid it 4 credits a turn against China's 42.
+    const land = (p: string) => Object.values(w.tiles).filter((t) => t.owner === p).length;
+    const out = (p: string) => Object.values(w.sites).filter((s) => s.owner === p).reduce((a, s) => a + s.yields.credits + s.yields.energy + s.yields.materials + s.yields.food + s.yields.industry, 0) + Math.floor(land(p) / RULES.hexesPerCredit);
+    const credits = (p: string) => Object.values(w.sites).filter((s) => s.owner === p).reduce((a, s) => a + s.yields.credits, 0) + Math.floor(land(p) / RULES.hexesPerCredit);
     const army = (p: string) => Object.values(w.formations).filter((f) => f.owner === p).reduce((a, f) => a + f.strength, 0);
     const spread = (f: (p: string) => number) => {
       const v = NATIONS.map((n) => f(n.id));
@@ -93,8 +98,10 @@ describe('The Pacific', () => {
     expect(spread(vp)).toBeLessThanOrEqual(0.05);
     expect(spread(out)).toBeLessThanOrEqual(0.05);
     expect(spread(army)).toBeLessThanOrEqual(0.1);
+    // No power is poorer in credits for being small: the land's pay is made up on the cities.
+    // (Japan's were 113 a turn against China's 148, a spread of 0.24, before 2.6.0.)
+    expect(spread(credits)).toBeLessThanOrEqual(0.1);
     // The United States is still the biggest country on the map, and Japan the smallest.
-    const land = (p: string) => Object.values(w.tiles).filter((t) => t.owner === p).length;
     expect(land('usa')).toBeGreaterThan(land('japan') * 5);
   });
 

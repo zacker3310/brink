@@ -34,6 +34,12 @@ export class GameSession {
     private memory: Record<NationId, AiMemory>,
     private histories: Record<NationId, TurnReport[]>,
     private lastReports: Record<NationId, TurnReport>,
+    /**
+     * Each human seat's staff memory. The staff is the same planner the rivals use, and like them it
+     * must remember its objective: planned from an empty memory every turn it chased a different
+     * prize each turn (Tokyo, Busan, Seoul, Tokyo...) and took nothing.
+     */
+    private staff: Record<NationId, AiMemory> = {},
   ) {}
 
   /** `playerNation` is the local seat; `others` are further human seats (multiplayer, hotseat). */
@@ -72,7 +78,7 @@ export class GameSession {
       const last = histories[n]!.at(-1);
       if (last) lastReports[n] = last;
     }
-    return new GameSession(clone(save.world), humans, clone(save.aiMemory), histories, lastReports);
+    return new GameSession(clone(save.world), humans, clone(save.aiMemory), histories, lastReports, clone(save.staffMemory ?? {}));
   }
 
   /** Human seats, the local one first. */
@@ -85,13 +91,16 @@ export class GameSession {
     if (nation === this.playerNation) throw new Error('the local seat cannot be handed to the AI');
     if (!this.seats.includes(nation)) return;
     this.seats = this.seats.filter((n) => n !== nation);
-    this.memory[nation] = emptyMemory();
+    // The AI carries on the seat's war with what its staff knew.
+    this.memory[nation] = this.staff[nation] ?? emptyMemory();
+    delete this.staff[nation];
   }
 
   /** A player returns to a seat the AI was holding. */
   reclaimSeat(nation: NationId): void {
     if (this.seats.includes(nation) || !this.world.nations[nation]) return;
     this.seats = [...this.seats, nation];
+    this.staff[nation] = this.memory[nation] ?? emptyMemory();
     delete this.memory[nation];
     this.histories[nation] ??= [];
   }
@@ -138,7 +147,12 @@ export class GameSession {
 
   /** What the AI would order for a human seat this turn: the phone's Auto button drafts from it. */
   suggest(nation: NationId, target?: SiteId): NationOrders {
-    return planOrders(buildView(this.world, nation), emptyMemory(), this.world.seed, target ? { target } : {});
+    return planOrders(buildView(this.world, nation), this.staff[nation] ?? emptyMemory(), this.world.seed, target ? { target } : {});
+  }
+
+  /** What a human seat's staff remembers (a copy), for tests. */
+  staffMemory(nation: NationId | null = this.playerNation): AiMemory {
+    return clone((nation && this.staff[nation]) || emptyMemory());
   }
 
   aiOrders(): NationOrders[] {
@@ -166,6 +180,11 @@ export class GameSession {
       this.memory[n] = updateMemory(this.memory[n]!, result.observations[n]!, result.reports[n]!.events);
     }
     this.lastReports = result.reports;
+    // Every human seat's staff learns from the turn exactly as an AI does, from the seat's own view.
+    for (const n of this.humans) {
+      if (this.world.nations[n]!.eliminated) continue;
+      this.staff[n] = updateMemory(this.staff[n] ?? emptyMemory(), result.observations[n]!, result.reports[n]!.events);
+    }
     for (const n of this.humans) {
       const h = this.histories[n]!;
       h.push(result.reports[n]!);
@@ -195,6 +214,7 @@ export class GameSession {
       world: clone(this.world),
       reports: clone(this.histories[this.playerNation]!),
       aiMemory: clone(this.memory),
+      staffMemory: clone(this.staff),
       hash: hashState(this.world),
       ...(this.humans.length > 1 || callsigns
         ? {

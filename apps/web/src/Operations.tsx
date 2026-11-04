@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { operationById, proposeOperations, type Operation, type OperationPhase } from '@brink/ai';
+import { ODDS_WORDS, operationById, proposeOperations, type Operation, type OperationPhase } from '@brink/ai';
 import { Icon } from './icons';
 import { operationSpot } from './opspot';
 import { useGame } from './store';
@@ -213,6 +213,8 @@ export function OperationRow() {
   const setOpen = useGame((s) => s.setOpsOpen);
   const focusOn = useGame((s) => s.focusOn);
   const op = useMemo(() => (view && active ? operationById(view, active.id, active.kind) : null), [view, active]);
+  // With none running (one just won, say), the staff's best next operation is named on the way in.
+  const best = useMemo(() => (view && !op ? (proposeOperations(view, 1)[0] ?? null) : null), [view, op]);
   if (!view || view.victory) return null;
   if (!op || !active) {
     return (
@@ -225,7 +227,9 @@ export function OperationRow() {
         <Icon name="objective" className="h-5 w-5 shrink-0 text-signal" />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="font-display block text-[15px] font-extrabold tracking-wide text-signal uppercase">Plan an operation</span>
-          <span className="block text-[12px] text-muted">Pick a prize: the staff marches, sails and storms it for you.</span>
+          <span className="block text-[12px] text-muted" data-testid="operation-suggestion">
+            {best ? `Staff suggests ${best.name}, ~${best.turns} turn${best.turns === 1 ? '' : 's'}, ${ODDS_WORDS[best.odds]}.` : 'Pick a prize: the staff marches, sails and storms it for you.'}
+          </span>
         </span>
         <Icon name="next" className="h-4 w-4 shrink-0 text-signal" />
       </button>

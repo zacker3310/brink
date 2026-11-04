@@ -11,7 +11,7 @@ export * from './commanders';
 export * from './doctrine';
 export * from './blurbs';
 
-export const RULESET_VERSION = '2.5.0';
+export const RULESET_VERSION = '2.6.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -531,7 +531,7 @@ export const VICTORY = {
    * Supremacy: average of a nation's percent shares of victory points, army strength and gross
    * income, with stability at least `supremacyStability`, from `supremacyFromTurn` on.
    */
-  supremacyShare: 31,
+  supremacyShare: 29,
   supremacyStability: 35,
   supremacyFromTurn: 8,
 } as const;

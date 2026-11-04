@@ -77,6 +77,9 @@ function invariants(w: WorldState): string[] {
 describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
   it('every match ends with a winner by the turn limit, with no invalid state', () => {
     const endings: Record<string, number> = {};
+    /** Who wins the decisive endings (not the turn limit), and who leads on score at the limit. */
+    const decisive: Record<string, number> = {};
+    const onScore: Record<string, number> = {};
     const turns: number[] = [];
     let rejected = 0;
     const usage = { facilities: 0, treaties: 0, cards: 0 };
@@ -100,10 +103,12 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
       const v = s.snapshot().victory!;
       expect(v.turn).toBeLessThanOrEqual(30);
       endings[v.reason] = (endings[v.reason] ?? 0) + 1;
+      const tally = v.reason === 'turn_limit' ? onScore : decisive;
+      tally[v.winner] = (tally[v.winner] ?? 0) + 1;
       turns.push(v.turn);
     }
     turns.sort((a, b) => a - b);
-    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties, 'generals promoted', generals.promoted, 'killed', generals.killed, 'top level', generals.topLevel, 'cards played', usage.cards);
+    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'decisive wins', decisive, 'turn-limit wins', onScore, 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties, 'generals promoted', generals.promoted, 'killed', generals.killed, 'top level', generals.topLevel, 'cards played', usage.cards);
     // The AI uses the economy and diplomacy it is given.
     expect(usage.facilities).toBeGreaterThan(MATCHES);
     expect(usage.treaties).toBeGreaterThan(MATCHES);
