@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { UNIT_CLASSES } from '@brink/contracts';
 import { RULES, UNITS } from '@brink/game-data';
-import { findPath, keyDistance, offsetToAxial, keyOf } from '@brink/map';
+import { findPath, keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { enterCost, seedCommanders, sortedKeys } from '@brink/simulation';
 import { createPacificScenario, MINORS, NATIONS, PACIFIC_ID } from './pacific';
 import { createScenario } from './index';
@@ -56,6 +56,11 @@ describe('The Pacific', () => {
     const key = (name: string) => Object.values(w.sites).find((s) => s.name === name)!.key;
     expect(findPath(key('Honolulu'), key('San Francisco'), cost)).toBeNull();
     expect(findPath(key('Tokyo'), key('Beijing'), cost)).toBeNull();
+    // British Columbia faces the open Pacific: no American hex beside Vancouver but Seattle to the south,
+    // and the Aleutians are islands at sea, not land touching it.
+    const beside = (name: string) => neighborKeys(key(name)).map((k) => w.tiles[k]).filter((t) => t && t.terrain !== 'water');
+    expect(beside('Vancouver').filter((t) => t!.owner === 'usa').map((t) => t!.siteId && w.sites[t!.siteId]!.name)).toEqual(['Seattle']);
+    expect(findPath(key('Adak'), key('Anchorage'), cost)).toBeNull();
     // Korea joins China by land; Alaska joins Canada.
     expect(findPath(key('Seoul'), key('Beijing'), cost)).not.toBeNull();
     expect(findPath(key('Anchorage'), key('Vancouver'), cost)).not.toBeNull();
