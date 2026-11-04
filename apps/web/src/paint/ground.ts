@@ -13,6 +13,8 @@ export interface Painted {
   y: number;
   /** World units per canvas pixel. */
   unit: number;
+  /** What lies beyond the canvas: the canvas fades to exactly this colour at its edges. */
+  background: number;
 }
 
 type Rgb = [number, number, number];
@@ -57,7 +59,8 @@ type Prop = { x?: number; y: number; draw: (g: CanvasRenderingContext2D) => void
 
 /** The open sea beyond the painted canvas: the canvas fades to exactly this at its edges. */
 export const SEA = 0x0a2433;
-const SEA_CSS = '#0a2433';
+/** The paper map lies on a dark wooden table. */
+export const TABLE = 0x1c1610;
 
 /** Height of each kind of ground, for the hillshade: light from the north-west across the land. */
 const ELEV: Record<Terrain, number> = { water: -1, plains: 0, urban: 0.1, forest: 0.4, hills: 1.3, mountains: 2.8 };
@@ -231,7 +234,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
   const sea = g.createRadialGradient(x0 + w / 2, y0 + h / 2, Math.min(w, h) * 0.2, x0 + w / 2, y0 + h / 2, Math.max(w, h) * 0.62);
   sea.addColorStop(0, '#1a5f7a');
   sea.addColorStop(0.55, '#134a62');
-  sea.addColorStop(1, SEA_CSS);
+  sea.addColorStop(1, '#0a2433');
   g.fillStyle = sea;
   g.fillRect(x0, y0, w, h);
   // Depth: how far each stretch of open water lies from any land. The deep ocean darkens.
@@ -624,24 +627,40 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
     const p = c(key);
     blob(p.x, p.y, size * 1.5, 'rgba(24,35,43,A)', 0.85);
   }
-  // Paper: warm inks on parchment (before the margins, which still fade to the open sea).
+  // Paper: the map printed in sepia inks on parchment. Colour drained, lifted toward the pale of
+  // the sheet, then stained with it; the sea stays a cooler ink so land and water still part.
   if (opts.paper) {
     g.save();
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'multiply';
-    g.fillStyle = 'rgba(236,214,168,0.55)';
-    g.fillRect(0, 0, canvas.width, canvas.height);
     g.globalCompositeOperation = 'saturation';
-    g.fillStyle = 'rgba(128,128,128,0.28)';
+    g.fillStyle = 'rgba(128,128,128,0.65)';
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.globalCompositeOperation = 'screen';
+    g.fillStyle = 'rgba(214,200,168,0.62)';
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = 'rgb(242,224,184)';
     g.fillRect(0, 0, canvas.width, canvas.height);
     g.restore();
+    // The sea in a cool wash of ink, so land and water still part at a glance.
+    const water = new Path2D();
+    water.rect(x0, y0, w, h);
+    water.addPath(coast);
+    g.save();
+    g.clip(water, 'evenodd');
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = 'rgba(96,140,170,0.7)';
+    g.fillRect(x0, y0, w, h);
+    g.restore();
   }
+  const [er, eg, eb] = opts.paper ? [28, 22, 16] : [10, 36, 51];
+  const edge = (a: number) => `rgba(${er},${eg},${eb},${a})`;
   // A vignette, then the margins fade into the open sea, so the canvas has no visible edge.
   const cx = x0 + w / 2;
   const cy = y0 + h / 2;
   const vig = g.createRadialGradient(cx, cy, Math.min(w, h) * 0.35, cx, cy, Math.max(w, h) * 0.72);
-  vig.addColorStop(0, 'rgba(10,36,51,0)');
-  vig.addColorStop(1, 'rgba(10,36,51,0.6)');
+  vig.addColorStop(0, edge(0));
+  vig.addColorStop(1, edge(opts.paper ? 0.75 : 0.6));
   g.fillStyle = vig;
   g.fillRect(x0, y0, w, h);
   const fade = pad * 0.85;
@@ -652,8 +671,8 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
     [0, y0 + h, 0, y0 + h - fade, x0, y0 + h - fade, w, fade],
   ] as const) {
     const edgeFade = g.createLinearGradient(ax, ay, bx, by);
-    edgeFade.addColorStop(0, 'rgba(10,36,51,1)');
-    edgeFade.addColorStop(1, 'rgba(10,36,51,0)');
+    edgeFade.addColorStop(0, edge(1));
+    edgeFade.addColorStop(1, edge(0));
     g.fillStyle = edgeFade;
     g.fillRect(rx, ry, rw, rh);
   }
@@ -667,7 +686,7 @@ export function paintTheatre(v: NationView, keys: HexKey[], size: number, opts: 
   g.fillRect(0, 0, canvas.width, canvas.height);
   g.restore();
 
-  return { canvas, x: x0, y: y0, unit: 1 / k };
+  return { canvas, x: x0, y: y0, unit: 1 / k, background: opts.paper ? TABLE : SEA };
 }
 
 function shadow(g: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, a = 0.32) {

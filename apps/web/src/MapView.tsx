@@ -854,6 +854,7 @@ export function MapView() {
       // Instrumented: `brink:paint` in the browser's performance timeline.
       performance.mark('brink:paint-start');
       const p = paintTheatre(v, keys, SIZE, { paper: style === 'paper' });
+      a.app.renderer.background.color = p.background;
       performance.measure('brink:paint', 'brink:paint-start');
       // Mipmapped, so the whole theatre seen from afar stays smooth instead of shimmering.
       const tex = new Texture({ source: new CanvasSource({ resource: p.canvas, autoGenerateMipmaps: true }) });
@@ -1024,7 +1025,7 @@ export function MapView() {
       }
       // Ground only remembered lies under a cool haze: still readable, plainly not seen now.
       for (const k of stale) wash.poly(poly(k));
-      if (stale.length) wash.fill({ color: 0x1b2a36, alpha: 0.4 });
+      if (stale.length) wash.fill({ color: 0x1b2a36, alpha: 0.3 });
       a.layers.overlay!.addChild(wash);
     }
     a.layers.overlay!.addChild(overlay);

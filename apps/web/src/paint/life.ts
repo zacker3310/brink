@@ -51,6 +51,9 @@ export interface LifeContext {
 export class MapLife {
   private readonly root = new Container();
   private readonly fogLayer = new Container();
+  /** Mist over ground only remembered, in four banks that breathe out of step. */
+  private readonly mistLayer = new Container();
+  private readonly mists: Container[] = [0, 1, 2, 3].map(() => new Container());
   private readonly shadowLayer = new Container();
   private readonly glintLayer = new Container();
   private readonly fireLayer = new Container();
@@ -71,7 +74,8 @@ export class MapLife {
     parent: Container,
     private readonly ctx: LifeContext,
   ) {
-    this.root.addChild(this.shadowLayer, this.glintLayer, this.fireLayer, this.fxLayer, this.fogLayer);
+    this.mistLayer.addChild(...this.mists);
+    this.root.addChild(this.shadowLayer, this.glintLayer, this.mistLayer, this.fireLayer, this.fxLayer, this.fogLayer);
     this.root.eventMode = 'none';
     parent.addChild(this.root);
     app.ticker.add(this.tick);
@@ -125,6 +129,22 @@ export class MapLife {
         const q = center(n);
         puff(p.x + (q.x - p.x) * 0.55, p.y + (q.y - p.y) * 0.55, size * 0.8, 0x56656f, 0.35, hash(n + k) * 6.3, 5);
       }
+    }
+
+    // Mist: a pale veil drifting over ground you have seen but cannot see now. It thins and
+    // thickens slowly; the haze under it (on the map) keeps the edge of what you see exact.
+    for (const m of this.mists) m.removeChildren().forEach((c) => c.destroy());
+    for (const k of keys) {
+      if (v.tiles[k]!.visibility !== 'observed') continue;
+      const p = center(k);
+      const h = hash(`${k}m`);
+      const s = new Sprite(tex);
+      s.anchor.set(0.5);
+      s.tint = 0xb8c6cf;
+      s.alpha = 0.13 + h * 0.09;
+      s.scale.set((size * 2.6) / 128, (size * 1.7) / 128);
+      s.position.set(p.x + (h - 0.5) * size * 0.5, p.y + (hash(`${k}n`) - 0.5) * size * 0.4);
+      this.mists[Math.floor(h * 4) % 4]!.addChild(s);
     }
 
     // Cloud shadows: a few, made once, drifting west to east forever.
@@ -307,6 +327,11 @@ export class MapLife {
       f.s.alpha = f.a * (0.93 + Math.sin(t * 0.4 + f.phase) * 0.07);
     }
     if (this.still) return;
+    this.mists.forEach((m, i) => {
+      m.alpha = 0.7 + 0.3 * Math.sin(t * 0.35 + i * 1.7);
+      m.x = Math.sin(t * 0.08 + i * 2.1) * 4;
+      m.y = Math.cos(t * 0.06 + i * 1.3) * 2;
+    });
     for (const s of this.shadows) {
       s.s.x += s.vx * dt;
       if (s.s.x - s.s.width / 2 > this.bounds.x + this.bounds.w) s.s.x = this.bounds.x - s.s.width / 2;
