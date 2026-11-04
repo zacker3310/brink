@@ -34,6 +34,13 @@ const MIN_DIST = 3.5;
 const PLAY_DIST = 11.5;
 /** How far back the film stands for a strike coming in by air (the sky over the target in frame). */
 const SUPPORT_DIST = 17;
+/**
+ * A strike filmed wide is framed this far beyond its target (away from the camera), so the target
+ * sits low in the frame and the sky the bombs, rockets and drones come down from is in it.
+ */
+const STRIKE_LIFT = 3;
+/** How far past the field's edge the film may take the focus for that; gestures never leave the field. */
+const FILM_SLACK = STRIKE_LIFT + 1;
 /** Closer than this, a soldier's weapon swaying at rest shows: idle soldiers count as moving. */
 const SWAY_DIST = 6;
 
@@ -349,6 +356,10 @@ export class BattleStage {
   private pauseAt = Infinity;
   /** The zoom to go back to once a strike filmed wide has come down. */
   private unwide: number | null = null;
+  /** How far past the field's edge the film's focus may stand now: FILM_SLACK while a strike is filmed wide. */
+  private filmSlack = 0;
+  /** The target of the strike framed with slack, to settle back on once everything is down. */
+  private strikeAim: { x: number; z: number } | null = null;
   private readonly preset;
   /** Frame timing (ms of our own work per frame), for the performance probe. */
   private readonly frameMs: number[] = [];
@@ -485,8 +496,10 @@ export class BattleStage {
     this.sorties.viewAt = (x, z) => {
       const cam = this.solveCam;
       cam.copy(this.camera, false);
-      // Where the focus can go: the film centres on the target, held inside the field.
-      pose(cam, { ...this.view(), fx: Math.max(0, Math.min(W, x)), fz: Math.max(0, Math.min(H, z)), dist: this.wantDist, tilt: this.wantTilt }, this.groundAt);
+      // Where the focus will be: framed beyond the target while a strike is filmed wide (which may
+      // stand past the field's edge), else centred on it inside the field.
+      const f = this.filmSlack > 0 ? { x: this.wantFocus.x, z: this.wantFocus.z } : { x: Math.max(0, Math.min(W, x)), z: Math.max(0, Math.min(H, z)) };
+      pose(cam, { ...this.view(), fx: f.x, fz: f.z, dist: this.wantDist, tilt: this.wantTilt }, this.groundAt);
       cam.updateProjectionMatrix();
       return cam;
     };
@@ -881,8 +894,10 @@ export class BattleStage {
   private applyCamera(dt: number): void {
     // Reduced motion: the camera cuts to where it is going.
     const k = dt <= 0 || this.cuts ? 1 : 1 - Math.exp(-dt * 6);
-    this.wantFocus.x = Math.max(0, Math.min(W, this.wantFocus.x));
-    this.wantFocus.z = Math.max(0, Math.min(H, this.wantFocus.z));
+    // The focus stays on the field, except while the film frames a strike past its edge.
+    const slack = this.filmSlack;
+    this.wantFocus.x = Math.max(-slack, Math.min(W + slack, this.wantFocus.x));
+    this.wantFocus.z = Math.max(-slack, Math.min(H + slack, this.wantFocus.z));
     this.focus.lerp(this.wantFocus, k);
     this.yaw = lerpAngle(this.yaw, this.wantYaw, k);
     this.tilt += (this.wantTilt - this.tilt) * k;
@@ -973,6 +988,13 @@ export class BattleStage {
   hold(on: boolean): void {
     this.held = on;
     if (!on) return;
+    // Fingers work inside the field's limits: a strike framed past the edge gives the camera back there.
+    if (this.filmSlack > 0) {
+      this.filmSlack = 0;
+      this.strikeAim = null;
+      this.focus.x = Math.max(0, Math.min(W, this.focus.x));
+      this.focus.z = Math.max(0, Math.min(H, this.focus.z));
+    }
     this.wantFocus.copy(this.focus);
     this.wantYaw = this.yaw;
     this.wantTilt = this.tilt;
@@ -2523,6 +2545,13 @@ export class BattleStage {
           before = this.wantDist;
           this.wantDist = SUPPORT_DIST;
         }
+        // Framed beyond the target, so what comes down from the sky is in the frame: past the
+        // field's edge when the target stands on the back row (the film only; fingers never go there).
+        if (wide && !this.held && !clip.joined) {
+          this.filmSlack = FILM_SLACK;
+          this.strikeAim = { ...aim };
+          this.wantFocus.set(aim.x - Math.sin(this.wantYaw) * STRIKE_LIFT, 0, aim.z - Math.cos(this.wantYaw) * STRIKE_LIFT);
+        }
         for (const o of outcomes) o.by = o.gun ? this.interceptor(o.gun, id) : null;
         const plan: Plan = { side, faction, outcomes, approach };
         let flight: Flight | null = null;
@@ -2532,7 +2561,7 @@ export class BattleStage {
         else if (id === 'himars' || id === 'tornado') {
           // Blue's own launcher: a cut to the edge to watch the salvo climb out, then the dive.
           const r = this.sorties.rockets(plan, id);
-          if (side === 'blue') this.gunCam(r.from, r.from.clone().add(new THREE.Vector3(0, 9, 0)), aim, 1.25);
+          if (side === 'blue') this.gunCam(r.from, r.from.clone().add(new THREE.Vector3(0, 9, 0)), aim, 1.25, 1.6);
         }
         else {
           const at = this.sorties.naval(plan, this.scene.fog instanceof THREE.Fog ? this.scene.fog.color : null);
@@ -2578,12 +2607,13 @@ export class BattleStage {
   }
 
   /** A cut to the ship on the horizon (or the rocket launcher off the edge) as it fires, then back to the target for the fall of shot. */
-  private gunCam(ship: THREE.Vector3, gun: THREE.Vector3, aim: { x: number; z: number }, dur = 1.5): void {
+  private gunCam(ship: THREE.Vector3, gun: THREE.Vector3, aim: { x: number; z: number }, dur = 1.5, rise = 2.8): void {
     if (!this.feel.actionCams || this.feel.motion !== 'full' || this.cam) return;
     // From the edge of the field nearest the ship, low, looking out to it.
     const ex = Math.max(2, Math.min(W - 2, gun.x * 0.25 + aim.x * 0.75));
     const ez = gun.z > H ? H + 1.5 : -1.5;
-    const eye = new THREE.Vector3(ex, this.ground(Math.max(0, Math.min(W, ex)), Math.max(0, Math.min(H, ez))) + 1.6, ez);
+    // A little higher for a ship (`rise`), so the sea's surface, its wake and white water, shows.
+    const eye = new THREE.Vector3(ex, this.ground(Math.max(0, Math.min(W, ex)), Math.max(0, Math.min(H, ez))) + rise, ez);
     this.cam = { from: eye, at: new THREE.Vector3(ship.x, gun.y * 0.6 + ship.y * 0.4, ship.z), t: 0, dur };
   }
 
@@ -2615,21 +2645,33 @@ export class BattleStage {
       };
       return;
     }
-    // Low and to one side of the target, the jet coming in over the camera's shoulder.
-    const side = new THREE.Vector3(flight.dir.z, 0, -flight.dir.x).normalize();
-    if (!Number.isFinite(side.x) || side.lengthSq() < 0.5) side.set(1, 0, 0);
-    const eye = target.clone().addScaledVector(side, 3.4).addScaledVector(flight.dir.clone().setY(0).normalize(), -1.2);
-    eye.y = Math.max(target.y + 1.1, this.ground(eye.x, eye.z) + 0.9);
+    // Low, off to one side and a little past the target, looking back up the run: the jet comes at
+    // the lens over the target, drops, and pulls up over the camera's shoulder. (Behind the camera,
+    // as it was, the jet was out of the frame until it had gone.) The run is flat in `dir` (ground).
+    const run = flight.dir.clone().setY(0);
+    if (run.lengthSq() < 1e-6) run.set(0, 0, -1);
+    run.normalize();
+    const side = new THREE.Vector3(run.z, 0, -run.x);
+    // Close to the line of the run (a portrait frame is narrow: about 19 degrees across), far enough
+    // past the target that the target and the jet far up the run share the frame.
+    const eye = target.clone().addScaledVector(side, 1.8).addScaledVector(run, 4.2);
+    eye.y = Math.max(target.y + 0.8, this.ground(eye.x, eye.z) + 1.0);
+    // The jet runs in at about 2.4 cells: look a little above the target toward it, so both are in
+    // the frame, and come down onto the target as the bombs fall.
+    const raised = target.clone().add(new THREE.Vector3(0, 0.5, 0));
     this.cam = {
       from: eye,
-      at: target.clone(),
+      at: raised.clone(),
       t: 0,
       dur,
       track: (t, _from, at) => {
         if (flight.alive) last.copy(flight.pos);
-        // Look between the jet and the target while it runs in, then settle on the target.
-        const w = flight.alive ? Math.max(0, 0.55 - (t / dur) * 0.9) : 0;
-        at.copy(target).lerp(last, w);
+        // Toward the jet while it is still coming (it cannot pass behind the lens: it is over the
+        // target first), then settle on the target for the blast.
+        const ahead = flight.alive && last.clone().sub(target).setY(0).dot(run) < 0.5;
+        const w = ahead ? Math.max(0.1, 0.5 - (t / dur) * 0.8) : 0;
+        at.copy(raised).lerp(last, w);
+        if (!ahead) at.lerp(target, Math.min(1, (t / dur) * 1.5));
       },
     };
   }
@@ -2820,6 +2862,12 @@ export class BattleStage {
     if (this.unwide !== null && !this.sorties.busy) {
       if (this.wantDist === SUPPORT_DIST) this.wantDist = this.unwide;
       this.unwide = null;
+    }
+    // Once everything in the air is down, the camera settles back on the target, inside the field.
+    if (this.filmSlack > 0 && !this.sorties.busy && this.strikeAim && this.cam === null) {
+      if (!this.held) this.wantFocus.set(Math.max(0, Math.min(W, this.strikeAim.x)), 0, Math.max(0, Math.min(H, this.strikeAim.z)));
+      this.filmSlack = 0;
+      this.strikeAim = null;
     }
     this.fx.update(dt, this.camera);
     this.crowd.update(dt);

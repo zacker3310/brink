@@ -1,4 +1,4 @@
-import type { ArenaBattle, CardPlay, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
+import type { ArenaBattle, CardPlay, FormationId, FormationOrder, HexKey, NationOrders, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { cardSupport, progressionSupport } from '@brink/simulation';
 import { keyDistance } from '@brink/map';
@@ -154,6 +154,40 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
       ...(support.red.length ? { redSupport: support.red } : {}),
     },
   };
+}
+
+
+/** An attack in this turn's orders that could be fought in the arena: its target, who goes, and the battle it would be. */
+export interface PlannedBattle {
+  target: HexKey;
+  orders: Record<FormationId, FormationOrder>;
+  title: string;
+  /** Already fought by hand this turn: its result rides on the orders. */
+  fought: boolean;
+}
+
+/**
+ * Every attack the turn's orders make (the staff's draft, an operation's, or the player's own that
+ * went to the odds) on a hex with enemies to fight, grouped by target in key order. Each can be
+ * fought by hand from the order review; none has to be.
+ */
+export function plannedBattles(view: NationView, draft: Pick<NationOrders, 'formations' | 'battles' | 'play'>): PlannedBattle[] {
+  const byTarget = new Map<HexKey, Record<FormationId, FormationOrder>>();
+  for (const id of Object.keys(draft.formations).sort()) {
+    const o = draft.formations[id]!;
+    if (o.type !== 'attack' || !view.formations[id]) continue;
+    const group = byTarget.get(o.target) ?? {};
+    group[id] = o;
+    byTarget.set(o.target, group);
+  }
+  const out: PlannedBattle[] = [];
+  for (const target of [...byTarget.keys()].sort()) {
+    const orders = byTarget.get(target)!;
+    const req = battleFor(view, target, orders, draft.play);
+    if (!req) continue;
+    out.push({ target, orders, title: req.title, fought: (draft.battles ?? []).some((b) => b.target === target) });
+  }
+  return out;
 }
 
 /** The arena's verdict, in the form the engine takes on the turn's orders. */

@@ -34,7 +34,8 @@ import {
 // the film told to show a shooter blue cannot see. `ARENA_MATRIX` is the number of battles; failing
 // cases are kept in arena-failing-seeds.json and run first next time.
 
-// About 10 s of CPU a battle: the default 24 run in about 4 minutes on a quiet machine.
+// About 6 to 15 s of CPU a battle (blue asks for the advice two orders in five): the default 24
+// run in 3 to 6 minutes, more on a loaded machine.
 const SIZE = Number(process.env.ARENA_MATRIX ?? 24);
 const SEEDS = fileURLToPath(new URL('./arena-failing-seeds.json', import.meta.url));
 
@@ -93,7 +94,11 @@ function runCase(n: number): Result {
   };
   try {
     const b = createBattle(setup);
-    const p = player(n, { advice: 0.03, planner: 0.01, illegal: 0.1, auto: 0.3, retreat: 0.003 });
+    // Blue plays like an attacker who means it: two orders in five are the advice (what Do It
+    // plays), the rest random legal orders and orders meant to be refused. With advice at 3% blue
+    // was a random walk that seldom reached the enemy, so 17 of 24 battles ran out the clock and
+    // the matrix hardly saw a capture, a break or an end-game state (docs/arena-v2.md, section 15).
+    const p = player(n, { advice: 0.4, planner: 0.01, illegal: 0.1, auto: 0.3, retreat: 0.003 });
     const played: Played = { setup, b, p, marks: [{ at: 0, hash: hashBattle(b) }] };
     let k = 0;
     const watch = (st: Step) => {

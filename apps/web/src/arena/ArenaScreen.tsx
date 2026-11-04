@@ -131,7 +131,7 @@ declare global {
 const SKIP_HOLD_MS = 300;
 
 const MODE_TEXT = {
-  destroy: ['Destroy Them', 'Knock out their company, or break it: they pull back under a third of their strength.'],
+  destroy: ['Destroy Them', 'Knock out their company, or break it: they pull back under two fifths of their strength.'],
   capture: ['Take the Ground', `End ${CAPTURE_ROUNDS} rounds in the amber circle with none of them in it, or break them.`],
 } as const;
 

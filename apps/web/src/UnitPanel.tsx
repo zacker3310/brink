@@ -10,7 +10,7 @@ import { Minimap } from './MapOverlays';
 import { boardOrders, describeOrder, fleetLoadOrders, type Mode } from './planning';
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
-import { battleFor } from './arena/battle';
+import { battleFor, plannedBattles } from './arena/battle';
 import { CommandRow } from './Generals';
 import { RANKS, rankOf } from '@brink/arena';
 
@@ -332,6 +332,7 @@ export function TurnControls() {
   const issueGroup = useGame((s) => s.issueGroup);
   const fleetLoad = fleetLoadOrders(view, draft.formations, plannedIds);
   const toLoad = Object.keys(fleetLoad).length;
+  const toFight = planned > 0 ? plannedBattles(view, draft).filter((b) => !b.fought).length : 0;
   const total = Object.keys(view.formations).length;
   const idle = idleFormations(view, draft.formations).length;
   const over = view.victory !== null;
@@ -339,18 +340,23 @@ export function TurnControls() {
     (s) => s.owner === view.self.id && (s.kind === 'capital' || s.kind === 'city') && !view.self.productionQueue.some((q) => q.siteId === s.id) && !draft.recruit.some((r) => r.siteId === s.id),
   ).length;
   return (
-    <div className="pointer-events-auto absolute right-3 bottom-3 z-10 flex w-56 flex-col items-stretch gap-1.5">
+    <div className="pointer-events-auto flex w-56 shrink-0 flex-col items-stretch gap-1.5" data-testid="turn-controls">
       <EventCard />
-      {lastTurn && !resolving && (
-        <button type="button" onClick={rewatch} data-testid="rewatch" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
-          <Icon name="replay" className="mr-1.5 h-3 w-3 align-[-2px]" />
-          Rewatch turn {lastTurn.before.turn}
-        </button>
-      )}
-      {report && (
-        <button type="button" onClick={() => setShowReport(true)} data-testid="open-report" className="border border-line bg-ink-950/90 px-2.5 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text">
-          <Icon name="report" className="mr-1.5 h-3 w-3 align-[-2px]" />Turn {report.turn} summary
-        </button>
+      {((lastTurn && !resolving) || report) && (
+        // Last turn, side by side: one row instead of two, so the rail leaves room for the notifications.
+        <div className="flex gap-1.5">
+          {lastTurn && !resolving && (
+            <button type="button" onClick={rewatch} data-testid="rewatch" className="min-w-0 flex-1 truncate border border-line bg-ink-950/90 px-2 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text" title={`Rewatch turn ${lastTurn.before.turn}`}>
+              <Icon name="replay" className="mr-1 h-3 w-3 align-[-2px]" />
+              Rewatch {lastTurn.before.turn}
+            </button>
+          )}
+          {report && (
+            <button type="button" onClick={() => setShowReport(true)} data-testid="open-report" className="min-w-0 flex-1 truncate border border-line bg-ink-950/90 px-2 py-1.5 text-left text-[11px] text-muted hover:border-faint hover:text-text" title={`Turn ${report.turn} summary`}>
+              <Icon name="report" className="mr-1 h-3 w-3 align-[-2px]" />Turn {report.turn} summary
+            </button>
+          )}
+        </div>
       )}
       {idleCities > 0 && !resolving && (
         <div className="border border-signal/40 bg-ink-950/90 px-2.5 py-1.5 text-[11px] text-signal" title="Click a city banner on the map to choose what it builds">
@@ -381,7 +387,14 @@ export function TurnControls() {
       )}
       {planned > 0 && !resolving && (
         <div className="flex items-center gap-2 border border-signal/40 bg-ink-950/90 px-2.5 py-1.5 text-[11px] text-text" data-testid="staff-plan">
-          <span className="min-w-0 flex-1">Staff has prepared a plan: {planned} order{planned === 1 ? '' : 's'}. Change any, then execute.</span>
+          <span className="min-w-0 flex-1">
+            Staff has prepared a plan: {planned} order{planned === 1 ? '' : 's'}. Change any, then execute.
+            {toFight > 0 && (
+              <button type="button" onClick={openReview} className="mt-0.5 block text-left font-semibold text-signal underline-offset-2 hover:underline" data-testid="plan-battles">
+                {toFight} battle{toFight === 1 ? '' : 's'} you can fight yourself
+              </button>
+            )}
+          </span>
           <button type="button" onClick={clearPlan} className="shrink-0 text-faint hover:text-text" data-testid="clear-plan">Clear</button>
         </div>
       )}

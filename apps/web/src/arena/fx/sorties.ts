@@ -59,7 +59,7 @@ const JET_SCALE = 1.25;
 const MISSILE_SCALE = 1.9;
 const BOMB_SCALE = 1.7;
 const DRONE_SCALE = 2.1;
-const ROCKET_SCALE = 1.8;
+const ROCKET_SCALE = 2.3;
 /** Ships are shown at their real size, far out. */
 const SHIP_OFF = 26;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -131,6 +131,10 @@ export class Sorties {
   private readonly shipUniforms = { uSea: { value: new THREE.Color() }, uSeat: { value: 0.2 } };
   private readonly seaMat: THREE.MeshBasicMaterial;
   private readonly wakeMat: THREE.MeshBasicMaterial;
+  /** The churn at a ship's stern: its own material, as it pulses. */
+  private readonly foamMat: THREE.MeshBasicMaterial;
+  /** White water standing off the sea round a ship (billboards). */
+  private readonly sprayMat: THREE.SpriteMaterial;
   private readonly spot: THREE.DataTexture;
   private readonly seaGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   /** The jet's motion-blur ghosts: lit like it, see-through. */
@@ -167,7 +171,9 @@ export class Sorties {
     this.shipMat.customProgramCacheKey = () => 'brink-ship';
     this.spot = spotTexture();
     this.seaMat = new THREE.MeshBasicMaterial({ color: 0x3d4247, alphaMap: this.spot, transparent: true, depthWrite: false, fog: false });
-    this.wakeMat = new THREE.MeshBasicMaterial({ color: 0xf2f3f0, alphaMap: this.spot, transparent: true, depthWrite: false, fog: false, opacity: 0.85 });
+    this.wakeMat = new THREE.MeshBasicMaterial({ color: 0xf2f3f0, alphaMap: this.spot, transparent: true, depthWrite: false, fog: false, opacity: 0.95 });
+    this.foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: this.spot, transparent: true, depthWrite: false, fog: false, opacity: 0.9 });
+    this.sprayMat = new THREE.SpriteMaterial({ color: 0xf6f7f5, alphaMap: this.spot, transparent: true, depthWrite: false, fog: false, opacity: 1 });
     this.ghostMats = GHOSTS.map(([, a]) => new THREE.MeshStandardMaterial({ color: 0x737b82, roughness: 0.5, metalness: 0.2, transparent: true, opacity: a, depthWrite: false }));
   }
 
@@ -225,6 +231,8 @@ export class Sorties {
     this.shipMat.dispose();
     this.seaMat.dispose();
     this.wakeMat.dispose();
+    this.foamMat.dispose();
+    this.sprayMat.dispose();
     this.spot.dispose();
     this.seaGeo.dispose();
     for (const m of this.ghostMats) m.dispose();
@@ -700,19 +708,50 @@ export class Sorties {
     mesh.rotation.y = bow > 0 ? Math.PI / 2 : -Math.PI / 2;
     mesh.updateMatrixWorld(true);
     this.scene.add(mesh);
-    // The sea round it (a darker patch fading into the haze), a bow wave and a wake down its side.
+    // The sea round it (a darker patch fading into the haze), a bow wave, the white water along its
+    // side, a long wake streaming from the stern with the two arms of its V spreading behind, and
+    // the churn at the screws: a ship under way, read from 26 cells off.
     const len = SHIP_LENGTH[kind] * 0.1;
     const water = new THREE.Mesh(this.seaGeo, this.seaMat);
-    water.scale.set(len * 3.2, 1, len * 1.1);
-    water.position.set(cx, level + 0.01, cz);
+    water.scale.set(len * 4.2, 1, len * 1.3);
+    water.position.set(cx - bow * len * 0.6, level + 0.01, cz);
     water.renderOrder = -1;
     const wake = new THREE.Mesh(this.seaGeo, this.wakeMat);
-    wake.scale.set(len * 1.25, 1, 2.2);
+    wake.scale.set(len * 1.25, 1, 2.6);
     wake.position.set(cx - bow * len * 0.08, level + 0.02, cz);
+    const trail = new THREE.Mesh(this.seaGeo, this.wakeMat);
+    trail.scale.set(len * 2.6, 1, 2.2);
+    trail.position.set(cx - bow * len * 1.55, level + 0.018, cz);
+    const arms = [1, -1].map((k) => {
+      const arm = new THREE.Mesh(this.seaGeo, this.wakeMat);
+      arm.scale.set(len * 2.1, 1, 0.9);
+      arm.rotation.y = k * bow * 0.3;
+      arm.position.set(cx - bow * len * 1.45, level + 0.016, cz + k * len * 0.32);
+      return arm;
+    });
     const bowWave = new THREE.Mesh(this.seaGeo, this.wakeMat);
-    bowWave.scale.set(len * 0.18, 1, 2.6);
+    bowWave.scale.set(len * 0.26, 1, 3.4);
     bowWave.position.set(cx + bow * len * 0.47, level + 0.025, cz);
-    this.scene.add(water, wake, bowWave);
+    const churn = new THREE.Mesh(this.seaGeo, this.foamMat);
+    churn.scale.set(len * 0.4, 1, 3);
+    churn.position.set(cx - bow * len * 0.55, level + 0.03, cz);
+    // White water standing up off the sea at the bow, the stern and down the wake, on the near side
+    // of the hull: billboards, so they read from the low cut at the field's edge too, where the flat
+    // wake is edge-on.
+    const near = cz + hz * 1.1;
+    const foam = [
+      [cx + bow * len * 0.46, 0.3],
+      [cx - bow * len * 0.52, 0.25],
+      [cx - bow * len * 1.3, 0.12],
+      [cx - bow * len * 0.04, 0.1],
+    ].map(([x, h], i) => {
+      const f = new THREE.Sprite(this.sprayMat);
+      f.position.set(x!, level + h!, near);
+      // Bow and stern: a burst; astern: a long low band; along the side: the wash at the waterline.
+      f.scale.set(len * (i === 2 ? 1.5 : i === 3 ? 1.0 : 0.4), i === 2 ? 0.35 : i === 3 ? 0.5 : 0.8, 1);
+      return f;
+    });
+    this.scene.add(water, trail, ...arms, wake, bowWave, churn, ...foam);
     const guns = SHIP_GUNS[kind].map(([x, y, z]) => mesh.localToWorld(new THREE.Vector3(x * 0.1, y * 0.1, z * 0.1)));
     const gun = guns[0]!;
     const toField = new THREE.Vector3(0, 0, -hz);
@@ -729,6 +768,12 @@ export class Sorties {
     this.add({
       update: (dt) => {
         t += dt;
+        // The screws' white water boils: a slow swell of its size and brightness.
+        const boil = Math.sin(t * 5.3) * 0.5 + Math.sin(t * 8.9 + 1.3) * 0.5;
+        churn.scale.set(len * (0.4 + boil * 0.04), 1, 3 + boil * 0.35);
+        this.foamMat.opacity = 0.85 + boil * 0.15;
+        foam[0]!.scale.set(len * (0.3 + boil * 0.02), 0.9 + boil * 0.15, 1);
+        foam[1]!.scale.set(len * (0.5 + boil * 0.03), 0.75 + boil * 0.1, 1);
         for (const s of shells) {
           if (s.fired || t < s.launch) continue;
           s.fired = true;
@@ -741,7 +786,7 @@ export class Sorties {
         return t < last + 2.5;
       },
       dispose: () => {
-        this.scene.remove(mesh, water, wake, bowWave);
+        this.scene.remove(mesh, water, trail, ...arms, wake, bowWave, churn, ...foam);
       },
     });
     return { ship: mesh.position.clone(), gun };
@@ -929,7 +974,10 @@ export class Sorties {
           root.updateMatrixWorld(true);
           root.localToWorld(tmp.copy(nozzle));
           const step = prev.distanceTo(pos);
-          this.fx.exhaust(tmp, dir, kind === 'gmlrs' ? 0.6 : 0.45, k < 0.25 ? 'booster' : 'motor');
+          this.fx.exhaust(tmp, dir, kind === 'gmlrs' ? 0.9 : 0.65, k < 0.25 ? 'booster' : 'motor');
+          // A motor's glare reads as a bright point however far the camera stands (a lit tail is
+          // what the eye picks out of the sky); every rocket of a ripple on High, every other on Low.
+          if (kind === 'gmlrs' || smokes) this.fx.motorGlow(tmp, kind === 'gmlrs' ? 1.1 : 0.75);
           this.fx.speedStreak(tmp, dir, Math.min(2.2, step * 4), kind === 'gmlrs' ? 0.03 : 0.02);
           if (smokes) {
             trail += step;

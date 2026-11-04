@@ -3,12 +3,17 @@ import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { arenaNote, atPlace, describeEffect, hexLabel, treatyText } from './insight';
 import { commanderNote } from './generals';
 import { dealText, stockText, TREATY_TEXT } from './leaders';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useGame } from './store';
 
 // Civ-style turn notifications: a column of icons on the right edge of the map. Hover to read,
 // click to jump there, right-click to dismiss. The full turn summary stays one click away.
 
 type Tone = 'good' | 'bad' | 'info';
+
+/** An icon's height and the gap between icons (h-10, gap-1.5), for how many fit. */
+const ICON_PX = 40;
+const GAP = 6;
 
 interface Note {
   id: string;
@@ -202,12 +207,26 @@ export function Notifications() {
   const dismiss = useGame((s) => s.dismissNote);
   const focusOn = useGame((s) => s.focusOn);
   const setShowReport = useGame((s) => s.setShowReport);
+  // The column stands over the turn controls in the map's right rail (Game.tsx): it shows as many
+  // icons as fit above them and folds the rest into "+N more", so it never runs into the stack.
+  const ref = useRef<HTMLUListElement>(null);
+  const [room, setRoom] = useState(9);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setRoom(Math.max(1, Math.floor((el.clientHeight + GAP) / (ICON_PX + GAP))));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [view, report, playback]);
   if (!view || !report || playback) return null;
   const notes = notesFor(view, report).filter((n) => !dismissed.includes(n.id));
   if (notes.length === 0) return null;
-  const shown = notes.slice(0, 9);
+  const fit = Math.min(9, room);
+  const shown = notes.length > fit ? notes.slice(0, Math.max(0, fit - 1)) : notes;
   return (
-    <ul className="pointer-events-auto absolute top-14 right-3 z-10 flex flex-col items-end gap-1.5" data-testid="notifications" aria-label="Turn notifications">
+    <ul ref={ref} className="pointer-events-none flex min-h-0 flex-1 flex-col items-end gap-1.5 [&>li]:pointer-events-auto" data-testid="notifications" aria-label="Turn notifications">
       {shown.map((n) => (
         <li key={n.id} className="note-in group relative">
           <button

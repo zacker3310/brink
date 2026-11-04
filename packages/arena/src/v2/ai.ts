@@ -2,18 +2,26 @@ import { bestFire, facingFrom, fitMen, penChance, shotValue, suppLevel, usableWe
 import { act, canAct, reachable, pathTo, safestCell, strikeInfo, SUPPORT_REACH, supportChance, supportIntercept, unitAt, unitById, whyNot } from './engine';
 import type { SupportId } from './types';
 
-/** What a support mission must be worth (in unit value, after its odds) before the AI calls it. */
-const SUPPORT_BAR: Record<SupportId, number> = { himars: 8, tornado: 10, naval_gun: 9, cruise_missile: 7, strike_jet: 9, kamikaze: 7 };
 import { passable } from './map';
 import { typeOf } from './roster';
 import { cheb, crestAhead, dist, isFlying, lineOfSight, sightRange, visibleTo } from './sight';
-import { at, BUILDING, H, inside, PROFILE, ROAD, RUBBLE, TREES, W, WALL, type Action, type Battle, type Ghost, type Point, type Side, type Unit, type UnitType, type Weapon } from './types';
+import { at, BUILDING, H, inside, PROFILE, ROAD, ROUND_LIMIT, RUBBLE, TREES, W, WALL, type Action, type Battle, type Ghost, type Point, type Side, type Unit, type UnitType, type Weapon } from './types';
 
 // The enemy (and your crews on autopilot) fighting combined arms (docs/arena-v2.md, section 6).
 // It plays from its own side's view: the units it sees now, ghosts of those it saw, the map. It
 // never reads a hidden unit, the random stream, or a roll before it is made: its tie-breaks come
 // from a hash of the seed, the turn and the unit. `decide` names the next action from the state
 // alone, so a test can ask it what it would do and get the same answer whatever it cannot see.
+
+/** What a support mission must be worth (in unit value, after its odds) before the AI calls it. */
+const SUPPORT_BAR: Record<SupportId, number> = { himars: 8, tornado: 10, naval_gun: 9, cruise_missile: 7, strike_jet: 9, kamikaze: 7 };
+/**
+ * How choosy the AI is with a mission as the battle wears on: the full bar in round 1, falling to
+ * two fifths of it by the last round, so a mission is fired at a good target rather than kept unused.
+ */
+function supportPatience(b: Battle): number {
+  return Math.max(0.4, 1 - (0.6 * (b.round - 1)) / Math.max(1, ROUND_LIMIT - 1));
+}
 
 // --- Its picture of the field ----------------------------------------------------------------------
 
@@ -729,7 +737,7 @@ export function decide(b: Battle, side: Side, skip: ReadonlySet<string> = new Se
       value *= (supportChance(b, side, s.id, e) / 100) * (1 - supportIntercept(b, side, s.id, e, v.visible));
       if (!best || value > best.value) best = { at: { x: e.x, y: e.y }, value };
     }
-    if (best && best.value >= SUPPORT_BAR[s.id]) return { type: 'support', asset: s.id, at: best.at };
+    if (best && best.value >= SUPPORT_BAR[s.id] * supportPatience(b)) return { type: 'support', asset: s.id, at: best.at };
   }
   const order = b.units
     .filter((u) => u.side === side && u.alive && !u.carrier && !skip.has(u.id))

@@ -450,6 +450,46 @@ describe('turns', () => {
     expect(b.endReason).toBe('captured');
   });
 
+  it('on the last round, an attacker alone in the zone when time runs out has taken it', () => {
+    const make = () => {
+      const b = createBattle(setup({ seed: 2, terrain: 'urban', site: 'city', skill: 0, attackers: [spec('a', ['m1a2'])], defenders: [spec('x', ['squad_e'])] }));
+      const z = b.map.zone!;
+      const me = b.units.find((u) => u.side === 'blue')!;
+      const them = b.units.find((u) => u.side === 'red')!;
+      put(me, z.x, z.y);
+      put(them, 0, 0);
+      them.mobilityKill = true;
+      return b;
+    };
+    // One round in the circle earlier is only a start: it takes two.
+    const early = make();
+    endTurn(early);
+    expect(early.ended).toBe(null);
+    expect(early.capture).toBe(1);
+    // The final bell: one round in it is enough.
+    const last = make();
+    last.round = ROUND_LIMIT;
+    endTurn(last);
+    expect(last.ended).toBe('won');
+    expect(last.endReason).toBe('captured');
+  });
+
+  it('the defender pulls out under two fifths of its company; the attacker breaks under a quarter', () => {
+    const b = bare(['m1a2', 'm1a2'], ['t90m', 't90m', 't90m', 't90m', 't90m', 't90m', 't90m', 't90m']);
+    put(unit(b, 'm1a2'), 0, 44);
+    // Five of eight gone: 37.5% left, combat ineffective (the old line of 35% would have fought on).
+    b.units.filter((u) => u.side === 'red').slice(0, 5).forEach((u) => (u.alive = false));
+    endTurn(b);
+    expect(b.ended).toBe('won');
+    expect(b.endReason).toBe('withdrew');
+    const c = bare(['m1a2', 'm1a2', 'm1a2', 'm1a2', 'm1a2'], ['t90m']);
+    // Four of five gone: 20% left, the company breaks.
+    c.units.filter((u) => u.side === 'blue').slice(0, 4).forEach((u) => (u.alive = false));
+    endTurn(c);
+    expect(c.ended).toBe('lost');
+    expect(c.endReason).toBe('withdrew');
+  });
+
   it('the defenders hold when the rounds run out; retreat is a loss that keeps what survived', () => {
     const b = bare(['m1a2'], ['t90m']);
     put(unit(b, 'm1a2'), 0, 44);
