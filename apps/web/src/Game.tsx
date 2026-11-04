@@ -175,7 +175,7 @@ function VpRace() {
   const view = useGame((s) => s.view)!;
   const ranked = powersOf(view);
   return (
-    <div className="hidden min-w-48 flex-1 flex-col justify-center gap-0.5 border-l border-line px-4 xl:flex" title={`${view.victoryThreshold} VP wins outright`} data-testid="vp-race">
+    <div className="hidden min-w-48 flex-1 flex-col justify-center gap-0.5 border-l border-line px-4 min-[1400px]:flex" title={`${view.victoryThreshold} VP wins outright`} data-testid="vp-race">
       <div className="font-display flex justify-between text-[9px] tracking-[0.06em] text-faint uppercase">
         <span>Victory points</span>
         <span>win at {view.victoryThreshold}</span>
@@ -432,13 +432,16 @@ export function Game() {
           <ModeBanner />
           <HoverCard />
           <ZoomControls onHelp={() => setHelp(!help)} />
-          <Notifications />
           <DesktopHand />
           <div className="pointer-events-none absolute bottom-40 left-1/2 z-30 flex w-[min(30rem,60%)] -translate-x-1/2 flex-col">
             <AimBanner />
           </div>
           <UnitPanel />
-          <TurnControls />
+          {/* The right rail: the turn's notifications above, the turn controls below, never on top of each other. */}
+          <div className="pointer-events-none absolute top-12 right-3 bottom-3 z-10 flex flex-col items-end gap-2">
+            <Notifications />
+            <TurnControls />
+          </div>
           <SidePanel />
           <CityPanel />
           <Toasts />

@@ -453,10 +453,14 @@ export function MapView() {
     const maxX = Math.max(...pts.map((p) => p.x)) + SIZE;
     const minY = Math.min(...pts.map((p) => p.y)) - SIZE;
     const maxY = Math.max(...pts.map((p) => p.y)) + SIZE;
-    const w = a.app.screen.width;
-    // On a phone the whole theatre fits between the status strip and the world card below it.
-    const top = isPhone() ? 130 : 0;
-    const h = a.app.screen.height - top - (isPhone() ? 330 : 0);
+    const phone = isPhone();
+    // On a desk the theatre fits left of the right rail (notifications over the turn controls and
+    // minimap, 224 px and its margins), under the operation strip and over the peeking hand, so no
+    // city label sits under a panel. On a phone it fits between the status strip and the world card.
+    const right = phone ? 0 : 244;
+    const w = a.app.screen.width - right;
+    const top = phone ? 130 : 44;
+    const h = a.app.screen.height - top - (phone ? 330 : 56);
     const s = Math.min((w - 8) / (maxX - minX), h / (maxY - minY), 1.6);
     a.world.scale.set(s);
     a.world.position.set((w - (maxX - minX) * s) / 2 - minX * s, top + (h - (maxY - minY) * s) / 2 - minY * s);
