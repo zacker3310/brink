@@ -7,6 +7,7 @@
 // the government's for that nation.
 
 import type { CardId, GovernmentId, NationId, Resource, UnitClass } from '@brink/contracts';
+import { NATION_DOCTRINE as russia } from './nations/russia';
 
 export const DOCTRINE = {
   /** Cards held at the end of a turn, after the draw. */
@@ -216,7 +217,9 @@ export interface NationDoctrine {
 }
 
 /** Signature decks by nation: one import and one entry each (see the header). */
-export const NATION_DOCTRINES: Record<NationId, NationDoctrine> = {};
+export const NATION_DOCTRINES: Record<NationId, NationDoctrine> = {
+  russia,
+};
 
 /** Every card the game knows: the generic ones and every nation's signature cards. */
 export const CARDS: Record<CardId, CardDef> = (() => {
