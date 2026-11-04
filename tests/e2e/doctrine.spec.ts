@@ -51,6 +51,10 @@ test('a phone plays a doctrine card and aims another at a hex', async ({ page },
   await page.getByTestId('play-card').tap();
   await expect(page.getByTestId('hand')).toBeHidden();
   await expect(page.getByTestId('aim-banner')).toContainText('Dig In');
+  // The map shows where it can go: your own ground, in friend blue.
+  expect(await page.evaluate(() => window.__brink!.cardTargets().length)).toBeGreaterThan(0);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: info.outputPath('doctrine-aiming.png') });
   const spot = await page.evaluate((h) => {
     const b = window.__brink!;
     return b
