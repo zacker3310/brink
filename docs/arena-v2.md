@@ -864,30 +864,66 @@ counted twice.
 
 `apps/web/src/arena/fx/sorties.ts` flies each mission; the stage (`queueSupport`) gives it a
 timeline measured from the start of the run, read off the durations of the steps it queues after
-it, so each bomb, shell or drone arrives when the film's blast (or the interception) for it plays.
-Models are code-built from real proportions (`models3d/aircraft.ts`).
+it, so each bomb, shell, rocket or drone arrives when the film's blast (or the interception) for it
+plays. Models are code-built from real proportions (`models3d/aircraft.ts`); what flies in is drawn
+a little over figure scale so it reads from the battle camera (the jet 1.25x: an F-35A is two cells
+long, about two and a half tanks; the drones 2.1x, the missiles 1.9x, the bombs 1.7x).
 
-- **Strike jet**: an F-35A (west) or Su-34 (east) runs in at low level from its side's edge on a
-  slant, releases two GBU-31s or KAB-500s that fall onto the blasts' cells, then pulls up into a
-  banked climb on afterburner, contrail and wingtip vapour behind it, a double sonic crack as it
-  goes over. Intercepted: a SAM (or a gun's tracer stream) from the interceptor meets it, a burst
-  and debris, and it rolls away burning and falls off the field; no bombs.
+- **Filmed wide**: everything that comes in by air (all but the naval guns) is watched from 17
+  cells back instead of the close play view, so the sky over the target is in the frame; the zoom
+  goes back once the last thing in the air has come down (not if you zoomed meanwhile).
+- **Strike jet**: an F-35A (west, Have Glass grey, gold canopy, coated edges, panel seams, the
+  weapons-bay doors) or Su-34 (east, two-tone grey-blue, dark radome, framed side-by-side canopy,
+  red stars on the fins and under the wings) runs in at 2.4 cells (24 m at figure scale), easing
+  down onto it, banked into the run and levelling for the drop; it releases two GBU-31s or
+  KAB-500s that fall onto the blasts' cells, then pulls up into a banked climb on afterburner,
+  contrail and wingtip vapour behind it, a double sonic crack as it goes over. Its slant and the
+  way it breaks are chosen against the camera that will watch it (`Sorties.viewAt`): as long as
+  possible in the frame, never nearer the lens than 6 cells while in it (it read as a grey slab
+  when it passed through the lens). Two faint trailing copies blur it and speed streaks hang off
+  its wingtips and spine (not on Low). Intercepted: a SAM (or a gun's tracer stream) from the
+  interceptor meets it just short of the target, a burst and debris; it rolls over, noses down
+  burning, turns away and goes into the ground in a fireball; no bombs.
 - **Cruise missile**: a Tomahawk (booster burning, then dropped) or Kalibr skims in at 0.45 cells,
-  pops up near the target and dives onto it, a bright smoke trail behind. Intercepted at the top of
-  its climb: a puff and debris.
-- **Naval gunfire**: an Arleigh Burke or Slava, broadside on, 34 cells off the side's edge, a
-  silhouette in the haze; its gun's flash ripples, the shells whistle in and the three blasts walk
-  over the area.
+  pops up 2.6 cells near the target and dives onto it, a bright smoke trail and speed streak behind.
+  Intercepted near the top of its climb: a puff and debris.
+- **Naval gunfire**: an Arleigh Burke or Slava, broadside on, 26 cells off the side's edge, a
+  silhouette in the haze, seated in the sea: its waterline just under the plain beyond the field
+  (`World.seaLevel`), the hull's foot melting into a darker patch of sea, a bow wave and a wake down
+  its side; its gun's flash ripples, the shells whistle in and the three blasts walk over the area.
 - **Kamikaze swarm**: one beat (`film.ts`, three drones of one mission), LUCAS or Geran-2 airframes
-  weaving in with a two-stroke buzz, staggered; each one shot down gets tracers or a missile from the
-  gun when blue sees it and a puff of debris, the rest dive in.
+  weaving in close together with a two-stroke buzz, staggered; each one shot down gets tracers or a
+  missile from the gun when blue sees it and a puff of debris, the rest dive in.
+- **Rockets**: HIMARS and Tornado-G launch from 22 cells beyond their side's edge, each rocket a
+  motor flare and smoke trail climbing out with a flash at the rail. HIMARS flies a GMLRS pair high
+  over and down in the near-vertical terminal dive onto the cell; Tornado-G ripples a salvo of
+  122 mm rockets (20 on High, 17 on Balanced, 15 on Low, where only every other one trails smoke)
+  on lower arcs, landing round each of the four blasts as it plays. Blue's own launch gets a cut to
+  the edge to watch the salvo climb out, then back for the dive.
 - Fog: the interceptor is drawn only when blue sees it (the engine names it only then); otherwise
-  the kill comes out of the sky. Ships are off the map and show nothing of the field.
+  the kill comes out of the sky. Ships and launchers are off the map and show nothing of the field.
 - Action cams (with the setting on and full motion, as ever): a blue jet run or cruise missile that
   kills a vehicle gets a moving shot (beside the target as the jet comes in; chasing the missile);
-  blue naval gunfire cuts to the ship for its first salvo.
+  blue naval gunfire cuts to the ship for its first salvo, blue rockets to their launch.
 - Trails space their puffs by the quality's density (fewer on Low); geometry and material are shared
-  per kind, the stage releases what was drawn. HIMARS and Tornado-G fly as rockets, as before.
+  per kind, the stage releases what was drawn.
+- Tests: `arena-support.spec.ts` calls blue's four missions from the card; `arena-sorties.spec.ts`
+  flies the rest through the `support` test hook (it searches the seeded stream for the roll it
+  wants): red's Su-34, Kalibr and Geran-2 shot down by the Gepard and Stinger, the Su-34 and Kalibr
+  getting through, the Tornado-G, blue's HIMARS and an F-35A kill under the action cam, each held
+  mid-flight for a look. `SUPPORT_SHOTS=<dir>` writes the frames; `SORTIES=<names>` flies a few.
+
+### 14.2 Mission card and after-action card
+
+The brief is a tabletop mission card (`MissionCard.tsx`, `mission-card.css`), inside the console's
+tokens: a hairline card with a printed rule inset and amber registration corners, the battle's name
+in condensed display caps, the objective with its mark, your force as counters (APP-6 pictograms,
+friendly tiles rounded, a count badge), your fire support as round chits with a pip per mission,
+what scouts report beside an angled hostile counter, the enemy's fire support as red chits, and the
+three rules the stars are earned by. Fight It and Back stay docked over the thumb. The verdict is the
+after-action card in the same frame: Victory or Repulsed in the same caps, the three stars (earned
+amber, the rest hollow), the same three rules each marked earned or not (`starsEarned`, as
+`arenaResult` counts them), the count, the grades and the turning round. Targets stay 44 pt.
 
 ## Sources
 

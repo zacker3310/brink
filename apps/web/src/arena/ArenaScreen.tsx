@@ -64,6 +64,7 @@ import {
 } from '@brink/arena';
 import { UnitGlyph } from '../glyphs';
 import { AfterAction } from './AfterAction';
+import { Card, Counters, Head, StarIcon, StarRules, SupportChit, starsEarned } from './MissionCard';
 import { loadLibrary, type Library } from './assets';
 import type { BattleRequest } from './battle';
 import { BattleLog } from './BattleLog';
@@ -479,17 +480,69 @@ function Brief({ req, onDifficulty, onFight, onQuick, onBack }: { req: BattleReq
   const mode = s.site === 'capital' || s.site === 'city' || s.site === 'objective' ? 'capture' : 'destroy';
   const [title, text] = MODE_TEXT[mode];
   return (
-    <div className="vercel safe-top safe-bottom safe-x absolute inset-0 overflow-y-auto bg-black" data-testid="arena-brief">
+    <div className="vercel mc-mat safe-top safe-bottom safe-x absolute inset-0 overflow-y-auto" data-testid="arena-brief">
       <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-4">
-        <div className="mt-5 text-[13px] font-semibold text-muted">
-          {BIOME_TEXT[cond.biome]} · {TIME_TEXT[cond.time]}, {WEATHER_TEXT[cond.weather]}
-          {s.river ? ' · river' : ''}
-        </div>
-        <h1 className="text-[28px] leading-tight font-bold tracking-tight">{req.title}</h1>
-        <div className="mt-3 rounded-2xl bg-ink-900 p-4">
-          <div className="text-[17px] font-semibold">{title}</div>
-          <p className="mt-0.5 text-[15px] text-muted">{text}</p>
-        </div>
+        <Card className="mt-5" testid="mission-card">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="mc-kicker">Mission Card</span>
+            <span className="text-right text-[13px] font-semibold text-muted">
+              {BIOME_TEXT[cond.biome]} · {TIME_TEXT[cond.time]}, {WEATHER_TEXT[cond.weather]}
+              {s.river ? ' · river' : ''}
+            </span>
+          </div>
+          <h1 className="mc-title mt-2">{req.title}</h1>
+          <div className="mt-3 flex gap-3 rounded-lg bg-ink-850 p-3">
+            <svg viewBox="0 0 24 24" className="mt-0.5 h-6 w-6 shrink-0 text-signal" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              {mode === 'capture' ? <path d="M6 21V4M6 4h11l-2.5 3.5L17 11H6" /> : <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></>}
+            </svg>
+            <div>
+              <div className="text-[17px] font-semibold">{title}</div>
+              <p className="mt-0.5 text-[15px] text-muted">{text}</p>
+            </div>
+          </div>
+          <Head>Your Force</Head>
+          {s.attackers.map((f) => (
+            <div key={f.id} className="mb-1">
+              {s.attackers.length > 1 && <div className="text-[14px] font-semibold">{f.name}</div>}
+              <Counters side="blue" types={mine.units.filter((u) => u.formation === f.id).map((u) => u.type)} />
+              <span className="sr-only">{tally(mine.units.filter((u) => u.formation === f.id).map((u) => typeOf(u.type).short))}</span>
+            </div>
+          ))}
+          {mine.support.length > 0 && (
+            <>
+              <Head>Fire Support</Head>
+              <ul className="divide-y divide-line">
+                {mine.support.map((x) => (
+                  <SupportChit key={x.id} id={x.id} name={supportName({ id: x.id, faction: FACTION_OF[s.arsenal.blue] })} role={`${SUPPORT_ROLE[x.id]} on call, ${x.missions} ${x.missions === 1 ? 'mission' : 'missions'}`} missions={x.missions} testid={`brief-support-${x.id}`} />
+                ))}
+              </ul>
+            </>
+          )}
+          <Head>What Scouts Report</Head>
+          <div className="flex gap-3" data-testid="arena-intel">
+            <span className="mc-counter shrink-0" data-side="red" aria-hidden>
+              <span className="text-[20px] leading-none font-bold text-hostile">~{theirs.units.length}</span>
+            </span>
+            <div>
+              <div className="text-[15px] font-semibold">About {theirs.units.length} units, dug in toward the far edge</div>
+              <div className="text-[14px] text-muted">{kinds(theirs.units.map((u) => typeOf(u.type).role))}</div>
+            </div>
+          </div>
+          {theirs.support.length > 0 && (
+            <>
+              <ul className="mt-2 divide-y divide-line" aria-label="Enemy fire support">
+                {theirs.support.map((x) => (
+                  <SupportChit key={x.id} id={x.id} side="red" name={supportName({ id: x.id, faction: FACTION_OF[s.arsenal.red] }, true)} role={`Theirs, ${x.missions} ${x.missions === 1 ? 'mission' : 'missions'}`} missions={x.missions} />
+                ))}
+              </ul>
+              <p className="mt-1 text-[14px] text-signal" data-testid="brief-enemy-support">
+                Seen nearby: they can call these on you. Spread out and bring air defence.
+              </p>
+            </>
+          )}
+          <Head>Stars</Head>
+          <StarRules />
+        </Card>
         <div className="mt-5 text-[13px] font-semibold text-muted">Difficulty</div>
         {onDifficulty ? (
           <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-xl bg-ink-900 p-1" role="radiogroup" aria-label="Difficulty" data-testid="arena-difficulty">
@@ -505,36 +558,6 @@ function Brief({ req, onDifficulty, onFight, onQuick, onBack }: { req: BattleReq
           </div>
         )}
         <p className="mt-1.5 px-1 text-[14px] text-muted">{difficultyText(difficulty)}</p>
-        <div className="mt-5 text-[13px] font-semibold text-muted">Your Company</div>
-        <ul className="mt-1.5 divide-y divide-line overflow-hidden rounded-2xl bg-ink-900">
-          {s.attackers.map((f) => {
-            const units = mine.units.filter((u) => u.formation === f.id);
-            return (
-              <li key={f.id} className="px-4 py-3">
-                {s.attackers.length > 1 && <div className="text-[15px] font-semibold">{f.name}</div>}
-                <div className={s.attackers.length > 1 ? 'text-[14px] text-muted' : 'text-[15px]'}>{tally(units.map((u) => typeOf(u.type).short))}</div>
-              </li>
-            );
-          })}
-          {mine.support.map((x) => (
-            <li key={x.id} className="px-4 py-3" data-testid={`brief-support-${x.id}`}>
-              <div className="text-[15px] font-semibold">{supportName({ id: x.id, faction: FACTION_OF[s.arsenal.blue] })}</div>
-              <div className="text-[14px] text-muted">
-                {SUPPORT_ROLE[x.id]} on call, {x.missions} {x.missions === 1 ? 'mission' : 'missions'}
-              </div>
-            </li>
-          ))}
-        </ul>
-        {theirs.support.length > 0 && (
-          <p className="mt-2 px-1 text-[14px] text-signal" data-testid="brief-enemy-support">
-            Enemy fire support seen nearby: {theirs.support.map((x) => `${x.missions}x ${supportName({ id: x.id, faction: FACTION_OF[s.arsenal.red] }, true)}`).join(', ')}. Spread out and bring air defence.
-          </p>
-        )}
-        <div className="mt-5 text-[13px] font-semibold text-muted">What Scouts Report</div>
-        <div className="mt-1.5 rounded-2xl bg-ink-900 px-4 py-3" data-testid="arena-intel">
-          <div className="text-[15px] font-semibold">About {theirs.units.length} units, dug in toward the far edge</div>
-          <div className="text-[14px] text-muted">{kinds(theirs.units.map((u) => typeOf(u.type).role))}</div>
-        </div>
         <ul className="mt-5 space-y-2 text-[15px] text-muted">
           <li>Each unit moves, then acts. Tap a unit, tap inside its outline to move, tap a red badge for the odds.</li>
           <li>Hit them in the side or rear: their front armour is far thicker. Smoke hides you for a turn.</li>
@@ -542,7 +565,7 @@ function Brief({ req, onDifficulty, onFight, onQuick, onBack }: { req: BattleReq
           <li>Hold a finger on a unit for its card, or on a cell to see what your unit could see and hit from there.</li>
           {s.abilities.length > 0 && <li>From your research: {s.abilities.map((a) => ABILITIES[a].name).join(', ')}.</li>}
         </ul>
-        <div className="mt-auto flex flex-col gap-2 pt-6 pb-4">
+        <div className="sticky bottom-0 mt-auto -mx-4 flex flex-col gap-2 border-t border-line bg-black px-4 pt-3 pb-4">
           <button type="button" onClick={onFight} className="v-btn v-btn-primary h-14 text-[17px] font-semibold" data-testid="arena-fight">
             Fight It
           </button>
@@ -566,46 +589,58 @@ function Verdict({ result, req, battle, onDone }: { result: ArenaResult; req: Ba
   const lost = battle.units.filter((u) => u.side === 'blue' && !u.alive).length;
   const killed = battle.units.filter((u) => u.side === 'red' && !u.alive).length;
   const acc = result.stats.blue.shots ? Math.round((result.stats.blue.hits / result.stats.blue.shots) * 100) : 0;
+  const earned = starsEarned(battle);
   return (
-    <div className="vercel screen-in safe-top safe-bottom absolute inset-0 z-20 overflow-y-auto bg-black/90" data-testid="arena-verdict">
-      <div className="mx-auto flex min-h-full max-w-sm flex-col items-center justify-center px-5 py-6 text-center">
-        <div className="text-[44px] font-bold tracking-tight">{result.won ? 'Victory' : 'Repulsed'}</div>
-        <div className="mt-2 flex gap-2" aria-label={`${result.stars} of 3 stars`} data-testid="arena-stars">
-          {[1, 2, 3].map((i) => (
-            <svg key={i} viewBox="0 0 24 24" className={`star-in h-11 w-11 ${i <= result.stars ? 'text-signal' : 'text-ink-700'}`} style={{ animationDelay: `${i * 160}ms` }} aria-hidden>
-              <path d="M12 2l3 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.7 21.4l1.5-7.1L1.8 9.4 9 8.6z" fill="currentColor" />
-            </svg>
-          ))}
-        </div>
-        <div className="mt-2 text-[13px] text-muted">Win · lose under a tenth of your force · win by round 9</div>
-        <dl className="mt-5 grid w-full grid-cols-4 gap-2">
-          {(
-            [
-              ['Destroyed', killed],
-              ['Lost', lost],
-              ['Rounds', result.rounds],
-              ['Hits', `${acc}%`],
-            ] as const
-          ).map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-ink-900 py-2.5">
-              <dd className="text-[20px] font-bold tabular-nums">{v}</dd>
-              <dt className="text-[12px] text-muted">{k}</dt>
+    <div className="vercel mc-mat screen-in safe-top safe-bottom absolute inset-0 z-20 overflow-y-auto" data-testid="arena-verdict">
+      <div className="mx-auto flex min-h-full max-w-sm flex-col justify-center px-4 py-6">
+        <Card testid="after-action-card">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="mc-kicker">After Action</span>
+            <span className="text-[13px] font-semibold text-muted">{req.title}</span>
+          </div>
+          <div className="mt-2 text-center">
+            <div className={`mc-title mc-title-big ${result.won ? '' : 'text-hostile'}`}>{result.won ? 'Victory' : 'Repulsed'}</div>
+            <div className="mt-2 flex justify-center gap-2" aria-label={`${result.stars} of 3 stars`} data-testid="arena-stars">
+              {[1, 2, 3].map((i) => (
+                <span key={i} className="star-in" style={{ animationDelay: `${i * 160}ms` }}>
+                  <StarIcon earned={i <= result.stars} className="mc-star mc-star-big" />
+                </span>
+              ))}
             </div>
-          ))}
-        </dl>
-        <AfterAction battle={battle} />
-        <ul className="mt-4 w-full divide-y divide-line overflow-hidden rounded-xl bg-ink-900 text-left">
-          {req.setup.attackers.map((f) => (
-            <li key={f.id} className="flex justify-between px-4 py-2.5 text-[14px]">
-              <span className="font-semibold">{f.name}</span>
-              <span className="text-muted tabular-nums">{Math.round((result.kept[f.id] ?? 0) / 10)}% left</span>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-4 text-[14px] text-muted">
-          {req.skirmish ? 'Practice battle: nothing on the war map changes.' : result.won ? 'The hex is yours when the turn ends, unless they reinforce it first.' : 'Your losses stand. The hex stays theirs.'}
-        </p>
-        <button type="button" onClick={onDone} className="v-btn v-btn-primary mt-6 h-12 w-full text-[16px] font-semibold" data-testid="arena-continue">
+          </div>
+          <Head>Stars</Head>
+          <StarRules earned={earned} />
+          <Head>The Count</Head>
+          <dl className="grid w-full grid-cols-4 gap-2 text-center">
+            {(
+              [
+                ['Destroyed', killed],
+                ['Lost', lost],
+                ['Rounds', result.rounds],
+                ['Hits', `${acc}%`],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="rounded-lg bg-ink-850 py-2.5">
+                <dd className="text-[20px] font-bold tabular-nums">{v}</dd>
+                <dt className="text-[12px] text-muted">{k}</dt>
+              </div>
+            ))}
+          </dl>
+          <Head>Grades</Head>
+          <AfterAction battle={battle} />
+          <ul className="mt-4 w-full divide-y divide-line overflow-hidden rounded-lg bg-ink-850 text-left">
+            {req.setup.attackers.map((f) => (
+              <li key={f.id} className="flex justify-between px-4 py-2.5 text-[14px]">
+                <span className="font-semibold">{f.name}</span>
+                <span className="text-muted tabular-nums">{Math.round((result.kept[f.id] ?? 0) / 10)}% left</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-center text-[14px] text-muted">
+            {req.skirmish ? 'Practice battle: nothing on the war map changes.' : result.won ? 'The hex is yours when the turn ends, unless they reinforce it first.' : 'Your losses stand. The hex stays theirs.'}
+          </p>
+        </Card>
+        <button type="button" onClick={onDone} className="v-btn v-btn-primary mt-4 h-12 w-full text-[16px] font-semibold" data-testid="arena-continue">
           {req.skirmish ? 'Done' : 'Back to the War'}
         </button>
       </div>

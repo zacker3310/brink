@@ -38,6 +38,9 @@ type Id = 'himars' | 'tornado' | 'naval_gun' | 'cruise_missile' | 'strike_jet' |
 
 /** Fly one mission for `side` at a cell, the film held at `stops` seconds after it is launched. */
 async function fly(page: Page, name: string, side: 'blue' | 'red', id: Id, at: { x: number; y: number }, want: 'intercept' | 'land' | 'kill' | undefined, stops: number[]): Promise<boolean> {
+  // `SORTIES=red-su34-down,blue-himars` flies only those (a quicker look while working on one).
+  const only = process.env.SORTIES?.split(',');
+  if (only && !only.includes(name)) return true;
   await ready(page);
   const flights = await page.evaluate(() => window.__arena!.film()!.flights);
   // Hold the film before it starts, so the stops count from the launch.
@@ -53,7 +56,7 @@ async function fly(page: Page, name: string, side: 'blue' | 'red', id: Id, at: {
   for (const [i, s] of stops.entries()) {
     await holdAt(page, s - gone);
     gone = s;
-    console.log(name, s, JSON.stringify(await page.evaluate(() => { const f = window.__arena!.film()!; return { steps: f.steps, beats: f.beats, cam: f.cam, clock: f.clock }; })));
+    console.log(name, s, JSON.stringify(await page.evaluate((at) => { const f = window.__arena!.film()!; return { steps: f.steps, beats: f.beats, cam: f.cam, clock: f.clock, focus: f.camera.slice(0, 6), aim: window.__arena!.toScreen(at.x, at.y) }; }, at)));
     await shot(page, `${name}-${i + 1}`);
   }
   await page.evaluate(() => window.__arena!.pauseFilm(null));
@@ -70,9 +73,15 @@ function where(page: Page, side: 'blue' | 'red', re: string) {
   }, { side, re });
 }
 
-/** End the turn (through the sheet when units still wait) and wait for it to come back. */
+/** End the turn, the staff's plan moving your units up when it offers one, and wait for it to come back. */
 async function endTurn(page: Page) {
   await ready(page);
+  const execute = page.getByTestId('arena-execute');
+  if (await execute.isVisible().catch(() => false)) {
+    await execute.tap();
+    await ready(page);
+    return;
+  }
   await page.getByTestId('arena-end-turn').tap();
   const now = page.getByTestId('arena-end-now');
   if (await now.isVisible().catch(() => false)) await now.tap();
@@ -116,7 +125,7 @@ test('the enemy flies its Su-34, Kalibr, Geran-2 and Tornado-G at you; your HIMA
   const red = (await where(page, 'red', 't90|bmp|tunguska|msta'))!;
   expect(await fly(page, 'blue-himars', 'blue', 'himars', red, undefined, [0.6, 1.5, 1.85])).toBe(true);
   let killed = false;
-  for (let turn = 0; turn < 4 && !killed; turn++) {
+  for (let turn = 0; turn < 4 && !killed && (process.env.SORTIES?.split(',').includes('blue-f35-kill') ?? true); turn++) {
     const seen = await page.evaluate(() => {
       const b = window.__arena!.arena()!;
       const u = b.units.find((v) => v.side === 'red' && v.alive && !v.carrier && /t90|bmp|tunguska|msta/.test(v.type) && b.intel.blue[v.id]?.now);

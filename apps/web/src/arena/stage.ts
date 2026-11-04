@@ -32,6 +32,8 @@ const SPREAD = 1.35;
 /** Closest and default camera distances (world units). */
 const MIN_DIST = 3.5;
 const PLAY_DIST = 11.5;
+/** How far back the film stands for a strike coming in by air (the sky over the target in frame). */
+const SUPPORT_DIST = 17;
 /** Closer than this, a soldier's weapon swaying at rest shows: idle soldiers count as moving. */
 const SWAY_DIST = 6;
 
@@ -345,6 +347,8 @@ export class BattleStage {
   private cam: { from: THREE.Vector3; at: THREE.Vector3; t: number; dur: number; track?: (t: number, from: THREE.Vector3, at: THREE.Vector3) => void } | null = null;
   /** Tests: the film holds still when its clock reaches this (screenshots mid-flight). */
   private pauseAt = Infinity;
+  /** The zoom to go back to once a strike filmed wide has come down. */
+  private unwide: number | null = null;
   private readonly preset;
   /** Frame timing (ms of our own work per frame), for the performance probe. */
   private readonly frameMs: number[] = [];
@@ -478,10 +482,13 @@ export class BattleStage {
     this.audio.ambience(battle.conditions.biome, battle.conditions.weather);
     this.sorties = new Sorties(this.scene, this.fx, this.audio, (x, z) => this.world.heightAt(x, z), { w: W, h: H }, () => this.world.seaLevel);
     // The jet's run is laid clear of where the camera will stand while it watches the target.
-    this.sorties.eyeAt = (x, z) => {
-      const v = { ...this.view(), fx: x, fz: z, dist: this.wantDist, tilt: this.wantTilt };
-      const { lx, lz, gy, h, r } = aim(v, this.camera.fov, this.groundAt);
-      return new THREE.Vector3(lx + Math.sin(v.yaw) * r, gy + h, lz + Math.cos(v.yaw) * r);
+    this.sorties.viewAt = (x, z) => {
+      const cam = this.solveCam;
+      cam.copy(this.camera, false);
+      // Where the focus can go: the film centres on the target, held inside the field.
+      pose(cam, { ...this.view(), fx: Math.max(0, Math.min(W, x)), fz: Math.max(0, Math.min(H, z)), dist: this.wantDist, tilt: this.wantTilt }, this.groundAt);
+      cam.updateProjectionMatrix();
+      return cam;
     };
 
     const tileGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
@@ -2504,9 +2511,17 @@ export class BattleStage {
     const aim = { x: head.to.x + 0.5, z: head.to.y + 0.5 };
     // A blue run that kills a vehicle gets a short cinematic cut (with action cams and full motion).
     const kills = side === 'blue' && beat.events.some((e) => e.type === 'destroyed' && e.seen && e.how !== 'expended' && this.views.get(e.unit)?.side === 'red' && this.views.get(e.unit)?.t.mobility !== 'foot');
+    // What comes in by air is filmed wide: from the close play view the sky over the target is out of
+    // the frame. The zoom goes back to where it was once the run has played.
+    const wide = clip.cam && id !== 'naval_gun';
+    let before: number | null = null;
     this.step(approach, {
       start: () => {
         this.show(clip, aim.x, aim.z, true);
+        if (wide && this.wantDist < SUPPORT_DIST && !this.held) {
+          before = this.wantDist;
+          this.wantDist = SUPPORT_DIST;
+        }
         for (const o of outcomes) o.by = o.gun ? this.interceptor(o.gun, id) : null;
         const plan: Plan = { side, faction, outcomes, approach };
         let flight: Flight | null = null;
@@ -2544,6 +2559,10 @@ export class BattleStage {
       }
       this.queue(e);
     }
+    // Back to the zoom it had once everything in the air has come down (unless someone zoomed meanwhile).
+    this.now(() => {
+      if (before !== null) this.unwide = before;
+    });
   }
 
   /** The gun that brought a mission down, as the film shows it: its muzzle and whether it fires shells or a missile. */
@@ -2797,6 +2816,10 @@ export class BattleStage {
     this.insight.tick(real, { yaw: this.yaw, perPx: (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / Math.max(1, this.host.clientHeight), cinematic: this.cam !== null });
     this.world.update(dt, this.camera);
     this.sorties.update(dt);
+    if (this.unwide !== null && !this.sorties.busy) {
+      if (this.wantDist === SUPPORT_DIST) this.wantDist = this.unwide;
+      this.unwide = null;
+    }
     this.fx.update(dt, this.camera);
     this.crowd.update(dt);
     this.audio.setListener({ x: this.focus.x - 0.5, y: this.focus.z - 0.5, zoom: Math.min(1, this.dist / this.maxDist) });

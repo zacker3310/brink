@@ -64,11 +64,11 @@ const ROCKET_SCALE = 1.8;
 const SHIP_OFF = 26;
 const UP = new THREE.Vector3(0, 1, 0);
 const JET_SPEED = 13;
-/** The jet's bombing run: its height over the target (30 m at figure scale) and how much higher it starts. */
-const RUN_ALT = 3;
+/** The jet's bombing run: its height over the target (24 m at figure scale, low enough to stay in the battle camera's frame) and how much higher it starts. */
+const RUN_ALT = 2.4;
 const RUN_DESCENT = 0.35;
 /** How close to the camera the jet's path may come before it fills the lens. */
-const CLEAR = 7;
+const CLEAR = 6;
 /** Seconds a bomb falls from release to its blast. */
 const BOMB_FALL = 0.85;
 /** The motion blur behind the jet: how far back each ghost trails (seconds of flight) and how faint. */
@@ -140,10 +140,11 @@ export class Sorties {
   /** Missions flown so far (tests wait on it). */
   launched = 0;
   /**
-   * Where the battle camera will stand while it watches a point: the jet's run is laid so it never
-   * fills the lens. Null flies the plain slant.
+   * The battle camera as it will stand while it watches a point (a posed camera, used at once): the
+   * jet's run is laid so it crosses the frame where it can be seen and never fills the lens. Null
+   * flies the plain slant.
    */
-  eyeAt: ((x: number, z: number) => THREE.Vector3) | null = null;
+  viewAt: ((x: number, z: number) => THREE.Camera) | null = null;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -251,33 +252,59 @@ export class Sorties {
       pos.addScaledVector(dir, JET_SPEED * 1.08 * dt);
       return next;
     };
-    return { h, runIn, pull };
+    /** One step of the fall once hit: the way it had, bleeding off, nosing down ever steeper, turning away. */
+    const fall = (dt: number, turn: number, pos: THREE.Vector3, vel: THREE.Vector3) => {
+      const next = turn + bank * dt * 1.5;
+      const flat = Math.hypot(vel.x, vel.z) * (1 - dt * 0.9);
+      vel.x = Math.sin(slant + next) * flat;
+      vel.z = hz * Math.cos(slant + next) * flat;
+      vel.y -= 8 * dt;
+      pos.addScaledVector(vel, dt);
+      return next;
+    };
+    return { h, runIn, pull, fall };
   }
 
   /** The slant and turn that keep the run clear of the camera watching `aim` (and a little random). */
   private layRun(aim: THREE.Vector3, ref: (slant: number) => THREE.Vector3, tRef: number, alt: number, hz: number, tOut: number, shot: boolean): { slant: number; bank: number } {
     const plain = { slant: (this.r() - 0.5) * 0.7, bank: this.r() < 0.5 ? 1 : -1 };
-    const eye = this.eyeAt?.(aim.x, aim.z);
-    if (!eye) return plain;
+    const cam = this.viewAt?.(aim.x, aim.z);
+    if (!cam) return plain;
+    const eye = cam.position;
     let best = plain;
     let score = -Infinity;
     const p = new THREE.Vector3();
     const d = new THREE.Vector3();
+    const ndc = new THREE.Vector3();
     for (let s = -0.8; s <= 0.801; s += 0.1) {
       for (const bank of [1, -1]) {
         const path = this.jetPath(ref(s), tRef, alt, s, hz, bank, tOut);
+        // How close it comes to the lens while in frame, and how long it is in frame.
         let near = Infinity;
-        for (let t = 0; t <= tOut; t += 0.05) near = Math.min(near, path.runIn(t, p).distanceTo(eye));
+        let seen = 0;
+        const look = (q: THREE.Vector3, count = true) => {
+          ndc.copy(q).project(cam);
+          if (ndc.z > 1 || Math.abs(ndc.x) > 1.15 || Math.abs(ndc.y) > 1.15) return;
+          if (count) seen += 0.05;
+          near = Math.min(near, q.distanceTo(eye));
+        };
+        for (let t = 0; t <= tOut; t += 0.05) look(path.runIn(t, p));
+        path.runIn(tOut, p);
+        let turn = 0;
         if (!shot) {
-          path.runIn(tOut, p);
-          let turn = 0;
           for (let t = tOut; t < tOut + 2.2; t += 0.05) {
             turn = path.pull(t, 0.05, turn, p, d);
-            near = Math.min(near, p.distanceTo(eye));
+            look(p);
+          }
+        } else {
+          d.copy(path.h).multiplyScalar(JET_SPEED * 0.85).setY(-0.6);
+          for (let t = 0; t < 1.6 && p.y > aim.y; t += 0.05) {
+            turn = path.fall(0.05, turn, p, d);
+            look(p, false);
           }
         }
-        // Past the clearance, any run will do: pick by a little noise (and a slight lean to the plain slant).
-        const v = Math.min(near, CLEAR) + this.r() * 0.6 - Math.abs(s) * 0.3;
+        // In frame as long as it can be, never closer than the clearance; a little noise between equals.
+        const v = Math.min(near, CLEAR) * 1.5 + Math.min(seen, 1.2) * 4 + this.r() * 0.4 - Math.abs(s) * 0.2;
         if (v > score) {
           score = v;
           best = { slant: s, bank };
@@ -305,7 +332,8 @@ export class Sorties {
     const tRef = Number.isFinite(tRelease) ? tRelease : shot!.at;
     const refFor = (slant: number) => {
       const h = new THREE.Vector3(Math.sin(slant), 0, hz * Math.cos(slant));
-      return new THREE.Vector3(aim.x, alt, aim.z).addScaledVector(h, Number.isFinite(tRelease) ? -lead : -JET_SPEED * 0.4);
+      // Brought down just short of its target, where the guns defending it reach and the camera looks.
+      return new THREE.Vector3(aim.x, alt, aim.z).addScaledVector(h, Number.isFinite(tRelease) ? -lead : -JET_SPEED * 0.12);
     };
     const tOut = Number.isFinite(tRelease) ? tRelease + 0.15 : tRef;
     // Run in on a slant, not straight down the field, and never through the lens.
@@ -378,7 +406,7 @@ export class Sorties {
             fx.shatter(pos, vel.copy(h).multiplyScalar(JET_SPEED), 1.3);
             fx.explosion(pos, 0.55, 'airburst');
             audio.impact('he', pos.x - 0.5, pos.z - 0.5);
-            vel.y = 0;
+            vel.copy(h).multiplyScalar(JET_SPEED * 0.85).setY(-0.6);
             rollV = bank * 2.6;
           }
           for (; dropped < booms.length && t >= tRelease + dropped * 0.12; dropped++) dropBomb(booms[dropped]!, dropped);
@@ -389,14 +417,21 @@ export class Sorties {
           turn = path.pull(t, dt, turn, pos, dir);
           roll = -bank * Math.min(1.25, (t - tOut) * 2.4);
         } else {
-          // Hit: it rolls over, noses down and trails fire and smoke off the field.
-          vel.y -= 1.1 * dt;
-          turn += bank * dt * 0.4;
-          vel.x = Math.sin(slant + turn) * JET_SPEED * 0.85;
-          vel.z = hz * Math.cos(slant + turn) * JET_SPEED * 0.85;
-          pos.addScaledVector(vel, dt);
+          // Hit: it rolls over, noses down trailing fire and smoke, and goes into the ground.
+          turn = path.fall(dt, turn, pos, vel);
           dir.copy(vel).normalize();
           roll += rollV * dt;
+          const ground = this.heightAt(pos.x, pos.z);
+          if (pos.y <= ground + 0.1) {
+            pos.y = ground + 0.05;
+            fx.explosion(pos, 1.1, 'he');
+            for (let i = 0; i < 6; i++) fx.trailPuff(pos.x + (this.r() - 0.5) * 0.8, pos.y + 0.2, pos.z + (this.r() - 0.5) * 0.8, 'burning', 1.6);
+            audio.impact('bombs', pos.x - 0.5, pos.z - 0.5);
+            gone = true;
+            this.scene.remove(root);
+            audio.stop(id);
+            return false;
+          }
         }
         if (!sonic && Number.isFinite(tRelease) && t >= tRelease + BOMB_FALL * 0.5) {
           sonic = true;
@@ -525,7 +560,7 @@ export class Sorties {
     const o = plan.outcomes[0]!;
     const shot = o.kind === 'intercept';
     // Shot down at the top of its climb, where the guns see it best.
-    const T = shot ? o.at / 0.86 : o.at;
+    const T = shot ? o.at / 0.93 : o.at;
     const hz = this.heading(plan.side);
     const slant = (this.r() - 0.5) * 0.6;
     const span = 26;
@@ -536,10 +571,10 @@ export class Sorties {
       const g = this.heightAt(out.x, out.z);
       // Sea-skimming over the ground, the pop-up, then the dive onto the cell.
       const skim = g + 0.45;
-      const top = Math.max(g, end.y) + 3.4;
-      if (u < 0.7) out.y = skim;
-      else if (u < 0.88) out.y = skim + (top - skim) * smooth(0.7, 0.88, u);
-      else out.y = top + (end.y - top) * ((u - 0.88) / 0.12) ** 1.6;
+      const top = Math.max(g, end.y) + 2.6;
+      if (u < 0.78) out.y = skim;
+      else if (u < 0.9) out.y = skim + (top - skim) * smooth(0.78, 0.9, u);
+      else out.y = top + (end.y - top) * ((u - 0.9) / 0.1) ** 1.6;
       return out;
     };
     const root = buildAircraft(kind);
@@ -730,11 +765,11 @@ export class Sorties {
       const T = shot ? dur / 0.82 : dur;
       const target = new THREE.Vector3(o.x, this.heightAt(o.x, o.z) + 0.05, o.z);
       const span = 20 + i * 2;
-      const side = (i - 1) * 3.5 + (this.r() - 0.5) * 2;
+      const side = (i - 1) * 1.3 + (this.r() - 0.5) * 0.6;
       const start = new THREE.Vector3(o.x + side, 0, o.z - hz * span);
       const dive = target.clone().add(new THREE.Vector3(0, 0, -hz * 1.6));
       const phase = this.r() * Math.PI * 2;
-      const weave = 0.5 + this.r() * 0.4;
+      const weave = 0.3 + this.r() * 0.25;
       const DIVE = Math.min(0.42, T * 0.2) / T;
       const at = (u: number, out: THREE.Vector3) => {
         if (u < 1 - DIVE) {
@@ -851,13 +886,13 @@ export class Sorties {
       let p2: THREE.Vector3;
       if (kind === 'gmlrs') {
         // Steep out of the pod, high over, then straight down onto the cell.
-        const apex = Math.max(14, dist * 0.55);
+        const apex = Math.min(16, Math.max(10, dist * 0.3));
         p1 = from.clone().add(new THREE.Vector3((r.to.x - from.x) * 0.15, apex, (r.to.z - from.z) * 0.15));
         p2 = r.to.clone().add(new THREE.Vector3(0, apex * 0.95, 0));
       } else {
-        const apex = Math.max(7, dist * 0.32);
+        const apex = Math.min(9, Math.max(5, dist * 0.18));
         p1 = from.clone().add(new THREE.Vector3((r.to.x - from.x) * 0.3, apex, (r.to.z - from.z) * 0.3));
-        p2 = from.clone().add(new THREE.Vector3((r.to.x - from.x) * 0.75, apex * 0.9, (r.to.z - from.z) * 0.75));
+        p2 = from.clone().add(new THREE.Vector3((r.to.x - from.x) * 0.8, apex * 0.7, (r.to.z - from.z) * 0.8));
       }
       const root = buildAircraft(kind);
       root.scale.setScalar(ROCKET_SCALE);
@@ -876,9 +911,9 @@ export class Sorties {
         update: (dt) => {
           t += dt;
           if (t < launch) return true;
-          // Accelerating off the rail, then a steady pace (the curve's own spacing does the rest).
+          // The curve's own spacing gives the pace: slow over the top, fast down onto the cell.
           const k = Math.min(1, (t - launch) / r.fly);
-          const u = kind === 'gmlrs' ? k * k * (1.6 - 0.6 * k) : k * (1.25 - 0.25 * k);
+          const u = k;
           prev.copy(pos);
           bezier(p0, p1, p2, r.to, Math.min(1, u), pos);
           bezier(p0, p1, p2, r.to, Math.min(1, u + 0.01), dir).sub(pos);
@@ -894,7 +929,7 @@ export class Sorties {
           root.updateMatrixWorld(true);
           root.localToWorld(tmp.copy(nozzle));
           const step = prev.distanceTo(pos);
-          this.fx.exhaust(tmp, dir, kind === 'gmlrs' ? 1 : 0.7, k < 0.35 ? 'booster' : 'motor');
+          this.fx.exhaust(tmp, dir, kind === 'gmlrs' ? 0.6 : 0.45, k < 0.25 ? 'booster' : 'motor');
           this.fx.speedStreak(tmp, dir, Math.min(2.2, step * 4), kind === 'gmlrs' ? 0.03 : 0.02);
           if (smokes) {
             trail += step;
