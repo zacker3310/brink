@@ -177,6 +177,9 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
       case 'facility_built':
         out.Production!.push({ tone: 'good', text: `${FACILITIES[e.facility].name} completed at ${view.sites[e.site]?.name ?? e.site}: ${FACILITIES[e.facility].summary.toLowerCase()}` });
         break;
+      case 'city_grew':
+        out.Production!.push({ tone: 'good', text: `${view.sites[e.site]?.name ?? e.site} grew to level ${e.level}.` });
+        break;
       case 'construction_cancelled':
         out.Production!.push({ tone: 'bad', text: `${FACILITIES[e.facility].name} at ${view.sites[e.site]?.name ?? e.site} lost: ${e.reason}.` });
         break;

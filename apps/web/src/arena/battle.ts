@@ -1,6 +1,6 @@
 import type { ArenaBattle, CardPlay, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
-import { cardSupport } from '@brink/simulation';
+import { cardSupport, progressionSupport } from '@brink/simulation';
 import { keyDistance } from '@brink/map';
 import { leaderEffects, leaderOf } from '@brink/simulation';
 import { abilitiesFor, ARSENAL_OF, RANKS, rankOf, SUPPORT_IDS, type ArenaResult, type ArenaSetup, type Battle, type BattleEvent, type SiteKind, type SupportId, type UnitSpec } from '@brink/arena';
@@ -80,6 +80,10 @@ export function supportFor(view: NationView, target: HexKey, exclude: readonly s
     if (c.key === target && !UNITS[c.unitClass].naval) continue;
     count(red, c.unitClass, keyDistance(c.key, target), false);
   }
+  // Research and the airbases and missile batteries within reach (progression.ts).
+  const built = progressionSupport(view, target);
+  for (const s of built.blue) add(blue, s.id, s.missions);
+  for (const s of built.red) add(red, s.id, s.missions);
   const list = (m: Map<SupportId, number>): SupportList => SUPPORT_IDS.filter((x) => (m.get(x) ?? 0) > 0).map((x) => ({ id: x, missions: m.get(x)! }));
   return { blue: list(blue), red: list(red) };
 }

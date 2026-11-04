@@ -16,11 +16,12 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { AIR_REBASE_RANGE, FACILITIES, FACILITY_SLOTS, TECHS, UNITS } from '@brink/game-data';
+import { AIR_REBASE_RANGE, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
 import { lockCommanderOrders } from './commanders';
 import { canPropose } from './diplomacy';
 import { checkPlays, marchBonus } from './doctrine';
+import { buildBlocker, facilityCost } from './progression';
 import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
 export interface LockedOrders {
@@ -215,16 +216,7 @@ export function checkDiplomacy(
 
 /** Why `nation` cannot start `facility` at `siteId` now, ignoring cost, or null. */
 export function checkBuild(world: WorldState, nation: NationId, siteId: string, facility: FacilityId): string | null {
-  const site = world.sites[siteId];
-  const def = FACILITIES[facility];
-  if (!site) return 'no such site';
-  if (!def) return 'unknown facility';
-  if (site.owner !== nation) return `${site.name} is not under your control`;
-  const building = world.nations[nation]!.construction.filter((c) => c.siteId === siteId);
-  if (site.facilities.includes(facility) || building.some((c) => c.facility === facility)) return `${site.name} already has a ${def.name.toLowerCase()}`;
-  if (site.facilities.length + building.length >= FACILITY_SLOTS[site.kind]) return `${site.name} has no room for another facility`;
-  if (def.requires && !world.nations[nation]!.research.unlocked.includes(def.requires)) return `${def.name} needs ${TECHS[def.requires]?.name ?? def.requires}`;
-  return null;
+  return buildBlocker(world, world.nations[nation]!, siteId, facility);
 }
 
 /** Builds accepted in site order, one per site, while they fit what recruits left of the stockpile. */
@@ -245,7 +237,7 @@ function lockBuilds(world: WorldState, nation: NationId, builds: BuildOrder[], r
       reject(why);
       continue;
     }
-    const cost = FACILITIES[b.facility].cost;
+    const cost = facilityCost(n, b.facility);
     if (RESOURCES.some((r) => reserved[r] + cost[r] > n.stockpile[r])) {
       reject(`insufficient resources for a ${FACILITIES[b.facility].name.toLowerCase()} at ${world.sites[b.siteId]!.name}`);
       continue;

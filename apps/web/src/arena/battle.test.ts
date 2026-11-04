@@ -33,6 +33,21 @@ function scene(): NationView {
 }
 
 describe('supportFor', () => {
+  it('adds what research and nearby airbases and missile batteries bring', () => {
+    const view = scene();
+    const base = supportFor(view, '10,10', ['inf']);
+    view.self.research = { ...view.self.research, unlocked: [...view.self.research.unlocked, 'air_mobility', 'loitering_munitions'].sort() };
+    const site = Object.values(view.sites).find((x) => x.owner === 'japan')!;
+    site.key = '11,11';
+    site.facilities = ['missile_battery'];
+    const s = supportFor(view, '10,10', ['inf']);
+    const of = (list: typeof s.blue, id: string) => list.find((x) => x.id === id)?.missions ?? 0;
+    expect(of(s.blue, 'strike_jet')).toBe(of(base.blue, 'strike_jet') + 1);
+    expect(of(s.blue, 'kamikaze')).toBe(of(base.blue, 'kamikaze') + 1);
+    expect(of(s.blue, 'cruise_missile')).toBe(of(base.blue, 'cruise_missile') + 1);
+    expect(s.red).toEqual(base.red);
+  });
+
   it('counts fleets, carriers, wings in range or on a deck nearby, and drones, for both sides', () => {
     const s = supportFor(scene(), '10,10', ['inf']);
     expect(s.blue).toEqual([

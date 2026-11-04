@@ -198,6 +198,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
       population: s.population,
       yields: { ...s.yields },
       facilities: s.owner === nation || visible ? [...s.facilities] : [],
+      ...((s.owner === nation || visible) && s.development !== undefined ? { development: s.development } : {}),
     };
     tiles[s.key]!.siteId = id;
   }

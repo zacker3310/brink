@@ -3,7 +3,7 @@ import { SAVE_VERSION } from '@brink/contracts';
 import { CARDS, HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { hashState } from '@brink/simulation';
-import { parseSave, SaveError, serializeSave } from './save';
+import { migrateSave, parseSave, SaveError, serializeSave } from './save';
 import { GameSession, HISTORY_KEPT } from './session';
 
 describe('GameSession', () => {
@@ -138,6 +138,35 @@ describe('GameSession', () => {
     }
     // The AIs that lost their memory of an objective have one again.
     expect(resumed.toSave('again', '2026-11-04T12:00:00Z').aiMemory.china!.objective).toBeDefined();
+  });
+
+  it('resumes a 2.5.0 campaign from before research branches and city growth, and plays on', () => {
+    const s = GameSession.create(PACIFIC_ID, 21, 'usa');
+    s.advance();
+    // What ruleset 2.5.0 wrote: sites without development, the six technologies of its tree.
+    const old = JSON.parse(serializeSave(s.toSave('old', '2026-11-04T12:00:00Z')));
+    old.rulesetVersion = '2.5.0';
+    old.world.rulesetVersion = '2.5.0';
+    for (const site of Object.values(old.world.sites) as Record<string, unknown>[]) delete site.development;
+    old.world.nations.usa.research = { current: 'combined_arms', progress: 40, unlocked: ['logistics_doctrine'] };
+    old.hash = hashState(old.world);
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.migratedFrom).toBe('2.5.0');
+    expect(loaded.hash).toBe(hashState(loaded.world));
+    const cities = Object.values(loaded.world.sites).filter((x) => x.kind === 'capital' || x.kind === 'city');
+    expect(cities.length).toBeGreaterThan(0);
+    for (const c of cities) expect(c.development).toBe(0);
+    for (const d of Object.values(loaded.world.sites).filter((x) => x.kind === 'depot')) expect(d.development).toBeUndefined();
+    // Migrating again changes nothing: the step keys on the field, not the version.
+    expect(hashState(migrateSave({ ...loaded, saveVersion: SAVE_VERSION }).world)).toBe(loaded.hash);
+    const resumed = GameSession.fromSave(loaded);
+    expect(resumed.view().self.research).toMatchObject({ current: 'combined_arms', unlocked: ['logistics_doctrine'] });
+    for (let i = 0; i < 2; i++) {
+      const r = resumed.advance();
+      expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    }
+    const capital = Object.values(resumed.view().sites).find((x) => x.owner === 'usa' && x.kind === 'capital')!;
+    expect(capital.development).toBeGreaterThan(0);
   });
 
   it('runs any campaign length from 5 turns to a 250-turn Total War', () => {

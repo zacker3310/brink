@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { CardId, CardPlay, NationView } from '@brink/contracts';
 import { CARDS, DOCTRINE, describeCard, type CardDef } from '@brink/game-data';
-import { cpIncome } from '@brink/simulation';
+import { cpIncome, handSizeOf } from '@brink/simulation';
 import { operationById } from '@brink/ai';
 import { hexLabel } from './insight';
 import { useGame } from './store';
@@ -90,7 +90,7 @@ function Fan({ width, onPicked, spread = 0.78 }: { width: number; onPicked?: () 
   const slots = handSlots(view, plays);
   const n = slots.length;
   const rivals = Object.values(view.nations).filter((x) => x.id !== view.self.id && !x.minor && !x.eliminated);
-  if (n === 0) return <p className="px-4 py-6 text-center text-[13px] text-muted">No cards in hand. You draw back to {DOCTRINE.handSize} at the end of the turn.</p>;
+  if (n === 0) return <p className="px-4 py-6 text-center text-[13px] text-muted">No cards in hand. You draw back to {handSizeOf(view.self)} at the end of the turn.</p>;
   const height = Math.round(width * 1.55);
   const picked = slots.find((x) => x.key === open);
   return (

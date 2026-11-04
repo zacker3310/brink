@@ -74,8 +74,9 @@ by a fifth.
 
 ### Facilities
 
-One of each per site; capitals hold 4, cities 3, depots and objectives 2. Paid in full when ordered;
-built with industry ahead of units; captured with the site.
+One of each per site; capitals hold 4, cities 3, depots and objectives 2, and a city gains one more
+slot at development levels 3 and 5. Paid in full when ordered (Urban Planning takes 15% off); built
+with industry ahead of units, in queue order; captured with the site.
 
 | Facility | Cost | Industry | Effect | Upkeep | Needs |
 |---|---|---|---|---|---|
@@ -85,6 +86,19 @@ built with industry ahead of units; captured with the site.
 | Factory | 120 cr, 80 mat | 60 | +12 industry | 2 en | Industrial Automation |
 | Research lab | 140 cr, 40 mat | 50 | +8 research | 3 cr, 1 en | Signals Intelligence |
 | Fortress | 100 cr, 100 mat | 60 | Own ground units here never drop below 60 entrenchment, even after a strike | 2 cr, 2 mat | Logistics Doctrine |
+| Naval yard | 110 cr, 70 mat | 50 | +6 industry, +20 supply capacity; ports only | 2 cr, 1 en | Naval Engineering |
+| Airbase | 120 cr, 10 en, 60 mat | 55 | A strike sortie in your hand-fought battles within 4 hexes; +10 supply capacity | 3 cr, 2 en | Air Mobility |
+| Missile battery | 130 cr, 90 mat | 60 | Your defenders in the hex +15%; a cruise missile in your battles within 3 hexes | 3 cr, 1 mat | Cruise Missiles |
+
+### City development
+
+Capitals and cities grow (`CITY_GROWTH` in `game-data/src/cities.ts`, the development phase right
+after the economy): 2 development a turn, +1 per facility standing there, +1 for a capital, +50%
+with Urban Planning; none while the owner's stability is under 40 or its food ran short that turn.
+Levels at 0, 24, 60, 120 and 200 development; every level above the first adds 2 credits, 2
+industry and 2 research to the city's yields, and levels 3 and 5 open a facility slot. A city that
+changes hands keeps half its development. Its owner is told when it reaches a new level; rivals see
+a city's development only while they can see the city.
 
 ## Military
 
@@ -116,16 +130,20 @@ The supply priority per unit decides who is served first when there is not enoug
 
 ## Research
 
-Six technologies in three short chains, each unlocking a capability as well as a bonus:
+Twenty-four technologies in five branches (`game-data/src/research.ts`), each with its
+prerequisites (every one of them first). Research points come from sites, labs, city levels and the
+research budget; one project at a time, up to 300 points banked while none is chosen. Effects reach
+the whole game: modifiers (combat, supply, movement, income, research, city growth, facility costs),
+doctrine (hand size, Command Points), facilities unlocked, and off-map support over every
+hand-fought battle. The six of ruleset 2.0 keep their ids and battle abilities.
 
-| Technology | Effect | Unlocks |
+| Branch | Technologies (cost, prerequisites) | Gives |
 |---|---|---|
-| Logistics Doctrine | +25% supply, +2 range | Fortress; Field repair in battle |
-| Signals Intelligence | +1 vision | Research lab; Recon sweep in battle |
-| Industrial Automation | +20% industry | Factory; Mines in battle |
-| Combined Arms (after Logistics) | +5% per extra class in an assault | Air strike in battle |
-| Precision Munitions (after Signals) | +20% strikes | Guided missiles in battle |
-| Composite Armor (after Automation) | +20% armor defense | Composite armour in battle |
+| Logistics & Economy | Logistics Doctrine (120); Industrial Automation (160); Urban Planning (200, Automation); Rail Network (220, Logistics); War Economy (300, Urban Planning + Rail) | Supply; industry and the Factory; growth +50%, buildings -15%; supply and materials; industry and income |
+| Armour | Combined Arms (180, Logistics); Composite Armor (200, Automation); Mobile Warfare (240, Combined Arms); Active Protection (260, Composite); Next-Generation Armour (340, Mobile + Active) | Mixed assaults; armour defense; +1 armour movement; more armour defense; +20% armour attack |
+| Air & Missiles | Air Mobility (140); Precision Munitions (200, Signals); Loitering Munitions (200, Air Mobility); Cruise Missiles (260, Precision); Stealth Airframes (360, Cruise + Loitering) | Strikes, the Airbase and a sortie per battle; +20% strikes; a kamikaze swarm per battle; the Missile battery and a cruise missile per battle; strikes and another sortie |
+| Naval | Naval Engineering (140); Littoral Warfare (200, Engineering); Carrier Aviation (260, Engineering + Air Mobility); Blue-Water Navy (340, Littoral + Carrier) | +1 ship movement and the Naval yard; ship attack, naval gunfire on the coast; ship defense, a coastal sortie; all three |
+| Cyber & Intel | Signals Intelligence (140); Staff College (150); Electronic Warfare (220, Signals); Command Networks (260, Staff College + Signals); Quantum Computing (320, EW + Networks) | Vision and the Research lab; a fourth card in hand; attack and home defense; +1 Command Point a turn; +25% research |
 
 ## Nations
 

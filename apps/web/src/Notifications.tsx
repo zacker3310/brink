@@ -147,6 +147,12 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
           out.push({ id, icon: 'gear', tone: 'good', title: `${FACILITIES[e.facility].name} built`, text: `${site?.name ?? e.site}: ${FACILITIES[e.facility].summary}`, at: site?.key });
         }
         break;
+      case 'city_grew':
+        if (e.nation === me) {
+          const site = view.sites[e.site];
+          out.push({ id, icon: 'gear', tone: 'good', title: `${site?.name ?? e.site} grew`, text: `Now level ${e.level}: more income, industry and research.`, at: site?.key });
+        }
+        break;
       case 'construction_cancelled':
         if (e.nation === me) out.push({ id, icon: 'gear', tone: 'bad', title: 'Construction lost', text: `${FACILITIES[e.facility].name} at ${view.sites[e.site]?.name}: ${e.reason}.` });
         break;

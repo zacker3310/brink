@@ -1,6 +1,7 @@
 import type { FormationId, GameEvent, Ledger, NationId, NationOrders, Resource, Stockpile, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { FACILITIES, RULES, TECHS, TREATIES, UNITS } from '@brink/game-data';
+import { FACILITIES, RESEARCH_BANK, RULES, TECHS, TREATIES, UNITS } from '@brink/game-data';
+import { levelYields } from './progression';
 import { clamp, fortressFloor, nationModifiers, pct, sortedKeys, zeroStockpile } from './rules';
 
 export interface Settlement {
@@ -21,9 +22,10 @@ export function grossYields(world: WorldState, nation: NationId): { income: Stoc
   for (const id of sortedKeys(world.sites)) {
     const s = world.sites[id]!;
     if (s.owner !== nation) continue;
-    for (const r of RESOURCES) income[r] += s.yields[r];
-    industry += s.yields.industry;
-    research += s.yields.research;
+    const lv = levelYields(s);
+    for (const r of RESOURCES) income[r] += s.yields[r] + lv[r];
+    industry += s.yields.industry + lv.industry;
+    research += s.yields.research + lv.research;
     for (const fac of s.facilities) {
       const y = FACILITIES[fac].yields;
       for (const r of RESOURCES) income[r] += y[r] ?? 0;
@@ -111,7 +113,7 @@ export function settleEconomy(
     n.research.current = null;
     events.push({ kind: 'research', nation, tech: current });
   }
-  if (!n.research.current) n.research.progress = Math.min(n.research.progress, 300);
+  if (!n.research.current) n.research.progress = Math.min(n.research.progress, RESEARCH_BANK);
 
   n.industrialCapacity = shortages.includes('energy') ? Math.floor(gross.industry / 2) : gross.industry;
   n.population = population;

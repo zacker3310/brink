@@ -6,12 +6,15 @@
 // supply are 0..100. One turn is six simulated hours.
 
 import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
+import { PROGRESSION_FACILITIES, type FacilitySupport } from './cities';
 
 export * from './commanders';
 export * from './doctrine';
 export * from './blurbs';
+export * from './research';
+export * from './cities';
 
-export const RULESET_VERSION = '2.5.0';
+export const RULESET_VERSION = '2.6.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -315,6 +318,24 @@ export interface Modifiers {
   ranged?: number;
   /** Percent added to defense of armored formations. */
   armorDefense?: number;
+  /** Percent added to the attack of armored (armor, mechanized) formations. */
+  armorAttack?: number;
+  /** Percent added to ships' assaults and strikes. */
+  navalAttack?: number;
+  /** Percent added to ships' defense. */
+  navalDefense?: number;
+  /** Movement points added to armored formations on land. */
+  armorMove?: number;
+  /** Movement points added to ships. */
+  navalMove?: number;
+  /** Doctrine cards held beyond the base hand. */
+  handSize?: number;
+  /** Command Points gained a turn beyond the base. */
+  commandPoints?: number;
+  /** Percent removed from facility costs. */
+  buildDiscount?: number;
+  /** Percent added to city development. */
+  growth?: number;
 }
 
 export interface GovernmentDef {
@@ -364,62 +385,6 @@ export const GOVERNMENTS: Record<GovernmentId, GovernmentDef> = {
   },
 };
 
-export interface TechDef {
-  name: string;
-  summary: string;
-  cost: number;
-  requires: TechId[];
-  modifiers: Modifiers;
-}
-
-export const TECHS: Record<TechId, TechDef> = {
-  logistics_doctrine: {
-    name: 'Logistics Doctrine',
-    summary: '+25% supply capacity, +2 supply range.',
-    cost: 120,
-    requires: [],
-    modifiers: { supplyCapacity: 25, supplyRange: 2 },
-  },
-  signals_intelligence: {
-    name: 'Signals Intelligence',
-    summary: '+1 vision for every formation.',
-    cost: 140,
-    requires: [],
-    modifiers: { vision: 1 },
-  },
-  industrial_automation: {
-    name: 'Industrial Automation',
-    summary: '+20% industrial capacity.',
-    cost: 160,
-    requires: [],
-    modifiers: { industry: 20 },
-  },
-  combined_arms: {
-    name: 'Combined Arms Doctrine',
-    summary: '+5% per extra unit class in an assault.',
-    cost: 180,
-    requires: ['logistics_doctrine'],
-    modifiers: { combinedArms: 5 },
-  },
-  precision_munitions: {
-    name: 'Precision Munitions',
-    summary: '+20% artillery, helicopter and drone strikes.',
-    cost: 200,
-    requires: ['signals_intelligence'],
-    modifiers: { ranged: 20 },
-  },
-  composite_armor: {
-    name: 'Composite Armor',
-    summary: '+20% defense for armor and mechanized infantry.',
-    cost: 200,
-    requires: ['industrial_automation'],
-    modifiers: { armorDefense: 20 },
-  },
-};
-
-/** Sorted, so iteration never depends on object insertion order. */
-export const TECH_IDS: readonly TechId[] = Object.keys(TECHS).sort();
-
 // ---------------------------------------------------------------------------
 // Facilities: what a nation can build at its sites. One of each per site, up to the site's slots.
 
@@ -435,6 +400,14 @@ export interface FacilityDef {
   upkeep: Stockpile;
   /** Research that must be finished before it can be built. */
   requires: TechId | null;
+  /** Only at a port. */
+  port?: true;
+  /** Added to the owner's supply capacity. */
+  supply?: number;
+  /** Percent added to the defense of the owner's formations in the site's hex. */
+  defense?: number;
+  /** Off-map support over the owner's hand-fought battles nearby. */
+  support?: FacilitySupport;
 }
 
 export const FACILITIES: Record<FacilityId, FacilityDef> = {
@@ -492,6 +465,7 @@ export const FACILITIES: Record<FacilityId, FacilityDef> = {
     upkeep: stock(2, 0, 2, 0),
     requires: 'logistics_doctrine',
   },
+  ...PROGRESSION_FACILITIES,
 };
 
 /** Sorted, so iteration never depends on object insertion order. */

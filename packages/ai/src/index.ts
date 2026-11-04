@@ -1,10 +1,8 @@
 import type {
   AiMemory,
-  BuildOrder,
   CommanderOrders,
   Budget,
   Contact,
-  FacilityId,
   Formation,
   FormationId,
   FormationOrder,
@@ -17,16 +15,16 @@ import type {
   SiteId,
   SiteView,
   Stockpile,
-  TechId,
   UnitClass,
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { AIR_REBASE_RANGE, EVENTS, FACILITIES, FACILITY_SLOTS, PERKS, STACK_LIMIT, TECHS, UNITS, type CommanderEffect, type EventEffect } from '@brink/game-data';
+import { AIR_REBASE_RANGE, EVENTS, FACILITIES, PERKS, STACK_LIMIT, UNITS, type CommanderEffect, type EventEffect } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
 import { enterCost, isNaval, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
 
 import { planCards } from './doctrine';
 import { landmasses } from './land';
+import { chooseResearch, planCityBuilds } from './research';
 
 export { planCards } from './doctrine';
 export { proposeOperations, operationById, type Operation, type OperationPhase } from './operations';
@@ -197,26 +195,6 @@ function nearestOwnSite(view: NationView, key: HexKey, kinds: readonly SiteView[
   return best;
 }
 
-const RESEARCH_PREFERENCE: TechId[] = [
-  'logistics_doctrine',
-  'industrial_automation',
-  'combined_arms',
-  'signals_intelligence',
-  'composite_armor',
-  'precision_munitions',
-];
-
-function chooseResearch(view: NationView): TechId | null | undefined {
-  const r = view.self.research;
-  if (r.current) return undefined;
-  for (const t of RESEARCH_PREFERENCE) {
-    const def = TECHS[t];
-    if (!def || r.unlocked.includes(t)) continue;
-    if (def.requires.every((p) => r.unlocked.includes(p))) return t;
-  }
-  return undefined;
-}
-
 /** What to build next, from the force mix and what the enemy fields. */
 function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[], overseas = false): UnitClass {
   const have = new Map<UnitClass, number>();
@@ -313,48 +291,6 @@ function planTreaties(view: NationView, plan: Plan, war: NationOrders['diplomacy
   }
   return out;
 }
-
-/** Which facility fixes the scarcest resource; then growth (factory, lab); a fortress where it is pressed. */
-function wantedFacility(view: NationView, memory: AiMemory, site: SiteView): FacilityId | null {
-  const s = view.self.stockpile;
-  const unlocked = view.self.research.unlocked;
-  const building = view.self.construction.filter((c) => c.siteId === site.id).map((c) => c.facility);
-  const can = (f: FacilityId) => !site.facilities.includes(f) && !building.includes(f) && (!FACILITIES[f].requires || unlocked.includes(FACILITIES[f].requires!));
-  const pressed = view.turn - (memory.pressure[site.id] ?? -99) <= 2;
-  const wants: FacilityId[] = [];
-  if (pressed && site.kind === 'capital') wants.push('fortress');
-  const scarce = (['food', 'materials', 'energy'] as const).filter((r) => s[r] < 120).sort((a, b) => s[a] - s[b]);
-  const fix: Record<string, FacilityId> = { food: 'farm', materials: 'mine', energy: 'power_plant' };
-  for (const r of scarce) wants.push(fix[r]!);
-  wants.push('factory', 'research_lab', 'mine', 'power_plant', 'farm');
-  return wants.find(can) ?? null;
-}
-
-/** One building at a time, keeping a reserve for upkeep and the next recruit. */
-function planBuilds(view: NationView, memory: AiMemory): BuildOrder[] {
-  if (view.self.construction.length > 0) return [];
-  // Paced: two to start, one more every four turns. A war is won by armies; buildings pay off slowly.
-  const standing = sortedKeys(view.sites).reduce((a, id) => a + (view.sites[id]!.owner === view.self.id ? view.sites[id]!.facilities.length : 0), 0);
-  if (standing >= 2 + Math.floor(view.turn / 4)) return [];
-  const left = { ...view.self.stockpile };
-  const reserve = { credits: 60, energy: 25, materials: 30, food: 25 };
-  const sites = sortedKeys(view.sites)
-    .map((id) => view.sites[id]!)
-    .filter((s) => s.owner === view.self.id)
-    .sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind] || (a.id < b.id ? -1 : 1));
-  for (const site of sites) {
-    const building = view.self.construction.filter((c) => c.siteId === site.id).length;
-    if (site.facilities.length + building >= FACILITY_SLOTS[site.kind]) continue;
-    const f = wantedFacility(view, memory, site);
-    if (!f) continue;
-    const cost = FACILITIES[f].cost;
-    if (RESOURCES.some((r) => left[r] - cost[r] < reserve[r])) return [];
-    return [{ siteId: site.id, facility: f }];
-  }
-  return [];
-}
-
-const KIND_RANK: Record<SiteView['kind'], number> = { capital: 0, city: 1, depot: 2, objective: 3 };
 
 function planBudget(view: NationView): Budget | undefined {
   const b = view.self.budget;
@@ -751,7 +687,7 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   const war = planDiplomacy(view, plan, memory, opts.spare ?? []).filter((d) => d.action !== 'declare_war' || !treatyIn(view.treaties, 'nonaggression', self, d.target, view.turn));
   const diplomacy = [...war, ...planTreaties(view, plan, war, opts.spare ?? [])].filter((d, i, all) => all.findIndex((x) => x.target === d.target) === i);
   // Build first (one project at a time), then recruit from what is left.
-  const build = planBuilds(view, memory);
+  const build = planCityBuilds(view, memory);
   const recruit = planRecruitment(view, memory, own, build.length ? FACILITIES[build[0]!.facility].cost : undefined, { overseas: sea.overseas });
 
   const research = chooseResearch(view);

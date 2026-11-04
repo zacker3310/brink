@@ -10,6 +10,7 @@ import {
   type AssaultOutcome,
 } from './combat';
 import { leaderEffects } from './commanders';
+import { siteDefense } from './progression';
 import { nationModifiers } from './rules';
 
 export type Confidence = 'confirmed' | 'estimated' | 'blind';
@@ -93,6 +94,7 @@ export function previewAssault(view: NationView, attackerIds: readonly Formation
     defenderMods: (owner) => enemyMods(view, owner),
     defending: () => false,
     leader: (fid) => leaders[fid],
+    fortified: siteDefense(tile?.siteId ? view.sites[tile.siteId] : undefined),
   };
   if (believed.low.length === 0) {
     return { confidence: 'blind', defenders: 0, share: [1000, 1000], attackerLoss: [0, 0], defenderLoss: [0, 0], outcomes: ['attacker_victory'] };
