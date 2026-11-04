@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { OperationsSheet, OperationStrip } from './Operations';
 import type { Resource } from '@brink/contracts';
 import { GOVERNMENTS, UNITS } from '@brink/game-data';
 import { useCamera } from './camera';
@@ -433,6 +434,10 @@ export function Game() {
           <CityPanel />
           <Toasts />
           {help && <KeyHelp onClose={() => setHelp(false)} />}
+          <div className="pointer-events-none absolute top-3 left-1/2 z-20 flex max-w-[min(36rem,90%)] -translate-x-1/2">
+            <OperationStrip className="max-w-full" />
+          </div>
+          <OperationsSheet />
           <VictoryOverlay />
         </div>
       </div>

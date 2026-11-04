@@ -1,4 +1,4 @@
-import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationView, SaveFile, TurnReport, WorldState } from '@brink/contracts';
+import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationView, SaveFile, SiteId, TurnReport, WorldState } from '@brink/contracts';
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { emptyMemory, planOrders, updateMemory } from '@brink/ai';
 import { RULESET_VERSION } from '@brink/game-data';
@@ -137,8 +137,8 @@ export class GameSession {
   }
 
   /** What the AI would order for a human seat this turn: the phone's Auto button drafts from it. */
-  suggest(nation: NationId): NationOrders {
-    return planOrders(buildView(this.world, nation), emptyMemory(), this.world.seed);
+  suggest(nation: NationId, target?: SiteId): NationOrders {
+    return planOrders(buildView(this.world, nation), emptyMemory(), this.world.seed, target ? { target } : {});
   }
 
   aiOrders(): NationOrders[] {

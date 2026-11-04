@@ -30,7 +30,8 @@ import { recordStars, recordWarWon } from './arena/career';
 import { warRequest, warSaveFor } from './arena/resume';
 import type { Mode } from './planning';
 import type { Response } from './protocol';
-import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type MapStyle, type SlotInfo } from './saves';
+import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type ActiveOperation, type MapStyle, type SlotInfo } from './saves';
+import { operationById, type Operation } from '@brink/ai';
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy';
 
@@ -109,6 +110,14 @@ interface State {
   planned: FormationId[];
   /** Take back every order the staff drafted that the player has not touched. */
   clearPlan(): void;
+  /** The operation the staff is running: every turn it drafts orders toward its prize. */
+  operation: ActiveOperation | null;
+  /** Launch an operation: the staff's plan is redrawn around it now and every turn after. */
+  launchOperation(op: Operation): void;
+  cancelOperation(): void;
+  /** The Operations sheet is open. */
+  opsOpen: boolean;
+  setOpsOpen(open: boolean): void;
   /** Load a save. Seats other players held in an old multiplayer save go to the AI. */
   loadGame(text: string): Promise<boolean>;
   toMenu(): void;
@@ -193,6 +202,16 @@ function prefersReducedMotion(): boolean {
   }
 }
 
+const opKey = (view: NationView) => `${view.scenarioId}|${view.self.id}`;
+
+function readOperation(view: NationView): ActiveOperation | null {
+  return readPrefs().operations?.[opKey(view)] ?? null;
+}
+
+function writeOperation(view: NationView, op: ActiveOperation | null): void {
+  writePrefs({ operations: { ...(readPrefs().operations ?? {}), [opKey(view)]: op } });
+}
+
 function freshDraft(view: NationView): NationOrders {
   return { nation: view.self.id, turn: view.turn, formations: {}, recruit: [], diplomacy: [] };
 }
@@ -205,8 +224,16 @@ export const useGame = create<State>((set, get) => {
     }
     if (r.type === 'state') {
       set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), planned: [], submitted: null, rejected: [], screen: 'game' });
-      // Staff plan mode: every turn opens with the staff's plan drafted; the player changes what they like.
-      if (get().staffPlan && !r.view.victory) void get().autoCommand(true);
+      // The operation for this seat, and whether it is over: the prize taken, or out of reach.
+      const op = readOperation(r.view);
+      if (op && !operationById(r.view, op.id, op.kind)) {
+        const site = r.view.sites[op.id.slice(5)];
+        get().notify(site?.owner === r.view.self.id ? `${op.codename} complete: ${site.name} is yours` : `${op.codename} called off: ${op.name.replace('Take ', '')} is out of reach`);
+        writeOperation(r.view, null);
+        set({ operation: null });
+      } else set({ operation: op });
+      // Staff plan mode (or a running operation): every turn opens with the staff's plan drafted; the player changes what they like.
+      if ((get().staffPlan || get().operation) && !r.view.victory) void get().autoCommand(true);
       // A war won opens the next theatre.
       if (wonCampaign(r.view)) recordWarWon(r.view.scenarioId);
       // A battle the page was closed in on this turn waits for the same attack (arena/resume.ts).
@@ -371,6 +398,42 @@ export const useGame = create<State>((set, get) => {
       set({ staffPlan: on });
       if (on) void get().autoCommand(true);
     },
+    operation: null,
+    launchOperation(op) {
+      const view = get().view;
+      if (!view) return;
+      const active: ActiveOperation = { id: op.id, kind: op.kind, codename: op.codename, name: op.name };
+      writeOperation(view, active);
+      // The staff's old plan gives way to the operation's; the player's own orders stay.
+      const { planned } = get();
+      editDraft((d) => {
+        for (const id of planned) delete d.formations[id];
+        // A missing transport is put on order where it can be built, when nothing is building there.
+        if (op.needs && !d.recruit.some((x) => x.siteId === op.needs!.siteId) && !view.self.productionQueue.some((q) => q.siteId === op.needs!.siteId)) {
+          d.recruit.push({ siteId: op.needs.siteId, unitClass: op.needs.unitClass });
+        }
+        return d;
+      });
+      set({ operation: active, planned: [], opsOpen: false });
+      get().notify(`${op.codename} launched: ${op.name}. The staff has drafted this turn's orders; check them, then end the turn.`);
+      void get().autoCommand(true);
+    },
+    cancelOperation() {
+      const { view, operation, planned } = get();
+      if (!view || !operation) return;
+      writeOperation(view, null);
+      editDraft((d) => {
+        for (const id of planned) delete d.formations[id];
+        return d;
+      });
+      set({ operation: null, planned: [] });
+      get().notify(`${operation.codename} called off`);
+      if (get().staffPlan) void get().autoCommand(true);
+    },
+    opsOpen: false,
+    setOpsOpen(open) {
+      set({ opsOpen: open });
+    },
     planned: [],
     clearPlan() {
       const { planned } = get();
@@ -385,7 +448,8 @@ export const useGame = create<State>((set, get) => {
     async autoCommand(auto = false) {
       const { view, draft, resolving } = get();
       if (!view || !draft || resolving) return;
-      const r = await engine.call({ type: 'suggest', nation: view.self.id });
+      const op = get().operation;
+      const r = await engine.call({ type: 'suggest', nation: view.self.id, ...(op ? { target: op.id.slice(5) } : {}) });
       if (r.type !== 'suggested') return;
       const cur = get().draft;
       if (!cur) return;

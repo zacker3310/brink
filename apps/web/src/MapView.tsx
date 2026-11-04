@@ -1098,7 +1098,7 @@ export function MapView() {
       badges.push(tagBadge(center(b.target), b.won ? 'WON' : 'REPULSED', b.won ? 0x4fd18b : 0xff5a4e));
     }
     // The suggested next objective: a ring in command amber.
-    const goal = replaying ? null : nextObjective(v);
+    const goal = replaying ? null : nextObjective(v, useGame.getState().operation);
     if (goal) {
       const c = center(goal.site.key);
       hl.circle(c.x, c.y, SIZE * 0.95).stroke({ width: 3, color: SIGNAL, alpha: 0.95 });

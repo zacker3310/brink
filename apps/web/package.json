@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@brink/ai": "workspace:*",
     "@brink/arena": "workspace:*",
     "@brink/contracts": "workspace:*",
     "@brink/game-data": "workspace:*",

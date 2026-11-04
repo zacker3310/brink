@@ -29,7 +29,7 @@ function handle(req: Request): Response {
   if (!session) return { type: 'error', message: 'no game in progress' };
   switch (req.type) {
     case 'suggest':
-      return { type: 'suggested', orders: session.suggest(req.nation) };
+      return { type: 'suggested', orders: session.suggest(req.nation, req.target) };
     case 'check':
       return { type: 'checked', rejected: session.check(req.orders) };
     case 'previewAssault':

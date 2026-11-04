@@ -13,6 +13,7 @@ import type {
   NationOrders,
   NationView,
   RecruitOrder,
+  SiteId,
   SiteView,
   Stockpile,
   TechId,
@@ -22,6 +23,10 @@ import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, EVENTS, FACILITIES, FACILITY_SLOTS, STACK_LIMIT, TECHS, UNITS, type EventEffect } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
 import { enterCost, isNaval, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
+
+import { landmasses } from './land';
+
+export { proposeOperations, operationById, type Operation, type OperationPhase } from './operations';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
 // order it writes goes through the same validator as a human's. Two layers:
@@ -106,6 +111,14 @@ function chooseTarget(view: NationView, memory: AiMemory, contacts: Contact[], o
     }
   }
   return best;
+}
+
+/** The player's chosen objective (an operation), when it is still a prize: not ours, not a friend's, and known. */
+function forcedTarget(view: NationView, id: SiteId | undefined): SiteView | null {
+  const s = id ? view.sites[id] : undefined;
+  if (!s || s.owner === view.self.id) return null;
+  if (s.owner !== null && !isHostile(view, s.owner)) return null;
+  return s;
 }
 
 /** A path for `f` toward `goal` over terrain this nation has seen, cut to this turn's allowance. */
@@ -457,16 +470,17 @@ function planMinor(view: NationView): NationOrders {
  * legal against the authoritative world by construction: every path runs over terrain the
  * nation has seen, within the formation's allowance.
  */
-export function planOrders(view: NationView, memory: AiMemory, seed: number, opts: { spare?: readonly NationId[] } = {}): NationOrders {
+export function planOrders(view: NationView, memory: AiMemory, seed: number, opts: { spare?: readonly NationId[]; target?: SiteId } = {}): NationOrders {
   if (view.self.minor) return planMinor(view);
   const self = view.self.id;
   const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
   const contacts = recentContacts(view);
+  const forced = forcedTarget(view, opts.target);
   const plan: Plan = {
     enemies: new Set(Object.keys(view.relations).filter((n) => isHostile(view, n) && !view.nations[n]!.eliminated)),
     contacts,
     threats: threatsTo(view, contacts),
-    target: chooseTarget(view, memory, contacts, own),
+    target: forced ?? chooseTarget(view, memory, contacts, own),
     ends: new Map(),
     seaEnds: new Map(),
   };
@@ -502,6 +516,9 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   const threatened = [...plan.threats.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
   for (const [siteId, threat] of threatened) {
     const site = view.sites[siteId]!;
+    // With an operation running, the threat next to its prize is the prize's own garrison: the
+    // answer is the assault, not a garrison sat in the city next door.
+    if (forced && keyDistance(site.key, forced.key) <= 3) continue;
     let assigned = own.filter((f) => committed.has(f.id) && f.key === site.key).reduce((a, f) => a + f.strength, 0);
     const pool = own
       .filter((f) => !committed.has(f.id) && UNITS[f.unitClass].ground && !f.aboard && f.unitClass !== 'recon')
@@ -609,7 +626,8 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   // A war fought on foot leaves the navy idle at home: it takes its own target across the sea, the
   // best enemy site on another landmass, with the troops already aboard (the army stays on its march).
   const land = landmasses(view);
-  const raid = seaTarget(view, memory, contacts, own, land, goal);
+  // An operation the player launched owns the navy too: no raid of its own elsewhere.
+  const raid = forced ? null : seaTarget(view, memory, contacts, own, land, goal);
   const sea = planSea(view, plan, own, orders, committed, raid?.key ?? goal, hostileHexes, !!raid);
   // Enemy cities in the army's way are stormed by everyone at their gates, when there are at least
   // STORM_TOGETHER of them (the objective first). A garrison dug in among the buildings is out of
@@ -743,28 +761,6 @@ function seaTarget(view: NationView, memory: AiMemory, contacts: Contact[], own:
     }
   }
   return best;
-}
-
-/** Land connectivity: which landmass each known hex belongs to (ground units walk within one). */
-function landmasses(view: NationView): Map<HexKey, number> {
-  const out = new Map<HexKey, number>();
-  let id = 0;
-  for (const start of sortedKeys(view.tiles)) {
-    if (out.has(start) || enterCost(view.tiles[start], 'infantry') === null) continue;
-    const queue = [start];
-    out.set(start, id);
-    while (queue.length) {
-      const k = queue.pop()!;
-      for (const n of neighborKeys(k)) {
-        if (!out.has(n) && enterCost(view.tiles[n], 'infantry') !== null) {
-          out.set(n, id);
-          queue.push(n);
-        }
-      }
-    }
-    id++;
-  }
-  return out;
 }
 
 /**

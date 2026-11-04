@@ -1,4 +1,4 @@
-import type { Difficulty, GameEvent, NationId, NationOrders, NationView, TurnReport } from '@brink/contracts';
+import type { Difficulty, GameEvent, NationId, NationOrders, NationView, SiteId, TurnReport } from '@brink/contracts';
 import type { AssaultPreview, StrikePreview } from '@brink/simulation';
 
 // Messages between the UI and the engine worker. The worker holds the authoritative world;
@@ -15,7 +15,8 @@ export type Request =
   /** `others` are further human seats; every other nation is AI. `theatre` picks the map, `crisis` the opening. */
   | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number; difficulty?: Difficulty; theatre?: string; crisis?: string }
   /** What the AI would order for this seat now (the Auto button). */
-  | { type: 'suggest'; nation: NationId }
+  /** `target`: the site of the operation the player launched; the staff plans toward it. */
+  | { type: 'suggest'; nation: NationId; target?: SiteId }
   | { type: 'stateFor'; nation: NationId }
   /** Resolve the turn with every human seat's orders; returns each human seat's new state. */
   | { type: 'resolve'; orders: NationOrders[] }

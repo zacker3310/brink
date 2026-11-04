@@ -71,6 +71,16 @@ export interface Prefs {
   staffPlan?: boolean;
   /** Painted fantasy map (default), clean board-game map, or satellite imagery. */
   mapStyle?: MapStyle;
+  /** The operation each campaign seat has launched, by `scenarioId|nation` (`store.operation`). */
+  operations?: Record<string, ActiveOperation | null>;
+}
+
+/** An operation the player launched: the staff plans toward its prize every turn until it falls. */
+export interface ActiveOperation {
+  id: string;
+  kind: 'overland' | 'amphibious';
+  codename: string;
+  name: string;
 }
 
 export function readPrefs(): Prefs {

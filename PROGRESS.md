@@ -282,6 +282,24 @@ Updated 2026-10-30 (arena v2.3). Milestone 1 (first playable).
   - Not measured: anything on a real iPhone (GPU frame time, touch feel on glass, haptics, Safari
     memory pressure). The checklist is `docs/device-testing.md`.
 
+- Operations, the staff as a planner (after "I can't figure out how to just do it"):
+  - The staff proposes named operations from the player's own picture (`packages/ai/src/operations.ts`,
+    `proposeOperations`): Take X, overland or amphibious, with phases (get a lift, assemble, embark, sail,
+    soften up, land, assault; or march, soften up, assault), where each stands this turn, turns to the
+    assault, odds from the engine's own preview, the force it uses, and what stands in the way (no
+    transports, too few berths, an enemy fleet off the beach, no warships for fire support).
+  - Launch makes the prize the staff's objective: `planOrders(view, memory, seed, { target })`, the
+    same planner the rivals use, so it marches to the port, boards, sails, lands and storms, and every
+    order is one the validator accepts. A missing amphibious group goes on order at the nearest port.
+    Every turn opens with the operation's orders drafted (Staff plan off or on); the player changes any.
+    The goal ring and chip follow the operation; it ends itself when the prize falls or is out of reach.
+  - Fixed in the planner (operations only): a landing that took the ground round its prize sat every
+    unit down to "defend" against the prize's own garrison. With an operation running, threats within
+    three hexes of the prize are answered by the assault. Seed 1: China takes Taipei on turn 4, the USA
+    Tokyo on turn 8 (never before), 0 rejected orders.
+  - UI: an Operations sheet (phone and desktop) and an operation strip over the map with the phase
+    track. Tests: `packages/ai/src/operations.test.ts`, `tests/e2e/operations*.spec.ts`.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real

@@ -13,6 +13,7 @@ import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
 import { advise } from './advisor';
+import { OperationsSheet, OperationStrip } from './Operations';
 import { boardOrders, describeOrder, fleetLoadOrders, hostilesAt, landOrders, loadOrders } from './planning';
 import { useReplay } from './replay';
 import { ICON, notesFor, TONE } from './Notifications';
@@ -36,6 +37,7 @@ const RES_NAME: Record<Resource, string> = { credits: 'funds', energy: 'energy',
 function Hud({ onMenu, onEconomy, onWorld }: { onMenu: () => void; onEconomy: () => void; onWorld: () => void }) {
   const view = useGame((s) => s.view)!;
   const report = useGame((s) => s.report);
+  const operation = useGame((s) => s.operation);
   const showThreat = useGame((s) => s.showThreat);
   const toggleThreat = useGame((s) => s.toggleThreat);
   const selectStack = useGame((s) => s.selectStack);
@@ -49,7 +51,7 @@ function Hud({ onMenu, onEconomy, onWorld }: { onMenu: () => void; onEconomy: ()
   const rival = ranked.find((n) => n.id !== s.id)!;
   const mine = view.nations[s.id]?.victoryPoints ?? 0;
   const short = ledger?.shortages ?? [];
-  const goal = nextObjective(view);
+  const goal = nextObjective(view, operation);
   const pct = (n: number) => `${Math.min(100, (n / view.victoryThreshold) * 100)}%`;
   return (
     <header className="safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-ink-950 via-ink-950/90 to-transparent pb-4" data-testid="top-bar">
@@ -356,6 +358,7 @@ function Chip({ cls, color, strength, done, size = 'h-9 w-9' }: { cls: Formation
 
 function UnitCard() {
   const view = useGame((s) => s.view)!;
+  const operation = useGame((s) => s.operation);
   const draft = useGame((s) => s.draft)!;
   const fid = useGame((s) => s.selectedFormation)!;
   const group = useGame((s) => s.group);
@@ -379,7 +382,7 @@ function UnitCard() {
   const naval = (x: Formation) => !!UNITS[x.unitClass].naval;
   const ship = members.length === 1 && UNITS[f.unitClass].carries ? f : null;
   const cargo = ship ? Object.values(view.formations).filter((p) => p.aboard === ship.id) : [];
-  const goal = nextObjective(view);
+  const goal = nextObjective(view, operation);
   // The staff's orders give way to loading; the player's own do not.
   const mine = Object.fromEntries(Object.entries(draft.formations).filter(([id]) => !planned.includes(id)));
   const loading = ship ? loadOrders(view, ship, mine) : {};
@@ -568,7 +571,10 @@ function Advisor({ selected }: { selected: string | null }) {
   const focusOn = useGame((s) => s.focusOn);
   const planned = useGame((s) => s.planned).length;
   if (view.victory) return null;
-  const a = advise(view, draft.formations, planned);
+  const operation = useGame((s) => s.operation);
+  const a = advise(view, draft.formations, planned, operation);
+  // The operation strip already says the plan is up: speak only about a unit to act on.
+  if (operation && !a.focus) return null;
   // With a unit open, speak only when the advice is about something else that matters more
   // (troops at sea, a ship to load): the card already says what to do with the unit in hand.
   if (selected && (!a.focus || a.focus === selected || group.includes(a.focus) || a.cta === 'Show me' && !/aboard/.test(a.text))) return null;
@@ -821,7 +827,8 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
 /** The whole game in three steps, at the start of a campaign and from the menu. */
 function HowToWin({ onClose }: { onClose: () => void }) {
   const view = useGame((s) => s.view)!;
-  const goal = nextObjective(view);
+  const operation = useGame((s) => s.operation);
+  const goal = nextObjective(view, operation);
   const crisis = crisisOf(view.crisis);
   const steps: [string, string][] = [
     ['Take places', `Cities and capitals are worth victory points, the minor states' most of all. Reach ${view.victoryThreshold} and you win; allies can win together, and a power far ahead in land, army and output wins by supremacy. Otherwise the best standing after turn ${view.maxTurns} wins.${goal ? ` Start with ${goal.site.name}: the amber ring.` : ''}`],
@@ -933,6 +940,11 @@ export function PhoneGame() {
                 <EventCard />
               </div>
             )}
+            {!debrief && !city && !resolving && !fid && (
+              <div className="pointer-events-none mx-3 mb-2 flex">
+                <OperationStrip className="max-w-full" />
+              </div>
+            )}
             {!debrief && !city && !resolving && <Advisor selected={fid} />}
             {debrief ? <Debrief onDone={() => setBriefed(reportTurn)} /> : fid ? <UnitCard /> : !city && selectedHex && <HexCard />}
             <Dock onCommand={() => setCommand(true)} cooling={cooling} />
@@ -941,6 +953,7 @@ export function PhoneGame() {
       </div>
       <CityPanel />
       {command && <CommandSheet onClose={() => setCommand(false)} />}
+      <OperationsSheet />
       {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
       {howTo && <HowToWin onClose={() => setHowTo(false)} />}
       <VictoryOverlay />

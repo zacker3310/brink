@@ -13,9 +13,15 @@ export interface Objective {
   distance: number;
 }
 
-export function nextObjective(view: NationView): Objective | null {
+export function nextObjective(view: NationView, operation?: { id: string } | null): Objective | null {
   const ground = Object.values(view.formations).filter((f) => UNITS[f.unitClass].ground);
   if (ground.length === 0) return null;
+  // A running operation is the answer: its prize, while it is still one.
+  const prize = operation?.id.startsWith('take:') ? view.sites[operation.id.slice(5)] : undefined;
+  if (prize && prize.owner !== view.self.id && (!prize.owner || view.relations[prize.owner] === 'war')) {
+    const by = [...ground].sort((a, b) => keyDistance(a.key, prize.key) - keyDistance(b.key, prize.key) || (a.id < b.id ? -1 : 1))[0]!;
+    return { site: prize, by, distance: keyDistance(by.key, prize.key) };
+  }
   let best: (Objective & { score: number }) | null = null;
   for (const site of Object.values(view.sites).sort((a, b) => (a.id < b.id ? -1 : 1))) {
     if (site.kind === 'depot' || site.owner === view.self.id) continue;
