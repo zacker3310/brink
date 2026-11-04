@@ -143,7 +143,7 @@ function grassTexture(size: number, seed: number): THREE.DataTexture {
 
 // --- Tree shapes ---------------------------------------------------------------------------------
 
-type Shape = 'broadleaf' | 'conifer' | 'birch' | 'scrub' | 'acacia' | 'bare' | 'autumn';
+type Shape = 'broadleaf' | 'conifer' | 'birch' | 'scrub' | 'acacia' | 'bare' | 'autumn' | 'palm' | 'jungle';
 
 const lin = (hexs: string): V3 => {
   const c = new THREE.Color(hexs);
@@ -159,6 +159,8 @@ function crownColour(biome: Biome, shape: Shape): V3 {
   if (shape === 'acacia') return lin('#5f6a3c');
   if (shape === 'bare') return lin('#6a6058');
   if (shape === 'autumn') return lin('#857a40');
+  if (shape === 'palm') return lin('#5a7130');
+  if (shape === 'jungle') return lin('#34502a');
   return lin(biome === 'urban' ? '#4f5d30' : '#4d5c2d');
 }
 
@@ -291,6 +293,40 @@ function treeShape(shape: Shape, biome: Biome, seed: number, cards: number, lobe
     trunk(g, 0.42, 0.022, 0.015, bark, -0.3, 0, 0, 1.2);
     core(g, [0, 0.58, 0], 0.4, 0.09, 0.38, col, rnd, snow);
     spread([0, 0.6, 0], 0.32, cards, 0.32, LEAF_UV.card, 0.9);
+  } else if (shape === 'palm') {
+    // A tall trunk curving up and over, a ragged head of drooping fronds and a few coconuts.
+    const lean = 0.25 + rnd() * 0.3;
+    let base: V3 = [0, 0, 0];
+    const segs = 4;
+    for (let k = 0; k < segs; k++) {
+      const a = lean * ((k + 1) / segs) * 1.3;
+      const h = 0.26;
+      const tip: V3 = [base[0] - Math.sin(a) * h, base[1] + Math.cos(a) * h, base[2]];
+      const c = new THREE.CylinderGeometry(0.022 - k * 0.003, 0.026 - k * 0.003, h + 0.02, 5, 1, true);
+      c.translate(0, h / 2, 0);
+      c.rotateZ(a);
+      c.translate(base[0], base[1], base[2]);
+      g.color = bark;
+      g.add(c, LEAF_UV.bark);
+      c.dispose();
+      base = tip;
+    }
+    const top = base;
+    const fronds = Math.max(7, cards + 1);
+    for (let k = 0; k < fronds; k++) {
+      const a = (k / fronds) * Math.PI * 2 + rnd() * 0.4;
+      frond(g, top, a, 0.42 + rnd() * 0.14, 0.09, 0.2 + rnd() * 0.35, col, LEAF_UV.card);
+    }
+    core(g, [top[0], top[1] - 0.03, top[2]], 0.05, 0.04, 0.05, lin('#5a4a2a'), rnd, false);
+  } else if (shape === 'jungle') {
+    // Rainforest: a tall bare bole with buttress roots, a wide high crown in tiers, vines below.
+    trunk(g, 0.75, 0.05, 0.026, bark);
+    for (let k = 0; k < 3; k++) trunk(g, 0.12, 0.03, 0.008, bark, -0.9, 0, 0, (k / 3) * Math.PI * 2 + rnd());
+    const a = rnd() * Math.PI * 2;
+    core(g, [Math.cos(a) * 0.1, 0.92, Math.sin(a) * 0.1], 0.42, 0.2, 0.38, col, rnd, false);
+    if (lobes > 1) core(g, [-Math.cos(a) * 0.14, 0.78, -Math.sin(a) * 0.14], 0.3, 0.18, 0.3, scaleV(col, 1.1), rnd, false);
+    spread([0, 0.88, 0], 0.42, cards + 2, 0.4, LEAF_UV.card, 0.6);
+    core(g, [0, 0.42, 0], 0.16, 0.24, 0.16, scaleV(col, 0.8), rnd, false);
   } else if (shape === 'bare') {
     trunk(g, 0.6, 0.032, 0.016, bark);
     for (let k = 0; k < 4; k++) trunk(g, 0.32, 0.014, 0.006, bark, 0.65 + rnd() * 0.25, 0, 0, (k / 4) * Math.PI * 2 + rnd());
@@ -318,8 +354,41 @@ function treeShape(shape: Shape, biome: Biome, seed: number, cards: number, lobe
   return g.geometry();
 }
 
+/** A palm frond: a strip from the crown out and down, narrowing to its tip, folded along its rib. */
+function frond(g: Geo, top: V3, a: number, len: number, w: number, droop: number, col: V3, uv: UVRect): void {
+  const ca = Math.cos(a);
+  const sa = Math.sin(a);
+  const n = 4;
+  const [u0, v0, u1, v1] = uv;
+  const at = (t: number): V3 => [top[0] + ca * len * t, top[1] + 0.06 * t - droop * t * t, top[2] + sa * len * t];
+  for (let k = 0; k < n; k++) {
+    const t0 = k / n;
+    const t1 = (k + 1) / n;
+    const p0 = at(t0);
+    const p1 = at(t1);
+    const w0 = w * (1 - t0 * 0.7);
+    const w1 = w * (1 - t1 * 0.7);
+    // The two halves of the leaf either side of the rib, dipping a little at their edges.
+    for (const s of [1, -1]) {
+      const e0: V3 = [p0[0] - sa * w0 * s, p0[1] - w0 * 0.3, p0[2] + ca * w0 * s];
+      const e1: V3 = [p1[0] - sa * w1 * s, p1[1] - w1 * 0.3, p1[2] + ca * w1 * s];
+      const up: V3 = [0, 1, 0];
+      g.color = scaleV(col, 0.8 + (1 - t1) * 0.35);
+      const um = (u0 + u1) / 2;
+      const ue = s > 0 ? u1 : u0;
+      g.tri(p0, e0, e1, [um, v1 - (v1 - v0) * t0], [ue, v1 - (v1 - v0) * t0], [ue, v1 - (v1 - v0) * t1], [up, up, up]);
+      g.tri(p0, e1, p1, [um, v1 - (v1 - v0) * t0], [ue, v1 - (v1 - v0) * t1], [um, v1 - (v1 - v0) * t1], [up, up, up]);
+    }
+  }
+}
+
 /** Which shapes a TREES cell's kind becomes in each biome. */
-function shapeFor(biome: Biome, kind: (typeof TREE_KINDS)[number], r: number): Shape {
+function shapeFor(biome: Biome, kind: (typeof TREE_KINDS)[number], r: number, tropical = false): Shape {
+  if (tropical && (biome === 'temperate' || biome === 'urban')) {
+    if (kind === 'scrub') return r < 0.5 ? 'scrub' : 'palm';
+    if (kind === 'conifer' || kind === 'birch') return r < 0.6 ? 'palm' : 'jungle';
+    return r < 0.65 ? 'jungle' : r < 0.85 ? 'broadleaf' : 'palm';
+  }
   if (kind === 'scrub') return 'scrub';
   if (biome === 'desert') return r < 0.75 ? 'acacia' : 'scrub';
   if (biome === 'winter') return kind === 'conifer' || (kind === 'broadleaf' && r < 0.3) ? 'conifer' : 'bare';
@@ -341,6 +410,8 @@ interface TreeRef {
   s: number;
   /** Height over spread, so no two crowns of a kind look alike. */
   tall: number;
+  /** Spread on one axis over the other. */
+  wide: number;
   fallen: boolean;
 }
 
@@ -397,7 +468,7 @@ export class Forest {
   private readonly dim = new THREE.Color();
   readonly meshes: THREE.InstancedMesh[] = [];
 
-  constructor(map: BattleMap, layout: Layout, hf: Heightfield, roads: Polyline[], leaf: THREE.Texture, wind: WindUniforms, field: FieldUniform, seed: number, cast: boolean, cards: number, lobes: number, reach: number) {
+  constructor(map: BattleMap, layout: Layout, hf: Heightfield, roads: Polyline[], leaf: THREE.Texture, wind: WindUniforms, field: FieldUniform, seed: number, cast: boolean, cards: number, lobes: number, reach: number, variants = 1, tropical = false) {
     this.material = new THREE.MeshStandardMaterial({ map: leaf, alphaTest: 0.42, vertexColors: true, side: THREE.DoubleSide, roughness: 1, metalness: 0 });
     addWind(this.material, wind, 0.035, 0.35, 'brink-trees', field);
     const biome = map.biome;
@@ -419,7 +490,7 @@ export class Forest {
           // Spread within the cell, a little over its edges so woods read as one canopy.
           const a = (k / n) * Math.PI * 2 + rnd();
           const d = 0.08 + rnd() * 0.36;
-          const shape = shapeFor(biome, kind, rnd());
+          const shape = shapeFor(biome, kind, rnd(), tropical);
           const big = shape === 'scrub' ? 0.9 + rnd() * 0.5 : 0.88 + rnd() * 0.5;
           places.push({ cell: i, shape, x: x + 0.5 + Math.cos(a) * d, z: y + 0.5 + Math.sin(a) * d, s: big, yaw: rnd() * Math.PI * 2, tint: tint(rnd()) });
         }
@@ -448,28 +519,34 @@ export class Forest {
           if (nearRoad(jx, jz)) continue;
           const kinds: (typeof TREE_KINDS)[number][] = biome === 'winter' ? ['conifer', 'birch', 'broadleaf'] : biome === 'desert' ? ['broadleaf', 'scrub'] : ['broadleaf', 'broadleaf', 'conifer', 'birch'];
           const kind = kinds[Math.floor(hash(seed, Math.round(jx), Math.round(jz), 3) * kinds.length)]!;
-          const shape = shapeFor(biome, kind, rnd());
+          const shape = shapeFor(biome, kind, rnd(), tropical);
           places.push({ cell: -1, shape, x: jx, z: jz, s: 0.8 + rnd() * 0.5, yaw: rnd() * Math.PI * 2, tint: tint(rnd()) });
         }
     }
     const shapes = [...new Set(places.map((p) => p.shape))].sort();
-    for (const shape of shapes) {
-      const mine = places.filter((p) => p.shape === shape);
-      const geo = treeShape(shape, biome, seed ^ (shapes.indexOf(shape) * 7919), cards, lobes);
+    // Each shape grown `variants` ways (a different crown and lean from its own seed), and every tree a
+    // little wider one way than the other, so neighbours of a kind are never the same tree turned.
+    const forms: { shape: Shape; v: number }[] = [];
+    for (const shape of shapes) for (let v = 0; v < variants; v++) forms.push({ shape, v });
+    const formOf = (p: Place) => Math.floor(hash(seed, Math.round(p.x * 16), Math.round(p.z * 16), 11) * variants);
+    for (const { shape, v } of forms) {
+      const mine = places.filter((p) => p.shape === shape && formOf(p) === v);
+      if (!mine.length) continue;
+      const geo = treeShape(shape, biome, seed ^ (shapes.indexOf(shape) * 7919) ^ (v * 104729), cards, lobes);
       const mesh = new THREE.InstancedMesh(geo, this.material, mine.length);
       mesh.castShadow = cast;
       mesh.receiveShadow = true;
-      mesh.name = `trees-${shape}`;
+      mesh.name = `trees-${shape}${v ? `-${v}` : ''}`;
       mine.forEach((p, i) => {
         const h = hf.at(p.x, p.z) - 0.02;
-        const ref: TreeRef = { mesh, i, x: p.x, y: h, z: p.z, yaw: p.yaw, s: p.s, tall: 0.82 + hash(seed, i, shapes.indexOf(shape), 9) * 0.4, fallen: false };
+        const ref: TreeRef = { mesh, i, x: p.x, y: h, z: p.z, yaw: p.yaw, s: p.s, tall: 0.82 + hash(seed, i, shapes.indexOf(shape) + v * 31, 9) * 0.4, wide: 0.84 + hash(seed, i, shapes.indexOf(shape) + v * 31, 10) * 0.32, fallen: false };
         this.place(ref, 0, 0);
         mesh.setColorAt(i, p.tint);
         if (p.cell >= 0) {
           const list = this.byCell.get(p.cell) ?? [];
           list.push(ref);
           this.byCell.set(p.cell, list);
-          const crown = shape === 'scrub' ? 0.25 : shape === 'birch' ? 1.12 : 1.02;
+          const crown = shape === 'scrub' ? 0.25 : shape === 'birch' ? 1.12 : shape === 'palm' || shape === 'jungle' ? 1.12 : 1.02;
           this.tops.set(p.cell, Math.max(this.tops.get(p.cell) ?? 0, h + crown * p.s));
         }
       });
@@ -487,7 +564,7 @@ export class Forest {
       this.axis.set(Math.sin(dir), 0, -Math.cos(dir));
       this.q.setFromAxisAngle(this.axis, angle).multiply(this.qy);
     } else this.q.copy(this.qy);
-    this.m.compose(this.v.set(r.x, r.y - angle * 0.02, r.z), this.q, this.sc.set(r.s, r.s * r.tall, r.s));
+    this.m.compose(this.v.set(r.x, r.y - angle * 0.02, r.z), this.q, this.sc.set(r.s * r.wide, r.s * r.tall, r.s / Math.sqrt(r.wide)));
     r.mesh.setMatrixAt(r.i, this.m);
     r.mesh.instanceMatrix.needsUpdate = true;
   }

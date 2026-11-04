@@ -52,6 +52,15 @@ export interface World {
   readonly grade: GradeUniform;
 }
 
+/** How the field is dressed beyond what the battle map says. */
+export interface WorldOptions {
+  /**
+   * The Pacific look on temperate and urban ground: rice paddies behind bunds and red laterite earth,
+   * palms and rainforest for woods, pastel towns under tin roofs.
+   */
+  tropical?: boolean;
+}
+
 /** Tone mapping the world is graded for. */
 const TONE = THREE.AgXToneMapping;
 
@@ -61,7 +70,8 @@ const TONE = THREE.AgXToneMapping;
  * the renderer's tone mapping (AgX) and exposure for the hour; dispose() puts all of those back.
  * Shadows: the sun casts when the preset has a shadow map; the scene owns renderer.shadowMap.
  */
-export function buildWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, map: BattleMap, conditions: Conditions, quality: Quality, seed: number, lib?: { hesco?: GLTF; container?: GLTF; tower?: GLTF }): World {
+export function buildWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, map: BattleMap, conditions: Conditions, quality: Quality, seed: number, lib?: { hesco?: GLTF; container?: GLTF; tower?: GLTF }, opts: WorldOptions = {}): World {
+  const tropical = opts.tropical === true;
   const preset = QUALITY[quality] ?? QUALITY.balanced;
   const high = quality === 'high';
   const low = quality === 'low';
@@ -81,7 +91,7 @@ export function buildWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ma
   const bridges = findBridges(map, hf);
 
   // --- Ground ---------------------------------------------------------------------------------
-  const paint = paintGround(map, layout, hf, net.lines, seed, texSize, high ? 12 : low ? 6 : 8);
+  const paint = paintGround(map, layout, hf, net.lines, seed, texSize, high ? 12 : low ? 6 : 8, tropical);
   // Craters already on the map are painted before the first upload.
   const preCraters: [number, number][] = [];
   const drawnCraters = new Set<number>();
@@ -137,7 +147,7 @@ export function buildWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ma
 
   // --- Structures -----------------------------------------------------------------------------
   const atlas = paintAtlas(texSize, seed);
-  const structures = new Structures(map, hf, bridges, atlas, seed, shadows, !low);
+  const structures = new Structures(map, hf, bridges, atlas, seed, shadows, !low, tropical);
   structures.uniforms.uLit.value = look.windowsLit;
   structures.uniforms.uGlow.value = look.windowGlow;
   group.add(structures.group);
@@ -145,7 +155,7 @@ export function buildWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ma
   // --- Flora ----------------------------------------------------------------------------------
   const wind: WindUniforms = { uTime: { value: 0 }, uWind: { value: conditions.weather === 'rain' || conditions.weather === 'snow' ? 1.6 : conditions.weather === 'fog' ? 0.4 : 1 } };
   const leaf = leafTexture(high ? 512 : 256, seed);
-  const forest = new Forest(map, layout, hf, net.lines, leaf, wind, field, seed, high && shadows, low ? 6 : high ? 10 : 8, low ? 1 : 2, low ? 2.5 : high ? 5.5 : 4);
+  const forest = new Forest(map, layout, hf, net.lines, leaf, wind, field, seed, high && shadows, low ? 6 : high ? 10 : 8, low ? 1 : 2, low ? 2.5 : high ? 5.5 : 4, low ? 1 : high ? 3 : 2, tropical);
   group.add(forest.group);
   const clutter = new Clutter(map, layout, hf, paint, seed, preset.clutter, forest.material, wind, field, high ? 128 : 64, high);
   group.add(clutter.group);

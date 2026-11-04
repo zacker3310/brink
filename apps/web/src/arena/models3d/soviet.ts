@@ -97,6 +97,33 @@ export function cupola(p: Parts, L: Lod, m: THREE.Matrix4, r = 0.4): void {
   mg(p, L, m.clone().multiply(T(r * 0.55, 0.45, 0.2)), true);
 }
 
+/**
+ * Relikt in a horseshoe round a turret's front: angular boxes stepped round the arc from `from` to `to`
+ * degrees off the bore (0 is dead ahead), leaving the mantlet clear, each leaning back by `slope`.
+ * Seen from above it is a ring of bricks, where Kontakt-5 is two smooth wedges in a V.
+ */
+export function reliktArc(p: Parts, L: Lod, o: { y: number; rx: number; rz: number; z0: number; h: number; t: number; from: number; to: number; n: number; slope: number; gap: number }, style: Style = S.paint): void {
+  const n = L.hi ? o.n : Math.max(2, Math.ceil(o.n / 2));
+  for (const s of [1, -1])
+    for (let i = 0; i < n; i++) {
+      const a = (o.from + ((o.to - o.from) * (i + 0.5)) / n) * D;
+      const seg = ((o.to - o.from) * D * Math.max(o.rx, o.rz)) / n - o.gap;
+      const x = Math.sin(a) * o.rx * s;
+      const z = o.z0 + Math.cos(a) * o.rz;
+      const g = convex([
+        [-seg / 2, 0, o.t / 2],
+        [seg / 2, 0, o.t / 2],
+        [-seg / 2, 0, -o.t / 2],
+        [seg / 2, 0, -o.t / 2],
+        [-seg / 2, o.h, -o.t / 2],
+        [seg / 2, o.h, -o.t / 2],
+        [-seg / 2, o.h, o.t * 0.05],
+        [seg / 2, o.h, o.t * 0.05],
+      ]);
+      p.add(g, style, T(x, o.y, z, 0, a * s, 0).multiply(T(0, 0, 0, -o.slope, 0, 0)));
+    }
+}
+
 /** A roof or glacis covered in ERA tiles: `cols` x `rows` over w x d, on a plane tilted by `tilt`. */
 export function eraPlate(p: Parts, L: Lod, m: THREE.Matrix4, w: number, d: number, cols: number, rows: number, t = 0.09): void {
   // Tiles in the frame's xz plane, standing up along y.

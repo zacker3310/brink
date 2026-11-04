@@ -120,6 +120,30 @@ interface Palette {
   parcel: number;
 }
 
+/**
+ * The Pacific's green country (the tropical look of the temperate and urban biomes): flooded and young
+ * rice in small paddies behind raised bunds, cane and dense green, red laterite earth, dark jungle floor.
+ */
+const TROPICAL: Palette = {
+  crops: [
+    { base: '#4d6656', alt: '#62804a', mask: [1, 0, 0.55], bands: 0.3, tram: 0 },
+    { base: '#6f8f3a', alt: '#5f8034', mask: [1, 0.05, 0.2], bands: 0.24, tram: 0 },
+    { base: '#4f6a2c', alt: '#5a7631', mask: [1, 0.2, 0], bands: 0.12, tram: 0.15 },
+    { base: '#86563a', alt: '#774b32', mask: [0.1, 1, 0], bands: 0.22, tram: 0.1 },
+    { base: '#66793a', alt: '#5b6e34', mask: [1, 0.25, 0], bands: 0.04, tram: 0 },
+  ],
+  verge: '#7b8a4a',
+  crest: '#7c8a44',
+  hollow: '#3d5a2c',
+  bare: '#8d583a',
+  mud: '#5a3d2b',
+  bed: '#2a3631',
+  wood: '#24341b',
+  yard: '#7d6c5a',
+  rock: '#77706a',
+  parcel: 3.6,
+};
+
 const PALETTES: Record<Biome, Palette> = {
   temperate: {
     crops: [
@@ -239,9 +263,9 @@ export interface Polyline {
   asphalt: boolean;
 }
 
-export function paintGround(map: BattleMap, layout: Layout, hf: Heightfield, roads: Polyline[], seed: number, maxSize: number, midPx: number): Paint {
+export function paintGround(map: BattleMap, layout: Layout, hf: Heightfield, roads: Polyline[], seed: number, maxSize: number, midPx: number, tropical = false): Paint {
   const biome = map.biome;
-  const pal = PALETTES[biome] ?? PALETTES.temperate;
+  const pal = tropical && (biome === 'temperate' || biome === 'urban') ? TROPICAL : (PALETTES[biome] ?? PALETTES.temperate);
   const crops = pal.crops.map((c) => ({ ...c, b: hex(c.base), a: hex(c.alt) }));
   const ew = layout.ew;
   const eh = layout.eh;
@@ -470,27 +494,55 @@ export function paintGround(map: BattleMap, layout: Layout, hf: Heightfield, roa
     }
   }
 
-  // Vehicle tracks across the open country (not in towns).
+  // Vehicle tracks across the open country (not in towns): pairs of ruts a track's width apart, the
+  // pressed earth darker, the grousers printed across it, some running in from the attackers' side and
+  // some looping where a vehicle turned.
   if (biome !== 'urban') {
-    const trackColor = biome === 'winter' ? 'rgba(70,62,52,0.55)' : biome === 'desert' ? 'rgba(120,98,70,0.35)' : 'rgba(52,42,30,0.32)';
-    g.strokeStyle = trackColor;
-    g.lineWidth = px * 0.05;
-    for (let n = 0; n < 7; n++) {
+    const rutColor = biome === 'winter' ? 'rgba(78,70,60,0.5)' : biome === 'desert' ? 'rgba(118,96,68,0.32)' : 'rgba(50,40,28,0.3)';
+    const treadColor = biome === 'winter' ? 'rgba(60,52,44,0.55)' : biome === 'desert' ? 'rgba(96,76,52,0.35)' : 'rgba(34,27,19,0.32)';
+    const lip = biome === 'winter' ? 'rgba(235,238,240,0.35)' : biome === 'desert' ? 'rgba(196,174,136,0.22)' : 'rgba(120,108,80,0.16)';
+    const rut = (pts: [number, number, number, number, number, number], gauge: number) => {
+      for (const side of [-gauge, gauge]) {
+        const [x0, z0, qx0, qz0, x1, z1] = pts;
+        const path = () => {
+          g.beginPath();
+          const [ax, ay] = toPx(x0 + side, z0);
+          const [qx, qy] = toPx(qx0 + side, qz0);
+          const [ex, ey] = toPx(x1 + side, z1);
+          g.moveTo(ax, ay);
+          g.quadraticCurveTo(qx, qy, ex, ey);
+        };
+        // The thrown-up lip, the pressed band, then the grouser prints.
+        g.setLineDash([]);
+        g.strokeStyle = lip;
+        g.lineWidth = px * 0.1;
+        path();
+        g.stroke();
+        g.strokeStyle = rutColor;
+        g.lineWidth = px * 0.065;
+        path();
+        g.stroke();
+        g.strokeStyle = treadColor;
+        g.lineWidth = px * 0.05;
+        g.setLineDash([Math.max(1, px * 0.012), Math.max(1, px * 0.018)]);
+        path();
+        g.stroke();
+      }
+      g.setLineDash([]);
+    };
+    for (let n = 0; n < 9; n++) {
       const x0 = rnd() * map.w;
       const z0 = map.h + 1 + rnd() * 4;
       const len = 8 + rnd() * 18;
       const bend = (rnd() - 0.5) * 10;
-      const x1 = x0 + bend * 0.5;
-      const z1 = z0 - len;
-      for (const side of [-0.13, 0.13]) {
-        g.beginPath();
-        const [ax, ay] = toPx(x0 + side, z0);
-        const [qx, qy] = toPx(x0 + bend + side, z0 - len / 2);
-        const [ex, ey] = toPx(x1 + side, z1);
-        g.moveTo(ax, ay);
-        g.quadraticCurveTo(qx, qy, ex, ey);
-        g.stroke();
-      }
+      rut([x0, z0, x0 + bend, z0 - len / 2, x0 + bend * 0.5, z0 - len], 0.13);
+    }
+    for (let n = 0; n < 4; n++) {
+      // A turn in the open: in, round, and away.
+      const x0 = 2 + rnd() * (map.w - 4);
+      const z0 = 4 + rnd() * (map.h - 8);
+      const k = rnd() < 0.5 ? -1 : 1;
+      rut([x0, z0 + 4, x0 + k * 3.5, z0, x0 + k * 5 + (rnd() - 0.5) * 2, z0 + 3 + rnd() * 3], 0.13);
     }
   }
 

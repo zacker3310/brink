@@ -26,6 +26,9 @@ const TINTS: Record<Biome, string[]> = {
   urban: ['#d8d2c6', '#cfc6b4', '#e0dcd2', '#c8ccc8', '#d6cbb5', '#c9c3b9'],
 };
 
+/** Pacific towns: lime-washed and pastel walls, faded by sun and rain. */
+const TROPICAL_TINTS = ['#efe2b0', '#cfe3d8', '#ecc9b0', '#d6e6ec', '#f2e9cf', '#cddcbc', '#e9d3d9', '#f0d79a'];
+
 interface Section {
   kind: Kind;
   region: Region;
@@ -77,6 +80,8 @@ export class Structures {
     cast: boolean,
     /** Balconies and rooftop clutter (off on Low). */
     private readonly detail = true,
+    /** The Pacific look: pastel walls and rusting tin roofs on temperate and urban ground. */
+    private readonly tropical = false,
   ) {
     this.cast = cast;
     this.tops = new Float32Array(map.w * map.h);
@@ -166,12 +171,14 @@ export class Structures {
       else if (kind === 'industrial') region = biome === 'desert' ? REGION.shed : ([REGION.shed, REGION.factory] as const)[look % 2]!;
       else region = REGION.shop;
       let roof: Region;
+      const pacific = this.tropical && (biome === 'temperate' || biome === 'urban');
       if (biome === 'winter') roof = REGION.roofSnow;
+      else if (pacific && (kind === 'house' || kind === 'industrial')) roof = REGION.roofSheet;
       else if (kind === 'house' && biome !== 'desert') roof = biome === 'steppe' ? (h(1) < 0.75 ? REGION.roofSheet : REGION.roofTile) : h(1) < 0.45 ? REGION.roofTile : REGION.roofSheet;
       else if (kind === 'industrial') roof = REGION.roofSheet;
       else roof = REGION.roofFlat;
       const panel = region === REGION.panel || region === REGION.panelDamaged;
-      const tints = panel ? PANEL_TINTS : (TINTS[biome] ?? TINTS.temperate);
+      const tints = panel ? PANEL_TINTS : pacific ? TROPICAL_TINTS : (TINTS[biome] ?? TINTS.temperate);
       const tc = new THREE.Color(tints[Math.floor(h(2) * tints.length)]!);
       // Dust and years of weather.
       const wear = (panel ? 0.64 : 0.74) + h(3) * 0.16;
@@ -184,7 +191,15 @@ export class Structures {
         [0.74, 0.66, 0.58],
         [0.7, 0.72, 0.74],
       ];
-      const roofTint: V3 = roof === REGION.roofSheet ? sheets[Math.floor(h(4) * sheets.length)]! : roof === REGION.roofTile ? [0.8 + h(5) * 0.12, 0.78 + h(5) * 0.1, 0.76 + h(5) * 0.1] : [0.85, 0.85, 0.85];
+      // Tin in the tropics: bright where new, rust where not.
+      const tin: V3[] = [
+        [0.86, 0.5, 0.36],
+        [0.74, 0.46, 0.34],
+        [0.82, 0.84, 0.82],
+        [0.5, 0.68, 0.7],
+        [0.8, 0.42, 0.32],
+      ];
+      const roofTint: V3 = roof === REGION.roofSheet ? (pacific ? tin : sheets)[Math.floor(h(4) * (pacific ? tin : sheets).length)]! : roof === REGION.roofTile ? [0.8 + h(5) * 0.12, 0.78 + h(5) * 0.1, 0.76 + h(5) * 0.1] : [0.85, 0.85, 0.85];
       for (const c of comp) this.sections.set(c, { kind, region, roof, tint, roofTint, block });
     }
   }
@@ -249,14 +264,19 @@ export class Structures {
     g.setMatrix(m);
     g.color = s.tint;
     const r = s.region;
-    const wallFace = (ax: number, az: number, bx: number, bz: number, len: number) => {
+    // Each wall shows its own stretch of the facade, some mirrored, so no two houses (and no two sides of
+    // one) carry the same windows in the same places. The front keeps its door near the middle.
+    const wallFace = (ax: number, az: number, bx: number, bz: number, len: number, front: boolean) => {
       g.rand = rnd();
-      g.wall(ax, az, bx, bz, -PLINTH, T, facadeRect(r, 0.5 - len / 2, 0.5 + len / 2, -PLINTH, T));
+      const room = Math.max(0, 1 - len);
+      const at = front ? 0.5 - len / 2 + (rnd() - 0.5) * Math.min(room, 0.12) : rnd() * room;
+      const flip = rnd() < 0.5;
+      g.wall(ax, az, bx, bz, -PLINTH, T, facadeRect(r, flip ? at + len : at, flip ? at : at + len, -PLINTH, T));
     };
-    wallFace(-w / 2, -d / 2, w / 2, -d / 2, w);
-    wallFace(w / 2, -d / 2, w / 2, d / 2, d);
-    wallFace(w / 2, d / 2, -w / 2, d / 2, w);
-    wallFace(-w / 2, d / 2, -w / 2, -d / 2, d);
+    wallFace(-w / 2, -d / 2, w / 2, -d / 2, w, false);
+    wallFace(w / 2, -d / 2, w / 2, d / 2, d, false);
+    wallFace(w / 2, d / 2, -w / 2, d / 2, w, true);
+    wallFace(-w / 2, d / 2, -w / 2, -d / 2, d, false);
     let top = T;
     if (map.biome === 'desert') {
       // Flat roof, a parapet and a water tank.

@@ -10,7 +10,7 @@ import { sampleMap, shell } from './sample';
 // Dev preview of the battlefield (world.html, not part of the production build). Query:
 // biome, time, weather, quality, thermal=1, seed, view (village | river | overview | attack),
 // x, z, dist, az, el (degrees), shell=1 to knock the village down, zone (capture progress),
-// tone (agx | aces | neutral), loop=0 to draw only on request. Drag to orbit, wheel to zoom.
+// tone (agx | aces | neutral), loop=0 to draw only on request, tropical=1 for the Pacific look. Drag to orbit, wheel to zoom.
 
 const q = new URLSearchParams(location.search);
 const pick = <T extends string>(key: string, options: readonly T[], fallback: T): T => {
@@ -58,7 +58,7 @@ const t0 = performance.now();
 
 async function main(): Promise<void> {
   const lib = { hesco: await hesco() };
-  world = buildWorld(renderer, scene, map, { biome, time, weather }, quality, seed, lib);
+  world = buildWorld(renderer, scene, map, { biome, time, weather }, quality, seed, lib, { tropical: q.get('tropical') === '1' });
   const built = performance.now() - t0;
   world.setThermal(q.get('thermal') === '1');
   const tone = q.get('tone');

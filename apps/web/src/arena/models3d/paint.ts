@@ -150,6 +150,7 @@ function makeCanvas(w: number, h: number): { ctx: CanvasRenderingContext2D | Off
   return { ctx: el.getContext('2d', { willReadFrequently: true })!, el };
 }
 
+const fract = (v: number) => v - Math.floor(v);
 const css = (hex: number, a = 1) => `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${a})`;
 
 function mix(a: number, b: number, t: number): number {
@@ -275,6 +276,97 @@ export function camoTexture(scheme: Scheme): THREE.DataTexture {
 export function dustOf(scheme: Scheme): number {
   return SCHEMES[scheme].dust;
 }
+
+// --- Wear --------------------------------------------------------------------------------------------
+
+/** Metres one tile of the wear map covers: finer than the camouflage so chips and splashes read close up. */
+const WEAR_M = 3;
+let wearTex: THREE.DataTexture | null = null;
+
+/**
+ * One tileable wear map shared by every scheme: R chipped paint (clusters of chips and scrapes where the
+ * crew climb and branches rub), G mud thrown up by the tracks (splashes and spatter), B rain and rust
+ * runs (streaks down from bolts and edges).
+ */
+export function wearTexture(): THREE.DataTexture {
+  if (wearTex) return wearTex;
+  const S2 = 256;
+  const rnd = mulberry(0x3a17);
+  const chips = new Float32Array(S2 * S2);
+  const mud = new Float32Array(S2 * S2);
+  const runs = new Float32Array(S2 * S2);
+  const cluster = fbm(S2, 404, 3, 4);
+  const at = (x: number, y: number) => (((Math.round(y) % S2) + S2) % S2) * S2 + (((Math.round(x) % S2) + S2) % S2);
+  const dab = (buf: Float32Array, cx: number, cy: number, rx: number, ry: number, v: number) => {
+    for (let y = -Math.ceil(ry); y <= Math.ceil(ry); y++)
+      for (let x = -Math.ceil(rx); x <= Math.ceil(rx); x++) {
+        const d = (x * x) / (rx * rx + 1e-3) + (y * y) / (ry * ry + 1e-3);
+        if (d <= 1) {
+          const i = at(cx + x, cy + y);
+          buf[i] = Math.max(buf[i]!, v * (1 - d * 0.35));
+        }
+      }
+  };
+  // Chips gather where the cluster noise is high: many in a few places, few elsewhere.
+  for (let i = 0; i < 2600; i++) {
+    const x = rnd() * S2;
+    const y = rnd() * S2;
+    if (cluster[at(x, y)]! < 0.42 + rnd() * 0.25) continue;
+    const r = 0.6 + rnd() * rnd() * 3.2;
+    dab(chips, x, y, r * (1 + rnd()), r, 0.6 + rnd() * 0.4);
+  }
+  // Long scrapes.
+  for (let i = 0; i < 40; i++) {
+    let x = rnd() * S2;
+    let y = rnd() * S2;
+    const a = rnd() * Math.PI;
+    for (let k = 0; k < 14 + rnd() * 30; k++) {
+      dab(chips, x, y, 0.8, 0.8, 0.7);
+      x += Math.cos(a) + (rnd() - 0.5) * 0.6;
+      y += Math.sin(a) + (rnd() - 0.5) * 0.6;
+    }
+  }
+  // Mud: big splashes with spatter round them, and fine spray between.
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * S2;
+    const y = rnd() * S2;
+    const r = 3 + rnd() * 9;
+    dab(mud, x, y, r * (1 + rnd() * 0.8), r, 0.75 + rnd() * 0.25);
+    for (let k = 0; k < 14; k++) {
+      const a = rnd() * Math.PI * 2;
+      const d = r * (1 + rnd() * 1.8);
+      dab(mud, x + Math.cos(a) * d, y + Math.sin(a) * d, 0.6 + rnd() * 2, 0.6 + rnd() * 2, 0.55 + rnd() * 0.4);
+    }
+  }
+  for (let i = 0; i < 1800; i++) dab(mud, rnd() * S2, rnd() * S2, 0.5 + rnd() * 1.1, 0.5 + rnd() * 1.1, 0.4 + rnd() * 0.5);
+  // Runs: thin streaks down (+v is down the face), fading as they go.
+  for (let i = 0; i < 260; i++) {
+    const x = rnd() * S2;
+    const y0 = rnd() * S2;
+    const len = 8 + rnd() * 50;
+    const w = 0.5 + rnd() * 1.3;
+    const v = 0.35 + rnd() * 0.65;
+    for (let k = 0; k < len; k++) dab(runs, x + Math.sin(k * 0.15 + i) * 0.4, y0 + k, w * (1 - (k / len) * 0.6), 0.8, v * (1 - k / len));
+  }
+  const data = new Uint8Array(S2 * S2 * 4);
+  for (let i = 0; i < S2 * S2; i++) {
+    data[i * 4] = Math.round(chips[i]! * 255);
+    data[i * 4 + 1] = Math.round(Math.min(1, mud[i]!) * 255);
+    data[i * 4 + 2] = Math.round(runs[i]! * 255);
+    data[i * 4 + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, S2, S2, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  wearTex = tex;
+  return tex;
+}
+
+/** Each unit's paint gets its own slide of the camouflage and wear, so two of a type are not twins. */
+let painted = 0;
 
 // --- Track links -------------------------------------------------------------------------------------
 
@@ -416,6 +508,10 @@ uniform float camoScale;
 uniform vec3 dustColor;
 uniform float dustTop;
 uniform float dustAmount;
+uniform sampler2D wearMap;
+uniform float wearScale;
+uniform float wearAmount;
+uniform vec3 paintShift;
 varying vec4 vTint;
 varying vec4 vAux;
 varying vec3 vObjP;
@@ -427,12 +523,17 @@ export function paintMaterial(o: PaintOpts): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.82, metalness: 0.12 });
   const def = SCHEMES[o.scheme];
   const proxy = o.spin;
+  const n = ++painted;
   const uniforms: Record<string, THREE.IUniform> = {
     camoMap: { value: camoTexture(o.scheme) },
     camoScale: { value: 1 / (TILE_M * METRE) },
     dustColor: { value: new THREE.Color(def.dust) },
     dustTop: { value: o.dustTop ?? 1.1 },
     dustAmount: { value: o.dust ?? 0.85 },
+    wearMap: { value: wearTexture() },
+    wearScale: { value: 1 / (WEAR_M * METRE) },
+    wearAmount: { value: def.wear },
+    paintShift: { value: new THREE.Vector3(fract(n * 0.618), fract(n * 0.382 + 0.5), fract(n * 0.786 + 0.25)) },
     spin: proxy ? { get value() { return proxy.rotation.x; } } : { value: 0 },
     spinRef: { value: o.spinRef ?? 1 },
   };
@@ -463,7 +564,7 @@ export function paintMaterial(o: PaintOpts): THREE.MeshStandardMaterial {
         `vec3 tn = normalize(vObjN);
         vec3 tw = pow(abs(tn), vec3(4.0));
         tw /= (tw.x + tw.y + tw.z + 1e-5);
-        vec3 tp = vObjP * camoScale;
+        vec3 tp = vObjP * camoScale + paintShift;
         vec4 camo = texture2D(camoMap, tp.zy) * tw.x + texture2D(camoMap, tp.xz + 0.37) * tw.y + texture2D(camoMap, tp.xy + 0.71) * tw.z;
         float grime = camo.a;
         vec3 surf = mix(vTint.rgb, camo.rgb * vTint.rgb, vTint.a);
@@ -472,6 +573,21 @@ export function paintMaterial(o: PaintOpts): THREE.MeshStandardMaterial {
         dust += max(tn.y, 0.0) * 0.3 * smoothstep(0.4, 0.75, grime);
         dust = clamp(dust * dustAmount, 0.0, 0.92);
         surf = mix(surf, dustColor, dust);
+        // Wear, close up: chipped paint to dark primer and steel, rain and rust runs down the sides, and
+        // mud thrown up low on the hull, darker and wetter than the dust.
+        vec3 wp = vObjP * wearScale + paintShift.zxy;
+        vec4 wr = texture2D(wearMap, wp.zy * vec2(1.0, -1.0)) * tw.x + texture2D(wearMap, wp.xz) * tw.y + texture2D(wearMap, wp.xy * vec2(1.0, -1.0)) * tw.z;
+        float side = 1.0 - abs(tn.y);
+        float painted = vTint.a;
+        float chip = smoothstep(0.5, 0.9, wr.r) * painted * min(wearAmount, 1.3) * smoothstep(0.25, 0.75, grime);
+        surf = mix(surf, vec3(0.08, 0.068, 0.055), chip * 0.6);
+        float run = wr.b * side * painted * wearAmount;
+        surf *= 1.0 - run * 0.38;
+        surf = mix(surf, vec3(0.2, 0.11, 0.05), run * run * 0.35);
+        float low = smoothstep(dustTop * 1.7, dustTop * 0.2, hgt);
+        float mud = smoothstep(0.22, 0.55, wr.g) * low * dustAmount;
+        surf = mix(surf, dustColor * vec3(0.42, 0.4, 0.37), clamp(mud, 0.0, 0.9));
+        dust = max(dust, mud * 0.6);
         surf *= vAux.y * (0.92 + 0.16 * grime);
         diffuseColor.rgb *= surf;`,
       )
@@ -488,7 +604,7 @@ export function paintMaterial(o: PaintOpts): THREE.MeshStandardMaterial {
         metalnessFactor *= 1.0 - dust;`,
       );
   };
-  mat.customProgramCacheKey = () => 'brink-paint-1';
+  mat.customProgramCacheKey = () => 'brink-paint-2';
   return mat;
 }
 
