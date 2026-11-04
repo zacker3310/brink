@@ -25,6 +25,15 @@ export interface BattleRequest {
 
 const BASE_SKILL = { easy: 0.18, normal: 0.38, hard: 0.58 } as const;
 
+/** Research that feeds the arena's Command Points (docs/arena-v2.md, section 16.3): staff work and command and control. */
+export const COMMAND_TECHS = ['staff_college', 'command_networks', 'signals_intelligence', 'combined_arms'] as const;
+
+/** What feeds the player's Command Points in a battle: the general at the head, the doctrine cards in play, the research. */
+export function commandFor(view: NationView, generalLevel: number, plays: readonly CardPlay[]): NonNullable<ArenaSetup['command']> {
+  const tech = COMMAND_TECHS.filter((t) => view.self.research.unlocked.includes(t)).length;
+  return { blue: { general: generalLevel, doctrine: plays.length, tech } };
+}
+
 function hash(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
@@ -152,6 +161,7 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
       theatre: view.scenarioId,
       ...(support.blue.length ? { support: support.blue } : {}),
       ...(support.red.length ? { redSupport: support.red } : {}),
+      command: commandFor(view, general?.level ?? 0, plays),
     },
   };
 }

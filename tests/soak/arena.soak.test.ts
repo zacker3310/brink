@@ -159,6 +159,43 @@ describe(`arena soak (${SETUPS} setups at ${LEVELS.length} difficulties)`, () =>
     }
   });
 
+  it('with command (section 16): zones, a deployment phase, reserves and Command Points, the AI calls its reserves and breaks no rule', () => {
+    let rejected = 0;
+    let waves = 0;
+    let called = 0;
+    let arrived = 0;
+    let orders = 0;
+    const n = Math.min(SETUPS, 20);
+    for (let seed = 1; seed <= n; seed++) {
+      const base = setupFor(seed);
+      const setup: ArenaSetup = {
+        ...base,
+        difficulty: LEVELS[seed % LEVELS.length]!,
+        reserves: { blue: { share: 250 + (seed % 3) * 100 }, red: { share: 150 + (seed % 2) * 150 } },
+        command: { blue: { general: seed % 4, doctrine: seed % 3, tech: seed % 2 }, red: { general: seed % 3 } },
+        deployment: {
+          manual: seed % 2 === 0,
+          blue: { zones: [{ kind: 'lz', at: { x: 4 + ((seed * 7) % 22), y: 29 + (seed % 9) } }, ...(seed % 3 === 0 ? [{ kind: 'drop' as const, at: { x: 15, y: 32 } }] : [])], airSuperiority: seed % 3 === 0 },
+        },
+      };
+      const b = createBattle(setup);
+      const start = (b.reserves?.blue.waves.length ?? 0) + (b.reserves?.red.waves.length ?? 0);
+      waves += start;
+      autoBattle(b);
+      expect(invariants(b), `seed ${seed}`).toEqual([]);
+      const refused = rejectedActions(b);
+      if (refused.length) console.log('refused with command', seed, refused.slice(0, 5));
+      rejected += refused.length;
+      called += start - ((b.reserves?.blue.waves.length ?? 0) + (b.reserves?.red.waves.length ?? 0));
+      arrived += b.events.filter((e) => e.type === 'reinforce').length;
+      orders += (b.groupSeq ?? 0);
+    }
+    console.log('command battles', n, 'waves', waves, 'called in whole', called, 'units arrived', arrived, 'groups formed', orders, 'rejected AI actions with command', rejected);
+    expect(waves).toBeGreaterThan(n);
+    expect(arrived).toBeGreaterThan(n);
+    expect(rejected).toBe(0);
+  });
+
   it('a player who holds part of the company each turn: every hold is taken, the AI still breaks no rule', () => {
     let rejected = 0;
     let holds = 0;

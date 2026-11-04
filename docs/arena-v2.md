@@ -977,6 +977,182 @@ Measured (default matrix, 24 battles; soak at `ARENA_SOAK=20`, the AI in blue's 
 What still times out is mostly a single weak formation (one mechanised platoon, guns only or
 drones only) against a full company: those battles are meant to be hard, and quick resolve stays.
 
+## 16. Command: groups, deployment and reserves (v2.6)
+
+Phase 2 of `docs/MASTER-PLAN.md`, the engine and AI half: the company is commanded in groups, placed
+on the zones the war map earned before round 1, and part of it waits off the field until Command
+Points bring it on. None of it rolls: every command action is checked by `whyNot` and taken by `act`
+like any other, rides in the command log (`submit`, `replay`), saves and resumes as plain JSON, and
+a group order expands into the ordinary unit actions. Types in `v2/command.ts`; rules in
+`v2/groups.ts`, `v2/deploy.ts`, `v2/reserves.ts` (wired in by `v2/command-rules.ts`); the AI in
+`v2/staff.ts`. All of it is exported from `@brink/arena`. `ARENA_RULES_VERSION` is 3.
+
+A setup without the new fields plays exactly as before: nothing new is stored on the battle
+(`deployment`, `reserves`, `groups` stay absent), the company is placed as it always was and the AI
+plays as it did. Groups can still be formed in any battle.
+
+### 16.1 Groups
+
+| Action | Does |
+|---|---|
+| `{ type: 'group', units, formation? }` | Forms `${side}:g${n}` from the side's live units (at most `GROUP_MAX`, 24). They leave any group they were in. The same set again is refused (`Already a group`). Default formation: `wedge` when half the ground units are armour, else `column`. |
+| `{ type: 'formation', group, formation }` | `column`, `line` or `wedge` (`FORMATIONS`); the same again is refused. |
+| `{ type: 'ungroup', group }` | Dissolves it. |
+| `{ type: 'order', group, order? }` | One order for the group (absent: its standing order, `group.order`, again). One order a group a turn (`Already ordered this turn`); refused with `Nothing to do` when no member has a legal first action. |
+
+`GroupOrder` (`GROUP_ORDERS`):
+
+- `{ kind: 'move', to, dash? }`: each unit moves to the reachable cell nearest its slot.
+- `{ kind: 'assault', to, target? }`: move toward the slot, then fire at `target` if it has a shot,
+  else at the enemy it sees with the best shot value.
+- `{ kind: 'overwatch', to? }`: (move toward the slot, then) overwatch.
+- `{ kind: 'screen', to }`: a line two cells apart (`SCREEN_SPACING`) across `to`, facing the
+  middle of the side's last known enemy positions (else up the field), then overwatch.
+- `{ kind: 'hold' }`: every unit holds.
+
+Slots (`slotsFor`): the anchor is `to`; forward is from the group's middle to it (up the field for
+blue, down for red, when it is under a cell away). Ground units sort front to back (tanks and
+carriers, then the rest, then guns, mortars, medics, recovery, air defence and engineers; then
+nearest the anchor, then id) and take the formation's offsets a cell apart: a column trails the
+anchor, a line goes abreast across the way they go, a wedge puts the first on the point and pairs
+behind it, a step back and out each. Aircraft (helicopters and drones) fly a stack: rows of three,
+`STACK_SPACING` (2) cells apart, two cells behind the ground lead (on the anchor when the group is
+aircraft alone).
+
+Expansion (`groupAct`): members in slot order, each to the end of its part (its move, then its one
+action) before the next starts, each step re-planned on the state as it now is and taken through
+`act`. So overwatch fires at a member as it would at a unit moved by hand, a member that bumps into
+a hidden enemy stops, and a member whose step is refused is skipped. Moves are chosen from what the
+side knows (`reachable` with its sight), never onto a cell a friend or a known enemy holds or another
+member has claimed, and only when they bring the unit at least half a cell nearer its slot.
+`planGroup(b, group, order?)` is the pure preview: each member's slot and its first action, legal now.
+
+Groups persist across turns until dissolved. A unit that dies or is merged away leaves its group
+(and a group with no one left is gone) whenever the engine checks for the battle's end, after every
+action and turn. A unit aboard a carrier stays in its group and rides along.
+
+### 16.2 Deployment
+
+`ArenaSetup.deployment` (`DeploymentSetup`): `{ manual?, blue?: { zones?, airSuperiority? }, red? }`.
+Zones (`ZoneSpec`, resolved by `zoneCells` into `DeployZone { id, kind, cells }`, best cell first):
+
+| Kind | From | Who may use it |
+|---|---|---|
+| `edge` | `edge`: `south` (blue's default: the map's own `blueSpawn`), `north` (red's), `west`, `east` (two cells deep, along the side's part) | anyone |
+| `lz` | `at` and radius `r` (2) | aircraft, and foot set down by them |
+| `beach` | the shore (cells next to water) nearest `at` (else the attack edge's middle), at most 40 cells; the attack edge when there is no water | ground units |
+| `drop` | `at` and `r`, only with `airSuperiority` | foot |
+| `position` | red's default: the map's `redSpawn` | anyone (deployment only, never a reserve entry) |
+
+Blue's zones are clipped to rows 26 and down (`BLUE_ZONE_FROM`), red's to rows 24 and up
+(`RED_ZONE_TO`), so neither lands in the other's deployment band; every side always has an edge,
+red always its positions; ids are `${side}:${kind}` (`blue:lz2` for a second). The defender's AI
+deploys only on its zones and never on a cell an attacker holds.
+
+With zones, the company starts auto-deployed in them (`autoDeploy`): aircraft prefer a landing
+zone, foot a drop zone, the rest the zones in the order the war map listed them; armour and carriers
+on a zone's best cells, guns and support from its back. With `manual: true` the battle opens in the
+deployment phase (`b.deployment.open`): blue may only `place`, `group`, `ungroup`, `formation` and
+`deployed`; everything else is refused with `Deploy first`.
+
+- `{ type: 'place', unit, at }`: onto a cell of a zone the unit may use and can stand on (passable;
+  no wreck or building for a vehicle). Onto a friend: they trade places when each may stand where
+  the other is. A cell with an enemy the side sees is `Taken`; one hidden there is found (revealed)
+  and the unit stays. Logs `{ type: 'deploy', unit, x, y, seen }` (undo-safe). `placements(b, unit)`
+  lists the cells it may take now.
+- `{ type: 'deployed' }`: done, round 1 begins. End Turn in the phase begins the battle and ends the
+  turn; Let Crews Play deploys (the AI's first choice is `deployed`) and plays it.
+
+### 16.3 Reserves and Command Points
+
+`ArenaSetup.reserves`: `{ blue?, red? }` of `ReserveSetup { formations?, share? }`: whole war-map
+formations held back, or a share (permille, at most 700) from the back of each formation. A lift is
+a unit with whoever rides in it; at least `MIN_ON_FIELD` (2) lifts always start on the field. The
+held lifts go into waves (`Wave { id: ${side}:w${n}, units, cost, via }`) by formation, at most
+`WAVE_LIFTS` (4) lifts each, off `b.units` into `b.reserves[side].waves`. A wave's `via` is the
+entry kinds every lift may use: `edge` always, `lz` when all are aircraft, `beach` when none is,
+`drop` when all are foot.
+
+`ArenaSetup.command`: `{ blue?, red? }` of `CommandSetup { general?, doctrine?, tech?, points? }`.
+Command Points for the battle (`commandPoints`): `points` when given, else 6 (`BASE_CP`) + 2 × the
+general's level + doctrine cards in play + command-and-control technologies, at most 30 (`MAX_CP`).
+The war map passes the general at the head of the stack, the cards played this turn and the
+researched techs among `staff_college`, `command_networks`, `signals_intelligence` and
+`combined_arms` (`commandFor` in `apps/web/src/arena/battle.ts`). A unit costs `CP_COST` by role:
+2 for tanks, IFVs, light tanks, tank hunters, attack and transport helicopters and guns; 1 for the
+rest and for every passenger. `b.reserves` is stored when the setup has `reserves` or `command`.
+
+`{ type: 'reserve', wave, zone }` brings a wave on at one of the side's entry zones (not `position`)
+its `via` allows, **at the start of the side's turn**: allowed while none of its units has acted
+this turn (placing, grouping and calling keep it open; any unit action, support call, ability or
+group order closes it: `acted` holds that turn's index), with the wave's whole cost in hand. Each
+lift takes the best free cell of the zone it can stand on, then out to three cells around the
+zone's best cell; a cell the side knows is held is passed, and one with a hidden enemy is passed
+and the enemy found there. A helicopter at a landing zone fast-ropes its squad onto the zone's
+cells nearest it, a roof included (the UH-60 and its squad on the roof). A lift with nowhere to go
+stays in reserve (the wave is not called again that turn), and only what came on is paid for.
+Arrivals are fresh (they move and act that turn), face the enemy, log one
+`{ type: 'reinforce', side, unit, wave, zone, x, y, seen }` each (not undo-safe; the film shows
+those blue sees), and form a group with the wave's id in `group.wave`.
+
+Reserves never called in keep all they had in `arenaResult` (a formation held back whole folds back
+at 1000). Until they come on they are no part of the field force: the side's value, its break or
+withdrawal line and its being wiped out are reckoned on the units on the field.
+
+`observe(b, side)` carries the side's own groups, zones and reserves, none of the other's (the
+enemy's waves read empty, its Command Points 0).
+
+### 16.4 The AI
+
+`commandDecision` (`v2/staff.ts`) runs first in `decide`, for either seat:
+
+- In blue's deployment phase it begins (`deployed`): the auto-deployment already placed the company.
+- Reserves: the attacker from its second round or once under 70% of its starting value; the
+  defender once it has seen the enemy, from round 3, or under 75%. Waves dearest first, each it can
+  afford, at the entry scoring best: far from its last known enemy positions (up to 14 cells), near
+  the objective (a quarter point a cell), and a landing zone with known air defence within 14 cells
+  marked down by 20.
+- Groups: a group in contact (a member suppressed, or an enemy it sees within 12 cells, `CONTACT`)
+  or within 4 cells of the objective is dissolved, and its units fight unit by unit with the
+  planner; otherwise it moves toward the objective in formation (aircraft halfway there a turn).
+  Where it cannot, it is dissolved. The objective: the capture zone, else (attacking) the middle of
+  the last known enemy, else the defender's positions.
+
+It reads its own side's view only, and its ties are broken by order and id, never the stream.
+
+### 16.5 API for the screen
+
+- Actions, through `act` / `whyNot` / `submit`: `place`, `deployed`, `group`, `ungroup`,
+  `formation`, `order`, `reserve`. Refusals are plain strings, for greying out.
+- Zones and the phase: `zonesOf(b, side)`, `placements(b, unit)`, `deploying(b)`, `zoneFits`.
+- Groups: `groupsOf(b, side)`, `groupById`, `groupOfUnit(b, unit)`, `planGroup(b, group, order?)`
+  (slots and first actions), `slotsFor`; `FORMATIONS`, `GROUP_ORDERS`.
+- Reserves: `callable(b, side)` (every wave and zone it may call now), `entriesFor(b, side, wave)`,
+  `commandPoints(setup)`, `reserveUnits(b, side?)`, `CP_COST`.
+- AI: `commandDecision(b, side, skip)`, `objectiveOf(b, side)`.
+- State: `b.groups`, `b.deployment` (`open`, `zones`), `b.reserves[side]` (`cp`, `start`, `waves`,
+  `acted`). Types: `Group`, `GroupOrder`, `Formation`, `DeployZone`, `ZoneSpec`, `ZoneKind`,
+  `DeploymentSetup`, `ReserveSetup`, `CommandSetup`, `Wave`, `SideReserves`.
+
+For the screen lane: the HUD's enemy strength bar sums red's units on the field, so a red wave
+arriving unseen raises its start; it should leave arrivals it has not seen out (as it leaves out
+kills it has not seen).
+
+### 16.6 Tests
+
+`v2/command.test.ts`: formations, expansion through the rules (overwatch fires on a group's
+member), persistence, deployment rules and zones, Command Points, waves, the landing on a roof, the
+start-of-turn rule, replay, the observation and the AI. The verification backbone draws zones,
+reserves and Command Points (a deployment phase in some) for 45% of its setups, after every other
+dimension; its seeded player places, begins, groups, orders groups and calls reserves among its
+random orders, and its state checks cover reserves, Command Points, groups and the phase. The fog
+and invariant tests each gained setups with command; the arena soak fights 20 setups with command.
+
+While adding a probed setup with command the fog probe reported the shot card's active protection
+as a leak: its `stores` change refilled or emptied a seen tank's APS charges at random, though the
+card shows the protection while it has charges by rule (the rule fixture in `fog.test.ts`). The
+change now keeps whether a seen tank has charges and varies only how many.
+
 ## Sources
 
 Specifications: General Dynamics Land Systems (M1A2 SEPv3, M1126 Stryker, M10 Booker), Krauss-Maffei

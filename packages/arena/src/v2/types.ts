@@ -1,5 +1,6 @@
 import type { GovernmentId, TechId, Terrain, UnitClass } from '@brink/contracts';
 import type { PlayerCommand } from './replay';
+import type { CommandSetup, Deployment, DeploymentSetup, Formation, Group, GroupOrder, ReserveSetup, SideReserves } from './command';
 
 // Arena v2: the shared contract between the rules engine, the level generator, the roster, the AI,
 // the renderer and the war map. Everything here is plain JSON data (docs/arena-v2.md).
@@ -405,6 +406,14 @@ export interface Battle {
   stream: number;
   /** The player's accepted commands in order (`submit` in replay.ts); absent in older saves. */
   commands?: PlayerCommand[];
+  /** Groups of units under one order (groups.ts); absent until the first is formed. */
+  groups?: Group[];
+  /** Groups formed so far, for their ids. */
+  groupSeq?: number;
+  /** Deployment zones and the deployment phase (deploy.ts); absent: the defaults, already deployed. */
+  deployment?: Deployment;
+  /** Reserves off the field and Command Points (reserves.ts); absent: none. */
+  reserves?: Record<Side, SideReserves>;
 }
 
 // --- Setup and result --------------------------------------------------------------------------------
@@ -446,6 +455,12 @@ export interface ArenaSetup {
   /** Off-map support the war map around the battle brings each side, beside the artillery's rockets. */
   support?: { id: SupportId; missions: number }[];
   redSupport?: { id: SupportId; missions: number }[];
+  /** Deployment zones the war map earned each side, and whether the player places the company (section 16). */
+  deployment?: DeploymentSetup;
+  /** What each side holds off the field as reserves. */
+  reserves?: { blue?: ReserveSetup; red?: ReserveSetup };
+  /** What feeds each side's Command Points. */
+  command?: { blue?: CommandSetup; red?: CommandSetup };
 }
 
 export interface ArenaResult {
@@ -481,7 +496,20 @@ export type Action =
   | { type: 'repair'; unit: string; target: string }
   | { type: 'breach'; unit: string; at: Point }
   | { type: 'mine'; unit: string; at: Point }
-  | { type: 'ability'; id: AbilityId; unit?: string; at?: Point };
+  | { type: 'ability'; id: AbilityId; unit?: string; at?: Point }
+  // Command (section 16): none of these rolls; `order` expands into the unit actions above.
+  /** Deployment phase: put a unit (and whoever rides in it) on a cell of a zone it may use. */
+  | { type: 'place'; unit: string; at: Point }
+  /** Deployment phase: done placing, the battle begins. */
+  | { type: 'deployed' }
+  /** Form a group of the side's units (taken out of any group they were in). */
+  | { type: 'group'; units: string[]; formation?: Formation }
+  | { type: 'ungroup'; group: string }
+  | { type: 'formation'; group: string; formation: Formation }
+  /** One order for the whole group (absent: its standing order again). */
+  | { type: 'order'; group: string; order?: GroupOrder }
+  /** Spend Command Points to bring a reserve wave on at an entry zone, at the start of the side's turn. */
+  | { type: 'reserve'; wave: string; zone: string };
 
 // --- Events (the film) ---------------------------------------------------------------------------
 
@@ -520,7 +548,11 @@ export type BattleEvent =
   | { type: 'ability'; id: AbilityId; x: number; y: number }
   | { type: 'radio'; side: Side; call: RadioCall; unit: string }
   | { type: 'capture'; rounds: number }
-  | { type: 'end'; won: boolean; reason: NonNullable<Battle['endReason']> };
+  | { type: 'end'; won: boolean; reason: NonNullable<Battle['endReason']> }
+  /** A unit put on a new cell in the deployment phase. */
+  | { type: 'deploy'; unit: string; x: number; y: number; seen: boolean }
+  /** A reserve unit arriving on the field (one event a unit, so the film shows only those blue sees). */
+  | { type: 'reinforce'; side: Side; unit: string; wave: string; zone: string; x: number; y: number; seen: boolean };
 
 // --- Abilities ---------------------------------------------------------------------------------------
 

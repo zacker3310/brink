@@ -9,6 +9,10 @@ import { hashBattle, submit, type PlayerCommand } from './replay';
 import { ABILITIES } from './rules';
 import { TYPES, typeOf } from './roster';
 import { cheb, dist, isFlying, visibleTo } from './sight';
+import { FORMATIONS, type GroupOrder, type ZoneSpec } from './command';
+import { deploying, zonesOf } from './deploy';
+import { groupsOf } from './groups';
+import { MAX_CP, reserveUnits } from './reserves';
 import {
   at,
   BUILDING,
@@ -101,6 +105,8 @@ export interface SetupPick {
   weather?: Weather;
   difficulty?: Difficulty;
   mix?: Mix;
+  /** Zones, reserves and Command Points: always (true), never (false), or drawn. */
+  command?: boolean;
 }
 
 const formationOf = (id: string, cls: UnitClass, r: Rng): UnitSpec => ({ id, cls, strength: 600 + r.int(401), name: id, color: '#888888', rank: r.int(2) });
@@ -170,7 +176,33 @@ export function arenaSetup(seed: number, pick: SetupPick = {}): ArenaSetup {
     // the dimensions above stay what they were.
     ...warSupport(r, 'support'),
     ...warSupport(r, 'redSupport'),
+    // Command (section 16): zones, reserves and Command Points, drawn after everything above.
+    ...(pick.command === false ? {} : commandSetup(r, attackers, defenders, pick.command === true)),
   };
+}
+
+/** Deployment zones, reserves and Command Points for some setups (a deployment phase in some of those). */
+function commandSetup(r: Rng, attackers: UnitSpec[], defenders: UnitSpec[], always: boolean): Partial<ArenaSetup> {
+  if (!always && !r.chance(0.45)) return {};
+  const out: Partial<ArenaSetup> = {};
+  const reserves: NonNullable<ArenaSetup['reserves']> = {};
+  if (r.chance(0.8)) reserves.blue = attackers.length >= 2 && r.chance(0.5) ? { formations: [attackers.at(-1)!.id] } : { share: 200 + r.int(301) };
+  if (r.chance(0.5)) reserves.red = defenders.length >= 2 && r.chance(0.3) ? { formations: [defenders.at(-1)!.id] } : { share: 150 + r.int(251) };
+  out.reserves = reserves;
+  out.command = { blue: { general: r.int(4), doctrine: r.int(3), tech: r.int(3) }, ...(r.chance(0.5) ? { red: { general: r.int(3) } } : {}) };
+  if (r.chance(0.7)) {
+    const zones: ZoneSpec[] = [];
+    if (r.chance(0.3)) zones.push({ kind: 'edge', edge: r.pick(['west', 'east', 'south'] as const) });
+    if (r.chance(0.6)) zones.push({ kind: 'lz', at: { x: 3 + r.int(W - 6), y: 27 + r.int(14) } });
+    if (r.chance(0.3)) zones.push({ kind: 'beach' });
+    if (r.chance(0.4)) zones.push({ kind: 'drop', at: { x: 3 + r.int(W - 6), y: 28 + r.int(10) }, r: 1 + r.int(3) });
+    out.deployment = {
+      manual: r.chance(0.6),
+      blue: { zones, airSuperiority: r.chance(0.5) },
+      ...(r.chance(0.4) ? { red: { zones: [{ kind: 'lz', at: { x: 3 + r.int(W - 6), y: 4 + r.int(14) } }] } } : {}),
+    };
+  }
+  return out;
 }
 
 const WAR_SUPPORT: SupportId[] = ['naval_gun', 'cruise_missile', 'strike_jet', 'kamikaze'];
@@ -251,6 +283,12 @@ const KINDS: readonly (readonly [Action['type'], number])[] = [
   ['mine', 3],
   ['ability', 3],
   ['hold', 2],
+  ['group', 3],
+  ['order', 5],
+  ['ungroup', 1],
+  ['formation', 1],
+  ['reserve', 2],
+  ['place', 2],
 ];
 const KIND_TOTAL = KINDS.reduce((s, [, w]) => s + w, 0);
 
@@ -322,6 +360,44 @@ export function randomAction(b: Battle, u: Unit, r: Rng): Action | null {
       const ready = ABILITY_IDS.filter((a) => b.abilities[a] === 'ready');
       return ready.length ? { type: 'ability', id: r.pick(ready), unit: u.id, at: aimCell(b, r) } : null;
     }
+    case 'group': {
+      const pool = [u, ...friends.filter((f) => cheb(f, u) <= 6)];
+      const units = pool.slice(0, 1 + r.int(Math.min(5, pool.length))).map((x) => x.id);
+      return { type: 'group', units, ...(r.chance(0.5) ? { formation: r.pick(FORMATIONS) } : {}) };
+    }
+    case 'order': {
+      const groups = groupsOf(b, 'blue');
+      if (!groups.length) return null;
+      const g = r.pick(groups);
+      const to = r.chance(0.5) ? near(u, 6, r) : aimCell(b, r);
+      const known = [...visibleTo(b, 'blue')].sort();
+      const orders: GroupOrder[] = [
+        { kind: 'move', to, ...(r.chance(0.15) ? { dash: true } : {}) },
+        { kind: 'assault', to, ...(known.length && r.chance(0.6) ? { target: r.pick(known) } : {}) },
+        r.chance(0.5) ? { kind: 'overwatch', to } : { kind: 'overwatch' },
+        { kind: 'screen', to },
+        { kind: 'hold' },
+      ];
+      return r.chance(0.15) ? { type: 'order', group: g.id } : { type: 'order', group: g.id, order: r.pick(orders) };
+    }
+    case 'ungroup':
+    case 'formation': {
+      const groups = groupsOf(b, 'blue');
+      if (!groups.length) return null;
+      const g = r.pick(groups);
+      return kind === 'ungroup' ? { type: 'ungroup', group: g.id } : { type: 'formation', group: g.id, formation: r.pick(FORMATIONS) };
+    }
+    case 'reserve': {
+      const waves = b.reserves?.blue.waves ?? [];
+      const zones = zonesOf(b, 'blue');
+      return waves.length && zones.length ? { type: 'reserve', wave: r.pick(waves).id, zone: r.pick(zones).id } : null;
+    }
+    case 'place': {
+      const zones = zonesOf(b, 'blue').filter((z) => z.cells.length);
+      return zones.length && r.chance(0.8) ? { type: 'place', unit: u.id, at: r.pick(r.pick(zones).cells) } : { type: 'place', unit: u.id, at: randomCell(r) };
+    }
+    case 'deployed':
+      return { type: 'deployed' };
   }
 }
 
@@ -480,6 +556,17 @@ export function playTurn(p: Player, b: Battle, watch?: Watch, stopAfter = Infini
   const cap = 3 * blueUnits(b).length + 8;
   for (let steps = 0; steps < cap && !b.ended && b.turn === 'blue'; steps++) {
     if (steps >= stopAfter) return;
+    // The deployment phase: place a few units (or try to), then begin.
+    if (deploying(b)) {
+      const live = blueUnits(b);
+      if (!live.length || r.chance(0.2)) send(p, b, { type: 'act', action: { type: 'deployed' } }, watch);
+      else {
+        const zones = zonesOf(b, 'blue').filter((z) => z.cells.length);
+        const z = r.pick(zones);
+        send(p, b, { type: 'act', action: { type: 'place', unit: r.pick(live).id, at: r.chance(0.85) ? r.pick(z.cells) : randomCell(r) } }, watch);
+      }
+      continue;
+    }
     if (r.chance(o.illegal)) {
       const x = refusable(b, r);
       send(p, b, x.cmd, watch, x.why);
@@ -620,6 +707,31 @@ export function stateProblems(b: Battle): string[] {
     if (layer.has(key)) bad.push(`${u.id} and ${layer.get(key)} share ${key}`);
     layer.set(key, u.id);
   }
+  // Command (section 16): reserves off the field, Command Points, groups, the deployment phase.
+  for (const u of reserveUnits(b)) {
+    if (ids.has(u.id)) bad.push(`${u.id} both on the field and in reserve`);
+    ids.add(u.id);
+    if (!u.alive) bad.push(`${u.id} dead in reserve`);
+  }
+  if (b.reserves) for (const s of ['blue', 'red'] as const) {
+    const r = b.reserves[s];
+    if (!isInt(r.cp, 0, MAX_CP) || r.cp > r.start) bad.push(`${s} command points ${r.cp} of ${r.start}`);
+    for (const w of r.waves) {
+      if (!w.units.length) bad.push(`${w.id} is empty`);
+      if (w.units.some((u) => u.side !== s)) bad.push(`${w.id} holds the other side`);
+    }
+  }
+  const grouped = new Set<string>();
+  for (const g of b.groups ?? []) {
+    if (!g.units.length) bad.push(`${g.id} is empty`);
+    for (const id of g.units) {
+      const u = b.units.find((x) => x.id === id);
+      if (!u || !u.alive || u.side !== g.side) bad.push(`${g.id} holds ${id}, not a live unit of its side`);
+      if (grouped.has(id)) bad.push(`${id} in two groups`);
+      grouped.add(id);
+    }
+  }
+  if (b.deployment?.open && (b.turnIndex !== 0 || b.turn !== 'blue')) bad.push(`deployment open in turn ${b.turnIndex}`);
   const mines = new Set<string>();
   for (const x of b.mines) {
     if (!inside(x.x, x.y) || !Number.isInteger(x.x) || !Number.isInteger(x.y)) bad.push(`mine at ${x.x},${x.y}`);
@@ -643,6 +755,7 @@ function actor(e: BattleEvent): string | null {
     case 'merge':
     case 'treat':
     case 'repair':
+    case 'deploy':
       return e.unit;
     case 'fire':
       return e.unit.startsWith('support:') ? null : e.unit;
@@ -1140,7 +1253,11 @@ export function change(b: Battle, kind: Change, r: Rng): Changed | null {
         for (const x of inSight) {
           for (const k of Object.keys(x.ammo)) x.ammo[k] = r.int((x.ammo[k] ?? 0) + 1);
           for (const k of Object.keys(x.smoke)) x.smoke[k] = r.int((x.smoke[k] ?? 0) + 1);
-          x.aps = r.int(x.aps + 1);
+          // How many charges are left is hidden; whether any are is on show (the launchers sit outside
+          // a turret in sight, and the shot card shows the protection while it has charges: see the
+          // rule in fog.test.ts). The change kept that out of view until a tank with APS was first in
+          // sight of a guided shooter in a probed battle, and then reported the rule as a leak.
+          x.aps = x.aps > 0 ? 1 + r.int(x.aps) : r.int(1);
           x.optics = r.chance(0.3);
           cells.push({ x: x.x, y: x.y });
         }

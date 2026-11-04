@@ -48,7 +48,7 @@ describe('advice', () => {
   it('is what the planner would do: a move then an action, or one action', () => {
     const b = company(3);
     const a = decide(b, 'blue');
-    if (!a || a.type === 'support' || a.type === 'ability') throw new Error(`expected a unit's action, got ${JSON.stringify(a)}`);
+    if (!a || a.type === 'support' || a.type === 'ability' || !('unit' in a)) throw new Error(`expected a unit's action, got ${JSON.stringify(a)}`);
     expect(advise(b, a.unit)[0]).toEqual(a);
     const plans = blueIds(b).map((id) => advise(b, id));
     expect(plans.filter((p) => p.length > 0).length).toBeGreaterThan(plans.length / 2);
