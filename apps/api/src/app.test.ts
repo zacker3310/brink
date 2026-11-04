@@ -17,7 +17,7 @@ describe('api', () => {
     expect(a.finalHash).toBe(b.finalHash);
     expect(a.victory.winner).toBeTruthy();
     expect(a.world).toBeUndefined();
-  }, 30_000); // two whole AI matches: seconds locally, more on a shared CI runner
+  }, 120_000); // two whole AI matches to the end: ~20 s locally since research and diplomacy; a shared CI runner, running every package at once, needs more
 
   it('validates input', async () => {
     expect((await app.inject({ method: 'POST', url: '/api/simulations', payload: { seed: 'x' } })).statusCode).toBe(400);
