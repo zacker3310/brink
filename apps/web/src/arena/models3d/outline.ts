@@ -53,10 +53,10 @@ function hullMaterial(color: THREE.Color, soldier: boolean): THREE.MeshBasicMate
     shader.uniforms.outlineWidth = soldier ? thin : width;
     shader.uniforms.outlineView = view;
     let vs = shader.vertexShader.replace('#include <project_vertex>', PUSH);
-    if (soldier) vs = 'attribute float vari;\nattribute vec4 look;\n' + vs.replace('#include <begin_vertex>', '#include <begin_vertex>\nif (abs(vari - look.w) > 0.5) transformed = vec3(0.0, -1000.0, 0.0);');
+    if (soldier) vs = 'attribute float vari;\nattribute vec4 look;\n' + vs.replace('#include <begin_vertex>', '#include <begin_vertex>\nif (vari > -0.5 && abs(vari - look.w) > 0.5) transformed = vec3(0.0, -1000.0, 0.0);');
     shader.vertexShader = 'attribute vec3 hullNormal;\nuniform float outlineWidth;\nuniform vec2 outlineView;\n' + vs;
   };
-  m.customProgramCacheKey = () => (soldier ? 'brink-hull-soldier-1' : 'brink-hull-1');
+  m.customProgramCacheKey = () => (soldier ? 'brink-hull-soldier-2' : 'brink-hull-1');
   return m;
 }
 

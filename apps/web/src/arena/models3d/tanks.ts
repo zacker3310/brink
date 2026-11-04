@@ -2,7 +2,7 @@ import { gunOf, turretOf, type Draft } from './draft';
 import { antenna, bag, barrel, bundle, cable, grille, hatch, headlight, hook, mg, panoramic, periscope, rack, rws, sightBox, slats, smoke } from './fittings';
 import { C, fender, runningGear, skirt } from './gear';
 import { S, T, box, chamfer, convex, cyl, lathe, rod, shade, sym, type Lod, type Parts, type V3 } from './kit';
-import { castTurret, cheekWedges, cupola, eraPlate, fenders, rearDrumsAndLog, rubberSkirt } from './soviet';
+import { castTurret, cheekWedges, cupola, eraPlate, fenders, rearDrumsAndLog, reliktArc, rubberSkirt } from './soviet';
 
 // Main battle tanks. Dimensions from the makers' data; layout (wheel stations, turret ring, glacis
 // angles) from side and top views.
@@ -658,15 +658,24 @@ export function t90(d: Draft): void {
   d.heat.push({ at: [0, 0, 3.0], size: [0.22, 0.22, 5.0], level: 0.3, parent: 'gun' });
 }
 
-/** T-80BVM: cast turret with Relikt, smaller rubber-tyred wheels, flat turbine deck, big rear exhaust. */
+/**
+ * T-80BVM: a lower, wider cast turret wearing Relikt as a ring of bricks round its front and a slab on its
+ * roof, a slat cage and a stowage basket round the bustle; on the hull, Relikt along the whole skirt in
+ * three rows, smaller rubber-tyred wheels, a flat turbine deck with a long grille, the big rear exhaust
+ * and no fuel drums. From above: a brick horseshoe and a caged rear, where the T-72B3 shows a V of
+ * smooth wedges and two drums.
+ */
 export function t80(d: Draft): void {
   const L = d.L;
   const { half } = t72Hull(d, { len: 7.0, design: 'cast' });
   const b = d.body;
   d.pitch = 0.164;
   plateSlab(b, [0, 0.98, half - 0.05], [0, 1.42, 2.2], 1.42, 0.17, shade(0.95));
-  if (L.hi) eraPlate(b, L, T(0, 1.06, 3.1, 0.34, 0, 0), 2.5, 0.75, 6, 2, 0.04);
-  rubberSkirt(b, L, { x: 1.81, top: 1.05, bottom: 0.5, z0: -half + 0.3, z1: half - 0.25, era: 2.4 });
+  // Relikt on the upper glacis: two rows of bricks right across.
+  eraPlate(b, L, T(0, 1.06, 3.1, 0.34, 0, 0), 2.7, 0.8, 7, 2, 0.07);
+  rubberSkirt(b, L, { x: 1.81, top: 1.05, bottom: 0.46, z0: -half + 0.3, z1: half - 0.25, era: 2 * half - 0.75, eraRows: 3 });
+  // Turbine deck: one long grille the width of the engine bay.
+  if (L.hi) grille(b, L, T(0, 1.452, -2.2), 2.6, 1.7, 13);
   // Turbine exhaust across the rear plate, and the log above it.
   b.add(box(1.7, 0.42, 0.12), S.paint, T(0, 1.18, -half - 0.03));
   if (L.hi) for (let i = 0; i < 6; i++) b.add(box(1.6, 0.03, 0.08), S.black, T(0, 1.02 + i * 0.065, -half - 0.1, 0.5, 0, 0));
@@ -676,24 +685,28 @@ export function t80(d: Draft): void {
 
   const t = turretOf(d, [0, 1.43, -0.35]);
   castTurret(t, L, [
-    [-0.02, 1.1, 1.25, 1.36],
-    [0.3, 1.08, 1.2, 1.3],
-    [0.55, 0.96, 1.0, 1.14],
-    [0.72, 0.76, 0.68, 0.94],
-    [0.8, 0.5, 0.3, 0.66],
+    [-0.02, 1.2, 1.18, 1.3],
+    [0.25, 1.18, 1.12, 1.26],
+    [0.46, 1.06, 0.92, 1.12],
+    [0.6, 0.84, 0.62, 0.92],
+    [0.66, 0.56, 0.3, 0.62],
   ]);
-  cheekWedges(t, L, { x: 0.68, y: 0.04, z: 1.32, len: 1.14, h: 0.62, t: 0.46, yaw: 31 * D, slope: 20 * D }, shade(0.97));
-  eraPlate(t, L, T(0, 0.7, 0.55, -0.28, 0, 0), 1.7, 0.55, 4, 1, 0.1);
-  sightBox(t, L, T(-0.6, 0.66, 0.2), 0.52, 0.42, 0.55);
-  cupola(t, L, T(-0.5, 0.74, -0.45));
-  hatch(t, L, T(0.5, 0.74, -0.4), 0.33);
-  for (const s of [1, -1]) smoke(t, L, T(s * 1.02, 0.5, 0.6, 0, s * 40 * D, 0), 4, 1);
-  slats(t, L, T(-1.25, 0.02, -1.65), 2.5, 0.62, 0.12);
-  if (L.hi) {
-    t.add(chamfer(1.4, 0.4, 0.34, 0.03), S.shade, T(0, 0.22, -1.48));
-    antenna(t, L, T(0.7, 0.6, -0.95), 2.2);
-  }
-  const g = gunOf(d, [0, 0.4, 0.98]);
+  // The horseshoe: two tiers of bricks, the lower proud of the turret wall, the upper stepped in.
+  reliktArc(t, L, { y: -0.02, rx: 1.4, rz: 1.36, z0: 0.0, h: 0.4, t: 0.36, from: 13, to: 95, n: 5, slope: 6 * D, gap: 0.04 }, shade(1.06));
+  reliktArc(t, L, { y: 0.38, rx: 1.2, rz: 1.16, z0: -0.02, h: 0.24, t: 0.32, from: 15, to: 85, n: 4, slope: 28 * D, gap: 0.04 }, shade(1.02));
+  // Roof slab of Relikt ahead of the hatches.
+  eraPlate(t, L, T(0, 0.64, 0.58, -0.1, 0, 0), 1.7, 0.6, 5, 2, 0.08);
+  sightBox(t, L, T(-0.62, 0.62, 0.15), 0.5, 0.44, 0.55);
+  cupola(t, L, T(-0.48, 0.66, -0.5));
+  hatch(t, L, T(0.5, 0.66, -0.45), 0.33);
+  for (const s of [1, -1]) smoke(t, L, T(s * 1.12, 0.48, 0.42, 0, s * 50 * D, 0), 4, 1);
+  // Stowage basket on the bustle and the cage round it on three sides.
+  rack(t, L, T(0, 0.12, -1.55), 1.9, 0.36, 0.55);
+  slats(t, L, T(1.42, 0.0, -0.45, 0, Math.PI / 2, 0), 1.45, 0.68, 0.13);
+  slats(t, L, T(-1.42, 0.0, -1.9, 0, -Math.PI / 2, 0), 1.45, 0.68, 0.13);
+  slats(t, L, T(-1.42, 0.0, -1.95), 2.84, 0.68, 0.13);
+  if (L.hi) antenna(t, L, T(0.75, 0.55, -1.05), 2.2);
+  const g = gunOf(d, [0, 0.36, 0.98]);
   gun125(g, L, 5.55);
   d.muzzle = [0, 0, 5.55];
   d.heat.push({ at: [0, 0, 3.0], size: [0.22, 0.22, 5.0], level: 0.3, parent: 'gun' });
