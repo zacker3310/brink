@@ -94,7 +94,9 @@ function candidate(view: NationView, card: CardDef, orders: Record<FormationId, 
     }
     case 'amphibious': {
       const landings = own.filter((f) => f.aboard && UNITS[f.unitClass].ground && orders[f.id]?.type === 'attack').length;
-      return { play: { card: card.id }, value: landings * 5 };
+      // Troops going ashore unopposed: little use, but it turns the hand over (like Forced March).
+      const ashore = own.some((f) => f.aboard && UNITS[f.unitClass].ground && orders[f.id]?.type === 'move');
+      return { play: { card: card.id }, value: landings * 5 + (ashore ? 1 : 0) };
     }
   }
 }

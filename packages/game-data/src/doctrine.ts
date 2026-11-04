@@ -9,6 +9,7 @@
 import type { CardId, GovernmentId, NationId, Resource, UnitClass } from '@brink/contracts';
 import { DOCTRINE as china } from './nations/china';
 import { NATION_DOCTRINE as russia } from './nations/russia';
+import { NATION_DOCTRINE as japan } from './nations/japan';
 
 export const DOCTRINE = {
   /** Cards held at the end of a turn, after the draw. */
@@ -221,6 +222,7 @@ export interface NationDoctrine {
 export const NATION_DOCTRINES: Record<NationId, NationDoctrine> = {
   china,
   russia,
+  japan,
 };
 
 /** Every card the game knows: the generic ones and every nation's signature cards. */

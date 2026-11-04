@@ -4,6 +4,7 @@
 import type { CommanderTraitId, GovernmentId, NationId, PerkId } from '@brink/contracts';
 import { ROSTER as china } from './nations/china';
 import { ROSTER as russia } from './nations/russia';
+import { ROSTER as japan } from './nations/japan';
 
 /**
  * What a general (a trait, a perk, or simply being there) does for the formation they lead.
@@ -149,6 +150,7 @@ export const GENERIC_ROSTER: Record<GovernmentId, readonly GeneralDef[]> = {
 export const NATION_ROSTERS: Record<NationId, readonly GeneralDef[]> = {
   china,
   russia,
+  japan,
 };
 
 /** The generals `nation` fields: its own roster, else its government's. */
