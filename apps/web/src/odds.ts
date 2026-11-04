@@ -1,4 +1,4 @@
-import type { Formation, FormationOrder, HexKey, NationView } from '@brink/contracts';
+import type { CardPlay, Formation, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { previewAssault, previewStrike } from '@brink/simulation';
 import { contextualOrder, reachFor } from './planning';
@@ -13,13 +13,13 @@ export const ODDS_TEXT: Record<Odds, string> = { good: 'Likely win', even: 'Even
 export const ODDS_TAG: Record<Odds, string> = { good: 'WIN', even: 'EVEN', bad: 'RISKY' };
 
 /** The order each unit of `group` would get for a tap on `key`; units that cannot do it are left out. */
-export function groupOrders(view: NationView, group: readonly string[], key: HexKey): { orders: Record<string, FormationOrder>; error: string | null } {
+export function groupOrders(view: NationView, group: readonly string[], key: HexKey, plays: readonly CardPlay[] = []): { orders: Record<string, FormationOrder>; error: string | null } {
   const orders: Record<string, FormationOrder> = {};
   let error: string | null = null;
   for (const id of group) {
     const f = view.formations[id];
     if (!f) continue;
-    const res = contextualOrder(view, f, key, 'move', reachFor(view, f), true);
+    const res = contextualOrder(view, f, key, 'move', reachFor(view, f, plays), true);
     if ('error' in res) error ??= res.error;
     else orders[id] = res.order;
   }

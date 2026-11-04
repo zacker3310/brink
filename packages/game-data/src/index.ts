@@ -8,6 +8,7 @@
 import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
 
 export * from './commanders';
+export * from './doctrine';
 
 export const RULESET_VERSION = '2.3.0';
 

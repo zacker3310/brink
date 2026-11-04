@@ -15,8 +15,9 @@ import { RULESET_VERSION } from '@brink/game-data';
 import { applyCommanderOrders, applyLeaderSupply, resolveCommanders } from './commanders';
 import { settleEconomy } from './economy';
 import { resolveDiplomacy } from './diplomacy';
+import { resolveDoctrine } from './doctrine';
 import { resolveWorldEvents } from './events';
-import { resolveEngagements, resolveRetreats, resolveStrikes } from './engagements';
+import { removeDestroyed, resolveEngagements, resolveRetreats, resolveStrikes } from './engagements';
 import { buildView, canDetect, computeVision, detectedFormations, updateIntel, victoryPoints, type Vision } from './fog';
 import { hashState } from './hash';
 import { resolveMovement } from './movement';
@@ -30,6 +31,7 @@ import { lockOrders } from './validate';
 export const PHASES = [
   'validate',
   'diplomacy',
+  'doctrine',
   'production',
   'logistics',
   'reconnaissance',
@@ -173,6 +175,13 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
       case 'proposal':
         if (e.from === nation || e.to === nation) out.push(e);
         break;
+      // A card played is public; who it hurt is told like a strike's victims.
+      case 'card_played': {
+        if (!e.victims) out.push(e);
+        else if (friendly(e.nation)) out.push({ ...e, victims: e.target && canDetect(world, vision, e.target) ? e.victims : e.victims.filter((v) => friendly(v.owner)) });
+        else out.push({ ...e, victims: e.victims.filter((v) => friendly(v.owner) || (!!e.target && sees(e.target))) });
+        break;
+      }
       // Treaties are public, like declarations of war.
       case 'diplomacy':
       case 'treaty':
@@ -210,6 +219,10 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   // 2. Diplomacy.
   resolveDiplomacy(world, orders, events);
   separateNewEnemies(world, events);
+
+  // 2c. Doctrine cards: paid, settled from one snapshot, the hands drawn back up.
+  resolveDoctrine(world, orders, events);
+  removeDestroyed(world, events);
 
   // 3. Production and recruitment. Each nation touches only its own stockpile and queue.
   const production: Record<NationId, Stockpile> = {};

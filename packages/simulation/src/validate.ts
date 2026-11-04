@@ -2,6 +2,7 @@ import type {
   ArenaBattle,
   BuildOrder,
   Budget,
+  CardPlay,
   DiplomaticAction,
   FacilityId,
   FormationOrder,
@@ -19,6 +20,7 @@ import { AIR_REBASE_RANGE, FACILITIES, FACILITY_SLOTS, TECHS, UNITS } from '@bri
 import { areAdjacent, keyDistance } from '@brink/map';
 import { lockCommanderOrders } from './commanders';
 import { canPropose } from './diplomacy';
+import { checkPlays, marchBonus } from './doctrine';
 import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
 export interface LockedOrders {
@@ -37,12 +39,13 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((s) => typeof s === 'string');
 }
 
-/** Why `order` is illegal for formation `id`, or null if it is legal. */
-export function checkFormationOrder(world: WorldState, nation: NationId, id: string, order: FormationOrder): string | null {
+/** Why `order` is illegal for formation `id`, or null if it is legal. `plays`: the cards played with it (a Forced March counts). */
+export function checkFormationOrder(world: WorldState, nation: NationId, id: string, order: FormationOrder, plays: readonly CardPlay[] = []): string | null {
   const f = world.formations[id];
   if (!f) return 'no such formation';
   if (f.owner !== nation) return 'formation belongs to another nation';
   const def = UNITS[f.unitClass];
+  const allowance = movementAllowance(f) + marchBonus(world.nations[nation], world.turn, f, plays);
   const o = order as unknown as Record<string, unknown>;
   switch (order.type) {
     case 'hold':
@@ -65,7 +68,7 @@ export function checkFormationOrder(world: WorldState, nation: NationId, id: str
       if (isNaval(f.unitClass) && order.type !== 'move') return 'ships can only move';
       const cost = pathCost(world.tiles, f.unitClass, f.key, order.path);
       if (cost === null) return 'path is not contiguous or crosses impassable terrain';
-      if (cost > movementAllowance(f)) return 'path exceeds movement allowance';
+      if (cost > allowance) return 'path exceeds movement allowance';
       return null;
     }
     case 'attack': {
@@ -84,7 +87,7 @@ export function checkFormationOrder(world: WorldState, nation: NationId, id: str
       if (f.aboard && order.path.length > 0) return 'an amphibious assault goes straight from the ship';
       const cost = pathCost(world.tiles, f.unitClass, f.key, order.path);
       if (cost === null) return 'approach is not contiguous or crosses impassable terrain';
-      if (cost > movementAllowance(f)) return 'approach exceeds movement allowance';
+      if (cost > allowance) return 'approach exceeds movement allowance';
       const end = order.path.at(-1) ?? f.key;
       if (!areAdjacent(end, order.target)) return 'target is not adjacent to the end of the approach';
       if (enterCost(world.tiles[order.target], f.unitClass) === null) return 'target hex is impassable';
@@ -307,10 +310,17 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
       continue;
     }
 
+    // Cards first: a Forced March played now lengthens this turn's moves.
+    if (sub.play !== undefined) {
+      const cards = checkPlays(world, nation, n.doctrine, Array.isArray(sub.play) ? sub.play : []);
+      for (const why of cards.rejected) reject(why);
+      if (cards.accepted.length > 0) locked.play = cards.accepted;
+    }
+
     const fOrders = sub.formations && typeof sub.formations === 'object' ? sub.formations : {};
     for (const id of Object.keys(fOrders).sort()) {
       const order = fOrders[id]!;
-      const why = checkFormationOrder(world, nation, id, order);
+      const why = checkFormationOrder(world, nation, id, order, locked.play);
       if (why) reject(why, id);
       else locked.formations[id] = order;
     }

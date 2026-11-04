@@ -1,5 +1,6 @@
-import type { ArenaBattle, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
+import type { ArenaBattle, CardPlay, FormationId, FormationOrder, HexKey, NationView } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
+import { cardSupport } from '@brink/simulation';
 import { keyDistance } from '@brink/map';
 import { leaderEffects, leaderOf } from '@brink/simulation';
 import { abilitiesFor, ARSENAL_OF, RANKS, rankOf, SUPPORT_IDS, type ArenaResult, type ArenaSetup, type Battle, type BattleEvent, type SiteKind, type SupportId, type UnitSpec } from '@brink/arena';
@@ -83,7 +84,15 @@ export function supportFor(view: NationView, target: HexKey, exclude: readonly s
   return { blue: list(blue), red: list(red) };
 }
 
-export function battleFor(view: NationView, target: HexKey, orders: Record<FormationId, FormationOrder>): BattleRequest | null {
+/** Blue's support with what its doctrine cards add: the lasting ones in its view and the ones played this turn. */
+export function withCards(view: NationView, blue: SupportList, plays: readonly CardPlay[] = []): SupportList {
+  const total = new Map<SupportId, number>(blue.map((s) => [s.id, s.missions]));
+  for (const c of cardSupport(view.self, view.turn, plays)) if ((SUPPORT_IDS as readonly string[]).includes(c.id)) total.set(c.id as SupportId, (total.get(c.id as SupportId) ?? 0) + c.missions);
+  return SUPPORT_IDS.filter((x) => (total.get(x) ?? 0) > 0).map((x) => ({ id: x, missions: total.get(x)! }));
+}
+
+/** `plays`: the doctrine cards played in this turn's draft (Air Superiority's sorties fly over the battle). */
+export function battleFor(view: NationView, target: HexKey, orders: Record<FormationId, FormationOrder>, plays: readonly CardPlay[] = []): BattleRequest | null {
   const fighters = Object.keys(orders)
     .filter((id) => orders[id]!.type === 'attack' && view.formations[id])
     .sort();
@@ -117,7 +126,8 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
   }));
   // The defenders' kit comes from the strongest power holding the hex.
   const owner = enemies[0]!.owner;
-  const support = supportFor(view, target, [...fighters, ...enemies.map((c) => c.formation)]);
+  const around = supportFor(view, target, [...fighters, ...enemies.map((c) => c.formation)]);
+  const support = { blue: withCards(view, around.blue, plays), red: around.red };
   const place = site?.name ?? (tile?.terrain ? `the ${tile.terrain}` : 'the line');
   return {
     target,

@@ -25,8 +25,10 @@ import { AIR_REBASE_RANGE, EVENTS, FACILITIES, FACILITY_SLOTS, PERKS, STACK_LIMI
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
 import { enterCost, isNaval, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
 
+import { planCards } from './doctrine';
 import { landmasses } from './land';
 
+export { planCards } from './doctrine';
 export { proposeOperations, operationById, type Operation, type OperationPhase } from './operations';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
@@ -731,6 +733,8 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   if (eventChoice !== undefined) out.eventChoice = eventChoice;
   const commanders = planCommanders(view, orders);
   if (commanders) out.commanders = commanders;
+  const play = planCards(view, orders);
+  if (play.length) out.play = play;
   return out;
 }
 

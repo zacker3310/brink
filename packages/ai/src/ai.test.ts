@@ -40,6 +40,35 @@ describe('AI', () => {
     expect(gens.some((c) => c.xp > 0)).toBe(true);
     expect(promoted).toBeGreaterThan(0);
   }, 120_000);
+  it('plays its doctrine cards, and the validator refuses none of them', () => {
+    let w = createPacificScenario(2);
+    const played = new Map<string, number>();
+    for (let turn = 0; turn < 15 && !w.victory; turn++) {
+      const subs = sortedKeys(w.nations)
+        .filter((n) => !w.nations[n]!.eliminated)
+        .map((n) => planOrders(buildView(w, n), emptyMemory(), w.seed));
+      const r = resolveTurn(w, subs);
+      expect(r.events.filter((e) => e.kind === 'order_rejected'), `turn ${w.turn}`).toEqual([]);
+      for (const e of r.events) if (e.kind === 'card_played') played.set(e.nation, (played.get(e.nation) ?? 0) + 1);
+      w = r.world;
+    }
+    // Every power plays cards; no minor state holds any.
+    expect([...played.keys()].sort()).toEqual(['china', 'japan', 'russia', 'usa']);
+  }, 60_000);
+
+  it('fires a Missile Barrage at a big enemy stack in range, and keeps it for one', () => {
+    const w = makeWorld(10, 6, ['a', 'b']);
+    w.sites['a-home']!.kind = 'capital';
+    own(w, 'a', [hexKey(0, 0), hexKey(1, 0)]);
+    unit(w, 'ar', 'a', 'recon', hexKey(2, 1));
+    unit(w, 'b1', 'b', 'armor', hexKey(4, 1));
+    w.nations.a!.doctrine = { cp: 5, hand: ['missile_barrage'], deck: [], discard: [], effects: [] };
+    const o = planOrders(buildView(w, 'a'), emptyMemory(), 1);
+    expect(o.play).toEqual([{ card: 'missile_barrage', target: hexKey(4, 1) }]);
+    expect(lockOrders(w, [o]).rejected).toEqual([]);
+    delete w.formations.b1;
+    expect(planOrders(buildView(w, 'a'), emptyMemory(), 1).play).toBeUndefined();
+  });
 
   it('is deterministic and reads nothing but its own view', () => {
     const w = createPacificScenario(5);

@@ -1,7 +1,7 @@
 import type { Formation, GovernmentId, HexKey, Nation, NationId, Site, SiteKind, Terrain, Tile, UnitClass, WorldState, Yields } from '@brink/contracts';
 import { RULESET_VERSION, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { hexKey, keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
-import { computeVision, emptyIntel, grossYields, mulberry32, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
+import { computeVision, emptyIntel, grossYields, initDoctrine, mulberry32, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
 // The Pacific: four real powers (the United States, Russia, China, Japan) around a compressed ocean,
 // seven independent states between them, and island chains to fight over. The map runs from Moscow
@@ -477,6 +477,8 @@ export function createPacificScenario(seed: number): WorldState {
     world.intel[id] = intel;
     updateIntel(world, id, computeVision(world, id), 0);
   }
+  // Every power opens with its doctrine: a hand of three and its first Command Points.
+  initDoctrine(world);
   return world;
 }
 

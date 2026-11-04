@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type {
   Budget,
+  CardId,
+  CardPlay,
   Difficulty,
   DiplomaticAction,
   FacilityId,
@@ -21,8 +23,8 @@ import { engine } from './engine';
 import { withPosting } from './generals';
 import { idleFormations, netChange, selfLedger, wonCampaign } from './insight';
 import { recommendedTech, recruitCostFor } from './rules-view';
-import { movementAllowance } from '@brink/simulation';
-import { UNITS } from '@brink/game-data';
+import { checkPlays, movementAllowance } from '@brink/simulation';
+import { CARDS, UNITS } from '@brink/game-data';
 import { useCoach } from './coach';
 import { sfx } from './sfx';
 import { battleFor, battleRecord, type BattleRequest } from './arena/battle';
@@ -170,6 +172,15 @@ interface State {
   setPerkChoice(commander: string, choice: 0 | 1): void;
   setDiplomacy(target: NationId, action: DiplomaticAction | null): void;
   setPriority(id: FormationId, p: SupplyPriority): void;
+  /** A doctrine card waiting for its target: the next hex tap aims it (a rival power's card takes `nation`). */
+  aimingCard: CardId | null;
+  /** Play a card from the hand: at once if it takes no target, else arm it for the next tap. */
+  playCard(card: CardId, nation?: NationId): void;
+  /** Aim the armed card at a hex. */
+  aimCard(key: HexKey): void;
+  cancelAim(): void;
+  /** Take a card back into the hand. */
+  unplayCard(index: number): void;
   submit(): Promise<void>;
   /** The order review is open: End Turn shows it, Commit submits. */
   review: boolean;
@@ -228,7 +239,7 @@ export const useGame = create<State>((set, get) => {
       return false;
     }
     if (r.type === 'state') {
-      set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), planned: [], submitted: null, rejected: [], screen: 'game' });
+      set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), planned: [], submitted: null, rejected: [], screen: 'game', aimingCard: null });
       // The operation for this seat, and whether it is over: the prize taken, or out of reach.
       const op = readOperation(r.view);
       if (op && !operationById(r.view, op.id, op.kind)) {
@@ -273,6 +284,22 @@ export const useGame = create<State>((set, get) => {
     void recheck();
   };
 
+  /** Add a card play to the draft if the engine's own check takes it with the others; else say why. */
+  const tryPlay = (p: CardPlay): boolean => {
+    const { view, draft } = get();
+    if (!view || !draft) return false;
+    const plays = [...(draft.play ?? []), p];
+    const res = checkPlays(view, view.self.id, view.self.doctrine, plays);
+    if (res.rejected.length > 0) {
+      get().notify(res.rejected[0]!, 'warn');
+      return false;
+    }
+    sfx.order();
+    editDraft((d) => ({ ...d, play: plays }));
+    get().notify(`${CARDS[p.card]?.name ?? p.card} played`);
+    return true;
+  };
+
   return {
     screen: 'menu',
     view: null,
@@ -314,6 +341,7 @@ export const useGame = create<State>((set, get) => {
     },
     lastTurn: null,
     armed: null,
+    aimingCard: null,
 
     async newGame(nation, seed, maxTurns, difficulty, theatre, crisis) {
       if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre, crisis }))) {
@@ -525,7 +553,7 @@ export const useGame = create<State>((set, get) => {
     },
     attack(target, orders) {
       const view = get().view;
-      const req = view ? battleFor(view, target, orders) : null;
+      const req = view ? battleFor(view, target, orders, get().draft?.play) : null;
       if (req && !useGame.getState().submitted) {
         set({ armed: null });
         get().fight(req);
@@ -584,6 +612,39 @@ export const useGame = create<State>((set, get) => {
         return d;
       }),
     setPriority: (id, p) => editDraft((d) => ({ ...d, supplyPriority: { ...(d.supplyPriority ?? {}), [id]: p } })),
+    playCard(card, nation) {
+      const { view, draft, resolving } = get();
+      const def = CARDS[card];
+      if (!view || !draft || resolving || !def) return;
+      if (def.target === 'own-hex' || def.target === 'enemy-hex' || def.target === 'hex') {
+        sfx.arm();
+        set({ aimingCard: card, armed: null, selectedFormation: null, group: [] });
+        get().notify(`${def.name}: tap ${def.target === 'own-hex' ? 'a hex of your own' : def.target === 'enemy-hex' ? 'a hex you do not hold' : 'any hex'} to aim it`);
+        return;
+      }
+      tryPlay({ card, ...(def.target === 'nation' && nation ? { nation } : {}) });
+    },
+    aimCard(key) {
+      const card = get().aimingCard;
+      if (!card) return;
+      if (tryPlay({ card, target: key })) set({ aimingCard: null });
+    },
+    cancelAim: () => set({ aimingCard: null }),
+    unplayCard(index) {
+      const p = get().draft?.play?.[index];
+      if (!p) return;
+      // A battle already fought with a card's support keeps the card: the support was used.
+      if ((get().draft?.battles?.length ?? 0) > 0 && CARDS[p.card]?.effects.some((e) => e.kind === 'arena_support')) {
+        get().notify(`${CARDS[p.card]!.name} flew over a battle already fought: it stays played`, 'warn');
+        return;
+      }
+      sfx.select();
+      editDraft((d) => {
+        d.play = (d.play ?? []).filter((_, i) => i !== index);
+        if (d.play.length === 0) delete d.play;
+        return d;
+      });
+    },
 
     async submit() {
       const { draft: planned, resolving, view } = get();

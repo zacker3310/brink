@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { GameEvent, HexKey, NationView, TurnReport, UnitClass } from '@brink/contracts';
-import { EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
+import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { Label, useKeys } from './chrome';
 import { UnitGlyph } from './glyphs';
 import { arenaNote, atPlace, describeEffect, hexLabel, netChange, toPlace, treatyText, turnClock, VICTORY_HOW } from './insight';
@@ -37,6 +37,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
   const at = (k: HexKey) => hexLabel(view, k);
   const totals: Totals = { lost: 0, dealt: 0, ourDestroyed: 0, theirDestroyed: 0, gained: 0, ceded: 0, battles: 0 };
   const out: Record<string, Row[]> = {
+    Doctrine: [],
     Engagements: [],
     Casualties: [],
     Territory: [],
@@ -183,6 +184,21 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
       case 'victory':
         out.Diplomacy!.push({ tone: e.winner === me || e.coalition?.includes(me) ? 'good' : 'bad', text: `${nation(view, e.winner)} wins ${VICTORY_HOW[e.reason]}.` });
         break;
+      case 'card_played': {
+        const card = CARDS[e.card]?.name ?? e.card;
+        const dealt = (e.victims ?? []).reduce((a, v) => a + (v.owner === me ? 0 : v.strengthLoss), 0);
+        const lost = (e.victims ?? []).reduce((a, v) => a + (v.owner === me ? v.strengthLoss : 0), 0);
+        totals.dealt += e.nation === me ? dealt : 0;
+        totals.lost += lost;
+        out.Doctrine!.push({
+          ...(e.target ? { at: e.target } : {}),
+          tone: e.nation === me ? 'good' : lost > 0 || e.targetNation === me ? 'bad' : undefined,
+          text: `${e.nation === me ? 'We' : nation(view, e.nation)} played ${card}${e.target ? ` on ${at(e.target)}` : e.targetNation ? ` on ${nation(view, e.targetNation)}` : ''}${
+            e.victims ? `: ${e.victims.length ? e.victims.map((v) => `${name(view, v.formation, v.owner)} −${v.strengthLoss}`).join(', ') : 'no confirmed hits'}` : ''
+          }.`,
+        });
+        break;
+      }
       case 'order_rejected':
         out.Orders!.push({ tone: 'bad', text: `Rejected${e.formation ? ` (${name(view, e.formation, me)})` : ''}: ${e.reason}.` });
         break;

@@ -25,6 +25,18 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
 
 ## Completed
 
+- Doctrine cards (ruleset 2.3.0): every power holds a hand of three national cards drawn from a deck
+  (by government now; `game-data/src/nations/<id>.ts` plus one map entry adds a nation's own), paid
+  for in Command Points (1 a turn, +1 per capital, +1 per four cities, cap 8), at most two a turn.
+  Thirteen generic cards: Air Superiority, Naval Bombardment, Missile Barrage, Forced March, Dig In,
+  Rally, Requisition, Propaganda, Sabotage, Recon Flight, Amphibious Doctrine, Kamikaze Swarm,
+  Disinformation. A new doctrine phase after diplomacy; lasting cards reach movement, strikes,
+  logistics, vision, landings and the arena's off-map support (`battleFor`). Plays are public in the
+  turn report and debrief. The AI plays by utility from its view, checked by the engine's own
+  `checkPlays`. Phone: a "Hand 3 · CP 5" chip opens a fanned hand; a targeted card is armed and the
+  next hex tap aims it; stamps on the order review. Desktop: the hand peeks up from the map's bottom
+  edge. Old saves are dealt a doctrine on load.
+
 - Engine: 12-phase resolver, discrete-event simultaneous movement, combat with class counters, terrain,
   entrenchment, river crossings, recon, air and artillery support, combined arms; logistics with
   interdiction and priorities; economy with budget, research, shortages and stability; diplomacy (war,

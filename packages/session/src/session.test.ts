@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SAVE_VERSION } from '@brink/contracts';
-import { RULESET_VERSION } from '@brink/game-data';
+import { CARDS, RULESET_VERSION } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { hashState } from '@brink/simulation';
 import { parseSave, SaveError, serializeSave } from './save';
@@ -89,6 +89,31 @@ describe('GameSession', () => {
     const resumed = GameSession.fromSave(loaded);
     resumed.advance();
     expect(resumed.view().commanders!['japan-gen-1']!.status).toBe('active');
+  });
+
+  it('deals doctrine cards to a 2.2.0 save that had none, and plays them on', () => {
+    const s = GameSession.create(PACIFIC_ID, 9, 'japan');
+    s.advance();
+    const old = JSON.parse(serializeSave(s.toSave('old', '2026-11-01T12:00:00Z')));
+    old.rulesetVersion = '2.2.0';
+    old.world.rulesetVersion = '2.2.0';
+    for (const n of Object.values(old.world.nations) as Record<string, unknown>[]) delete n.doctrine;
+    old.hash = hashState(old.world);
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.migratedFrom).toBe('2.2.0');
+    const japan = loaded.world.nations.japan!.doctrine!;
+    expect(japan.hand).toHaveLength(3);
+    expect(loaded.world.nations.taiwan!.doctrine).toBeUndefined();
+    expect(loaded.hash).toBe(hashState(loaded.world));
+    const resumed = GameSession.fromSave(loaded);
+    const view = resumed.view();
+    expect(view.self.doctrine).toEqual(japan);
+    // A card that needs no target, from the hand this seed deals.
+    const card = japan.hand.find((c) => CARDS[c]!.target === 'none' && CARDS[c]!.cost <= japan.cp)!;
+    expect(card).toBeDefined();
+    const r = resumed.advance({ nation: 'japan', turn: view.turn, formations: {}, recruit: [], diplomacy: [], play: [{ card }] });
+    expect(r.reports.japan!.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    expect(r.reports.japan!.events).toContainEqual({ kind: 'card_played', nation: 'japan', card });
   });
 
   it('runs any campaign length from 5 turns to a 250-turn Total War', () => {

@@ -3,6 +3,8 @@
 
 import type { Commander, CommanderEvent, CommanderId, CommanderOrders, CommanderSighting } from './commanders';
 export * from './commanders';
+import type { CardPlay, CardPlayedEvent, DoctrineState, PublicDoctrine } from './doctrine';
+export * from './doctrine';
 
 export type NationId = string;
 export type FormationId = string;
@@ -180,6 +182,8 @@ export interface Nation {
   event?: PendingEvent | null;
   /** A human seat's command edge from the campaign difficulty (`DIFFICULTY_EDGE`). Absent: none. */
   edge?: Difficulty;
+  /** Doctrine cards and Command Points (`doctrine.ts`). Absent for minor states and older worlds. */
+  doctrine?: DoctrineState;
 }
 
 export type WorldEventId =
@@ -284,6 +288,8 @@ export interface NationOrders {
   battles?: ArenaBattle[];
   /** Generals to assign or relieve, and level-up perk choices. */
   commanders?: CommanderOrders;
+  /** Doctrine cards played this turn (at most `DOCTRINE.maxPlays`). */
+  play?: CardPlay[];
 }
 
 export interface LastKnownContact {
@@ -442,7 +448,8 @@ export type GameEvent =
   | { kind: 'elimination'; nation: NationId; /** Who took the whole country: the holder of most of its cities. */ annexedBy?: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
   | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string }
-  | CommanderEvent;
+  | CommanderEvent
+  | CardPlayedEvent;
 
 export interface TurnReport {
   turn: number;
@@ -506,6 +513,8 @@ export interface PublicNation {
   victoryPoints: number;
   /** A minor state: neutral ground with a militia, never a rival power. */
   minor?: boolean;
+  /** Command Points and hand size: public. The cards themselves are not. */
+  doctrine?: PublicDoctrine;
 }
 
 export interface NationView {

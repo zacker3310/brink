@@ -222,7 +222,8 @@ export function HoverCard() {
   const resolving = useGame((s) => s.resolving);
   const cam = useCamera((s) => s.camera);
   const f = fid ? view.formations[fid] : undefined;
-  const reach = useMemo(() => (f ? reachFor(view, f) : null), [view, f]);
+  const plays = useGame((s) => s.draft?.play);
+  const reach = useMemo(() => (f ? reachFor(view, f, plays) : null), [view, f, plays]);
   if (!key) return null;
   const t = view.tiles[key];
   if (!t) return null;

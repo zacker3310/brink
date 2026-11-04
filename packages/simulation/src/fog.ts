@@ -14,6 +14,7 @@ import type {
 import { TERRAIN, victoryBars } from '@brink/game-data';
 import { rangeKeys } from '@brink/map';
 import { leaderEffects, leaderOf } from './commanders';
+import { revealedHexes } from './doctrine';
 import { clone, nationModifiers, relationOf, sortedKeys, visionRadius } from './rules';
 import { supremacyStanding } from './victory';
 
@@ -66,6 +67,8 @@ export function computeVision(world: WorldState, nation: NationId, reconActive: 
     // Everyone sees into their own hex; only reconnaissance sees into cover beyond it.
     add(f.key, true);
   }
+  // A Recon Flight sees all of its circle, cover or not.
+  for (const n of [...eyes].sort()) for (const k of revealedHexes(world, n)) add(k, true);
   return { visible, detect };
 }
 
@@ -251,7 +254,17 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
   const relations: Record<NationId, Relation> = {};
   for (const id of sortedKeys(world.nations)) {
     const n = world.nations[id]!;
-    nations[id] = { id, name: n.name, color: n.color, government: n.government, eliminated: n.eliminated, victoryPoints: vp[id]!, ...(n.minor ? { minor: true } : {}) };
+    nations[id] = {
+      id,
+      name: n.name,
+      color: n.color,
+      government: n.government,
+      eliminated: n.eliminated,
+      victoryPoints: vp[id]!,
+      ...(n.minor ? { minor: true } : {}),
+      // Command Points and hand size are public; the cards are not.
+      ...(n.doctrine ? { doctrine: { cp: n.doctrine.cp, hand: n.doctrine.hand.length } } : {}),
+    };
     if (id !== nation) relations[id] = relationOf(world.relations, nation, id);
   }
 
