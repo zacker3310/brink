@@ -119,9 +119,11 @@ hover combat card) and gets the same map.
 | Counters, pictograms | `counters.ts`, `design/pictograms.ts`, `glyphs.tsx` | The only way to draw a unit |
 | Odds, goal | `odds.ts`, `objective.ts` | Shared by map and cards |
 | World card, How to win | `PhoneGame.tsx` | The whole theatre with war/peace per nation; the three-step brief |
-| Research, Diplomacy | `Panels.tsx` | Plain-word cards, one decision each; research funding Low / Normal / High |
+| Research | `Research.tsx` | The tree: what is in progress, five branch chips (44 px), each branch's technologies by depth as cards (done, researching, open, locked with what it needs; what it builds; what it brings to battle); funding Low / Normal / High |
+| Diplomacy | `Panels.tsx` | Plain-word cards, one decision each |
 | Desktop HUD | `Game.tsx`, `UnitPanel.tsx`, `MapOverlays.tsx` | Mouse and keyboard |
 | City banners, production | `Cities.tsx` | Production is a bottom sheet on a phone |
+| City development, build queue | `CityBuild.tsx` | Level and growth meter, slots, the construction queue with turns, every facility with its cost or why it cannot start |
 | Coach | `Coach.tsx`, `coach.ts` | Guided first match, touch wording on phones |
 | Sound | `sfx.ts` | WebAudio, no files |
 

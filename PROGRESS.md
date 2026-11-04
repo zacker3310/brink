@@ -25,6 +25,18 @@ Updated 2026-11-04 (commanders, ruleset 2.3.0). Milestone 1 (first playable).
 
 ## Completed
 
+- Civ-style progression (ruleset 2.6.0): a research tree of 24 technologies in five branches
+  (Logistics & Economy, Armour, Air & Missiles, Naval, Cyber & Intel; `game-data/src/research.ts`)
+  whose effects reach movement (armour, ships), combat (armour attack, ship attack and defense),
+  supply, income, research, doctrine (a fourth card, an extra Command Point), facility costs, city
+  growth and the arena's off-map support. City development (`game-data/src/cities.ts`,
+  `simulation/src/progression.ts`, a development phase after the economy): capitals and cities grow
+  to level 5, each level adding yields and levels 3 and 5 a facility slot. Three new facilities:
+  naval yard (ports), airbase and missile battery (support over nearby battles, defenders +15%).
+  The AI's research and build choices live in `ai/src/research.ts`. Phone: the Research screen
+  (`Research.tsx`, branch chips and tree cards) and the city build panel (`CityBuild.tsx`, level,
+  growth, slots, build queue); e2e `progression.spec.ts`. Older saves gain development 0 on load.
+
 - Doctrine cards (ruleset 2.3.0): every power holds a hand of three national cards drawn from a deck
   (by government now; `game-data/src/nations/<id>.ts` plus one map entry adds a nation's own), paid
   for in Command Points (1 a turn, +1 per capital, +1 per four cities, cap 8), at most two a turn.

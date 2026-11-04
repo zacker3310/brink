@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { CARDS, COMMANDER_RULES, DOCTRINE, FACILITY_SLOTS, levelForXp, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { CARDS, CITY_GROWTH, COMMANDER_RULES, DOCTRINE, FACILITY_SLOTS, LEVEL_SLOT_AT, levelForXp, STACK_LIMIT, TECHS, UNITS } from '@brink/game-data';
 import { PACIFIC_ID } from '@brink/scenarios';
 import { GameSession } from '@brink/session';
 
@@ -53,7 +53,14 @@ function invariants(w: WorldState): string[] {
   }
   for (const s of Object.values(w.sites)) if (w.tiles[s.key]!.owner !== s.owner) bad.push(`site ${s.id} owner differs from its hex`);
   for (const s of Object.values(w.sites)) {
-    if (s.facilities.length > FACILITY_SLOTS[s.kind] || new Set(s.facilities).size !== s.facilities.length) bad.push(`site ${s.id} facilities ${s.facilities.join(',')}`);
+    // Ruleset 2.6: a city's level opens more slots, and a city taken keeps its buildings though it
+    // loses half its development, so the bound is the most a site of its kind can ever hold.
+    if (s.facilities.length > FACILITY_SLOTS[s.kind] + LEVEL_SLOT_AT.length || new Set(s.facilities).size !== s.facilities.length) bad.push(`site ${s.id} facilities ${s.facilities.join(',')}`);
+    const dev = s.development ?? 0;
+    if (!Number.isInteger(dev) || dev < 0 || dev > CITY_GROWTH.max) bad.push(`site ${s.id} development ${dev}`);
+  }
+  for (const n of Object.values(w.nations)) {
+    for (const t of n.research.unlocked) if (!TECHS[t] || TECHS[t]!.requires.some((p) => !n.research.unlocked.includes(p))) bad.push(`${n.id} has ${t} without its prerequisites`);
   }
   for (const t of w.treaties) {
     if (!(t.a < t.b) || t.until < t.from) bad.push(`malformed treaty ${JSON.stringify(t)}`);
@@ -79,7 +86,7 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
     const endings: Record<string, number> = {};
     const turns: number[] = [];
     let rejected = 0;
-    const usage = { facilities: 0, treaties: 0, cards: 0 };
+    const usage = { facilities: 0, treaties: 0, cards: 0, techs: 0, grown: 0 };
     const generals = { promoted: 0, killed: 0, topLevel: 1 };
     for (let seed = 1; seed <= MATCHES; seed++) {
       const s = GameSession.create(PACIFIC_ID, seed, null);
@@ -92,6 +99,8 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
         generals.promoted += r.events.filter((e) => e.kind === 'commander' && e.change === 'level_up').length;
         generals.killed += r.events.filter((e) => e.kind === 'commander' && e.change === 'killed').length;
         usage.cards += r.events.filter((e) => e.kind === 'card_played').length;
+        usage.techs += r.events.filter((e) => e.kind === 'research').length;
+        usage.grown += r.events.filter((e) => e.kind === 'city_grew').length;
         const bad = invariants(s.snapshot());
         expect(bad, `seed ${seed} turn ${s.turn}`).toEqual([]);
         if (++guard > 40) throw new Error(`seed ${seed} did not end`);
@@ -103,11 +112,14 @@ describe(`AI-vs-AI soak (${MATCHES} matches)`, () => {
       turns.push(v.turn);
     }
     turns.sort((a, b) => a - b);
-    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties, 'generals promoted', generals.promoted, 'killed', generals.killed, 'top level', generals.topLevel, 'cards played', usage.cards);
+    console.log('endings', endings, 'median turn', turns[Math.floor(turns.length / 2)], 'rejected AI orders', rejected, 'facilities built', usage.facilities, 'treaties signed', usage.treaties, 'generals promoted', generals.promoted, 'killed', generals.killed, 'top level', generals.topLevel, 'cards played', usage.cards, 'techs researched', usage.techs, 'cities grown', usage.grown);
     // The AI uses the economy and diplomacy it is given.
     expect(usage.facilities).toBeGreaterThan(MATCHES);
     expect(usage.treaties).toBeGreaterThan(MATCHES);
     expect(usage.cards).toBeGreaterThan(MATCHES * 10);
+    // Every power researches down its tree, and cities grow a level or more in a match.
+    expect(usage.techs).toBeGreaterThan(MATCHES * 8);
+    expect(usage.grown).toBeGreaterThan(MATCHES * 4);
     expect(rejected).toBe(0);
     // Generals see war: they rise in rank.
     expect(generals.promoted).toBeGreaterThan(0);
