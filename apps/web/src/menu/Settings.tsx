@@ -129,12 +129,13 @@ export function Settings({ onBack }: { onBack: () => void }) {
               onChange={(palette) => put({ palette })}
             />
           </Row>
-          <Row id="map" label="War map" note="Painted world map, a clean board, or satellite ground.">
+          <Row id="map" label="War map" note="Painted world map, an ink-on-paper chart, a clean board, or satellite ground.">
             <Seg<MapStyle>
               id="map"
               value={mapStyle}
               options={[
                 ['painted', 'Painted'],
+                ['paper', 'Paper'],
                 ['atlas', 'Clean'],
                 ['satellite', 'Satellite'],
               ]}
