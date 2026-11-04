@@ -167,6 +167,19 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
+  packages/mapgen:
+    dependencies:
+      '@brink/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@brink/map':
+        specifier: workspace:*
+        version: link:../map
+    devDependencies:
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+
   packages/scenarios:
     dependencies:
       '@brink/contracts':

@@ -21,7 +21,7 @@ export const MAX_TURNS = 30;
  * Aleutians, Hawaii, Guam). Minor states: K Canada, M Mexico, N North Korea, S South Korea, T Taiwan,
  * Z Kazakhstan, G Mongolia.
  */
-const GRID: readonly string[] = [
+export const GRID: readonly string[] = [
   'RRRRRRRRRRRRRRRRRRRRRRRRRRUUUUUKKKKKKKK.', // 0  Siberia, the Bering land crossing, Alaska, the Yukon
   'RRRRRRRRRRRRRRRRRRRRRRRRRUUUUUUUKKKKKKK.', // 1  St Petersburg, Yakutsk
   'RRRRRRRRRRRRRRRRRRR..RRR..UUUUUUKKKKKKK.', // 2  the Sea of Okhotsk, Kamchatka
@@ -44,11 +44,11 @@ const GRID: readonly string[] = [
   '..CCCCCCCC....................MMM.......', // 19
 ];
 
-const REGION: Record<string, NationId> = { R: 'russia', C: 'china', J: 'japan', U: 'usa', K: 'canada', M: 'mexico', N: 'nkorea', S: 'skorea', T: 'taiwan', Z: 'kazakhstan', G: 'mongolia' };
+export const REGION: Record<string, NationId> = { R: 'russia', C: 'china', J: 'japan', U: 'usa', K: 'canada', M: 'mexico', N: 'nkorea', S: 'skorea', T: 'taiwan', Z: 'kazakhstan', G: 'mongolia' };
 
 type Place = [col: number, row: number, name: string];
 
-interface NationSpec {
+export interface NationSpec {
   id: NationId;
   name: string;
   /** The name on a map label or a small tile: 'USA', 'N. Korea'. */
@@ -172,7 +172,7 @@ export const MINORS: readonly NationSpec[] = [
   { id: 'mongolia', short: 'Mongolia', name: 'Mongolia', color: '#a8744a', government: 'federation', minor: true, capital: [11, 7, 'Ulaanbaatar'], cities: [[9, 6, 'Khovd']], depots: [], rough: 15 },
 ];
 
-const ALL: readonly NationSpec[] = [...NATIONS, ...MINORS];
+export const ALL: readonly NationSpec[] = [...NATIONS, ...MINORS];
 
 /** A nation's short name for map labels and small tiles; the full name if it is not one of ours. */
 export function shortName(name: string): string {
@@ -180,7 +180,7 @@ export function shortName(name: string): string {
 }
 
 /** Victory points by site name where a place is worth more than its size: what the war is about. */
-const PRIZE: Record<string, number> = {
+export const PRIZE: Record<string, number> = {
   Taipei: 9,
   Seoul: 8,
   'Mexico City': 8,
@@ -196,7 +196,7 @@ const PRIZE: Record<string, number> = {
 };
 
 /** Island outposts: a runway and a harbour, worth little in themselves; their worth is where they are. */
-const OUTPOSTS = new Set(['Guam', 'Adak']);
+export const OUTPOSTS = new Set(['Guam', 'Adak']);
 
 const at = (col: number, row: number): HexKey => keyOf(offsetToAxial(col, row));
 

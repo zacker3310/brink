@@ -1,0 +1,772 @@
+{
+  "format": "brink-map",
+  "version": 1,
+  "id": "pacific",
+  "name": "The Pacific",
+  "cols": 40,
+  "rows": 20,
+  "layout": "odd-r",
+  "source": "Hand-drawn character grid (formerly inline in packages/scenarios/src/pacific.ts), converted by packages/mapgen convert-pacific.",
+  "layers": {
+    "owner": {
+      "legend": {
+        ".": null,
+        "C": "china",
+        "G": "mongolia",
+        "J": "japan",
+        "K": "canada",
+        "M": "mexico",
+        "N": "nkorea",
+        "R": "russia",
+        "S": "skorea",
+        "T": "taiwan",
+        "U": "usa",
+        "Z": "kazakhstan"
+      },
+      "rows": [
+        "RRRRRRRRRRRRRRRRRRRRRRRRRRUUUUUKKKKKKKK.",
+        "RRRRRRRRRRRRRRRRRRRRRRRRRUUUUUUUKKKKKKK.",
+        "RRRRRRRRRRRRRRRRRRR..RRR..UUUUUUKKKKKKK.",
+        "RRRRRRRRRRRRRRRRRR...RR....UUUUUKKKKKKK.",
+        "RRRRRRRRRRRRRRRRRR.R.R..UU.U....KKKKKKK.",
+        "RRRRRRRRRRRRRRRRRR....R.........KKKKKKK.",
+        "ZZZZZZZRRGGGGGCCCC..JJ....KKKKKKKKKKKKK.",
+        "ZZZZZZZCGGGGGCCCNN.JJJJ...UUUUUUUUUUUUU.",
+        "ZZZZZZCCCCCCCCCC.S..JJJ...UUUUUUUUUUUUU.",
+        "ZZZZZZCCCCCCCCCC.SS.JJJ...UUUUUUUUUUUUU.",
+        "CCCCCCCCCCCCCCCC....JJ....UUUUUUUUUUUUU.",
+        "CCCCCCCCCCCCCCCC....JJ....UUUUUUUUUUUUU.",
+        "CCCCCCCCCCCCCCCC.......UU.UUUUUUUUUUUUU.",
+        "CCCCCCCCCCCCCCC.TTT.......UUUUUUUUUUUUU.",
+        "CCCCCCCCCCCCCCC.TTT.......UUUUUUUUUUUUU.",
+        "CCCCCCCCCCCCCCC.TT...U.....MMMMMMMMMM...",
+        "CCCCCCCCCCCCCC...T.........MMMMMMMM.....",
+        "CCCCCCCCCCCCC...............MMMMMM......",
+        "CCCCCCCCCCCC.................MMMMM......",
+        "..CCCCCCCC....................MMM......."
+      ]
+    },
+    "terrain": {
+      "legend": {
+        "~": "water",
+        "*": "seeded"
+      },
+      "rows": [
+        "***************************************~",
+        "***************************************~",
+        "*******************~~***~~*************~",
+        "******************~~~**~~~~************~",
+        "******************~*~*~~**~*~~~~*******~",
+        "******************~~~~*~~~~~~~~~*******~",
+        "******************~~**~~~~*************~",
+        "******************~****~~~*************~",
+        "****************~*~~***~~~*************~",
+        "****************~**~***~~~*************~",
+        "****************~~~~**~~~~*************~",
+        "****************~~~~**~~~~*************~",
+        "****************~~~~~~~**~*************~",
+        "***************~***~~~~~~~*************~",
+        "***************~***~~~~~~~*************~",
+        "***************~**~~~*~~~~~**********~~~",
+        "**************~~~*~~~~~~~~~********~~~~~",
+        "*************~~~~~~~~~~~~~~~******~~~~~~",
+        "************~~~~~~~~~~~~~~~~~*****~~~~~~",
+        "~~********~~~~~~~~~~~~~~~~~~~~***~~~~~~~"
+      ]
+    },
+    "seaZone": {
+      "legend": {
+        "-": null,
+        "a": "okhotsk",
+        "b": "north-pacific",
+        "c": "sea-of-japan",
+        "d": "east-china-sea",
+        "e": "south-china-sea",
+        "f": "central-pacific",
+        "g": "east-pacific",
+        "h": "atlantic"
+      },
+      "rows": [
+        "---------------------------------------h",
+        "---------------------------------------h",
+        "-------------------aa---bb-------------h",
+        "------------------aaa--bbbb------------h",
+        "------------------a-a-bb--b-bbbb-------h",
+        "------------------aaaa-bbbbbbbbb-------h",
+        "------------------cc--ffff-------------h",
+        "------------------c----fff-------------h",
+        "----------------c-cc---fff-------------h",
+        "----------------c--c---fff-------------h",
+        "----------------dddd--dfff-------------h",
+        "----------------dddd--dfff-------------h",
+        "----------------ddddddd--f-------------h",
+        "---------------e---effffff-------------h",
+        "---------------e---effffff-------------h",
+        "---------------e--eef-ffffg----------hhh",
+        "--------------eee-eeffffffg--------hhhhh",
+        "-------------eeeeeeeffffffgg------ghhhhh",
+        "------------eeeeeeeeffffffggg-----ghhhhh",
+        "ee--------eeeeeeeeeeffffffgggg---gghhhhh"
+      ]
+    },
+    "biome": {
+      "legend": {
+        "~": "sea",
+        "t": "tundra",
+        "b": "boreal",
+        "m": "temperate",
+        "s": "steppe",
+        "d": "desert",
+        "u": "subtropical",
+        "r": "tropical"
+      },
+      "rows": [
+        "ttttttttttttttttttttttttttttttttttttttt~",
+        "ttttttttttttttttttttttttttttttttttttttt~",
+        "ttttttttttttttttttt~~ttt~~ttttttttttttt~",
+        "bbbbbbbbbbbbbbbbbb~~~bb~~~~bbbbbbbbbbbb~",
+        "bbbbbbbbbbbbbbbbbb~b~b~~bb~b~~~~bbbbbbb~",
+        "bbbbbbbbbbbbbbbbbb~~~~b~~~~~~~~~bbbbbbb~",
+        "sssssssmmsssssmmmm~~mm~~~~mmmmmmmmmmmmm~",
+        "sssssssmsssssmmmmm~mmmm~~~mmmmmmmmmmmmm~",
+        "ssssssmmmmmmmmmm~m~~mmm~~~mmmmmmmmmmmmm~",
+        "ssssssmmmmmmmmmm~mm~mmm~~~mmmmmmmmmmmmm~",
+        "mmmmmmmmmmmmmmmm~~~~mm~~~~mmmmmmmmmmmmm~",
+        "mmmmmmmmmmmmmmmm~~~~mm~~~~mmmmmmmmmmmmm~",
+        "mmmmmmmmmmmmmmmm~~~~~~~rr~uuuuuuuuuuuuu~",
+        "uuuuuuuuuuuuuuu~uuu~~~~~~~uuuuuuuuuuuuu~",
+        "uuuuuuuuuuuuuuu~uuu~~~~~~~uuuuuuuuuuuuu~",
+        "uuuuuuuuuuuuuuu~uu~~~r~~~~~dddddddddd~~~",
+        "uuuuuuuuuuuuuu~~~u~~~~~~~~~dddddddd~~~~~",
+        "uuuuuuuuuuuuu~~~~~~~~~~~~~~~uuuuuu~~~~~~",
+        "uuuuuuuuuuuu~~~~~~~~~~~~~~~~~uuuuu~~~~~~",
+        "~~uuuuuuuu~~~~~~~~~~~~~~~~~~~~uuu~~~~~~~"
+      ]
+    }
+  },
+  "nations": [
+    {
+      "id": "usa",
+      "name": "United States",
+      "short": "USA",
+      "color": "#4f8fe0",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "usa-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "russia",
+      "name": "Russia",
+      "short": "Russia",
+      "color": "#d0543e",
+      "government": "directorate",
+      "role": "power",
+      "capital": "russia-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "china",
+      "name": "China",
+      "short": "China",
+      "color": "#e0b43c",
+      "government": "union",
+      "role": "power",
+      "capital": "china-capital",
+      "terrainBias": -10
+    },
+    {
+      "id": "japan",
+      "name": "Japan",
+      "short": "Japan",
+      "color": "#e8e8ee",
+      "government": "federation",
+      "role": "power",
+      "capital": "japan-capital",
+      "terrainBias": 35
+    },
+    {
+      "id": "canada",
+      "name": "Canada",
+      "short": "Canada",
+      "color": "#b9424f",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "canada-capital",
+      "terrainBias": 25
+    },
+    {
+      "id": "mexico",
+      "name": "Mexico",
+      "short": "Mexico",
+      "color": "#3e9a62",
+      "government": "union",
+      "role": "minor",
+      "capital": "mexico-capital",
+      "terrainBias": 0
+    },
+    {
+      "id": "nkorea",
+      "name": "North Korea",
+      "short": "N. Korea",
+      "color": "#8a5ab8",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "nkorea-capital",
+      "terrainBias": 45
+    },
+    {
+      "id": "skorea",
+      "name": "South Korea",
+      "short": "S. Korea",
+      "color": "#3fa7b5",
+      "government": "federation",
+      "role": "minor",
+      "capital": "skorea-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "taiwan",
+      "name": "Taiwan",
+      "short": "Taiwan",
+      "color": "#c97ab0",
+      "government": "federation",
+      "role": "minor",
+      "capital": "taiwan-capital",
+      "terrainBias": 40
+    },
+    {
+      "id": "kazakhstan",
+      "name": "Kazakhstan",
+      "short": "Kazakh.",
+      "color": "#8fae3a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "kazakhstan-capital",
+      "terrainBias": 0
+    },
+    {
+      "id": "mongolia",
+      "name": "Mongolia",
+      "short": "Mongolia",
+      "color": "#a8744a",
+      "government": "federation",
+      "role": "minor",
+      "capital": "mongolia-capital",
+      "terrainBias": 15
+    }
+  ],
+  "sites": [
+    {
+      "id": "usa-capital",
+      "kind": "capital",
+      "name": "Washington",
+      "at": [38, 10],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city0",
+      "kind": "city",
+      "name": "San Francisco",
+      "at": [26, 10],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city1",
+      "kind": "city",
+      "name": "Los Angeles",
+      "at": [26, 13],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city2",
+      "kind": "city",
+      "name": "Seattle",
+      "at": [26, 7],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city3",
+      "kind": "city",
+      "name": "Honolulu",
+      "at": [24, 12],
+      "owner": "usa",
+      "victoryPoints": 4
+    },
+    {
+      "id": "usa-city4",
+      "kind": "city",
+      "name": "New York",
+      "at": [38, 8],
+      "owner": "usa",
+      "victoryPoints": 3
+    },
+    {
+      "id": "usa-city5",
+      "kind": "city",
+      "name": "Chicago",
+      "at": [33, 8],
+      "owner": "usa",
+      "victoryPoints": 3
+    },
+    {
+      "id": "usa-depot0",
+      "kind": "depot",
+      "name": "Anchorage",
+      "at": [28, 3],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-depot1",
+      "kind": "depot",
+      "name": "Guam",
+      "at": [21, 15],
+      "owner": "usa",
+      "profile": "outpost"
+    },
+    {
+      "id": "usa-depot2",
+      "kind": "depot",
+      "name": "Adak",
+      "at": [24, 4],
+      "owner": "usa",
+      "profile": "outpost"
+    },
+    {
+      "id": "usa-depot3",
+      "kind": "depot",
+      "name": "Houston",
+      "at": [32, 12],
+      "owner": "usa",
+      "victoryPoints": 1
+    },
+    {
+      "id": "russia-capital",
+      "kind": "capital",
+      "name": "Moscow",
+      "at": [2, 3],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city0",
+      "kind": "city",
+      "name": "Vladivostok",
+      "at": [17, 5],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city1",
+      "kind": "city",
+      "name": "Khabarovsk",
+      "at": [16, 4],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city2",
+      "kind": "city",
+      "name": "St Petersburg",
+      "at": [1, 1],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city3",
+      "kind": "city",
+      "name": "Petropavlovsk",
+      "at": [22, 3],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city4",
+      "kind": "city",
+      "name": "Novosibirsk",
+      "at": [9, 4],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-depot0",
+      "kind": "depot",
+      "name": "Sakhalin",
+      "at": [19, 4],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-depot1",
+      "kind": "depot",
+      "name": "Yakutsk",
+      "at": [13, 1],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-depot2",
+      "kind": "depot",
+      "name": "Yekaterinburg",
+      "at": [5, 2],
+      "owner": "russia"
+    },
+    {
+      "id": "china-capital",
+      "kind": "capital",
+      "name": "Beijing",
+      "at": [12, 8],
+      "owner": "china"
+    },
+    {
+      "id": "china-city0",
+      "kind": "city",
+      "name": "Harbin",
+      "at": [14, 6],
+      "owner": "china"
+    },
+    {
+      "id": "china-city1",
+      "kind": "city",
+      "name": "Shanghai",
+      "at": [15, 10],
+      "owner": "china"
+    },
+    {
+      "id": "china-city2",
+      "kind": "city",
+      "name": "Guangzhou",
+      "at": [14, 15],
+      "owner": "china"
+    },
+    {
+      "id": "china-city3",
+      "kind": "city",
+      "name": "Chengdu",
+      "at": [8, 12],
+      "owner": "china"
+    },
+    {
+      "id": "china-city4",
+      "kind": "city",
+      "name": "Xi'an",
+      "at": [9, 10],
+      "owner": "china"
+    },
+    {
+      "id": "china-depot0",
+      "kind": "depot",
+      "name": "Wuhan",
+      "at": [11, 11],
+      "owner": "china"
+    },
+    {
+      "id": "china-depot1",
+      "kind": "depot",
+      "name": "Urumqi",
+      "at": [2, 11],
+      "owner": "china"
+    },
+    {
+      "id": "japan-capital",
+      "kind": "capital",
+      "name": "Tokyo",
+      "at": [22, 7],
+      "owner": "japan"
+    },
+    {
+      "id": "japan-city0",
+      "kind": "city",
+      "name": "Osaka",
+      "at": [20, 9],
+      "owner": "japan"
+    },
+    {
+      "id": "japan-city1",
+      "kind": "city",
+      "name": "Sapporo",
+      "at": [20, 6],
+      "owner": "japan"
+    },
+    {
+      "id": "japan-city2",
+      "kind": "city",
+      "name": "Fukuoka",
+      "at": [20, 10],
+      "owner": "japan"
+    },
+    {
+      "id": "japan-city3",
+      "kind": "city",
+      "name": "Nagoya",
+      "at": [21, 9],
+      "owner": "japan"
+    },
+    {
+      "id": "japan-depot0",
+      "kind": "depot",
+      "name": "Sendai",
+      "at": [21, 7],
+      "owner": "japan"
+    },
+    {
+      "id": "canada-capital",
+      "kind": "capital",
+      "name": "Ottawa",
+      "at": [36, 5],
+      "owner": "canada",
+      "victoryPoints": 8
+    },
+    {
+      "id": "canada-city0",
+      "kind": "city",
+      "name": "Vancouver",
+      "at": [26, 6],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-city1",
+      "kind": "city",
+      "name": "Calgary",
+      "at": [33, 5],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-city2",
+      "kind": "city",
+      "name": "Whitehorse",
+      "at": [32, 2],
+      "owner": "canada"
+    },
+    {
+      "id": "mexico-capital",
+      "kind": "capital",
+      "name": "Mexico City",
+      "at": [31, 17],
+      "owner": "mexico",
+      "victoryPoints": 8
+    },
+    {
+      "id": "mexico-city0",
+      "kind": "city",
+      "name": "Tijuana",
+      "at": [27, 15],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-city1",
+      "kind": "city",
+      "name": "Guadalajara",
+      "at": [29, 16],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-city2",
+      "kind": "city",
+      "name": "Monterrey",
+      "at": [34, 15],
+      "owner": "mexico"
+    },
+    {
+      "id": "nkorea-capital",
+      "kind": "capital",
+      "name": "Pyongyang",
+      "at": [16, 7],
+      "owner": "nkorea",
+      "victoryPoints": 6
+    },
+    {
+      "id": "nkorea-city0",
+      "kind": "city",
+      "name": "Wonsan",
+      "at": [17, 7],
+      "owner": "nkorea"
+    },
+    {
+      "id": "skorea-capital",
+      "kind": "capital",
+      "name": "Seoul",
+      "at": [17, 8],
+      "owner": "skorea",
+      "victoryPoints": 8
+    },
+    {
+      "id": "skorea-city0",
+      "kind": "city",
+      "name": "Busan",
+      "at": [18, 9],
+      "owner": "skorea"
+    },
+    {
+      "id": "taiwan-capital",
+      "kind": "capital",
+      "name": "Taipei",
+      "at": [16, 13],
+      "owner": "taiwan",
+      "victoryPoints": 9
+    },
+    {
+      "id": "taiwan-city0",
+      "kind": "city",
+      "name": "Kaohsiung",
+      "at": [17, 15],
+      "owner": "taiwan"
+    },
+    {
+      "id": "kazakhstan-capital",
+      "kind": "capital",
+      "name": "Astana",
+      "at": [3, 7],
+      "owner": "kazakhstan"
+    },
+    {
+      "id": "kazakhstan-city0",
+      "kind": "city",
+      "name": "Almaty",
+      "at": [4, 9],
+      "owner": "kazakhstan"
+    },
+    {
+      "id": "mongolia-capital",
+      "kind": "capital",
+      "name": "Ulaanbaatar",
+      "at": [11, 7],
+      "owner": "mongolia"
+    },
+    {
+      "id": "mongolia-city0",
+      "kind": "city",
+      "name": "Khovd",
+      "at": [9, 6],
+      "owner": "mongolia"
+    }
+  ],
+  "seaZones": [
+    {
+      "id": "okhotsk",
+      "name": "Sea of Okhotsk"
+    },
+    {
+      "id": "north-pacific",
+      "name": "North Pacific"
+    },
+    {
+      "id": "sea-of-japan",
+      "name": "Sea of Japan"
+    },
+    {
+      "id": "east-china-sea",
+      "name": "East China Sea"
+    },
+    {
+      "id": "south-china-sea",
+      "name": "South China Sea"
+    },
+    {
+      "id": "central-pacific",
+      "name": "Central Pacific"
+    },
+    {
+      "id": "east-pacific",
+      "name": "Eastern Pacific"
+    },
+    {
+      "id": "atlantic",
+      "name": "Atlantic and the Gulf"
+    }
+  ],
+  "straits": [
+    {
+      "id": "taiwan-strait",
+      "name": "Taiwan Strait",
+      "kind": "strait",
+      "hexes": [
+        [15, 13],
+        [15, 14]
+      ],
+      "joins": [
+        "east-china-sea",
+        "south-china-sea"
+      ]
+    },
+    {
+      "id": "korea-strait",
+      "name": "Korea Strait",
+      "kind": "strait",
+      "hexes": [
+        [19, 8],
+        [19, 9]
+      ],
+      "joins": [
+        "sea-of-japan",
+        "east-china-sea"
+      ]
+    },
+    {
+      "id": "la-perouse",
+      "name": "La Pérouse Strait",
+      "kind": "strait",
+      "hexes": [
+        [19, 5],
+        [20, 5]
+      ],
+      "joins": [
+        "okhotsk",
+        "sea-of-japan"
+      ]
+    },
+    {
+      "id": "bering",
+      "name": "Bering crossing",
+      "kind": "land-bridge",
+      "hexes": [
+        [25, 0],
+        [26, 0]
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "kind": "oil",
+      "at": [6, 2],
+      "name": "West Siberian fields"
+    },
+    {
+      "kind": "oil",
+      "at": [28, 1],
+      "name": "Prudhoe Bay"
+    },
+    {
+      "kind": "oil",
+      "at": [31, 13],
+      "name": "Permian Basin"
+    },
+    {
+      "kind": "oil",
+      "at": [14, 7],
+      "name": "Daqing"
+    },
+    {
+      "kind": "rare-earths",
+      "at": [11, 9],
+      "name": "Bayan Obo"
+    },
+    {
+      "kind": "chips",
+      "at": [16, 14],
+      "name": "Hsinchu"
+    },
+    {
+      "kind": "chips",
+      "at": [17, 9],
+      "name": "Pyeongtaek"
+    },
+    {
+      "kind": "chips",
+      "at": [22, 8],
+      "name": "Kumamoto"
+    },
+    {
+      "kind": "food",
+      "at": [30, 9],
+      "name": "The Corn Belt"
+    },
+    {
+      "kind": "food",
+      "at": [10, 13],
+      "name": "Sichuan Basin"
+    }
+  ]
+}

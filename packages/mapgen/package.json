@@ -1,0 +1,16 @@
+{
+  "name": "@brink/mapgen",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests",
+    "map:check": "tsx src/cli/map-check.ts ../scenarios/src/maps",
+    "map:testbed": "tsx src/cli/testbed.ts ../scenarios/src/maps/testbed.map.json"
+  },
+  "dependencies": { "@brink/contracts": "workspace:*", "@brink/map": "workspace:*" },
+  "devDependencies": { "tsx": "4.23.15" }
+}
