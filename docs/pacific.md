@@ -25,8 +25,8 @@ garrison straight from the ships.
 | United States | coast to coast, Alaska, the Aleutians, Hawaii and Guam | United States |
 | Canada, Mexico, North Korea, South Korea, Taiwan, Kazakhstan, Mongolia | their real places | themselves (minor states) |
 
-The Bering crossing is land: an army walks from Chukotka into Alaska (and the other way). The Aleutians are two islands strung
-west from Alaska toward Kamchatka. Hawaii is two hexes in mid-ocean, Guam one in the south-west.
+The Bering crossing is land: an army walks from Chukotka into Alaska (and the other way). The Aleutians are a two-hex chain in open
+sea between the Alaska Peninsula and Kamchatka, clear of British Columbia: Vancouver faces the open Pacific. Hawaii is two hexes in mid-ocean, Guam one in the south-west.
 Kazakhstan and Mongolia sit between Russia and China: the land war's buffer. Korea's long border is
 with China (Manchuria); Russia touches it only at Vladivostok's corner. Every power has prizes next
 door: Canada and Mexico for the United States, the Koreas and Mongolia for China and Russia,

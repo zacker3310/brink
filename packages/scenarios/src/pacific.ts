@@ -26,8 +26,8 @@ const GRID: readonly string[] = [
   'RRRRRRRRRRRRRRRRRRRRRRRRRUUUUUUUKKKKKKK.', // 1  St Petersburg, Yakutsk
   'RRRRRRRRRRRRRRRRRRR..RRR..UUUUUUKKKKKKK.', // 2  the Sea of Okhotsk, Kamchatka
   'RRRRRRRRRRRRRRRRRR...RR....UUUUUKKKKKKK.', // 3  Moscow, Anchorage
-  'RRRRRRRRRRRRRRRRRR.R.R.....U....KKKKKKK.', // 4  Sakhalin, the Alaska Peninsula
-  'RRRRRRRRRRRRRRRRRR....R.U.U.....KKKKKKK.', // 5  the Kurils, the Aleutians
+  'RRRRRRRRRRRRRRRRRR.R.R..UU.U....KKKKKKK.', // 4  Sakhalin, the Aleutians, the Alaska Peninsula
+  'RRRRRRRRRRRRRRRRRR....R.........KKKKKKK.', // 5  the Kurils; open sea off British Columbia
   'ZZZZZZZRRGGGGGCCCC..JJ....KKKKKKKKKKKKK.', // 6  Kazakhstan, Mongolia, Vladivostok, Hokkaido, Vancouver
   'ZZZZZZZCGGGGGCCCNN.JJJJ...UUUUUUUUUUUUU.', // 7  Korea, Honshu, Seattle
   'ZZZZZZCCCCCCCCCC.S..JJJ...UUUUUUUUUUUUU.', // 8  Seoul, Tokyo, New York
@@ -90,7 +90,7 @@ export const NATIONS: readonly NationSpec[] = [
     depots: [
       [28, 3, 'Anchorage'],
       [21, 15, 'Guam'],
-      [24, 5, 'Adak'],
+      [24, 4, 'Adak'],
       [32, 12, 'Houston'],
     ],
     rough: 10,
