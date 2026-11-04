@@ -2,6 +2,7 @@
 // starts with. Integers only, like every balance number. Changing one is a ruleset change.
 
 import type { CommanderTraitId, GovernmentId, NationId, PerkId } from '@brink/contracts';
+import { ROSTER as usa } from './nations/usa';
 
 /**
  * What a general (a trait, a perk, or simply being there) does for the formation they lead.
@@ -144,7 +145,9 @@ export const GENERIC_ROSTER: Record<GovernmentId, readonly GeneralDef[]> = {
  * `ROSTER: GeneralDef[]`; registering it is one import and one entry here, e.g.
  * `import { ROSTER as usa } from './nations/usa';` and `usa,` below.
  */
-export const NATION_ROSTERS: Record<NationId, readonly GeneralDef[]> = {};
+export const NATION_ROSTERS: Record<NationId, readonly GeneralDef[]> = {
+  usa,
+};
 
 /** The generals `nation` fields: its own roster, else its government's. */
 export function rosterFor(nation: NationId, government: GovernmentId): readonly GeneralDef[] {
