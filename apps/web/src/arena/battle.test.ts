@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Contact, Formation, NationView, UnitClass } from '@brink/contracts';
 import { createPacificScenario } from '@brink/scenarios';
 import { buildView } from '@brink/simulation';
-import { battleFor, supportFor } from './battle';
+import { battleFor, plannedBattles, supportFor } from './battle';
 
 // The war map around a battle is what it brings: ships offshore, carriers and air wings, drones.
 
@@ -77,5 +77,23 @@ describe('supportFor', () => {
     expect(kamikaze(battleFor(view, '10,10', orders))).toBe(1);
     // Red never gets blue's cards.
     expect(battleFor(view, '10,10', orders, [{ card: 'air_superiority' }])!.setup.redSupport?.find((x) => x.id === 'strike_jet')?.missions).toBe(1);
+  });
+});
+
+describe('plannedBattles', () => {
+  it('lists the attacks in the orders that have enemies to fight, one per target, and which were fought', () => {
+    const view = scene();
+    const formations = {
+      inf: { type: 'attack' as const, target: '10,10', path: [] },
+      marines: { type: 'attack' as const, target: '10,10', path: [] },
+      // Nobody there to fight: it goes to the map, not the arena.
+      wing: { type: 'attack' as const, target: '15,15', path: [] },
+      uav: { type: 'hold' as const },
+    };
+    const list = plannedBattles(view, { formations });
+    expect(list.map((b) => [b.target, Object.keys(b.orders), b.fought])).toEqual([['10,10', ['inf', 'marines'], false]]);
+    expect(list[0]!.title).toBe(battleFor(view, '10,10', list[0]!.orders)!.title);
+    const fought = plannedBattles(view, { formations, battles: [{ target: '10,10', attackers: ['inf', 'marines'], defenders: [], kept: {}, won: true }] });
+    expect(fought[0]!.fought).toBe(true);
   });
 });

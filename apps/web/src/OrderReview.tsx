@@ -1,6 +1,7 @@
 import type { DiplomaticAction, OrderType, Resource, Stockpile } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { CARDS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
+import { plannedBattles } from './arena/battle';
 import { CardFace, cpLeft } from './Hand';
 import { useKeys } from './chrome';
 import { idleFormations, netChange, selfLedger } from './insight';
@@ -32,7 +33,10 @@ export function OrderReview() {
   const rejected = useGame((s) => s.rejected);
   const close = useGame((s) => s.closeReview);
   const submit = useGame((s) => s.submit);
+  const attack = useGame((s) => s.attack);
   const phone = usePhone();
+  // Attacks the staff (or an operation) drafted go to the odds unless the player fights them here.
+  const battles = plannedBattles(view, draft);
   useKeys(
     (e) => {
       if (e.key === 'Escape') close();
@@ -109,6 +113,42 @@ export function OrderReview() {
             </div>
             {(draft.battles?.length ?? 0) > 0 && <p className="mt-1.5 text-[12px] text-good">{draft.battles!.length} battle{draft.battles!.length === 1 ? '' : 's'} fought by hand: their results replace the odds if the enemy there has not changed.</p>}
           </section>
+
+          {battles.length > 0 && (
+            <section className="mt-3" data-testid="review-battles">
+              <h3 className="font-display text-[11px] font-bold tracking-[0.08em] text-muted uppercase">Battles this turn</h3>
+              <ul className="mt-1 space-y-1.5">
+                {battles.map((b) => {
+                  const n = Object.keys(b.orders).length;
+                  return (
+                    <li key={b.target} className="flex items-center gap-3 rounded-lg border border-line bg-ink-850 px-3 py-2" data-testid="planned-battle">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-semibold">{b.title}</div>
+                        <div className="text-[11px] text-faint">
+                          {n} unit{n === 1 ? '' : 's'} · {b.fought ? 'fought by hand' : 'settled by the odds unless you fight it'}
+                        </div>
+                      </div>
+                      {b.fought ? (
+                        <span className="shrink-0 rounded-full border border-good/60 px-2.5 py-1 text-[12px] font-semibold text-good">Fought</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            close();
+                            attack(b.target, b.orders);
+                          }}
+                          className="v-btn v-btn-secondary h-11 shrink-0 px-3 text-[13px] font-semibold"
+                          data-testid="fight-planned"
+                        >
+                          Fight it yourself
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           {(draft.play?.length ?? 0) > 0 && (
             <section className="mt-3" data-testid="review-cards">

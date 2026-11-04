@@ -13,6 +13,7 @@ import { hexLabel, idleFormations, netChange, selfLedger } from './insight';
 import { MapView } from './MapView';
 import { Diplomacy, Economy, Military, Overview, Research } from './Panels';
 import { advise } from './advisor';
+import { plannedBattles } from './arena/battle';
 import { OperationRow, OperationsSheet } from './Operations';
 import { operationById } from '@brink/ai';
 import { boardOrders, describeOrder, fleetLoadOrders, hostilesAt, landOrders, loadOrders } from './planning';
@@ -784,6 +785,8 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
   const planned = useGame((s) => s.planned).length;
   const resolving = useGame((s) => s.resolving);
   const idle = idleFormations(view, draft.formations).length;
+  // Battles in the staff's plan the player may fight by hand from the order review.
+  const toFight = planned > 0 ? plannedBattles(view, draft).filter((b) => !b.fought).length : 0;
   const over = view.victory !== null;
   const key = 'font-display flex h-14 w-[3.6rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-line bg-ink-850 text-[11px] font-bold tracking-wide uppercase active:bg-ink-700 disabled:opacity-35';
   return (
@@ -824,7 +827,7 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
         >
           <div className="font-display text-xl leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : planned > 0 ? 'Execute' : 'End turn'}</div>
           <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">
-            {resolving ? 'orders locked' : idle ? `${idle} without orders` : planned > 0 ? `staff plan · ${planned} order${planned === 1 ? '' : 's'}` : 'everyone has orders'}
+            {resolving ? 'orders locked' : idle ? `${idle} without orders` : planned > 0 ? `staff plan · ${planned} order${planned === 1 ? '' : 's'}${toFight ? ` · ${toFight} to fight` : ''}` : 'everyone has orders'}
           </div>
         </button>
       </div>

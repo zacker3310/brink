@@ -10,7 +10,7 @@ import { Minimap } from './MapOverlays';
 import { boardOrders, describeOrder, fleetLoadOrders, type Mode } from './planning';
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
-import { battleFor } from './arena/battle';
+import { battleFor, plannedBattles } from './arena/battle';
 import { CommandRow } from './Generals';
 import { RANKS, rankOf } from '@brink/arena';
 
@@ -332,6 +332,7 @@ export function TurnControls() {
   const issueGroup = useGame((s) => s.issueGroup);
   const fleetLoad = fleetLoadOrders(view, draft.formations, plannedIds);
   const toLoad = Object.keys(fleetLoad).length;
+  const toFight = planned > 0 ? plannedBattles(view, draft).filter((b) => !b.fought).length : 0;
   const total = Object.keys(view.formations).length;
   const idle = idleFormations(view, draft.formations).length;
   const over = view.victory !== null;
@@ -381,7 +382,14 @@ export function TurnControls() {
       )}
       {planned > 0 && !resolving && (
         <div className="flex items-center gap-2 border border-signal/40 bg-ink-950/90 px-2.5 py-1.5 text-[11px] text-text" data-testid="staff-plan">
-          <span className="min-w-0 flex-1">Staff has prepared a plan: {planned} order{planned === 1 ? '' : 's'}. Change any, then execute.</span>
+          <span className="min-w-0 flex-1">
+            Staff has prepared a plan: {planned} order{planned === 1 ? '' : 's'}. Change any, then execute.
+            {toFight > 0 && (
+              <button type="button" onClick={openReview} className="ml-1 font-semibold text-signal underline-offset-2 hover:underline" data-testid="plan-battles">
+                {toFight} battle{toFight === 1 ? '' : 's'} you can fight yourself
+              </button>
+            )}
+          </span>
           <button type="button" onClick={clearPlan} className="shrink-0 text-faint hover:text-text" data-testid="clear-plan">Clear</button>
         </div>
       )}
