@@ -300,6 +300,18 @@ Updated 2026-10-30 (arena v2.3). Milestone 1 (first playable).
   - UI: an Operations sheet (phone and desktop) and an operation strip over the map with the phase
     track. Tests: `packages/ai/src/operations.test.ts`, `tests/e2e/operations*.spec.ts`.
 
+- The film of war-map fire support (arena v2.4, docs/arena-v2.md section 14.1): code-built F-35A and
+  Su-34 jets that run in, bomb (GBU-31 / KAB-500 falling onto the blasts' cells) and pull away on
+  afterburner with contrails and a sonic crack, or take a SAM or tracers and fall burning off the field;
+  Tomahawk (booster) and Kalibr skimming in and popping up to dive; an Arleigh Burke or Slava on the
+  horizon walking its shells over the area; a kamikaze swarm (LUCAS / Geran-2) as one beat, weaving in
+  with a two-stroke buzz, each drone shot down or diving on its own. Interceptors drawn only when blue
+  sees them; action cams for a blue jet or missile run that kills a vehicle and a cut to the ship.
+  FPV and loitering drones now draw their airframes (they were never added to the scene). New Fire
+  Support skirmish (7 stars); the e2e `arena-support.spec.ts` calls each mission and shoots it mid-flight
+  (`__arena.pauseFilm`). Gate: typecheck, lint, unit (web 73), matrix 0 genuine failures, arena e2e 20
+  passed / 5 skipped. Not done: HIMARS and Tornado-G still fly as plain rockets.
+
 ## Outstanding
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real

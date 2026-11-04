@@ -860,6 +860,35 @@ counted twice.
 - The film flies missiles and bombs in from the side's own edge, the swarm as three drones, and an
   airburst where the guns get one.
 
+### 14.1 The film of it
+
+`apps/web/src/arena/fx/sorties.ts` flies each mission; the stage (`queueSupport`) gives it a
+timeline measured from the start of the run, read off the durations of the steps it queues after
+it, so each bomb, shell or drone arrives when the film's blast (or the interception) for it plays.
+Models are code-built from real proportions (`models3d/aircraft.ts`).
+
+- **Strike jet**: an F-35A (west) or Su-34 (east) runs in at low level from its side's edge on a
+  slant, releases two GBU-31s or KAB-500s that fall onto the blasts' cells, then pulls up into a
+  banked climb on afterburner, contrail and wingtip vapour behind it, a double sonic crack as it
+  goes over. Intercepted: a SAM (or a gun's tracer stream) from the interceptor meets it, a burst
+  and debris, and it rolls away burning and falls off the field; no bombs.
+- **Cruise missile**: a Tomahawk (booster burning, then dropped) or Kalibr skims in at 0.45 cells,
+  pops up near the target and dives onto it, a bright smoke trail behind. Intercepted at the top of
+  its climb: a puff and debris.
+- **Naval gunfire**: an Arleigh Burke or Slava, broadside on, 34 cells off the side's edge, a
+  silhouette in the haze; its gun's flash ripples, the shells whistle in and the three blasts walk
+  over the area.
+- **Kamikaze swarm**: one beat (`film.ts`, three drones of one mission), LUCAS or Geran-2 airframes
+  weaving in with a two-stroke buzz, staggered; each one shot down gets tracers or a missile from the
+  gun when blue sees it and a puff of debris, the rest dive in.
+- Fog: the interceptor is drawn only when blue sees it (the engine names it only then); otherwise
+  the kill comes out of the sky. Ships are off the map and show nothing of the field.
+- Action cams (with the setting on and full motion, as ever): a blue jet run or cruise missile that
+  kills a vehicle gets a moving shot (beside the target as the jet comes in; chasing the missile);
+  blue naval gunfire cuts to the ship for its first salvo.
+- Trails space their puffs by the quality's density (fewer on Low); geometry and material are shared
+  per kind, the stage releases what was drawn. HIMARS and Tornado-G fly as rockets, as before.
+
 ## Sources
 
 Specifications: General Dynamics Land Systems (M1A2 SEPv3, M1126 Stryker, M10 Booker), Krauss-Maffei

@@ -1201,6 +1201,203 @@ export class Effects {
     this.timer(T_COOKOFF, at.x, at.y, at.z, 1, 4.5);
   }
 
+  // --- Off-map support in the air --------------------------------------------------------------
+
+  /** How dense the quality preset draws effects (0.45 Low .. 1 High): trails space their puffs by it. */
+  get density(): number {
+    return this.budget.density;
+  }
+
+  /**
+   * One frame of an engine's flame at a nozzle, pointing back along `dir` (the way it flies): an
+   * afterburner's long white-hot core and orange halo, a jet at cruise, a booster's flare or a
+   * missile's motor.
+   */
+  exhaust(at: THREE.Vector3, dir: THREE.Vector3, size: number, kind: 'afterburner' | 'jet' | 'booster' | 'motor'): void {
+    const g = this.gt;
+    const life = this.lastDt * 1.5 + 1e-4;
+    const hot = kind === 'afterburner' || kind === 'booster';
+    const len = (kind === 'afterburner' ? 0.9 : kind === 'booster' ? 0.7 : kind === 'motor' ? 0.35 : 0.3) * size;
+    // The core: a streak down the plume.
+    g.reset(STREAK).colour(FLASH, hot ? 1.4 : 1);
+    g.ax = -dir.x;
+    g.ay = -dir.y;
+    g.az = -dir.z;
+    g.s0 = g.s1 = 0.06 * size;
+    g.lenMax = len;
+    g.life = life;
+    g.fade = 0;
+    g.inten = this.night ? 3 : 2.2;
+    g.imp = 2.6;
+    this.glow(at.x - dir.x * len * 0.5, at.y - dir.y * len * 0.5, at.z - dir.z * len * 0.5);
+    g.reset(FLAME);
+    g.s0 = g.s1 = (hot ? 0.16 : 0.1) * size;
+    g.life = life;
+    g.fade = 0;
+    g.cool = 0;
+    g.heat = hot ? 0.95 : 0.8;
+    g.inten = this.night ? 2.6 : 2;
+    g.imp = 2.5;
+    this.glow(at.x, at.y, at.z);
+    if (kind === 'jet') return;
+    g.reset(GLOW).colour(FIRE_GLOW, 1.2);
+    g.s0 = g.s1 = (this.night ? 0.9 : 0.45) * size;
+    g.life = life;
+    g.fade = 0;
+    g.inten = this.night ? 0.9 : 0.5;
+    g.imp = 2.4;
+    this.glow(at.x - dir.x * len * 0.3, at.y - dir.y * len * 0.3, at.z - dir.z * len * 0.3);
+  }
+
+  /**
+   * One puff of a trail where something flies: a jet's thin white contrail, a missile's bright
+   * smoke, the black smoke and fire of a burning airframe, the grey smoke of a drone hit.
+   */
+  trailPuff(x: number, y: number, z: number, kind: 'contrail' | 'missile' | 'burning' | 'smoke', size = 1): void {
+    const s = this.st;
+    if (kind === 'contrail') {
+      s.reset().colour(SMOKE_WHITE, TRAIL, 1.05, 1);
+      s.vx = this.rr(-0.03, 0.03);
+      s.vy = this.rr(-0.01, 0.03);
+      s.vz = this.rr(-0.03, 0.03);
+      s.s0 = 0.1 * size;
+      s.s1 = this.rr(0.5, 0.7) * size * this.cover;
+      s.grow = 1.2;
+      s.life = this.rr(2.6, 3.6);
+      s.fadeIn = 0.03;
+      s.fadeOut = 2.2;
+      s.alpha = 0.45;
+      s.dens = 0.15;
+      s.drag = 1;
+      s.wind = 0.8;
+      s.imp = 0.35;
+    } else if (kind === 'missile') {
+      s.reset().colour(SMOKE_WHITE, TRAIL, 1, 0.9);
+      s.vx = this.rr(-0.05, 0.05);
+      s.vy = this.rr(-0.02, 0.05);
+      s.vz = this.rr(-0.05, 0.05);
+      s.s0 = 0.1 * size;
+      s.s1 = this.rr(0.4, 0.6) * size * this.cover;
+      s.grow = 0.9;
+      s.life = this.rr(2.4, 3.4);
+      s.fadeIn = 0.03;
+      s.fadeOut = 2;
+      s.alpha = 0.5;
+      s.dens = 0.35;
+      s.drag = 1;
+      s.wind = 0.6;
+      s.emis = 0.9;
+      s.emisK = 9;
+      s.hot = 0.6;
+      s.imp = 0.8;
+    } else if (kind === 'burning') {
+      s.reset().colour(SMOKE_OILY, SMOKE_BLACK);
+      s.vx = this.rr(-0.1, 0.1);
+      s.vy = this.rr(0.05, 0.25);
+      s.vz = this.rr(-0.1, 0.1);
+      s.s0 = 0.15 * size;
+      s.s1 = this.rr(0.6, 0.9) * size * this.cover;
+      s.grow = 1;
+      s.life = this.rr(3, 4.5);
+      s.fadeIn = 0.03;
+      s.fadeOut = 2.2;
+      s.alpha = 0.75;
+      s.dens = 0.9;
+      s.drag = 1;
+      s.wind = 0.7;
+      s.emis = 1;
+      s.emisK = 4;
+      s.hot = 1;
+      s.imp = 1;
+      this.puff(x, y, z);
+      // Flame licking back from the wound.
+      const g = this.gt;
+      g.reset(FLAME);
+      g.s0 = 0.18 * size;
+      g.s1 = 0.3 * size;
+      g.life = this.rr(0.15, 0.3);
+      g.inten = this.night ? 1.8 : 1.2;
+      g.heat = 0.85;
+      g.cool = 1;
+      g.imp = 1.6;
+      this.glow(x, y, z);
+      return;
+    } else {
+      s.reset().colour(SMOKE_GREY, SMOKE_BLACK);
+      s.vy = this.rr(0, 0.15);
+      s.s0 = 0.08 * size;
+      s.s1 = this.rr(0.3, 0.45) * size * this.cover;
+      s.grow = 1;
+      s.life = this.rr(1.6, 2.6);
+      s.fadeIn = 0.03;
+      s.fadeOut = 1.4;
+      s.alpha = 0.6;
+      s.dens = 0.7;
+      s.drag = 1;
+      s.wind = 0.7;
+      s.imp = 0.7;
+    }
+    this.puff(x, y, z);
+  }
+
+  /**
+   * Something torn apart in the air (an intercepted missile, jet or drone): a burst, sparks and
+   * pieces of it falling on along `vel`, its momentum.
+   */
+  shatter(at: THREE.Vector3, vel: THREE.Vector3, size: number): void {
+    this.blast(at.x, at.y, at.z, 0.35 * size, K_AIRBURST);
+    this.sparks(at.x, at.y, at.z, this.cnt(16), vel.x * 0.1, vel.y * 0.1 + 0.2, vel.z * 0.1, 1, 2, 5, SPARK, 0.5, 1.2, true);
+    for (let i = 0, n = Math.round(10 * size * (0.5 + 0.5 * this.budget.density)); i < n; i++) {
+      this.debris.throw(at.x, at.y, at.z, vel.x * this.rr(0.2, 0.5) + this.rr(-1.2, 1.2), vel.y * 0.2 + this.rr(0.5, 2.5), vel.z * this.rr(0.2, 0.5) + this.rr(-1.2, 1.2), this.rr(0.02, 0.05) * size, METAL, this.rr(0.6, 1.1), this.rr(3, 5), this.r());
+    }
+    // A smudge of smoke where it was.
+    for (let i = 0, n = this.cnt(4); i < n; i++) this.trailPuff(at.x + this.rr(-0.2, 0.2), at.y + this.rr(-0.2, 0.2), at.z + this.rr(-0.2, 0.2), 'smoke', 1.6 * size);
+  }
+
+  /** A big gun far off (a ship's): the flash, its glow lighting the haze and a cloud of smoke. */
+  farFlash(at: THREE.Vector3, dir: THREE.Vector3, size: number): void {
+    const g = this.gt;
+    g.reset(GLOW).colour(FLASH);
+    g.s0 = 2.5 * size;
+    g.s1 = 4 * size;
+    g.life = 0.25;
+    g.fade = 2;
+    g.inten = this.night ? 2.2 : 1.3;
+    g.imp = 2.2;
+    this.glow(at.x, at.y, at.z);
+    g.reset(FLAME);
+    g.vx = dir.x * 6;
+    g.vy = dir.y * 6;
+    g.vz = dir.z * 6;
+    g.drag = 4;
+    g.s0 = 0.8 * size;
+    g.s1 = 1.8 * size;
+    g.life = 0.18;
+    g.inten = 2.2;
+    g.heat = 1;
+    g.cool = 1;
+    g.imp = 2.2;
+    this.glow(at.x, at.y, at.z);
+    const s = this.st;
+    for (let i = 0, n = this.cnt(3); i < n; i++) {
+      s.reset().colour(PROPELLANT, SMOKE_GREY);
+      s.vx = dir.x * this.rr(1, 3);
+      s.vy = this.rr(0.2, 0.6);
+      s.vz = dir.z * this.rr(1, 3);
+      s.drag = 1.2;
+      s.s0 = 1.2 * size;
+      s.s1 = this.rr(3.5, 5) * size;
+      s.grow = 1.5;
+      s.life = this.rr(4, 6);
+      s.fadeOut = 3;
+      s.alpha = 0.55;
+      s.dens = 0.5;
+      s.wind = 1;
+      s.imp = 0.6;
+      this.puff(at.x, at.y, at.z);
+    }
+  }
+
   // --- Fires, smoke and dust --------------------------------------------------------------------
 
   /** A burning wreck: flames, a black column leaning with the wind, a flickering light. Calling again moves it. */

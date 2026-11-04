@@ -333,6 +333,22 @@ function drone(sr: number, r: Rand, low: boolean): Samples {
   return finish(out, sr, 0.8);
 }
 
+/**
+ * A jet going over low and fast: the double crack of its bow and tail shocks (the N-wave a sonic
+ * boom is), the thump under them, and the roll of it off the ground.
+ */
+function sonic(sr: number, r: Rand): Samples {
+  const len = 2.4;
+  const out = samples(sr, len);
+  nwave(out, sr, 0, 14, 1, r);
+  nwave(out, sr, 0.12, 12, 0.85, r);
+  friedlander(out, sr, 0, 9, 0.7);
+  friedlander(out, sr, 0.12, 8, 0.6);
+  mode(out, sr, 0, 34, 380, 0.5, r, 3);
+  rumble(out, sr, 0.08, 2.2, 170, 0.35, 7, r);
+  return finish(out, sr);
+}
+
 /** An incoming shell's whistle; the buffer ends where the round lands. */
 function whistle(sr: number, r: Rand): Samples {
   const len = 3;
@@ -525,6 +541,7 @@ export const SOUNDS: Record<string, SoundDef> = {
   fpv: { make: (sr, r) => drone(sr, r, false), low: false, variants: 1 },
   loiter: { make: (sr, r) => drone(sr, r, true), low: false, variants: 1 },
   whistle: { make: whistle, low: false, variants: 1 },
+  sonic: { make: sonic, low: true, variants: 1 },
   ke_hit: { make: keHit, low: false, variants: 2 },
   bounce: { make: bounce, low: false, variants: 2 },
   he: whole('he'),

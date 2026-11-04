@@ -23,6 +23,8 @@ interface Window {
       turnIndex: number;
       /** The seeded stream's state. */
       stream: number;
+      /** Off-map support and the missions it has left. */
+      support: { id: string; side: 'blue' | 'red'; missions: number }[];
     } | null;
     /** A cell's centre on screen. */
     toScreen(x: number, y: number): { x: number; y: number };
@@ -60,7 +62,9 @@ interface Window {
       insight: { threat: number; threatOf: number; watch: number; air: number; suspected: number; likely: number; glyph: string | null; ghosts: number; expected: number };
     } | null;
     /** The film: steps waiting or playing, beats playing, an action cam, its clock, steps that failed. */
-    film(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number } | null;
+    film(): { steps: number; beats: number; cam: boolean; clock: number; settled: boolean; faults: number; shake: number; camera: number[]; played: number; planned: number; flights: number } | null;
+    /** Hold the film still once this many more seconds of it have played (null lets it go on). */
+    pauseFilm(seconds: number | null): void;
     /** The field's palette, who wears an outline, and how many hull meshes are drawn. */
     look(): { palette: 'standard' | 'colourblind'; selected: string | null; target: string | null; hulls: number } | null;
     /** The cells (y * w + x) the selected unit can be tapped to move to now. */

@@ -122,7 +122,7 @@ const HITS: Record<string, Hit> = {
   small: { sound: 'small', level: -9, reach: 5, slap: false },
 };
 
-type LoopKind = 'diesel' | 'turbine' | 'rotor' | 'fpv' | 'uav';
+type LoopKind = 'diesel' | 'turbine' | 'rotor' | 'fpv' | 'uav' | 'jet' | 'cruise' | 'moped';
 
 const LOOPS: Record<LoopKind, { level: number; reach: number; spool: number }> = {
   diesel: { level: -10, reach: 9, spool: 0.25 },
@@ -130,6 +130,10 @@ const LOOPS: Record<LoopKind, { level: number; reach: number; spool: number }> =
   rotor: { level: -6, reach: 14, spool: 0.6 },
   fpv: { level: -14, reach: 6, spool: 0.08 },
   uav: { level: -16, reach: 8, spool: 0.3 },
+  // Off-map support flying over: a strike jet low and fast, a cruise missile's turbofan, a one-way drone's two-stroke.
+  jet: { level: -3, reach: 22, spool: 0.12 },
+  cruise: { level: -8, reach: 14, spool: 0.1 },
+  moped: { level: -11, reach: 9, spool: 0.1 },
 };
 
 /** Speed of sound for doppler, in cells a second, scaled like the arrival delay. */
@@ -346,6 +350,25 @@ export class BattleAudio {
   /** A drone by id: an FPV quadcopter's whine, or a recon UAV's buzz. */
   drone(id: string, kind: 'fpv' | 'uav', x: number, y: number): void {
     this.source(id, kind, x, y, () => undefined);
+  }
+
+  /** Off-map support in the air, by id, called as it moves: a strike jet, a cruise missile, a Shahed's engine. */
+  flyer(id: string, kind: 'jet' | 'cruise' | 'moped', x: number, y: number): void {
+    this.source(id, kind, x, y, () => undefined);
+  }
+
+  /** A jet's sonic boom, or the double crack of one going over low and fast. */
+  sonic(x: number, y: number): void {
+    const b = this.ready();
+    if (!b) return;
+    const spot = place(x, y, this.listener, 30, this.night);
+    // Overhead and everywhere at once: no arrival delay, little lost to the air.
+    const level = dB(-2) * Math.max(0.35, spot.gain);
+    if (!this.admit(level, true)) return;
+    const v = this.chain(b, { ...spot, gain: Math.max(0.35, spot.gain), delay: 0, cutoff: 16000 }, dB(-2), true);
+    const at = b.ctx.currentTime + 0.02;
+    const end = this.one(b, v, 'sonic', 0, at, 1);
+    this.keep(v, level, at, end, 0.4);
   }
 
   stop(id: string): void {
@@ -1010,6 +1033,47 @@ export class BattleAudio {
         const k = src.doppler * (1 + 0.25 * speed);
         motors.forEach((m, i) => m.frequency.setTargetAtTime(330 * (1 + 0.013 * i) * k, t, tc));
         whine.frequency.setTargetAtTime(2343 * k, t, tc);
+      };
+    } else if (s.kind === 'jet' || s.kind === 'cruise') {
+      // A jet going over: the broad roar of the exhaust, the tearing mid band, and the fan's whine
+      // above it; a cruise missile's small turbofan is mostly whine and hiss.
+      const jet = s.kind === 'jet';
+      const rg = gain(jet ? 1 : 0.35);
+      const roar = filt('lowpass', jet ? 700 : 1200, 0.6, rg);
+      play(noiseBuf, roar, this.r() * 2);
+      const mg = gain(jet ? 0.55 : 0.4);
+      const mid = filt('bandpass', jet ? 420 : 1500, 0.9, mg);
+      play(noiseBuf, mid, this.r() * 2);
+      const wg = gain(jet ? 0.035 : 0.05);
+      const wf = filt('bandpass', jet ? 2600 : 4200, 2, wg);
+      const whine = osc('sawtooth', jet ? 2300 : 3900, wf);
+      const whine2 = osc('sawtooth', jet ? 3460 : 5800, wf);
+      set = (src, t, tc) => {
+        const k = src.doppler;
+        whine.frequency.setTargetAtTime((jet ? 2300 : 3900) * k, t, tc);
+        whine2.frequency.setTargetAtTime((jet ? 3460 : 5800) * k, t, tc);
+        wf.frequency.setTargetAtTime((jet ? 2600 : 4200) * k, t, tc);
+        roar.frequency.setTargetAtTime((jet ? 700 : 1200) * k * k, t, tc);
+        mid.frequency.setTargetAtTime((jet ? 420 : 1500) * k, t, tc);
+      };
+    } else if (s.kind === 'moped') {
+      // Shahed / LUCAS: a small piston engine flat out, a moped's rasp, the prop beating in it.
+      const body = filt('bandpass', 700, 0.7, input);
+      const am = gain(0.75, body);
+      const depth = c.createGain();
+      depth.gain.value = 0.3;
+      depth.connect(am.gain);
+      nodes.push(depth);
+      const beat = osc('sine', 33, depth);
+      const f0 = 118 + this.r() * 14;
+      const b1 = osc('sawtooth', f0, am);
+      const b2 = osc('square', f0 * 2.01, gain(0.35, am));
+      const hiss = filt('bandpass', 2200, 0.8, gain(0.06));
+      play(noiseBuf, hiss, this.r() * 2);
+      set = (src, t, tc) => {
+        b1.frequency.setTargetAtTime(f0 * src.doppler, t, tc);
+        b2.frequency.setTargetAtTime(f0 * 2.01 * src.doppler, t, tc);
+        beat.frequency.setTargetAtTime(33 * src.doppler, t, tc);
       };
     } else {
       // Recon UAV (Orlan-10, Raven): a small engine's buzz with a slow wobble.
