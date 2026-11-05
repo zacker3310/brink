@@ -123,6 +123,8 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
     }
     case 'nonaggression':
       if (opts.spare?.includes(from)) return yes;
+      // A power pulling ahead of us asks for a pact to keep us off it while it wins: no.
+      if (standing(view, from) >= standing(view, self) + AI.pactGap) return { accept: false, reason: 'strength' };
       return mood >= AI.pactMood && from !== focus ? yes : { accept: false, reason: from === focus ? 'focus' : 'mood' };
     case 'trade':
       return mood >= AI.tradeMood ? yes : { accept: false, reason: 'mood' };

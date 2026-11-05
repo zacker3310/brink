@@ -92,7 +92,7 @@ export function defenderPower(defenders: readonly Formation[], ctx: AssaultConte
     // Infantry makes the most of cover; armor makes the least.
     const cover = d.unitClass === 'infantry' ? pct(terrain.defense, 150) : d.unitClass === 'armor' ? pct(terrain.defense, 50) : terrain.defense;
     v = pct(v, 100 + cover);
-    v = pct(v, 100 + Math.floor(d.entrenchment / 2));
+    v = pct(v, 100 + Math.floor(d.entrenchment / RULES.entrenchmentPerDefense));
     if (ctx.defending(d.id)) v = pct(v, 120);
     if (ctx.tileOwner === d.owner) v = pct(v, 100 + mods.homeDefense);
     if (d.unitClass === 'armor' || d.unitClass === 'mechanized') v = pct(v, 100 + mods.armorDefense);

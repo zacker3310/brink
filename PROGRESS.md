@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-11-04 (the staff after an operation, AI at sea, ruleset 2.6.0). Milestone 1 (first playable).
+Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.9.0). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -25,6 +25,34 @@ Updated 2026-11-04 (the staff after an operation, AI at sea, ruleset 2.6.0). Mil
 
 ## Completed
 
+- Balance after research, leaders and the staff AI (ruleset 2.9.0). Measured on 2.8.0: of 40 soak
+  matches 15 decisive (China 12, Russia 3), median turn 30; after the first ten turns the wars
+  were fought by nobody. Root causes and fixes, all in `packages/ai` unless named:
+  - Prey across an ocean: after the minors fell, every power declared on the weakest by VP (Japan)
+    and none could land. War is now made on the power easiest to get at (`approach`: site to site,
+    a crossing wider than a strait costs 12 hexes more), weighed against its VP.
+  - Armies outgrew their economies: upkeep ran 70 energy against 46-56 income, so by turn 8 every
+    power ran at half industry with dry tanks. Recruitment now keeps a formation's upkeep within
+    what the stockpile carries for 6 turns (`balanceOf`, simulation `economy.ts`, shares the
+    engine's upkeep reckoning `upkeepOf`); a deficit is mended first (power plant, farm or mine,
+    whatever the pace) and the treasury saves toward it (`buildSaving`).
+  - Piecemeal storms: two formations at a city's gates stormed whatever was in it and seven storms in
+    ten failed. A city is now stormed when the strength at its gates is 2.8 times the garrison
+    believed inside (falling as the war stalls); the rest dig in while the army comes up. A city in
+    sight is not a city seen into: the target choice assumes a guard round an unseen great power's
+    city (2000-3000) and a minor's militia. Rules: entrenchment gives +1% defence per 4 points (per 2
+    before; `RULES.entrenchmentPerDefense`).
+  - Landings that never landed: ships steered into hexes held by powers at peace (a halt, every
+    turn); transports sailed with one regiment; an operation built no lift, and what it built it
+    built on the wrong sea (Houston). Paths now avoid peace-held hexes, transports fill in port, an
+    operation across the sea keeps lift for eight formations, and ships are built and gathered only
+    on the fleet's own sea. A US landing on Hokkaido takes Sapporo again (operations test).
+  - Pacts shielded the leader: everyone signed non-aggression with the strongest power. No pact now
+    with a power 3-4 points of standing ahead (`LEADER_TUNING.ai.pactGap`); the balance of power
+    turns on a leader 6 points ahead (8). Welfare is raised from stability 52 (45).
+  - Data: the Union's units 8% cheaper (15%); Easy and Normal command edges re-measured.
+  Result, 40 matches: 25 decisive (62%), median turn 29; decisive wins USA 14, China 10, Russia 1;
+  on score USA 9, Japan 4, China 2. Difficulty (32 a level): see Outstanding.
 - Civ-style progression (ruleset 2.6.0): a research tree of 24 technologies in five branches
   (Logistics & Economy, Armour, Air & Missiles, Naval, Cyber & Intel; `game-data/src/research.ts`)
   whose effects reach movement (armour, ships), combat (armour attack, ship attack and defense),
@@ -413,13 +441,13 @@ Updated 2026-11-04 (the staff after an operation, AI at sea, ruleset 2.6.0). Mil
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
   Safari/WebKit; verify on a device (audio unlock, safe areas, standalone launch).
 
-- Balance (ruleset 2.6.0): of 40 soak matches, 21 end by supremacy, 19 on score at the turn limit
-  (2.5.0: 19 decisive). Decisive wins China 13, Russia 4, USA 3, Japan 1 (2.5.0: China 17, Russia
-  1, USA 1, Japan 0); on score USA 7, Russia 6, China 5, Japan 1. Human win rates
-  (`pnpm test:difficulty`, 32 a level): Easy 84%, Normal 59%, Hard 25% (2.5.0: 88, 59, 28). Japan
-  in the human seat is still the weakest (3 of 8 on Easy, 0 of 8 on Normal). Next levers: Japan's
-  lift (two amphibious groups carry four formations; the home army mostly waits for them), and the
-  energy deficit every power runs from turn 1 (upkeep about 70 a turn against 45 to 56 income).
+- Balance (ruleset 2.9.0): 40 soak matches, 25 decisive, median turn 29; decisive wins USA 14,
+  China 10, Russia 1, Japan 0 (Japan wins 4 on score). Human win rates (`pnpm test:difficulty`, 32
+  a level): Easy 88%, Normal 59%, Hard 28% (2.8.0: 88, 47, 25); as the human seat Japan wins 4 of 8
+  on Easy and on Normal, Russia 8 and 1.
+  Russia and Japan still rarely win outright: Russia fights China on land and loses ground and
+  stability; Japan climbs to 26-28% standing and seldom past 29%. The median sits near 30 because a
+  third of matches still reach the limit; supremacy at 28% gives 80% decisive and median 25.
 - The staff after an operation (ruleset 2.6.0; playtest: China took Taipei on turn 4, then sat on
   53 VP from turn 5 to turn 9): the staff planned every turn from an empty memory, so it chased a
   different prize each turn (Tokyo, Busan, Seoul, Tokyo...), and the store dropped its diplomacy,

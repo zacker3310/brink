@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyCrisis, CRISES, createPacificScenario } from '@brink/scenarios';
 import { hexKey } from '@brink/map';
 import { buildView, lockOrders, previewAssault, resolveTurn, seedCommanders, sortedKeys } from '@brink/simulation';
-import { makeWorld, own, setRelation, site, unit } from '../../simulation/src/fixture.test-util';
+import { makeWorld, own, setRelation, setTerrain, site, unit } from '../../simulation/src/fixture.test-util';
 import { emptyMemory, planOrders, updateMemory } from './index';
 
 describe('AI', () => {
@@ -91,6 +91,9 @@ describe('AI', () => {
     const target = hexKey(6, 2);
     site(w, 'b-town', target, 'b', 'city', 5);
     own(w, 'b', [target]);
+    // On a hill: since ruleset 2.9.0 entrenchment counts half what it did, and on open ground the
+    // defender at the preview's assumed entrenchment fell to an even fight with one attacker.
+    setTerrain(w, target, 'hills');
     unit(w, 'b1', 'b', 'infantry', target, { entrenchment: 40 });
     unit(w, 'ar', 'a', 'recon', hexKey(4, 2));
     const attackers = ['a1', 'a2', 'a3'];

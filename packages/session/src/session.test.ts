@@ -196,6 +196,30 @@ describe('GameSession', () => {
     expect(resumed.toSave('again', '2026-11-04T13:00:00Z').staffMemory!.china!.objective).toBe(resumed.staffMemory().objective);
   });
 
+  it('resumes a 2.8.0 campaign under 2.9.0 rules unchanged in state, and migrating twice is a no-op', () => {
+    // Ruleset 2.9.0 changes numbers and AI play only (entrenchment counts half in defense; the AI
+    // budgets for upkeep, storms in mass, fills its transports): a 2.8.0 world carries on as it is.
+    const s = GameSession.create(PACIFIC_ID, 9, 'japan');
+    s.advance();
+    s.advance();
+    const old = JSON.parse(serializeSave(s.toSave('old', '2026-11-05T12:00:00Z')));
+    old.rulesetVersion = '2.8.0';
+    old.world.rulesetVersion = '2.8.0';
+    old.hash = hashState(old.world);
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.migratedFrom).toBe('2.8.0');
+    expect(loaded.rulesetVersion).toBe(RULESET_VERSION);
+    expect(loaded.hash).toBe(hashState(loaded.world));
+    // Nothing but the version moved: the same world as written, under the new rules.
+    expect({ ...loaded.world, rulesetVersion: '2.8.0' }).toEqual(old.world);
+    expect(hashState(migrateSave({ ...loaded, saveVersion: SAVE_VERSION }).world)).toBe(loaded.hash);
+    const resumed = GameSession.fromSave(loaded);
+    for (let i = 0; i < 2; i++) {
+      const r = resumed.advance(resumed.suggest('japan'));
+      expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    }
+  });
+
   it('runs any campaign length from 5 turns to a 250-turn Total War', () => {
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 45 }).snapshot().maxTurns).toBe(45);
     expect(GameSession.create(PACIFIC_ID, 1, 'usa', [], { maxTurns: 999 }).snapshot().maxTurns).toBe(250);

@@ -361,6 +361,8 @@ export const LEADER_TUNING = {
   ai: {
     allianceMood: 30,
     pactMood: -10,
+    /** No pact with a power this many points of standing ahead: it would only shield the leader. */
+    pactGap: 4,
     tradeMood: -25,
     jointOpMood: 0,
     /** Percent of what they give a leader wants back in an exchange, before mood. */

@@ -1,4 +1,4 @@
-import type { FormationId, GameEvent, Ledger, NationId, NationOrders, Resource, Stockpile, WorldState } from '@brink/contracts';
+import type { FacilityId, Formation, FormationId, GameEvent, Ledger, Nation, NationId, NationView, NationOrders, Resource, SiteKind, Stockpile, Treaty, WorldState, Yields } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { FACILITIES, RESEARCH_BANK, RULES, TECHS, TREATIES, UNITS } from '@brink/game-data';
 import { levelYields } from './progression';
@@ -12,8 +12,20 @@ export interface Settlement {
   research: number;
 }
 
-/** Gross income and throughput for a nation in the current world. Shared with the UI. */
-export function grossYields(world: WorldState, nation: NationId): { income: Stockpile; industry: number; research: number } {
+/**
+ * What the economy reads of a world: a `WorldState`, or a nation's own view of its sites, ground and
+ * treaties with itself as the one nation (`balanceOf` builds that for the AI).
+ */
+export interface EconomyWorld {
+  turn: number;
+  nations: Record<NationId, Pick<Nation, 'government' | 'research' | 'edge' | 'stability'>>;
+  sites: Record<string, { owner: NationId | null; kind: SiteKind; yields: Yields; facilities: readonly FacilityId[]; development?: number; population: number }>;
+  tiles: Record<string, { owner: NationId | null } | undefined>;
+  treaties: readonly Treaty[];
+}
+
+/** Gross income and throughput for a nation in the current world. Shared with the UI and the AI. */
+export function grossYields(world: EconomyWorld, nation: NationId): { income: Stockpile; industry: number; research: number } {
   const n = world.nations[nation]!;
   const mods = nationModifiers(n);
   const income = zeroStockpile();
@@ -38,12 +50,46 @@ export function grossYields(world: WorldState, nation: NationId): { income: Stoc
     if (t.kind !== 'trade' || (t.a !== nation && t.b !== nation) || t.from > world.turn || t.until < world.turn) continue;
     for (const r of RESOURCES) income[r] += TREATIES.tradeIncome[r];
   }
-  const hexes = Object.values(world.tiles).filter((t) => t.owner === nation).length;
+  const hexes = Object.values(world.tiles).filter((t) => t?.owner === nation).length;
   income.credits += Math.floor(hexes / RULES.hexesPerCredit);
   const unrest = n.stability < 40 ? 80 : 100;
   for (const r of RESOURCES) income[r] = pct(pct(income[r], 100 + mods.income[r]), unrest);
   industry = pct(pct(industry, 100 + mods.industry), unrest);
   return { income, industry, research };
+}
+
+/**
+ * Upkeep a nation owes a turn: its formations, its sites' facilities, food for its people and
+ * energy for its industry. One reckoning for the economy phase and the AI's planning.
+ */
+export function upkeepOf(world: Pick<EconomyWorld, 'sites'>, nation: NationId, own: readonly Pick<Formation, 'unitClass'>[], industry: number): Stockpile {
+  const due = zeroStockpile();
+  for (const f of own) for (const r of RESOURCES) due[r] += UNITS[f.unitClass].upkeep[r];
+  let population = 0;
+  for (const id of sortedKeys(world.sites)) {
+    const s = world.sites[id]!;
+    if (s.owner !== nation) continue;
+    population += s.population;
+    for (const fac of s.facilities) for (const r of RESOURCES) due[r] += FACILITIES[fac].upkeep[r];
+  }
+  due.food += Math.floor(population / RULES.popPerFood);
+  due.energy += Math.floor(industry / RULES.industryPerEnergy);
+  return due;
+}
+
+/**
+ * A nation's balance a turn, from its own view: gross income less the upkeep its army, buildings,
+ * people and industry owe. Negative is a deficit the stockpile pays until it runs dry.
+ */
+export function balanceOf(view: Pick<NationView, 'self' | 'sites' | 'tiles' | 'treaties' | 'turn' | 'formations'>): Stockpile {
+  const self = view.self.id;
+  const world: EconomyWorld = { turn: view.turn, nations: { [self]: view.self }, sites: view.sites, tiles: view.tiles, treaties: view.treaties };
+  const gross = grossYields(world, self);
+  const own = sortedKeys(view.formations).map((id) => view.formations[id]!).filter((f) => f.owner === self);
+  const due = upkeepOf(world, self, own, gross.industry);
+  const out = zeroStockpile();
+  for (const r of RESOURCES) out[r] = gross.income[r] - due[r];
+  return out;
 }
 
 /**
@@ -72,14 +118,7 @@ export function settleEconomy(
     .filter((s) => s.owner === nation)
     .reduce((a, s) => a + s.population, 0);
 
-  const upkeepDue = zeroStockpile();
-  for (const f of own) for (const r of RESOURCES) upkeepDue[r] += UNITS[f.unitClass].upkeep[r];
-  for (const id of sortedKeys(world.sites)) {
-    const s = world.sites[id]!;
-    if (s.owner === nation) for (const fac of s.facilities) for (const r of RESOURCES) upkeepDue[r] += FACILITIES[fac].upkeep[r];
-  }
-  upkeepDue.food += Math.floor(population / RULES.popPerFood);
-  upkeepDue.energy += Math.floor(gross.industry / RULES.industryPerEnergy);
+  const upkeepDue = upkeepOf(world, nation, own, gross.industry);
 
   const income = gross.income;
   const upkeep = zeroStockpile();

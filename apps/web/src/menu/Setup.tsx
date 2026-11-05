@@ -16,8 +16,8 @@ import { LeaderCard } from './Leader';
 // Console scope's resets so display type survives.
 
 const DIFFICULTIES: { id: Difficulty; label: string; threat: number; text: string }[] = [
-  { id: 'easy', label: 'Easy', threat: 1, text: 'Your natural ally beside you, one enemy. +70% income, +40% attack, cheaper units.' },
-  { id: 'normal', label: 'Normal', threat: 2, text: 'All three rivals at war with you. +15% income, +10% attack.' },
+  { id: 'easy', label: 'Easy', threat: 1, text: 'Your natural ally beside you, one enemy. +75% income, +55% attack, cheaper units.' },
+  { id: 'normal', label: 'Normal', threat: 2, text: 'All three rivals at war with you. +40% income, +30% attack.' },
   { id: 'hard', label: 'Hard', threat: 3, text: 'Everyone at war, no edge, and the AI starts richer.' },
 ];
 
