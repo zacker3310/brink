@@ -47,14 +47,22 @@ describe('operations', () => {
     expect(china.rejected).toBe(0);
     expect(china.fell).not.toBeNull();
     // A landing across the ocean onto a great power's coast: Petropavlovsk, on Kamchatka (it falls on
-    // turn 9). The prize was Tokyo, then Sendai beside it. Since ruleset 2.7.0 Japan's dove leader
-    // makes peace on its other fronts and its whole army meets a landing on the home islands (an
-    // amphibious group off the coast is a threat, its fleets hunt convoys): no lone US landing takes
-    // a Japanese city in 30 turns. That is balance to tune (PROGRESS), not what this test proves.
+    // turn 12).
     const usa = run(1, 'usa', 'Petropavlovsk', 16);
     expect(usa.rejected).toBe(0);
     expect(usa.fell).not.toBeNull();
-    // And the island power carries its own landing across the ocean: Honolulu falls on turn 15.
+    // And onto the home islands themselves: a US landing on Hokkaido takes Sapporo (turn 9), and
+    // Japan's army takes it back about ten turns later. From ruleset 2.7.0 to 2.8.0 no lone US
+    // landing took a Japanese city in 30 turns: the US staff sailed its troops in ones and twos,
+    // built no lift to follow them (and what it built, it built at Houston, on a sea with no way to
+    // the Pacific), and stormed the city with whatever stood at its gates. Since 2.9.0 an operation
+    // across the sea builds lift for eight formations on the fleet's own sea, a transport fills
+    // before it sails, a city is stormed only in mass, and a dug-in garrison counts for less.
+    // Tokyo, Sendai, Nagoya, Osaka and Fukuoka still hold.
+    const japanHome = run(1, 'usa', 'Sapporo', 20);
+    expect(japanHome.rejected).toBe(0);
+    expect(japanHome.fell).not.toBeNull();
+    // And the island power carries its own landing across the ocean: Honolulu falls on turn 13.
     // (Seattle, on the US mainland, now holds for 30 turns.)
     const japan = run(1, 'japan', 'Honolulu', 22);
     expect(japan.rejected).toBe(0);

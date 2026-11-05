@@ -30,3 +30,31 @@ export function landmasses(view: NationView): Map<HexKey, number> {
   return out;
 }
 
+
+const seaCache = new WeakMap<NationView['tiles'], Map<HexKey, number>>();
+
+/** Sea connectivity: which body of water each known sea hex belongs to (ships sail within one). */
+export function seas(view: NationView): Map<HexKey, number> {
+  const hit = seaCache.get(view.tiles);
+  if (hit) return hit;
+  const out = new Map<HexKey, number>();
+  seaCache.set(view.tiles, out);
+  const water = (k: HexKey) => view.tiles[k]?.terrain === 'water';
+  let id = 0;
+  for (const start of sortedKeys(view.tiles)) {
+    if (out.has(start) || !water(start)) continue;
+    const queue = [start];
+    out.set(start, id);
+    while (queue.length) {
+      const k = queue.pop()!;
+      for (const n of neighborKeys(k)) {
+        if (!out.has(n) && water(n)) {
+          out.set(n, id);
+          queue.push(n);
+        }
+      }
+    }
+    id++;
+  }
+  return out;
+}

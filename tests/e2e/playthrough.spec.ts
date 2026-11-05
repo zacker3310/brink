@@ -228,6 +228,10 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
       await shot(page, `t${turn}-report`);
       await page.getByTestId('close-report').tap();
     }
+    // A won campaign ends the walk: the victory screen covers the debrief, so it is checked first.
+    // (Since ruleset 2.9.0 China on Normal can win by supremacy inside eight turns; the debrief's
+    // close button then sat under the victory screen and the tap waited out the test.)
+    if (await page.getByTestId('victory').isVisible().catch(() => false)) break;
     if (await page.getByTestId('debrief-close').isVisible().catch(() => false)) await page.getByTestId('debrief-close').tap();
     if (await page.getByTestId('victory').isVisible().catch(() => false)) break;
   }

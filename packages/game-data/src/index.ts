@@ -15,7 +15,7 @@ export * from './research';
 export * from './cities';
 export * from './leaders';
 
-export const RULESET_VERSION = '2.8.0';
+export const RULESET_VERSION = '2.9.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -351,11 +351,14 @@ export interface GovernmentDef {
  * commander still learning the war. Hard has none (the AI gets the stockpile bonus instead).
  */
 export const DIFFICULTY_EDGE: Record<Difficulty, Modifiers> = {
-  easy: { income: { credits: 70, energy: 70, materials: 70, food: 70 }, industry: 60, research: 40, stability: 15, attack: 50, homeDefense: 50, recruitDiscount: 30, supplyCapacity: 30, ranged: 20 },
+  easy: { income: { credits: 75, energy: 75, materials: 75, food: 75 }, industry: 65, research: 40, stability: 15, attack: 55, homeDefense: 50, recruitDiscount: 30, supplyCapacity: 30, ranged: 20 },
   // Ruleset 2.6.0 halved Normal's edge (+30% income and industry, +20% attack, +25% home defence,
   // 15% cheaper units before): with the staff fighting at sea and supremacy at 29%, the old edge won
   // 78% of Normal campaigns.
-  normal: { income: { credits: 15, energy: 15, materials: 15, food: 15 }, industry: 15, research: 10, stability: 5, attack: 10, homeDefense: 15, recruitDiscount: 10, supplyCapacity: 5 },
+  // Ruleset 2.9.0 raised it again (and Easy's income, industry and attack): the AI that budgets for
+  // its upkeep, storms in mass and fills its transports took Normal to 41% and Easy to 78%; with
+  // this edge they measure 59% and 88% (32 campaigns a level).
+  normal: { income: { credits: 40, energy: 40, materials: 40, food: 40 }, industry: 40, research: 10, stability: 5, attack: 30, homeDefense: 25, recruitDiscount: 15, supplyCapacity: 10 },
   hard: {},
 };
 
@@ -386,7 +389,9 @@ export const GOVERNMENTS: Record<GovernmentId, GovernmentDef> = {
   union: {
     name: 'Agrarian Union',
     summary: 'Cheap, stubborn mass armies that defend home ground fiercely.',
-    modifiers: { income: { food: 20, materials: 10 }, recruitDiscount: 15, homeDefense: 15, research: -10 },
+    // Units 8% cheaper (15% until ruleset 2.9.0: once every power's AI kept its economy out of
+    // deficit, the cheapest army outgrew the rest and China won 21 of 40 measured campaigns).
+    modifiers: { income: { food: 20, materials: 10 }, recruitDiscount: 8, homeDefense: 15, research: -10 },
   },
 };
 
@@ -549,6 +554,14 @@ export const RULES = {
   repulse: 450,
   /** Stability a nation loses for declaring war on a nation it is at peace or allied with. */
   perfidy: { peace: 10, alliance: 20 },
+  /**
+   * Defense a defender gains from its entrenchment: one percent for every this many points (100
+   * dug in: +25%). Two until ruleset 2.9.0 (+50%), which on top of a city's cover, a defend order
+   * and home ground made one dug-in infantry division in a city worth five attacking ones: the AI's
+   * storms failed seven times in ten, a city changed hands every few turns in a whole theatre, and
+   * three campaigns in five ran to the turn limit.
+   */
+  entrenchmentPerDefense: 4,
   /** Entrenchment a formation loses each time an artillery or air strike hits it. */
   strikeEntrenchment: 25,
   /** Defenders whose organization falls to this level break and retreat. */
