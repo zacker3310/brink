@@ -1,8 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // A battle the staff drafts goes to the odds unless the player chooses to fight it: the order
-// review lists the turn's battles, each with Fight It Yourself. Backing out of the brief leaves the
-// staff's orders as they were; nothing is forced.
+// review lists the turn's battles, each with Fight It Yourself, and ENTER BATTLE stands over the
+// turn controls whenever there is one. Backing out of the brief leaves the staff's orders as they
+// were; nothing is forced. With the staff's plan up, End Turn (Execute) ends the turn in one click,
+// so the review is opened with its own Review button.
+
+/** The order review: its own button while Execute ends the turn in one click, else End Turn. */
+async function review(page: Page): Promise<void> {
+  const open = page.getByTestId('open-review');
+  await (await open.isVisible().catch(() => false) ? open : page.getByTestId('end-turn')).click();
+}
 
 async function start(page: Page): Promise<void> {
   await page.goto('./');
@@ -27,11 +35,13 @@ test('desktop: a staff-drafted attack can be fought by hand from the order revie
   let found = false;
   for (let turn = 1; turn <= 8 && !found; turn++) {
     await expect(page.getByTestId('end-turn')).toContainText('Execute', { timeout: 60_000 });
-    await page.getByTestId('end-turn').click();
+    await review(page);
     await expect(page.getByTestId('order-review')).toBeVisible();
     const fight = page.getByTestId('fight-planned');
     if ((await fight.count()) > 0) {
       found = true;
+      // The same battles put ENTER BATTLE on the turn controls (it sits under the review).
+      await expect(page.getByTestId('enter-battle')).toHaveAttribute('data-count', String(await fight.count()));
       // Optional, and it says so: left alone, the odds settle it.
       await expect(page.getByTestId('review-battles')).toContainText('settled by the odds unless you fight it');
       await fight.first().click();
@@ -40,7 +50,7 @@ test('desktop: a staff-drafted attack can be fought by hand from the order revie
       // Optional: back out, and the staff's attack still stands, to be settled by the odds.
       await page.getByTestId('arena-back').click();
       await expect(page.getByTestId('arena-brief')).toHaveCount(0);
-      await page.getByTestId('end-turn').click();
+      await review(page);
       await expect(page.getByTestId('fight-planned').first()).toBeVisible();
       break;
     }

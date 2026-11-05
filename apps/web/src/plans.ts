@@ -43,7 +43,8 @@ function threatAt(view: NationView, key: HexKey, reach: number): { strength: num
   const by = new Map<NationId, number>();
   for (const id of Object.keys(view.contacts).sort()) {
     const c = view.contacts[id]!;
-    if (view.relations[c.owner] !== 'war' || !isGround(c.unitClass)) continue;
+    // Minor states' militias hold their own ground; they never march on anyone.
+    if (view.relations[c.owner] !== 'war' || view.nations[c.owner]?.minor || !isGround(c.unitClass)) continue;
     if (keyDistance(c.key, key) > reach) continue;
     strength += c.estimatedStrength;
     units += 1;
@@ -65,9 +66,9 @@ function holds(view: NationView): (Plan & { urgency: number })[] {
     const near = own.filter((f) => keyDistance(f.key, site.key) <= 1).sort((a, b) => (a.id < b.id ? -1 : 1));
     if (near.length === 0) continue;
     const ours = near.reduce((a, f) => a + f.strength, 0);
-    // Worth a plan when the enemy outnumbers what stands there, or a capital sees any army close.
+    // Worth a plan when the enemy comes close to what stands there (a capital: half of it).
     const ratio = threat.strength / Math.max(1, ours);
-    if (ratio < 0.8 && site.kind !== 'capital') continue;
+    if (ratio < (site.kind === 'capital' ? 0.5 : 0.8)) continue;
     const who = threat.nation ? (view.nations[threat.nation]?.name ?? 'The enemy') : 'The enemy';
     out.push({
       id: `hold:${site.id}`,
@@ -130,7 +131,8 @@ function fromOperation(op: Operation): Plan {
     kind: 'operation',
     title: op.name,
     line: `~${plural(Math.max(1, op.turns), 'turn')} · ${ODDS_WORDS[op.odds]} · ${op.victoryPoints} VP`,
-    why: op.why[0] ?? op.summary,
+    // The line already gives the VP: the reason reads on from it.
+    why: (op.why[0] ?? op.summary).replace(/^\d+ VP[,;]?\s*/, '').replace(/^./, (c) => c.toUpperCase()),
     cta: 'Launch',
     odds: op.odds,
     at: op.at,
@@ -148,7 +150,7 @@ export function proposePlans(view: NationView, opts: { operation?: { id: string 
   const max = opts.max ?? 4;
   const running = opts.operation?.id ?? null;
   const prize = running?.startsWith('take:') ? view.sites[running.slice(5)] : undefined;
-  const ops = proposeOperations(view, 3)
+  const ops = proposeOperations(view, 4)
     .filter((o) => o.id !== running)
     .map(fromOperation);
   const hold = holds(view);

@@ -128,7 +128,7 @@ const TONE: Record<string, string> = { good: 'text-good', even: 'text-signal', b
 const KIND_ICON: Record<Plan['kind'], 'objective' | 'defense' | 'flag' | 'next'> = { operation: 'objective', hold: 'defense', peace: 'flag', staff: 'next' };
 
 /** One plan: what, how long and how likely, and the one tap that adopts it. */
-export function PlanRow({ plan, rank, compact = false }: { plan: Plan; rank?: number; compact?: boolean }) {
+export function PlanRow({ plan, rank, compact = false, onAdopt }: { plan: Plan; rank?: number; compact?: boolean; onAdopt?: () => void }) {
   const resolving = useGame((s) => s.resolving);
   return (
     <li className={`flex items-center gap-3 ${compact ? 'py-1.5' : 'rounded-xl border border-line bg-ink-850 px-3 py-2.5'}`} data-testid="plan" data-plan={plan.id}>
@@ -145,7 +145,10 @@ export function PlanRow({ plan, rank, compact = false }: { plan: Plan; rank?: nu
       <button
         type="button"
         disabled={resolving}
-        onClick={() => void adopt(plan)}
+        onClick={() => {
+          onAdopt?.();
+          void adopt(plan);
+        }}
         className="font-display h-11 min-w-[5.5rem] shrink-0 rounded-lg bg-signal px-3 text-[14px] font-extrabold tracking-wide text-ink-950 uppercase active:brightness-90 disabled:opacity-40"
         data-testid="plan-adopt"
       >
@@ -162,7 +165,7 @@ export function PlanRow({ plan, rank, compact = false }: { plan: Plan; rank?: nu
 export function PlanPicker({ intro = false, onClose }: { intro?: boolean; onClose: () => void }) {
   const view = useGame((s) => s.view)!;
   const operation = useGame((s) => s.operation);
-  const plans = usePlanList(4);
+  const plans = usePlanList(5);
   const goal = nextObjective(view, operation);
   const crisis = intro ? crisisOf(view.crisis) : undefined;
   const steps: [string, string][] = [
@@ -192,7 +195,7 @@ export function PlanPicker({ intro = false, onClose }: { intro?: boolean; onClos
         ) : (
           <ol className="mt-3 flex flex-col gap-2" data-testid="plans">
             {plans.map((p, i) => (
-              <PlanRow key={p.id} plan={p} rank={i + 1} />
+              <PlanRow key={p.id} plan={p} rank={i + 1} onAdopt={onClose} />
             ))}
           </ol>
         )}

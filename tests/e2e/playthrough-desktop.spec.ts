@@ -32,6 +32,8 @@ test('desktop: a new player plays China for two turns', async ({ page }) => {
   await page.waitForTimeout(1000);
   await shot(page, 'turn1');
 
+  // The plans for the turn stand over the turn controls from the first turn, each one click.
+  await expect(page.getByTestId('desk-plans').getByTestId('plan').first()).toBeVisible({ timeout: 30_000 });
   await page.getByTestId('operations-open').click();
   const sheet = page.getByTestId('operations');
   await expect(sheet.getByTestId('operation').first()).toBeVisible();
@@ -55,8 +57,10 @@ test('desktop: a new player plays China for two turns', async ({ page }) => {
   await page.getByTestId('tab-generals').click();
 
   for (let turn = 1; turn <= 2; turn++) {
+    // With the operation's plan up, Execute ends the turn in one click; otherwise the review comes first.
+    const oneTap = (await page.getByTestId('end-turn').getAttribute('data-one-tap')) === 'true';
     await page.getByTestId('end-turn').click();
-    await page.getByTestId('commit-turn').click();
+    if (!oneTap) await page.getByTestId('commit-turn').click();
     await page.getByTestId('skip-replay').click({ timeout: 15_000 }).catch(() => undefined);
     await expect(page.getByTestId('turn')).toContainText(`${turn + 1} / 20`, { timeout: 90_000 });
     await page.waitForTimeout(800);
