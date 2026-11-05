@@ -59,7 +59,10 @@ test('a European campaign starts as Germany on a phone and plays two turns', asy
     // The staff has drafted every order: Execute plays it.
     await expect(page.getByTestId('end-turn')).toContainText('Execute', { timeout: 60_000 });
     await page.getByTestId('end-turn').tap();
-    await page.getByTestId('commit-turn').tap();
+    // With the staff's plan running the turn ends in one tap (int-staff's one-tap turn); otherwise the
+    // order review opens and Commit ends it: wait for the review a moment and commit if it came.
+    const commit = page.getByTestId('commit-turn');
+    if (await commit.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) await commit.tap();
     if (await page.getByTestId('replay').isVisible({ timeout: 30_000 }).catch(() => false)) {
       await page.getByTestId('skip-replay').tap({ timeout: 3000 }).catch(() => undefined);
     }

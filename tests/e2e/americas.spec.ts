@@ -67,7 +67,10 @@ test('a campaign in the Americas starts on its own map and plays two turns on a 
     }
     await expect(page.getByTestId('end-turn')).toBeEnabled({ timeout: 30_000 });
     await page.getByTestId('end-turn').tap();
-    await page.getByTestId('commit-turn').tap();
+    // With the staff's plan running the turn ends in one tap (int-staff's one-tap turn); otherwise the
+    // order review opens and Commit ends it: wait for the review a moment and commit if it came.
+    const commit = page.getByTestId('commit-turn');
+    if (await commit.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) await commit.tap();
     if (await page.getByTestId('replay').isVisible({ timeout: 15_000 }).catch(() => false)) {
       await page.waitForTimeout(1200);
       if (turn === 1) await shot(page, '04-replay');
