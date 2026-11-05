@@ -61,7 +61,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
   const turns = CAMPAIGN_TURNS[length];
-  const bars = victoryBars(turns);
+  const bars = victoryBars(turns, nations.length);
   const [difficulty, setDifficulty] = useState<Difficulty>(() => readPrefs().difficulty ?? 'easy');
   const pickDifficulty = (d: Difficulty) => {
     setDifficulty(d);

@@ -2,7 +2,7 @@
 
 The second theatre (MASTER-PLAN Phase 6: "Middle East: the Gulf, Hormuz and oil shocks" and
 "Africa: the Horn, the Sahel, and Suez from the south", built as one theatre). Six regional powers
-from the Mediterranean's south shore to the Cape, nineteen minor states between them, and four of
+from the Mediterranean's south shore to the Cape, twenty-four minor states between them, and four of
 the world's chokepoints. Every leader and general is invented; real countries are treated
 even-handedly, and no power is cast as the villain: each is a playable side with a doctrine of its
 own, and every pair of powers starts at war, as in the Pacific.
@@ -15,6 +15,8 @@ rewrites the file, and a test checks the committed file matches byte for byte). 
 baked from Natural Earth's 1:50m admin-0 countries (public domain) over lon -18..63, lat -35..42,
 equirectangular; it was then finished by hand. About 1.8 degrees to the hex: the Levant, Suez, the
 Gulf and Bab-el-Mandeb are drawn wider than life so a country fits and each strait is one hex.
+Egypt and Saudi Arabia share no border: the Gulf of Aqaba (sea) and Jordan's Aqaba lie between Sinai
+and Tabuk, as on the ground.
 
 North is up. The top rows are the south of Iberia, Italy and Greece (unaligned), Anatolia, the
 Caucasus and the Caspian; the bottom row is the Cape.
@@ -22,7 +24,7 @@ Caucasus and the Caspian; the bottom row is the Cape.
 | Character | Meaning |
 |---|---|
 | `~` | sea |
-| `+` | unaligned land: states not in the war at this scale (Tunisia, Mauritania, West Africa west of Nigeria, Cameroon and the Congo basin's north, South Sudan, Uganda, Tanzania, Zambia, Zimbabwe, Botswana, Madagascar, the Gulf states, Lebanon, Cyprus) and disputed ground (Western Sahara). Nobody's: an army that walks in takes it, out of supply until it is held. No unaligned hex has four neighbours of one nation, so the front's consolidation never hands one over unfought (tested). |
+| `+` | unaligned land: states not in the war at this scale (Tunisia, Mauritania, Senegal to Benin but Ghana, the Central African Republic, the Congo, Gabon, South Sudan, Uganda, Eritrea, Djibouti, Zambia, Botswana, Madagascar, the Gulf states, Lebanon, Cyprus, southern Europe, the Caucasus) and disputed ground (Western Sahara). Nobody's: an army that walks in takes it, out of supply until it is held. No unaligned hex has four neighbours of one nation, so the front's consolidation never hands one over unfought (tested). |
 | `T I S E N Z` | the powers: Turkey, Iran, Saudi Arabia, Egypt, Nigeria, South Africa |
 | lowercase | the minor states (below) |
 
@@ -95,19 +97,28 @@ so a second theatre that also fields Turkey can share it.
 
 ## Minor states
 
-Morocco, Algeria, Libya, Mali, Chad, Sudan, Ethiopia, Somalia, Kenya, DR Congo, Angola, Namibia,
-Mozambique, Iraq, Syria, Israel, Jordan, Yemen, Oman: each a capital (its seat of government) and up
-to three cities, militia only (Algeria, DR Congo, Ethiopia, Iraq and Sudan raise more), at war with
-every power and at peace with each other, as in the Pacific. Their capitals are the powers'
-objectives. Somalia includes Somaliland, as internationally recognised; Western Sahara is
+Morocco, Algeria, Libya, Mali, Niger, Chad, Ghana, Cameroon, Sudan, Ethiopia, Somalia, Kenya,
+Tanzania, DR Congo, Angola, Namibia, Zimbabwe, Mozambique, Iraq, Syria, Israel, Jordan, Yemen, Oman:
+each a capital (its seat of government) and up to three cities, militia only, at war with every
+power and at peace with each other, as in the Pacific. Every minor raises a regiment more in each
+city (Algeria, DR Congo, Ethiopia, Iraq and Sudan two). Their capitals are the powers' objectives.
+
+Prizes are weighted by what the war is about (`PRIZES` in `packages/mapgen/src/mideast.ts`): the
+oil states and the Levant between the four northern powers (Iraq 10 and 6, Syria, Israel, Jordan,
+Yemen, Oman, Libya, Sudan 8 or 9 and 5) are worth more than a minor's usual 6 and 4, and the states
+of the south and west less (4 and 2). Without it, the two southern powers had a dozen prizes to
+themselves while the four in the north fought over the rest, and won 19 of 20 AI-only matches. Somalia includes Somaliland, as internationally recognised; Western Sahara is
 unaligned; Malawi, too narrow at this scale, lies inside Mozambique's hexes.
 
 ## The war
 
 - **Turn limit:** 30 by default (`MIDEAST_MAX_TURNS`); the setup screen's lengths apply as everywhere.
-- **Victory bars:** the game's (`victoryBars`): domination at 32% of all victory points, supremacy at
-  29% standing from turn 8. Six powers make both harder to reach than with four; the soak reports how
-  often a match is decided before the limit.
+- **Victory bars:** `victoryBars(maxTurns, powers)`. The game's bars were measured on four level
+  powers; a map with more sets `WorldState.barPowers` at build, and the bars come down: domination in
+  proportion (21% of the points for six), supremacy to a fair share plus the four-power margin (21%
+  standing for six), from turn 8. At the four-power bars no match of 20 was decided before the limit
+  (no leader passed 18% standing). Maps of four or fewer powers, the Pacific among them (its crises
+  too), are unchanged.
 - **Opening Crises:** none. The fourteen crises are written for the Pacific's places and powers, so
   the theatre (`crises: false` on its `THEATRES` entry) opens with the classic war, and the setup
   screen hides the crisis deck; `GameSession.create` refuses a crisis there.
@@ -133,6 +144,20 @@ back to the next theatre's first power. `shortName` and `powerSpec` look across 
   0 rejected orders and the soak's invariants between every turn (`tests/soak/invariants.ts`, shared
   with the Pacific's soak).
 - `tests/e2e/mideast.spec.ts`: a phone picks the theatre, plays Egypt and ends two turns.
+
+## Balance (20 AI-only matches, `MIDEAST_SOAK=20`)
+
+| Pass | Decided before the limit | Winners | Rejected AI orders |
+|---|---|---|---|
+| Four-power bars, nineteen minors | 0 of 20 | Nigeria 11, South Africa 8, Iran 1 (all at the limit) | 0 |
+| Scaled bars (21 / 19), twenty-four minors | 20 of 20, median turn 14 | Nigeria 12, South Africa 8 | 0 |
+| Supremacy at a fair share plus 4 (21), a regiment more in every minor city, no Egypt-Saudi border | 17 of 20, median turn 25 | South Africa 13, Nigeria 6, Iran 1 | 0 |
+| Prizes weighted to the north (shipped) | 14 of 20, median turn 29 | South Africa 11, Nigeria 6, Saudi Arabia, Turkey, Iran 1 each | 0 |
+
+The southern powers still win most AI-only matches: they meet no rival power, the minor states and
+unaligned land around them are theirs to take, and the four northern powers wear each other down.
+Every northern power but Egypt has now won; the next pass is the AI's (the balance of power, which
+cannot reach a leader across the continent) rather than the map's.
 
 ## Measured
 

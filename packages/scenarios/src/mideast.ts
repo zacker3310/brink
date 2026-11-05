@@ -4,7 +4,7 @@ import { buildScenario, nationSpecs, type NationSpec, type ScenarioSetup } from 
 import mideastMap from './maps/mideast.map.json';
 
 // The Middle East and Africa: six regional powers (Turkey, Iran, Saudi Arabia, Egypt, Nigeria,
-// South Africa) from the Mediterranean's south shore to the Cape, nineteen minor states between them,
+// South Africa) from the Mediterranean's south shore to the Cape, twenty-four minor states between them,
 // and four of the world's chokepoints (Gibraltar, Suez, Bab-el-Mandeb, Hormuz). The geography is the
 // map file `maps/mideast.map.json`, written by `packages/mapgen/src/cli/mideast.ts`; the seed varies
 // only the ground the map leaves to it. Land outside every nation (`+` in the grid) is unaligned:
@@ -29,13 +29,16 @@ const SETUP: ScenarioSetup = {
     nigeria: { port: 'Lagos', ships: ['fleet', 'transport'] },
     'south-africa': { port: 'Durban', ships: ['fleet', 'transport'] },
   },
-  // Big countries defend deeper: militia per city beyond the infantry every city has.
+  // Militia per city beyond the infantry every city has: a regiment more everywhere, so no prize falls
+  // to a single column (the first 20 AI-only matches saw most minor capitals taken by turn 6), and
+  // the big countries deeper still.
   militia: {
-    algeria: ['infantry'],
-    'dr-congo': ['infantry'],
+    ...Object.fromEntries(MIDEAST_MAP.nations.filter((n) => n.role === 'minor').map((n) => [n.id, ['infantry'] as UnitClass[]])),
+    algeria: ['infantry', 'infantry'],
+    'dr-congo': ['infantry', 'infantry'],
     ethiopia: ['infantry', 'mechanized'],
-    iraq: ['infantry'],
-    sudan: ['infantry'],
+    iraq: ['infantry', 'mechanized'],
+    sudan: ['infantry', 'infantry'],
   } satisfies Record<NationId, UnitClass[]>,
 };
 

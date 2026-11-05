@@ -367,6 +367,11 @@ export interface WorldState {
   /** Number of the next turn to be resolved. Starts at 1. */
   turn: number;
   maxTurns: number;
+  /**
+   * The level powers the victory bars are scaled for (`victoryBars`): the map's powers when it names
+   * more than four (the Middle East and Africa: six). Absent: four, the bars as measured.
+   */
+  barPowers?: number;
   seed: number;
   /** Next id for formations and production items. */
   nextId: number;
@@ -564,6 +569,8 @@ export interface NationView {
   rulesetVersion: string;
   turn: number;
   maxTurns: number;
+  /** As `WorldState.barPowers`: the powers the victory bars are scaled for, when not four. */
+  barPowers?: number;
   self: Nation;
   nations: Record<NationId, PublicNation>;
   relations: Record<NationId, Relation>;

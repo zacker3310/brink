@@ -239,6 +239,8 @@ export function buildScenario(map: MapFile, seed: number, setup: ScenarioSetup):
     scenarioId: setup.scenarioId,
     turn: 1,
     maxTurns: setup.maxTurns,
+    // More than four powers: the victory bars come down in proportion (`victoryBars`).
+    ...(powers.length > 4 ? { barPowers: powers.length } : {}),
     seed: seed >>> 0,
     nextId: 1,
     tiles,

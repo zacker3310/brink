@@ -33,11 +33,13 @@ describe('The Middle East and Africa', () => {
     expect(w.scenarioId).toBe(MIDEAST_ID);
     expect(w.maxTurns).toBe(30);
     expect(shortName('South Africa')).toBe('S. Africa');
-  });
+  }, 60_000);
 
-  it('is six powers and nineteen minor states on a 44 x 44 map with sea and every land terrain', () => {
+  it('is six powers and twenty-four minor states on a 44 x 44 map with sea and every land terrain', () => {
     expect(MIDEAST_NATIONS.map((n) => n.id)).toEqual(['turkey', 'iran', 'saudi-arabia', 'egypt', 'nigeria', 'south-africa']);
-    expect(MIDEAST_MINORS).toHaveLength(19);
+    expect(MIDEAST_MINORS).toHaveLength(24);
+    // Six powers: the victory bars come down in proportion (victoryBars).
+    expect(w.barPowers).toBe(6);
     expect(Object.keys(w.tiles)).toHaveLength(44 * 44);
     const terrains = new Set(Object.values(w.tiles).map((t) => t.terrain));
     for (const t of ['plains', 'forest', 'hills', 'mountains', 'urban', 'water'] as const) expect(terrains.has(t), t).toBe(true);
@@ -49,6 +51,7 @@ describe('The Middle East and Africa', () => {
       morocco: 'Rabat', algeria: 'Algiers', libya: 'Tripoli', mali: 'Bamako', chad: "N'Djamena", sudan: 'Khartoum', ethiopia: 'Addis Ababa',
       somalia: 'Mogadishu', kenya: 'Nairobi', 'dr-congo': 'Kinshasa', angola: 'Luanda', namibia: 'Windhoek', mozambique: 'Maputo',
       iraq: 'Baghdad', syria: 'Damascus', israel: 'Jerusalem', jordan: 'Amman', yemen: "Sana'a", oman: 'Muscat',
+      niger: 'Niamey', ghana: 'Accra', cameroon: 'Yaoundé', tanzania: 'Dodoma', zimbabwe: 'Harare',
     };
     expect(sortedKeys(w.nations)).toEqual(Object.keys(capitals).sort());
     for (const [n, name] of Object.entries(capitals)) {

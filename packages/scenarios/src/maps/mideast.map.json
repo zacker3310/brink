@@ -19,20 +19,25 @@
         "T": "turkey",
         "Z": "south-africa",
         "a": "algeria",
+        "b": "zimbabwe",
         "c": "chad",
         "d": "dr-congo",
         "e": "ethiopia",
         "f": "somalia",
         "g": "angola",
+        "h": "ghana",
         "i": "israel",
         "j": "jordan",
         "k": "mali",
         "l": "libya",
         "m": "morocco",
+        "n": "niger",
         "o": "oman",
         "q": "iraq",
         "r": "syria",
         "s": "sudan",
+        "t": "tanzania",
+        "u": "cameroon",
         "w": "yemen",
         "x": "namibia",
         "y": "kenya",
@@ -46,36 +51,36 @@
         "~~~~~mmmmaaaaa++~~~~~~~~~~+~~+rrqqqIIIIIIII+",
         "~~~~mmmmaaaaaa+lll~~ll~~~~~~ijjqqqqqIIIIII++",
         "~~~~mmmaaaaaaaallllllllEEEEEEjSSSqqqIIIIIII+",
-        "~~~mmaaaaaaaaalllllllllEEEE~ESSSSSS+~~IIIII+",
-        "~~+++aaaaaaaaalllllllllEEEEE~SSSSSSSS~~IIII+",
+        "~~~mmaaaaaaaaalllllllllEEEE~EjSSSSS+~~IIIII+",
+        "~~+++aaaaaaaaalllllllllEEEEE~~SSSSSSS~~IIII+",
         "~++++aaaaaaaaalllllllllEEEEE~SSSSSSSS+~~~~I+",
         "~+++++kkaaaaaalllllllllEEEEEE~SSSSSSSS++oo~~",
-        "++++++kkkaaaaa++++cccclssssss~SSSSSSSSSooo~~",
-        "~++++++kkkkaaa+++++ccccsssssss~SSSSSSSooo~~~",
-        "++++++kkkkkk++++++cccccsssssss~SSSSSSwoo~~~~",
-        "+++kkkkkkkkk++++++cccccsssssss+~wwwwwwo~~~~~",
-        "+++kkkkkk++++++++cccccsssssss++~wwwww~~~~~~~",
-        "~++kkkkk++++NNNNNcccccsssssssee+~www~~~~~~~~",
+        "++++++kkkaaaaannnncccclssssss~SSSSSSSSSooo~~",
+        "~++++++kkkkaaannnnnccccsssssss~SSSSSSSooo~~~",
+        "++++++kkkkkknnnnnncccccsssssss~SSSSSSwoo~~~~",
+        "+++kkkkkkkkknnnnnncccccsssssss+~wwwwwwo~~~~~",
+        "+++kkkkkk++nnnnnncccccsssssss++~wwwww~~~~~~~",
+        "~++kkkkk++nnNNNNNcccccsssssssee+~www~~~~~~~~",
         "~++++kk++++NNNNNNcccccsssssseee+~~~~ff~~~~~~",
-        "~~++++++++++NNNNN+ccc+++++++eeeeefffff~~~~~~",
-        "~~~++++++++NNNNN++++++++++++eeeeeefff~~~~~~~",
-        "~~~~+++++++NNNN+++++++++++++eeeeeffff~~~~~~~",
-        "~~~~~~~~~~~~~~++++++dddddd++yyeeefff~~~~~~~~",
-        "~~~~~~~~~~~~~~~+++++ddddddd++yyyfff~~~~~~~~~",
+        "~~++++++hh++NNNNNuccc+++++++eeeeefffff~~~~~~",
+        "~~~+++++hh+NNNNNuu++++++++++eeeeeefff~~~~~~~",
+        "~~~~++++hh+NNNNuuu++++++++++eeeeeffff~~~~~~~",
+        "~~~~~~~~~~~~~~uuu+++dddddd++yyeeefff~~~~~~~~",
+        "~~~~~~~~~~~~~~~uu+++ddddddd++yyyfff~~~~~~~~~",
         "~~~~~~~~~~~~~~~++++ddddddd++yyyyf~~~~~~~~~~~",
         "~~~~~~~~~~~~~~~++++ddddddd+++yyyf~~~~~~~~~~~",
         "~~~~~~~~~~~~~~~+++dddddddd++++yy~~~~~~~~~~~~",
-        "~~~~~~~~~~~~~~~~++dddddddd+++++y~~~~~~~~~~~~",
-        "~~~~~~~~~~~~~~~~dgdddddddd+++++~~~~~~~~~~~~~",
-        "~~~~~~~~~~~~~~~~~ggdggddddd+++++~~~~~~~~~~~~",
-        "~~~~~~~~~~~~~~~~~ggggdddd++++++~~~~~~~~~~~~~",
-        "~~~~~~~~~~~~~~~~~gggggg+d++++++z~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~++dddddddd+tttty~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~dgddddddddttttt~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~ggdggdddddttttt~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~ggggdddd+ttttt~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~gggggg+d+tttttz~~~~~~~~~~~~",
         "~~~~~~~~~~~~~~~~gggggg++++++zzzz~~~~+~~~~~~~",
         "~~~~~~~~~~~~~~~~~ggggg+++++zzzzz~~~~++~~~~~~",
         "~~~~~~~~~~~~~~~~gggggg+++++zzzz~~~+++~~~~~~~",
-        "~~~~~~~~~~~~~~~~~xxxxx++++++zz~~~~+++~~~~~~~",
-        "~~~~~~~~~~~~~~~~~xxxx++++++zz~~~~~++~~~~~~~~",
-        "~~~~~~~~~~~~~~~~~~xxx++++++zz~~~~~++~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~xxxxx+++bbbzz~~~~+++~~~~~~~",
+        "~~~~~~~~~~~~~~~~~xxxx+++bbbzz~~~~~++~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~xxx++++bbzz~~~~~++~~~~~~~~",
         "~~~~~~~~~~~~~~~~~xxxx+++ZZZzz~~~~+++~~~~~~~~",
         "~~~~~~~~~~~~~~~~~~xxx+++ZZZz~~~~~~~~~~~~~~~~",
         "~~~~~~~~~~~~~~~~~~xxZZZZZZZ~~~~~~~~~~~~~~~~~",
@@ -103,7 +108,7 @@
         "~~~~mmmm**********~~**~~~~~~*pppppppmmpppp**",
         "~~~~pmmmppppppppppppppppppppppppppppppmmppp*",
         "~~~pppppppppppppppppppppppp~pppppppp~~pmmpp*",
-        "~~pppppppppppppppppppppppppp~pppppppp~~pmmp*",
+        "~~pppppppppppppppppppppppppp~~ppppppp~~pmmp*",
         "~ppppppppppphhpppppppppppppp~ppppppppp~~~~**",
         "~ppppppppppphhppppppppppppppp~phhhpppppphh~~",
         "pppppppppppphhpppphhppppppppp~phhppppppp**~~",
@@ -163,7 +168,7 @@
         "aaaa--------------bb--bbbbbb----------------",
         "aaaa----------------------------------------",
         "aaa------------------------d--------ee------",
-        "aa--------------------------d--------ee-----",
+        "aa--------------------------dd-------ee-----",
         "a---------------------------d---------eeef--",
         "a----------------------------d------------ff",
         "-----------------------------d------------ff",
@@ -219,7 +224,7 @@
         "~~~~hhhhuuuuuuuuuu~~uu~~~~~~udddddddhhdddduu",
         "~~~~dhhhddddddddddddddduuuuuudddddddddhhdddu",
         "~~~dddddddddddddddddddddddd~dddddddd~~dhhddr",
-        "~~dddddddddddddddddddddddddd~dddddddd~~dhhdr",
+        "~~dddddddddddddddddddddddddd~~ddddddd~~dhhdr",
         "~ddddddddddddddddddddddddddd~ddddddddd~~~~sr",
         "~dddddddddddddddddddddddddddd~dddddddddddr~~",
         "ddddddddddddddddddddddddddddd~ddddddddddrr~~",
@@ -508,6 +513,56 @@
       "role": "minor",
       "capital": "oman-capital",
       "terrainBias": 10
+    },
+    {
+      "id": "niger",
+      "name": "Niger",
+      "short": "Niger",
+      "color": "#d08a3a",
+      "government": "union",
+      "role": "minor",
+      "capital": "niger-capital",
+      "terrainBias": 0
+    },
+    {
+      "id": "ghana",
+      "name": "Ghana",
+      "short": "Ghana",
+      "color": "#5aa06a",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "ghana-capital",
+      "terrainBias": 0
+    },
+    {
+      "id": "cameroon",
+      "name": "Cameroon",
+      "short": "Cameroon",
+      "color": "#4a8a7a",
+      "government": "union",
+      "role": "minor",
+      "capital": "cameroon-capital",
+      "terrainBias": 15
+    },
+    {
+      "id": "tanzania",
+      "name": "Tanzania",
+      "short": "Tanzania",
+      "color": "#5a7ac0",
+      "government": "union",
+      "role": "minor",
+      "capital": "tanzania-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "zimbabwe",
+      "name": "Zimbabwe",
+      "short": "Zimbabwe",
+      "color": "#a85a5a",
+      "government": "union",
+      "role": "minor",
+      "capital": "zimbabwe-capital",
+      "terrainBias": 10
     }
   ],
   "sites": [
@@ -641,7 +696,7 @@
       "id": "saudi-arabia-city3",
       "kind": "city",
       "name": "Tabuk",
-      "at": [29, 7],
+      "at": [30, 7],
       "owner": "saudi-arabia"
     },
     {
@@ -810,49 +865,64 @@
       "kind": "capital",
       "name": "Tripoli",
       "at": [16, 5],
-      "owner": "libya"
+      "owner": "libya",
+      "victoryPoints": 8
     },
     {
       "id": "libya-city0",
       "kind": "city",
       "name": "Benghazi",
       "at": [20, 5],
-      "owner": "libya"
+      "owner": "libya",
+      "victoryPoints": 5
     },
     {
       "id": "mali-capital",
       "kind": "capital",
       "name": "Bamako",
       "at": [5, 16],
-      "owner": "mali"
+      "owner": "mali",
+      "victoryPoints": 4
     },
     {
       "id": "mali-city0",
       "kind": "city",
       "name": "Timbuktu",
       "at": [8, 14],
-      "owner": "mali"
+      "owner": "mali",
+      "victoryPoints": 2
     },
     {
       "id": "chad-capital",
       "kind": "capital",
       "name": "N'Djamena",
       "at": [17, 17],
-      "owner": "chad"
+      "owner": "chad",
+      "victoryPoints": 4
+    },
+    {
+      "id": "chad-city0",
+      "kind": "city",
+      "name": "Abéché",
+      "at": [21, 16],
+      "owner": "chad",
+      "victoryPoints": 2
     },
     {
       "id": "sudan-capital",
       "kind": "capital",
       "name": "Khartoum",
       "at": [27, 15],
-      "owner": "sudan"
+      "owner": "sudan",
+      "victoryPoints": 8
     },
     {
       "id": "sudan-city0",
       "kind": "city",
       "name": "Port Sudan",
       "at": [29, 12],
-      "owner": "sudan"
+      "owner": "sudan",
+      "victoryPoints": 5
     },
     {
       "id": "ethiopia-capital",
@@ -901,140 +971,248 @@
       "kind": "capital",
       "name": "Kinshasa",
       "at": [18, 26],
-      "owner": "dr-congo"
+      "owner": "dr-congo",
+      "victoryPoints": 4
     },
     {
       "id": "dr-congo-city0",
       "kind": "city",
       "name": "Kisangani",
       "at": [23, 23],
-      "owner": "dr-congo"
+      "owner": "dr-congo",
+      "victoryPoints": 2
     },
     {
       "id": "dr-congo-city1",
       "kind": "city",
       "name": "Lubumbashi",
       "at": [24, 30],
-      "owner": "dr-congo"
+      "owner": "dr-congo",
+      "victoryPoints": 2
     },
     {
       "id": "angola-capital",
       "kind": "capital",
       "name": "Luanda",
       "at": [17, 28],
-      "owner": "angola"
+      "owner": "angola",
+      "victoryPoints": 4
     },
     {
       "id": "angola-city0",
       "kind": "city",
       "name": "Huambo",
       "at": [18, 31],
-      "owner": "angola"
+      "owner": "angola",
+      "victoryPoints": 2
     },
     {
       "id": "namibia-capital",
       "kind": "capital",
       "name": "Windhoek",
       "at": [18, 37],
-      "owner": "namibia"
+      "owner": "namibia",
+      "victoryPoints": 4
+    },
+    {
+      "id": "namibia-city0",
+      "kind": "city",
+      "name": "Walvis Bay",
+      "at": [17, 37],
+      "owner": "namibia",
+      "victoryPoints": 2
     },
     {
       "id": "mozambique-capital",
       "kind": "capital",
       "name": "Maputo",
       "at": [27, 38],
-      "owner": "mozambique"
+      "owner": "mozambique",
+      "victoryPoints": 4
     },
     {
       "id": "mozambique-city0",
       "kind": "city",
       "name": "Beira",
       "at": [28, 35],
-      "owner": "mozambique"
+      "owner": "mozambique",
+      "victoryPoints": 2
     },
     {
       "id": "mozambique-city1",
       "kind": "city",
       "name": "Nampula",
       "at": [30, 32],
-      "owner": "mozambique"
+      "owner": "mozambique",
+      "victoryPoints": 2
     },
     {
       "id": "iraq-capital",
       "kind": "capital",
       "name": "Baghdad",
       "at": [34, 4],
-      "owner": "iraq"
+      "owner": "iraq",
+      "victoryPoints": 10
     },
     {
       "id": "iraq-city0",
       "kind": "city",
       "name": "Mosul",
       "at": [33, 3],
-      "owner": "iraq"
+      "owner": "iraq",
+      "victoryPoints": 6
     },
     {
       "id": "iraq-city1",
       "kind": "city",
       "name": "Basra",
       "at": [35, 6],
-      "owner": "iraq"
+      "owner": "iraq",
+      "victoryPoints": 6
     },
     {
       "id": "syria-capital",
       "kind": "capital",
       "name": "Damascus",
       "at": [30, 4],
-      "owner": "syria"
+      "owner": "syria",
+      "victoryPoints": 9
     },
     {
       "id": "syria-city0",
       "kind": "city",
       "name": "Aleppo",
       "at": [29, 3],
-      "owner": "syria"
+      "owner": "syria",
+      "victoryPoints": 5
     },
     {
       "id": "israel-capital",
       "kind": "capital",
       "name": "Jerusalem",
       "at": [28, 5],
-      "owner": "israel"
+      "owner": "israel",
+      "victoryPoints": 9
     },
     {
       "id": "jordan-capital",
       "kind": "capital",
       "name": "Amman",
       "at": [29, 5],
-      "owner": "jordan"
+      "owner": "jordan",
+      "victoryPoints": 8
     },
     {
       "id": "yemen-capital",
       "kind": "capital",
       "name": "Sana'a",
       "at": [33, 15],
-      "owner": "yemen"
+      "owner": "yemen",
+      "victoryPoints": 8
     },
     {
       "id": "yemen-city0",
       "kind": "city",
       "name": "Aden",
       "at": [34, 16],
-      "owner": "yemen"
+      "owner": "yemen",
+      "victoryPoints": 5
     },
     {
       "id": "oman-capital",
       "kind": "capital",
       "name": "Muscat",
       "at": [41, 11],
-      "owner": "oman"
+      "owner": "oman",
+      "victoryPoints": 8
     },
     {
       "id": "oman-city0",
       "kind": "city",
       "name": "Salalah",
       "at": [38, 14],
-      "owner": "oman"
+      "owner": "oman",
+      "victoryPoints": 5
+    },
+    {
+      "id": "niger-capital",
+      "kind": "capital",
+      "name": "Niamey",
+      "at": [10, 16],
+      "owner": "niger",
+      "victoryPoints": 4
+    },
+    {
+      "id": "niger-city0",
+      "kind": "city",
+      "name": "Agadez",
+      "at": [15, 13],
+      "owner": "niger",
+      "victoryPoints": 2
+    },
+    {
+      "id": "ghana-capital",
+      "kind": "capital",
+      "name": "Accra",
+      "at": [9, 20],
+      "owner": "ghana",
+      "victoryPoints": 4
+    },
+    {
+      "id": "ghana-city0",
+      "kind": "city",
+      "name": "Kumasi",
+      "at": [8, 19],
+      "owner": "ghana",
+      "victoryPoints": 2
+    },
+    {
+      "id": "cameroon-capital",
+      "kind": "capital",
+      "name": "Yaoundé",
+      "at": [16, 22],
+      "owner": "cameroon",
+      "victoryPoints": 4
+    },
+    {
+      "id": "cameroon-city0",
+      "kind": "city",
+      "name": "Douala",
+      "at": [14, 21],
+      "owner": "cameroon",
+      "victoryPoints": 2
+    },
+    {
+      "id": "tanzania-capital",
+      "kind": "capital",
+      "name": "Dodoma",
+      "at": [28, 27],
+      "owner": "tanzania",
+      "victoryPoints": 4
+    },
+    {
+      "id": "tanzania-city0",
+      "kind": "city",
+      "name": "Dar es Salaam",
+      "at": [31, 28],
+      "owner": "tanzania",
+      "victoryPoints": 2
+    },
+    {
+      "id": "zimbabwe-capital",
+      "kind": "capital",
+      "name": "Harare",
+      "at": [26, 34],
+      "owner": "zimbabwe",
+      "victoryPoints": 4
+    },
+    {
+      "id": "zimbabwe-city0",
+      "kind": "city",
+      "name": "Bulawayo",
+      "at": [24, 35],
+      "owner": "zimbabwe",
+      "victoryPoints": 2
     }
   ],
   "seaZones": [

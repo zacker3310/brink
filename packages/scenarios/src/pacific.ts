@@ -68,7 +68,7 @@ export const THEATRES: readonly Theatre[] = [
   {
     id: MIDEAST_ID,
     name: 'Middle East and Africa',
-    summary: 'Istanbul to the Cape: six regional powers, nineteen states between them, and the oil and the straits of Suez, Hormuz and Bab-el-Mandeb.',
+    summary: 'Istanbul to the Cape: six regional powers, twenty-four states between them, and the oil and the straits of Suez, Hormuz and Bab-el-Mandeb.',
     unlock: 0,
     nations: MIDEAST_NATIONS,
     minors: MIDEAST_MINORS,

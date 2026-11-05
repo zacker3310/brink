@@ -24,36 +24,36 @@ const GRID = [
   '~~~~~mmmmaaaaa++~~~~~~~~~~+~~+rrqqqIIIIIIII+', // 4 Cyprus, Lebanon
   '~~~~mmmmaaaaaa+lll~~ll~~~~~~ijjqqqqqIIIIII++', // 5 Israel, Jordan
   '~~~~mmmaaaaaaaallllllllEEEEEEjSSSqqqIIIIIII+', // 6 Port Said at col 27: the Suez Canal
-  '~~~mmaaaaaaaaalllllllllEEEE~ESSSSSS+~~IIIII+', // 7 the Gulf of Suez, Kuwait
-  '~~+++aaaaaaaaalllllllllEEEEE~SSSSSSSS~~IIII+', // 8
+  '~~~mmaaaaaaaaalllllllllEEEE~EjSSSSS+~~IIIII+', // 7 the Gulf of Suez, Aqaba, Kuwait
+  '~~+++aaaaaaaaalllllllllEEEEE~~SSSSSSS~~IIII+', // 8 the Gulf of Aqaba: Egypt and Saudi Arabia share no border
   '~++++aaaaaaaaalllllllllEEEEE~SSSSSSSS+~~~~I+', // 9 Hormuz at col 40, Qatar
   '~+++++kkaaaaaalllllllllEEEEEE~SSSSSSSS++oo~~', // 10 the Emirates, Musandam
-  '++++++kkkaaaaa++++cccclssssss~SSSSSSSSSooo~~', // 11
-  '~++++++kkkkaaa+++++ccccsssssss~SSSSSSSooo~~~', // 12
-  '++++++kkkkkk++++++cccccsssssss~SSSSSSwoo~~~~', // 13
-  '+++kkkkkkkkk++++++cccccsssssss+~wwwwwwo~~~~~', // 14
-  '+++kkkkkk++++++++cccccsssssss++~wwwww~~~~~~~', // 15
-  '~++kkkkk++++NNNNNcccccsssssssee+~www~~~~~~~~', // 16 Bab-el-Mandeb at col 32
+  '++++++kkkaaaaannnncccclssssss~SSSSSSSSSooo~~', // 11
+  '~++++++kkkkaaannnnnccccsssssss~SSSSSSSooo~~~', // 12
+  '++++++kkkkkknnnnnncccccsssssss~SSSSSSwoo~~~~', // 13
+  '+++kkkkkkkkknnnnnncccccsssssss+~wwwwwwo~~~~~', // 14
+  '+++kkkkkk++nnnnnncccccsssssss++~wwwww~~~~~~~', // 15
+  '~++kkkkk++nnNNNNNcccccsssssssee+~www~~~~~~~~', // 16 Bab-el-Mandeb at col 32
   '~++++kk++++NNNNNNcccccsssssseee+~~~~ff~~~~~~', // 17
-  '~~++++++++++NNNNN+ccc+++++++eeeeefffff~~~~~~', // 18
-  '~~~++++++++NNNNN++++++++++++eeeeeefff~~~~~~~', // 19
-  '~~~~+++++++NNNN+++++++++++++eeeeeffff~~~~~~~', // 20
-  '~~~~~~~~~~~~~~++++++dddddd++yyeeefff~~~~~~~~', // 21
-  '~~~~~~~~~~~~~~~+++++ddddddd++yyyfff~~~~~~~~~', // 22
+  '~~++++++hh++NNNNNuccc+++++++eeeeefffff~~~~~~', // 18
+  '~~~+++++hh+NNNNNuu++++++++++eeeeeefff~~~~~~~', // 19
+  '~~~~++++hh+NNNNuuu++++++++++eeeeeffff~~~~~~~', // 20
+  '~~~~~~~~~~~~~~uuu+++dddddd++yyeeefff~~~~~~~~', // 21
+  '~~~~~~~~~~~~~~~uu+++ddddddd++yyyfff~~~~~~~~~', // 22
   '~~~~~~~~~~~~~~~++++ddddddd++yyyyf~~~~~~~~~~~', // 23
   '~~~~~~~~~~~~~~~++++ddddddd+++yyyf~~~~~~~~~~~', // 24
   '~~~~~~~~~~~~~~~+++dddddddd++++yy~~~~~~~~~~~~', // 25
-  '~~~~~~~~~~~~~~~~++dddddddd+++++y~~~~~~~~~~~~', // 26
-  '~~~~~~~~~~~~~~~~dgdddddddd+++++~~~~~~~~~~~~~', // 27
-  '~~~~~~~~~~~~~~~~~ggdggddddd+++++~~~~~~~~~~~~', // 28
-  '~~~~~~~~~~~~~~~~~ggggdddd++++++~~~~~~~~~~~~~', // 29
-  '~~~~~~~~~~~~~~~~~gggggg+d++++++z~~~~~~~~~~~~', // 30
+  '~~~~~~~~~~~~~~~~++dddddddd+tttty~~~~~~~~~~~~', // 26
+  '~~~~~~~~~~~~~~~~dgddddddddttttt~~~~~~~~~~~~~', // 27
+  '~~~~~~~~~~~~~~~~~ggdggdddddttttt~~~~~~~~~~~~', // 28
+  '~~~~~~~~~~~~~~~~~ggggdddd+ttttt~~~~~~~~~~~~~', // 29
+  '~~~~~~~~~~~~~~~~~gggggg+d+tttttz~~~~~~~~~~~~', // 30
   '~~~~~~~~~~~~~~~~gggggg++++++zzzz~~~~+~~~~~~~', // 31 Madagascar
   '~~~~~~~~~~~~~~~~~ggggg+++++zzzzz~~~~++~~~~~~', // 32 Malawi, too narrow at this scale, inside Mozambique
   '~~~~~~~~~~~~~~~~gggggg+++++zzzz~~~+++~~~~~~~', // 33
-  '~~~~~~~~~~~~~~~~~xxxxx++++++zz~~~~+++~~~~~~~', // 34
-  '~~~~~~~~~~~~~~~~~xxxx++++++zz~~~~~++~~~~~~~~', // 35
-  '~~~~~~~~~~~~~~~~~~xxx++++++zz~~~~~++~~~~~~~~', // 36
+  '~~~~~~~~~~~~~~~~~xxxxx+++bbbzz~~~~+++~~~~~~~', // 34
+  '~~~~~~~~~~~~~~~~~xxxx+++bbbzz~~~~~++~~~~~~~~', // 35
+  '~~~~~~~~~~~~~~~~~~xxx++++bbzz~~~~~++~~~~~~~~', // 36
   '~~~~~~~~~~~~~~~~~xxxx+++ZZZzz~~~~+++~~~~~~~~', // 37
   '~~~~~~~~~~~~~~~~~~xxx+++ZZZz~~~~~~~~~~~~~~~~', // 38
   '~~~~~~~~~~~~~~~~~~xxZZZZZZZ~~~~~~~~~~~~~~~~~', // 39
@@ -90,6 +90,11 @@ const REGIONS: Record<string, NationId | null> = {
   j: 'jordan',
   w: 'yemen',
   o: 'oman',
+  n: 'niger',
+  h: 'ghana',
+  u: 'cameroon',
+  t: 'tanzania',
+  b: 'zimbabwe',
 };
 
 const power = (id: NationId, name: string, short: string, color: string, government: MapNation['government'], terrainBias: number): MapNation => ({ id, name, short, color, government, role: 'power', capital: `${id}-capital`, terrainBias });
@@ -121,6 +126,11 @@ const NATIONS: MapNation[] = [
   minor('jordan', 'Jordan', 'Jordan', '#a06a8a', 'commonwealth', 0),
   minor('yemen', 'Yemen', 'Yemen', '#8a6a4a', 'union', 30),
   minor('oman', 'Oman', 'Oman', '#c96a4a', 'commonwealth', 10),
+  minor('niger', 'Niger', 'Niger', '#d08a3a', 'union', 0),
+  minor('ghana', 'Ghana', 'Ghana', '#5aa06a', 'commonwealth', 0),
+  minor('cameroon', 'Cameroon', 'Cameroon', '#4a8a7a', 'union', 15),
+  minor('tanzania', 'Tanzania', 'Tanzania', '#5a7ac0', 'union', 10),
+  minor('zimbabwe', 'Zimbabwe', 'Zimbabwe', '#a85a5a', 'union', 10),
 ];
 
 type Kind = MapSite['kind'];
@@ -156,7 +166,7 @@ const SITES: MapSite[] = [
   site('saudi-arabia', 'city', 'Dammam', 36, 8),
   site('saudi-arabia', 'city', 'Najran', 33, 13),
   site('saudi-arabia', 'city', 'Jeddah', 30, 11),
-  site('saudi-arabia', 'city', 'Tabuk', 29, 7),
+  site('saudi-arabia', 'city', 'Tabuk', 30, 7),
   site('saudi-arabia', 'depot', 'Hail', 32, 8),
 
   site('egypt', 'capital', 'Cairo', 26, 7),
@@ -189,6 +199,7 @@ const SITES: MapSite[] = [
   site('mali', 'capital', 'Bamako', 5, 16),
   site('mali', 'city', 'Timbuktu', 8, 14),
   site('chad', 'capital', "N'Djamena", 17, 17),
+  site('chad', 'city', 'Abéché', 21, 16),
   site('sudan', 'capital', 'Khartoum', 27, 15),
   site('sudan', 'city', 'Port Sudan', 29, 12),
   site('ethiopia', 'capital', 'Addis Ababa', 31, 18),
@@ -203,6 +214,7 @@ const SITES: MapSite[] = [
   site('angola', 'capital', 'Luanda', 17, 28),
   site('angola', 'city', 'Huambo', 18, 31),
   site('namibia', 'capital', 'Windhoek', 18, 37),
+  site('namibia', 'city', 'Walvis Bay', 17, 37),
   site('mozambique', 'capital', 'Maputo', 27, 38),
   site('mozambique', 'city', 'Beira', 28, 35),
   site('mozambique', 'city', 'Nampula', 30, 32),
@@ -217,7 +229,47 @@ const SITES: MapSite[] = [
   site('yemen', 'city', 'Aden', 34, 16),
   site('oman', 'capital', 'Muscat', 41, 11),
   site('oman', 'city', 'Salalah', 38, 14),
+  site('niger', 'capital', 'Niamey', 10, 16),
+  site('niger', 'city', 'Agadez', 15, 13),
+  site('ghana', 'capital', 'Accra', 9, 20),
+  site('ghana', 'city', 'Kumasi', 8, 19),
+  site('cameroon', 'capital', 'Yaoundé', 16, 22),
+  site('cameroon', 'city', 'Douala', 14, 21),
+  site('tanzania', 'capital', 'Dodoma', 28, 27),
+  site('tanzania', 'city', 'Dar es Salaam', 31, 28),
+  site('zimbabwe', 'capital', 'Harare', 26, 34),
+  site('zimbabwe', 'city', 'Bulawayo', 24, 35),
 ];
+
+// What the war is about: the oil states and the Levant between the four northern powers are worth
+// more than a minor state's usual 6 and 4 points, and the states deep in the south and west worth
+// less. Twenty AI-only matches at the usual points went to Nigeria and South Africa 19 times: the
+// two southern powers had a dozen prizes to themselves while the four in the north fought over the rest.
+const PRIZES: Readonly<Record<NationId, readonly [capital: number, city: number]>> = {
+  iraq: [10, 6],
+  syria: [9, 5],
+  israel: [9, 5],
+  jordan: [8, 5],
+  yemen: [8, 5],
+  oman: [8, 5],
+  libya: [8, 5],
+  sudan: [8, 5],
+  mali: [4, 2],
+  niger: [4, 2],
+  chad: [4, 2],
+  ghana: [4, 2],
+  cameroon: [4, 2],
+  'dr-congo': [4, 2],
+  angola: [4, 2],
+  namibia: [4, 2],
+  mozambique: [4, 2],
+  zimbabwe: [4, 2],
+  tanzania: [4, 2],
+};
+for (const s of SITES) {
+  const p = s.owner ? PRIZES[s.owner] : undefined;
+  if (p && (s.kind === 'capital' || s.kind === 'city')) s.victoryPoints = s.kind === 'capital' ? p[0] : p[1];
+}
 
 const SEA_ZONES = [
   { id: 'atlantic', name: 'North Atlantic' },
@@ -231,7 +283,7 @@ const SEA_ZONES = [
   { id: 'indian-ocean', name: 'Indian Ocean' },
 ];
 
-const RED_SEA = new Set(['27,7', '28,8', '28,9', '29,10', '30,11', '30,12', '30,13', '31,14', '31,15', '32,16', '29,11']);
+const RED_SEA = new Set(['27,7', '28,8', '29,8', '28,9', '29,10', '30,11', '30,12', '30,13', '31,14', '31,15', '32,16', '29,11']);
 const GULF = new Set(['36,7', '37,7', '37,8', '38,8', '38,9', '39,9', '40,9']);
 
 function zoneAt(col: number, row: number): string {
