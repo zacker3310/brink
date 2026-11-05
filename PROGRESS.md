@@ -55,7 +55,9 @@ Updated 2026-11-05 (six theatres in one build: the Pacific, Europe, the Middle E
     9, Turkey 4, Germany 2); the Middle East and Africa 70%, median 29 (South Africa 11, Nigeria 3);
     the Indo-Pacific South 70%, median 23 (Indonesia 6, China 4, Australia 3, Pakistan 1); the
     Americas 80%, median 24 (Colombia 10, Mexico 3, Canada 3); First Contact: the Visitors 2 of 20
-    (10%), the Accord once, 17 at the limit. Matrix 0 genuine failures. A 2.12.0 Pacific save resumes
+    (10%), the Accord once, 17 at the limit. Matrix 0 genuine failures. E2E: the four theatres' phone
+    specs (now following the one-tap turn), the Black Files, the menu, generals and the playthrough
+    pass. A 2.12.0 Pacific save resumes
     unchanged and plays three turns with no order refused; the Pacific's turn-1 hashes moved with
     the version stamp alone.
 
