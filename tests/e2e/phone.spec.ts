@@ -9,11 +9,14 @@ async function endTurn(page: Page, turn: number) {
   await page.getByTestId('end-turn').tap();
   await page.getByTestId('commit-turn').tap();
   await expect(page.getByTestId('replay')).toBeVisible({ timeout: 15000 });
-  // A short replay may finish on its own before the tap lands.
+  // A short replay may finish on its own before the tap lands. The tap skips Playwright's wait for the
+  // button to hold still: a combat replay drawn in software WebGL can starve the page of the two quiet
+  // frames that wait needs, though the button is there and live. Then the replay must be over.
   await page
     .getByTestId('skip-replay')
-    .tap({ timeout: 3000 })
+    .tap({ timeout: 3000, force: true })
     .catch(() => undefined);
+  await expect(page.getByTestId('replay')).toHaveCount(0, { timeout: 60_000 });
   // The debrief comes up first; the full report is one tap away.
   await expect(page.getByTestId('debrief')).toContainText(`Turn ${turn - 1} debrief`);
   await page.getByTestId('debrief-report').tap();
