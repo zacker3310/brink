@@ -80,7 +80,7 @@ a power's opening as the Pacific's 32% and 29%. Total War asks for a conquest ev
 
 ## Measured
 
-See PROGRESS.md for the soak (`tests/soak/europe.soak.test.ts`, `SOAK_EUROPE_MATCHES`).
+20 AI-only matches (`tests/soak/europe.soak.test.ts`, `SOAK_EUROPE_MATCHES`): 0 refused orders, 85% decisive (supremacy 10, domination 7, turn limit 3), median turn 21. Winners: Poland 13, Germany 5, the United Kingdom 2. Before the balance pass (Union Poland, Szczecin beside Berlin): Poland 15 of 20.
 
 ## Still open
 

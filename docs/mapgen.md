@@ -130,5 +130,8 @@ committed file matches the generator byte for byte.
   checked, but the simulation does not read them yet. That is the trade-and-chokepoints lane.
 - **Scale.** At 160 x 80 the per-hex loops in the builder and in fog and supply need the incremental
   work the master plan lists. The testbed's numbers above are the baseline.
-- **Pacific-only data still in code:** the crises (by site name and Pacific cells), Easy's natural
-  allies (`session.ts`, `ALLY`), and the setup screen's nation blurbs.
+- **Pacific-only data still in code:** the crises (by site name and Pacific cells; `theatres.ts`
+  gives other theatres none). Easy's natural allies are a preference list per power, and the setup
+  screen reads each theatre's own nations (`docs/europe.md`).
+- **Europe** (`europe.map.json`, 56 x 32, 46 nations) is the second theatre: a Natural Earth bake
+  finished by hand, its grid in `packages/mapgen/src/europe.ts`.

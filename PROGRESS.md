@@ -25,6 +25,18 @@ Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.
 
 ## Completed
 
+- Europe, the second theatre (docs/europe.md, Phase 5 first wave). A 56 x 32 map baked from Natural
+  Earth and finished by hand (`packages/mapgen/src/europe.ts`): six powers (the United Kingdom,
+  France, Germany, Poland, Russia, Turkey), forty minor states, the Channel, the Danish Straits,
+  Gibraltar, the Bosphorus and Dardanelles as straits and the Suwałki corridor as a land bridge.
+  Country files with invented generals, doctrine decks and leaders for the five new powers; navies
+  off several home ports; victory bars per theatre (`THEATRE_VICTORY`: 15% domination, 18%
+  supremacy). The setup screen lists each theatre's own nations; Easy's natural ally is per theatre.
+  Soak (`tests/soak/europe.soak.test.ts`), 20 AI-only matches: 0 refused orders, 17 decisive (85%:
+  supremacy 10, domination 7), median turn 21; winners Poland 13, Germany 5, the United Kingdom 2.
+  Open: Poland still wins too often, Russia, France and Turkey not at all; a European turn costs
+  three to four times a Pacific one (46 nations).
+
 - Balance after research, leaders and the staff AI (ruleset 2.9.0). Measured on 2.8.0: of 40 soak
   matches 15 decisive (China 12, Russia 3), median turn 30; after the first ten turns the wars
   were fought by nobody. Root causes and fixes, all in `packages/ai` unless named:
