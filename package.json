@@ -17,6 +17,7 @@
     "test:matrix": "pnpm --filter @brink/tests matrix",
     "test:difficulty": "pnpm --filter @brink/tests difficulty",
     "test:e2e": "pnpm --filter @brink/tests e2e",
+    "map:check": "pnpm --filter @brink/mapgen map:check",
     "check": "pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {

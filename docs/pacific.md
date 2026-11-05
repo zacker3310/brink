@@ -7,7 +7,8 @@ phase passes `pnpm check`, the soak and e2e on its own and goes to `main`.
 
 ## Map
 
-40 x 20 hexes (800), authored as a character grid in `packages/scenarios/src/pacific.ts`, so the
+40 x 20 hexes (800), authored as a map file, `packages/scenarios/src/maps/pacific.map.json` (the
+format: `docs/mapgen.md`; its owner layer is the character grid the map was first drawn as), so the
 geography is drawn, not generated. The seed varies only ground texture (forest, hills, mountains)
 inside each country, never coastlines or borders. North is up. The map runs from Moscow and St
 Petersburg in the west to Washington and New York on the Atlantic in the east: all of Russia and all
@@ -34,7 +35,7 @@ Kazakhstan for Russia, South Korea across the strait for Japan.
 
 ### Parity
 
-Every power starts level, whatever its size (`parity` in `pacific.ts`): the same victory points, the
+Every power starts level, whatever its size (`parity` in `scenarios/src/build.ts`): the same victory points, the
 same raw output (its cities' own yields, before its government's bent, so the Commonwealth's richer
 treasury still pays for its modest army), and an army of the same weight. Victory points and yields
 are scaled across each power's own sites, so where its strength lies is unchanged; lighter armies are
