@@ -190,9 +190,10 @@ export function bindingTreaty(world: Pick<WorldState, 'treaties' | 'turn'>, a: N
  * Whether `from` may still offer `kind` to `to`: peace or a ceasefire needs a war, an alliance or a
  * pact needs peace, trade and exchanges need no war and no embargo, a demand needs peace. A pact,
  * trade or joint operation already running cannot be offered again until its last turn (an offer
- * then renews it). An alliance against a common enemy needs no war between the two and no pact or
- * ceasefire with the enemy; a joint operation needs one of the two at war with the prize's holder
- * and neither bound to it by a pact or ceasefire (`jointOpProblem`).
+ * then renews it). An alliance against a common enemy needs no war between the two and no pact,
+ * ceasefire or Accord with the enemy; a joint operation needs one of the two at war with the prize's
+ * holder and neither bound to it by a pact, ceasefire or the Accord (`jointOpProblem`). Passage needs
+ * peace (allies have it already); the Accord, that the Visitors are awake (`accordOpen`).
  */
 export function canPropose(world: DiplomacyWorld, from: NationId, to: NationId, kind: ProposalKind, terms?: DealTerms): boolean {
   const rel = relationOf(world.relations, from, to);

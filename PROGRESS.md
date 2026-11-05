@@ -39,6 +39,17 @@ Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and 
   where it cannot be signed. Save migrations run in order (2.3 commanders and doctrine, 2.6
   development and memories, the Black Files' `normalizeBlackFiles`), each field-keyed and
   idempotent; `session/src/migrate.test.ts` loads a 2.8.0 and a 2.9.0 save under 2.12.0.
+  Found in the merge: `fundAirlifts` reserved only exchanges and tribute, so a sweetener a leader
+  agreed to pay could have had a lift refused; it reserves every deal's `dealGives` now. And the
+  Ulaanbaatar proofs had failed on int-staff since airborne met balance 2.9.0: the planner storms a
+  city only with 2.8 times the garrison it believes inside and never sees into one among buildings,
+  so the marines that flew in wandered off. An ordered airborne operation now storms its prize once
+  three are down (`storm`, ai `airborne.ts`): Easy seed 2 (the steppe edit) falls on turn 5 (10
+  seeds of 12 by turn 6); on Normal the rivals' fleets meet the convoy and it stages later (seed 12:
+  four drops beside the city on turns 6 and 7; seed 7 now two, on turn 6). Measured on 2.12.0: soak
+  (20 matches) 15 decisive by supremacy, 5 at the limit, median turn 24, 0 rejected AI orders and
+  actions; First Contact (20) Visitors 3, 17 at the limit; Pacific with the toggle (4) 0 rejected;
+  matrix 0 genuine failures.
 - Diplomacy that works, merged with airborne warfare and right of passage (ruleset 2.11.0; both
   lanes had set 2.10.0 on their own). Right of passage is a deal like the others the diplomacy
   fixes restructured: it may carry a sweetener (`cleanTerms`, `mirrors`, `dealGives`, paid on

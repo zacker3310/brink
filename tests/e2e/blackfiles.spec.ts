@@ -23,10 +23,16 @@ async function fresh(page: Page, key: string) {
   await page.getByTestId('menu-new').tap();
 }
 
-/** End the turn, skip its replay, read and close the debrief. */
+/**
+ * End the turn, skip its replay, read and close the debrief. With the staff's plan running the turn
+ * ends in one tap (int-staff's one-tap turn); otherwise the order review opens and Commit ends it:
+ * wait for the review a moment (`isVisible` does not wait) and commit if it came.
+ */
 async function endTurn(page: Page, name: string) {
+  await expect(page.getByTestId('end-turn')).toContainText('Execute', { timeout: 30_000 });
   await page.getByTestId('end-turn').tap();
-  await page.getByTestId('commit-turn').tap();
+  const commit = page.getByTestId('commit-turn');
+  if (await commit.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) await commit.tap();
   if (await page.getByTestId('replay').isVisible({ timeout: 15_000 }).catch(() => false)) {
     await page.waitForTimeout(800);
     await shot(page, `${name}-replay`);
