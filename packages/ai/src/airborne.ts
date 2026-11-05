@@ -1,7 +1,7 @@
 import type { Formation, FormationId, FormationOrder, HexKey, NationOrders, NationView, SiteId, SiteView, Stockpile } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { AIRBORNE, FACILITIES, STACK_LIMIT, TERRAIN, UNITS } from '@brink/game-data';
-import { findPath, keyDistance, neighborKeys } from '@brink/map';
+import { findPath, keyDistance, neighborKeys, reachable, type Reach } from '@brink/map';
 import {
   airliftCost,
   airliftOrigin,
@@ -181,10 +181,11 @@ export function airbornePlan(view: NationView, site: SiteView): AirbornePlan | n
       // The stage: a sea hex within the deck's reach of a drop zone, soonest reached by the carrier
       // and the nearest loaded group together, the least exposed, with the quietest way in.
       const ferry = [...loaded].sort((a, b) => keyDistance(a.key, lead.key) - keyDistance(b.key, lead.key) || (a.id < b.id ? -1 : 1))[0];
+      // One flood fill over the sea per ship and view (the Operations sheet judges every prize).
       const turnsTo = (ship: Formation, k: HexKey) => {
         if (ship.key === k) return 0;
-        const p = findPath(ship.key, k, (_a, b) => step(b));
-        return p ? Math.ceil(p.cost / Math.max(1, movementAllowance(ship))) : null;
+        const r = seaReach(view, ship, step)[k];
+        return r ? Math.ceil(r.cost / Math.max(1, movementAllowance(ship))) : null;
       };
       const zoneScore = (st: HexKey) => {
         let best: number | null = null;
@@ -236,6 +237,24 @@ function stageDanger(view: NationView, k: HexKey): number {
     if (s.owner && view.relations[s.owner] === 'war' && !view.nations[s.owner]?.minor && keyDistance(s.key, k) <= UNITS.air.range) n++;
   }
   return n;
+}
+
+const seaMemo = new WeakMap<NationView, Map<string, Record<HexKey, Reach>>>();
+
+/** Cheapest sea route cost from `ship` to every sea hex it can reach, worked out once per view and ship. */
+function seaReach(view: NationView, ship: Formation, step: (k: HexKey) => number | null): Record<HexKey, Reach> {
+  let byShip = seaMemo.get(view);
+  if (!byShip) {
+    byShip = new Map();
+    seaMemo.set(view, byShip);
+  }
+  const key = `${ship.id}@${ship.key}`;
+  let r = byShip.get(key);
+  if (!r) {
+    r = reachable(ship.key, 1000, (_a, b) => step(b));
+    byShip.set(key, r);
+  }
+  return r;
 }
 
 function seaCost(view: NationView, k: HexKey): number | null {
