@@ -169,8 +169,8 @@ resolution. Declarations of war and embargoes take effect at once.
 | Offer a ceasefire | War | Peace when both offer, and for 3 turns neither may declare war. |
 | Offer an exchange | Not at war, no embargo | Resources change hands once (up to 400 of each), when the other side offers the mirror. What you give is reserved like a recruit's cost. |
 | Demand tribute | Peace | An ultimatum: paid when they offer the payment back. Unpaid after two turns, it lapses: they defied you. |
-| Alliance against X | Not at war with each other; no pact or ceasefire with X | Allies, and whichever of you is not yet at war with X goes to war (perfidy applies). |
-| Joint operation | Not at war with each other; you at war with the prize's holder | For 5 turns both march on one city; ends when either takes it. |
+| Alliance against X | Not at war with each other; no pact or ceasefire with X | Allies, and whichever of you is not yet at war with X goes to war (perfidy applies). May carry a sweetener: resources handed over on signing. |
+| Joint operation | Not at war with each other; one of you at war with the prize's holder; neither bound to it by a pact or ceasefire | For 5 turns both march on one city and share what they see of it; whichever of you is not yet at war with its holder goes to war (perfidy applies); ends when either takes it. May carry a sweetener. |
 
 ### Leaders
 
@@ -189,7 +189,19 @@ weaker power an ultimatum and goes to war when defied, friends propose joint ope
 a resource offer a swap. A dove will not declare war on a power it feels warmly about, and nobody
 trades with a power they detest.
 
-Treaties are public: every power sees every agreement. Nations at peace may share ground; when war
+Asked to join a war (an alliance against X, or a joint operation on X's city, when not already
+fighting X), a leader weighs it: how they feel about you and about X, whether X leads the race,
+stands ahead of them, took a city of theirs or sits on their doorstep, the wars already on their
+hands, an ally asking, their temper and what the deal pays (`LEADER_TUNING.ai.joinWar`). A refusal
+says why: they like X, they have wars enough, X is too strong, they want more, or they do not
+trust you. A leader in a joint operation, or allied to a power at war with X, makes no peace with
+X while their war goes well.
+
+The staff (the planner that drafts the player's orders) signs only trade and non-aggression pacts
+with powers already at peace. It never makes peace or a ceasefire for the player: it advises it,
+and the diplomacy screen takes the advice with one tap.
+
+Treaties are public: every power sees every agreement, and who is at war or allied with whom. Nations at peace may share ground; when war
 breaks out over a shared hex, the side not on its own ground falls back.
 
 ## Victory

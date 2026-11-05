@@ -216,3 +216,81 @@ export function leaderReactions(view: NationView, report: Pick<TurnReport, 'even
   }
   return out;
 }
+
+const NEEDS_PEACE: ReadonlySet<DiplomaticAction> = new Set<DiplomaticAction>(['propose_alliance', 'propose_nonaggression', 'propose_trade', 'propose_exchange', 'demand_tribute', 'pay_tribute', 'propose_joint_op']);
+
+/** The relation between any two powers as the player sees it (wars and alliances are public). */
+function relationIn(view: NationView, a: NationId, b: NationId): string {
+  if (a === view.self.id) return view.relations[b] ?? 'war';
+  if (b === view.self.id) return view.relations[a] ?? 'war';
+  return view.publicRelations?.[a < b ? `${a}|${b}` : `${b}|${a}`] ?? 'peace';
+}
+
+/** A pact or ceasefire in force between `a` and `b`, by name, or null. */
+function bindingName(view: NationView, a: NationId, b: NationId): string | null {
+  const t = view.treaties.find((x) => (x.kind === 'nonaggression' || x.kind === 'ceasefire') && ((x.a === a && x.b === b) || (x.a === b && x.b === a)) && x.from <= view.turn && x.until >= view.turn);
+  return t ? (t.kind === 'ceasefire' ? 'ceasefire' : 'non-aggression pact') : null;
+}
+
+/**
+ * Why the player cannot offer `action` to `nation`, in plain words, or null when they can. `why` is
+ * the engine's own reason (`diplomacyBlocked`); this says what it means and what to do first.
+ */
+export function blockedText(view: NationView, nation: NationId, action: DiplomaticAction, terms: DealTerms | undefined, why: string | null): string | null {
+  if (!why) return null;
+  const me = view.self.id;
+  const name = (n: NationId) => view.nations[n]?.name ?? n;
+  const them = name(nation);
+  const rel = view.relations[nation] ?? 'war';
+  if (rel === 'war' && NEEDS_PEACE.has(action)) return `Make peace with ${them} first`;
+  if (action === 'propose_alliance' && !terms?.against && rel === 'alliance') return `You are already allies with ${them}`;
+  if (action === 'propose_alliance' && terms?.against) {
+    const x = terms.against;
+    const mine = bindingName(view, me, x);
+    if (mine) return `Your ${mine} with ${name(x)} forbids it`;
+    const theirs = bindingName(view, nation, x);
+    if (theirs) return `${them} has a ${theirs} with ${name(x)}`;
+  }
+  if (action === 'propose_joint_op' && terms?.site) {
+    const s = view.sites[terms.site];
+    if (!s) return 'No such city';
+    if (view.tiles[s.key]?.visibility === 'unknown') return `You have never seen ${s.name}`;
+    const holder = s.owner;
+    if (!holder) return `${s.name} is held by nobody`;
+    if (holder === me) return `${s.name} is already yours`;
+    if (holder === nation) return `${s.name} is ${them}'s`;
+    const mine = bindingName(view, me, holder);
+    if (mine) return `Your ${mine} with ${name(holder)} forbids it`;
+    const theirs = bindingName(view, nation, holder);
+    if (theirs) return `${them} has a ${theirs} with ${name(holder)}`;
+    if (relationIn(view, me, holder) !== 'war' && relationIn(view, nation, holder) !== 'war') return `${s.name} isn't held by a power you or ${them} are fighting`;
+  }
+  const pact = action === 'declare_war' ? bindingName(view, me, nation) : null;
+  if (pact) return `Your ${pact} with ${them} forbids it until it runs out`;
+  return why.charAt(0).toUpperCase() + why.slice(1);
+}
+
+/** Why a leader said no, in plain words. `kind` and `terms` are the offer as the player made it. */
+export function refusalText(view: NationView, nation: NationId, reason: string, kind: ProposalKind, terms?: DealTerms): string {
+  const them = view.nations[nation]?.name ?? nation;
+  const x = kind === 'alliance' ? terms?.against : kind === 'joint_op' && terms?.site ? (view.sites[terms.site]?.owner ?? undefined) : undefined;
+  const target = x ? (view.nations[x]?.name ?? x) : null;
+  const mood = view.moods?.[nation]?.mood;
+  switch (reason) {
+    case 'likes_target':
+      return target ? `${them} won't start a war with ${target} for you: they like ${target}.` : `${them} won't turn on a friend for you.`;
+    case 'stretched':
+      return target ? `${them} has wars enough on its hands to take on ${target} too.` : `${them} has wars enough on its hands.`;
+    case 'strength':
+      if (target) return `${them} thinks ${target} is too strong for the two of you.`;
+      return kind === 'tribute' ? `${them} does not fear you enough to pay.` : kind === 'nonaggression' ? `${them} will not shield a power pulling ahead of it.` : `${them} thinks you are too strong to deal with.`;
+    case 'terms':
+      return target ? `${them} wants more for a war with ${target}: add a sweetener.` : kind === 'tribute' ? `That is more than ${them} will hand over.` : `${them} wants a better price.`;
+    case 'focus':
+      return kind === 'peace' || kind === 'ceasefire' ? `${them} will not make peace while their war goes their way.` : `${them}'s army is set on you: no deal now.`;
+    case 'cannot':
+      return `${them} cannot agree to that now${target ? ` (a treaty with ${target}, or they have not seen the prize)` : ''}.`;
+    default:
+      return mood !== undefined ? `${them} does not trust you enough for that (mood ${mood > 0 ? '+' : ''}${mood}).` : `${them} does not trust you enough for that.`;
+  }
+}

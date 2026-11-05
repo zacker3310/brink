@@ -184,6 +184,15 @@ generic leader per government, `LEADER_TUNING`); memory in `WorldState.memories`
   end `aiOrders` passes the human's offers to the same function (`incoming`), so the screen's answer
   is the answer at resolution.
 - Saves before 2.6 gain `memories: {}` on load (keyed on the field being absent).
+- 2.10: joining a war is weighed (`joinWar` in `consider`), not refused unless already hated. A joint
+  operation needs one partner at war with the holder (`jointOpProblem`); the other goes to war on
+  signing. `lockOrders` judges a joint operation on the holder as the proposer knows it
+  (`knownSiteOwner`): a prize that changed hands out of sight voids the deal at resolution instead of
+  rejecting the order, so the AI, which sees only its view, is never refused. Partners see the prize
+  and its ring through each other's formations (`computeVision`). Alliances and joint operations may
+  carry a sweetener (`give`/`get`, mirrored, reserved like a recruit, paid on signing). Every pair's
+  relation is public in the view (`NationView.publicRelations`); the AI's and the client's diplomacy
+  checks read it through `diplomacyWorldOf`.
 
 ## Rejected alternatives
 

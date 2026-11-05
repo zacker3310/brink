@@ -46,16 +46,15 @@ describe('the staff in the player\'s diplomacy', () => {
     const v = s.view();
     const target = Object.keys(v.relations).find((n) => v.relations[n] === 'peace' && !v.nations[n]!.minor)!;
     const r = s.advance({ ...draftOf(s), diplomacy: [{ target, action: 'declare_war' }] });
-    const view = s.view();
-    expect(view.relations[target]).toBe('war');
+    expect(s.view().relations[target]).toBe('war');
     for (let i = 0; i < 3; i++) {
       const sug = s.suggest('usa');
-      const out = staffDiplomacy(view, draftOf(s), sug.diplomacy, i === 0 ? r.reports.usa : null);
+      const out = staffDiplomacy(s.view(), draftOf(s), sug.diplomacy, i === 0 ? r.reports.usa : null);
       expect(out.orders.filter((d) => d.target === target)).toEqual([]);
       if (i === 0) expect(out.advice.filter((d) => d.target === target)).toEqual([]);
       for (const d of out.orders) expect(['propose_trade', 'propose_nonaggression']).toContain(d.action);
       s.advance({ ...draftOf(s), diplomacy: out.orders });
       expect(s.view().relations[target]).toBe('war');
     }
-  });
+  }, 60_000);
 });

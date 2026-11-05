@@ -110,6 +110,9 @@ function prizes(view: NationView): SiteView[] {
     .filter((s) => view.tiles[s.key]?.terrain != null);
 }
 
+/** What a joint operation's prize adds to an operation's score: enough to lead the list. */
+const JOINT_OP_BONUS = 60;
+
 /** Every operation the staff can see against one prize, judged from where the forces stand now. */
 function judge(view: NationView, site: SiteView, land: Map<HexKey, number>, prefer?: OperationKind): Operation | null {
   const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
@@ -237,8 +240,11 @@ function judge(view: NationView, site: SiteView, land: Map<HexKey, number>, pref
   if (odds === 'bad') warnings.push('Too strong to storm as it stands: soften it up with air and guns, or bring more troops');
   if (site.kind === 'capital') why.push('A capital: taking it shakes the whole country');
 
+  // A joint operation's prize: a partner's army marches on it too, so the staff puts it first.
+  const joint = view.treaties.find((t) => t.kind === 'joint_op' && t.site === site.id && (t.a === view.self.id || t.b === view.self.id) && t.until >= view.turn);
+  if (joint) why.unshift(`A joint operation with ${view.nations[joint.a === view.self.id ? joint.b : joint.a]?.name ?? 'a partner'}: their army marches on ${name} too`);
   const lead = phases.find((p) => p.state === 'now') ?? phases.find((p) => p.state === 'next');
-  const score = site.victoryPoints * 10 - turns * 8 + ODDS_SCORE[odds] - garrison / 100 + (kind === 'overland' ? 20 : 0) + (site.kind === 'capital' ? 10 : 0);
+  const score = site.victoryPoints * 10 - turns * 8 + ODDS_SCORE[odds] - garrison / 100 + (kind === 'overland' ? 20 : 0) + (site.kind === 'capital' ? 10 : 0) + (joint ? JOINT_OP_BONUS : 0);
   return {
     id: `take:${site.id}`,
     kind,

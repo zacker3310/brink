@@ -252,6 +252,13 @@ function settleDeal(world: WorldState, p: Proposal, events: GameEvent[], committ
   events.push({ kind: 'exchange', a, b, aGave: aGives, bGave: bGives, ...(tribute ? { tribute: true as const } : {}), ...(can ? {} : { void: true as const }) });
 }
 
+/** Pay an alliance's or joint operation's sweetener, if it has one, told from the side of the one who pays. */
+function sweeten(world: WorldState, p: Proposal, events: GameEvent[], committed: Record<NationId, Stockpile>): void {
+  if (stockTotal(p.terms?.give) + stockTotal(p.terms?.get) === 0) return;
+  const payer = stockTotal(p.terms?.give) > 0 ? p : { ...p, from: p.to, to: p.from, ...(p.terms ? { terms: mirrorTerms(p.terms)! } : {}) };
+  settleDeal(world, payer, events, committed);
+}
+
 /** A deep copy of terms: they ride in events and proposals and are never shared. */
 function copyTerms(t: DealTerms): DealTerms {
   return JSON.parse(JSON.stringify(t)) as DealTerms;
@@ -365,7 +372,7 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
             goToWar(world, n, x, events);
           }
         }
-        if (p.kind === 'alliance' && stockTotal(p.terms?.give) + stockTotal(p.terms?.get) > 0) settleDeal(world, p, events, committed);
+        if (p.kind === 'alliance') sweeten(world, p, events, committed);
         break;
       }
       case 'ceasefire':
@@ -386,7 +393,7 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
           goToWar(world, n, holder, events);
         }
         sign(world, 'joint_op', a, b, LEADER_TUNING.jointOpTurns, events, undefined, p.terms!.site!);
-        if (stockTotal(p.terms?.give) + stockTotal(p.terms?.get) > 0) settleDeal(world, p, events, committed);
+        sweeten(world, p, events, committed);
         break;
       }
       case 'nonaggression':

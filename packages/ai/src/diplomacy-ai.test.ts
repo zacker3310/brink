@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DealTerms, NationOrders, WorldState } from '@brink/contracts';
 import { hexKey } from '@brink/map';
-import { buildView, lockOrders, resolveTurn } from '@brink/simulation';
+import { buildView, clone, lockOrders, resolveTurn } from '@brink/simulation';
 import { makeWorld, setRelation, site } from '../../simulation/src/fixture.test-util';
 import { consider, jointOpTarget, leaderDiplomacy, verdictLine } from './diplomacy-ai';
 import { emptyMemory } from './index';
@@ -112,7 +112,7 @@ describe('leaders asked to join a war', () => {
     expect(against(buildView(w, 'b')).reason).toBe('likes_target');
     // Two wars on its hands already (d and e): stretched.
     const x = makeWorld(8, 6, ['a', 'b', 'c', 'd']);
-    x.nations.e = { ...structuredClone(x.nations.d!), id: 'e', name: 'Nation E' };
+    x.nations.e = { ...clone(x.nations.d!), id: 'e', name: 'Nation E' };
     x.intel.e = { observed: {}, knownOwner: {}, lastKnown: {} };
     site(x, 'e-home', hexKey(3, 3), 'e');
     for (const [p, q] of [['a', 'b'], ['a', 'c'], ['b', 'c'], ['a', 'd'], ['a', 'e'], ['c', 'd'], ['c', 'e'], ['d', 'e']] as const) setRelation(x, p, q, 'peace');

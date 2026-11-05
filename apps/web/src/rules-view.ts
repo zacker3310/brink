@@ -1,6 +1,6 @@
-import type { DealTerms, DiplomaticAction, FacilityId, NationId, NationView, Relation, Stockpile, TechId, UnitClass } from '@brink/contracts';
+import type { DealTerms, DiplomaticAction, FacilityId, NationId, NationView, Stockpile, TechId, UnitClass } from '@brink/contracts';
 import { FACILITIES, TECH_IDS, TECHS } from '@brink/game-data';
-import { buildBlocker, checkDiplomacy, facilitySlots, pairKey, recruitCost, researchRate } from '@brink/simulation';
+import { buildBlocker, checkDiplomacy, diplomacyWorldOf, facilitySlots, recruitCost, researchRate } from '@brink/simulation';
 
 export function recruitCostFor(view: NationView, unitClass: UnitClass): Stockpile {
   return recruitCost(view.self, unitClass);
@@ -28,9 +28,8 @@ export function researchPerTurn(view: NationView, share = view.self.budget.resea
 
 /** Why the player may not take `action` toward `target` this turn, or null. The engine's own check, run on the view. */
 export function diplomacyBlocked(view: NationView, target: NationId, action: DiplomaticAction, terms?: DealTerms): string | null {
-  const relations: Record<string, Relation> = {};
-  for (const [n, r] of Object.entries(view.relations)) relations[pairKey(view.self.id, n)] = r;
-  return checkDiplomacy({ relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites, tiles: view.tiles }, view.self.id, target, action, terms);
+  // Every pair's relation is public (a joint operation needs one of the two at war with the holder).
+  return checkDiplomacy(diplomacyWorldOf(view), view.self.id, target, action, terms);
 }
 
 /** Why `facility` cannot be started at `siteId`, ignoring cost, or null. The engine's own check, in the player's words. */
