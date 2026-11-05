@@ -89,5 +89,5 @@ describe('generateTheatre', () => {
       expect(map.nations.filter((n) => n.role === 'power')).toHaveLength(powers);
       expect(map.layers.owner.rows).toHaveLength(rows);
     }
-  });
+  }, 60_000); // eleven maps built and checked, up to 12 powers on 96 x 48: ~1 s locally, ~10 s on the Pages runner beside every other package
 });
