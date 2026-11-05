@@ -34,7 +34,7 @@ const CLASSIC = {
   id: 'classic',
   name: 'Classic War',
   hook: 'Everyone against everyone.',
-  story: 'No spark, no story: the four powers are at war from the first hour and the minor states are fair game. The way Brink was first played.',
+  story: 'No spark, no story: every power is at war from the first hour and the minor states are fair game. The way Brink was first played.',
   setup: 'Every power is at war with every other (on Easy, with just one of them). Minor states hold their own cities.',
   threat: 2 as const,
   recommended: null as NationId | null,
@@ -56,16 +56,16 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   };
   // Each theatre has its own powers, minor states and crises; a nation the theatre does not have
   // falls back to its first power.
-  const NATIONS = theatrePowers(theatreId);
-  const MINORS = theatreMinors(theatreId);
+  const nations = theatrePowers(theatreId);
+  const minors = theatreMinors(theatreId);
   const CRISES = theatreCrises(theatreId);
-  const [chosen, setNation] = useState<NationId>(() => readPrefs().nation ?? NATIONS[0]!.id);
-  const nation = NATIONS.some((n) => n.id === chosen) ? chosen : NATIONS[0]!.id;
+  const [chosen, setNation] = useState<NationId>(() => readPrefs().nation ?? nations[0]!.id);
+  const nation = nations.some((n) => n.id === chosen) ? chosen : nations[0]!.id;
   const [seed, setSeed] = useState(randomSeed);
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
   const turns = CAMPAIGN_TURNS[length];
-  const bars = victoryBars(turns, theatreId);
+  const bars = victoryBars(turns, nations.length, theatreId);
   const [difficulty, setDifficulty] = useState<Difficulty>(() => readPrefs().difficulty ?? 'easy');
   const pickDifficulty = (d: Difficulty) => {
     setDifficulty(d);
@@ -94,7 +94,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     pickCrisis(CRISES[(i + 1 + (seed % (CRISES.length - 1))) % CRISES.length]!.id);
   };
   const world = useMemo(() => createScenario(theatreId, seed), [theatreId, seed]);
-  const spec = NATIONS.find((n) => n.id === nation)!;
+  const spec = nations.find((n) => n.id === nation)!;
   const gov = GOVERNMENTS[spec.government];
   const info = useMemo(() => dossier(world, nation), [world, nation]);
   const op = operationName(seed);
@@ -137,18 +137,18 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
 
   useKeys(
     (e) => {
-      const i = NATIONS.findIndex((n) => n.id === nation);
+      const i = nations.findIndex((n) => n.id === nation);
       if (e.key === 'Escape') onBack();
-      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') pick(NATIONS[(i + 1) % NATIONS.length]!.id);
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') pick(NATIONS[(i - 1 + NATIONS.length) % NATIONS.length]!.id);
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') pick(nations[(i + 1) % nations.length]!.id);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') pick(nations[(i - 1 + nations.length) % nations.length]!.id);
       else if (e.key === 'r') setSeed(randomSeed());
       else if (e.key === 'Enter' && document.activeElement === document.body) void begin();
       else {
         const n = Number(e.key);
-        if (n >= 1 && n <= NATIONS.length) pick(NATIONS[n - 1]!.id);
+        if (n >= 1 && n <= nations.length) pick(nations[n - 1]!.id);
       }
     },
-    [nation, seed, starting, turns, difficulty, theatreId],
+    [nation, seed, starting, turns, difficulty, theatreId, nations],
   );
 
   const incomes: [string, number][] = [
@@ -253,8 +253,8 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
           <SectionHead id="roster" index="01">
             Choose your nation
           </SectionHead>
-          <div className="grid grid-cols-4 gap-2 lg:grid-cols-1" role="radiogroup" aria-label="Nation">
-            {NATIONS.map((n, i) => {
+          <div className={`grid ${nations.length > 4 ? 'grid-cols-3' : 'grid-cols-4'} gap-2 lg:grid-cols-1`} role="radiogroup" aria-label="Nation">
+            {nations.map((n, i) => {
               const g = GOVERNMENTS[n.government];
               const active = n.id === nation;
               return (
@@ -384,7 +384,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               <div className="flex flex-wrap gap-1.5 text-[13px]">
                 {info.fronts.length === 0 && <span className="text-faint">None. Every rival is across the sea.</span>}
                 {info.fronts.map((f) => {
-                  const r = [...NATIONS, ...MINORS].find((n) => n.id === f)!;
+                  const r = [...nations, ...minors].find((n) => n.id === f)!;
                   return (
                     <span key={f} className="wr-front" style={{ ['--c' as string]: r.color }}>
                       <Emblem color={r.color} government={r.government} className="h-4.5 w-4.5" />
@@ -429,7 +429,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {crisis.recommended && crisis.recommended !== nation && (
                   <button type="button" className="wr-chip" onClick={() => pick(crisis.recommended!)} data-testid="crisis-play-as">
-                    Play as {NATIONS.find((n) => n.id === crisis.recommended)!.name}
+                    Play as {nations.find((n) => n.id === crisis.recommended)!.name}
                   </button>
                 )}
                 {crisis.recommended === nation && <span className="wr-chip wr-chip-on">Recommended side</span>}

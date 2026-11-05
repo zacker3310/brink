@@ -31,4 +31,17 @@ describe('victory bars by campaign length', () => {
     // Whatever the standing, nothing but the turn limit or a conquest ends it this early.
     expect(evaluateVictory(w)?.reason ?? null).not.toBe('supremacy');
   });
+
+  it('comes down in proportion for more than four powers, from the count fixed at build', () => {
+    // The Middle East and Africa's six powers played 20 AI-only matches to the limit at the
+    // four-power bars: no leader passed 18% standing or 14% of the points.
+    expect(victoryBars(30, 4)).toEqual(victoryBars(30));
+    expect(victoryBars(30, 6)).toEqual({ dominationShare: 21, supremacyShare: 21, supremacyFromTurn: 8 });
+    expect(victoryBars(250, 6).dominationShare).toBe(60);
+    const w = makeWorld(8, 6, ['a', 'b']);
+    const four = victoryThreshold(w);
+    w.barPowers = 6;
+    expect(victoryThreshold(w)).toBe(Math.ceil((totalVictoryPoints(w) * 21) / 100));
+    expect(victoryThreshold(w)).toBeLessThanOrEqual(four);
+  });
 });

@@ -10,6 +10,11 @@ import { ROSTER as uk } from './nations/uk';
 import { ROSTER as france } from './nations/france';
 import { ROSTER as germany } from './nations/germany';
 import { ROSTER as poland } from './nations/poland';
+import { ROSTER as egypt } from './nations/egypt';
+import { ROSTER as iran } from './nations/iran';
+import { ROSTER as nigeria } from './nations/nigeria';
+import { ROSTER as saudiArabia } from './nations/saudi-arabia';
+import { ROSTER as southAfrica } from './nations/south-africa';
 import { ROSTER as turkey } from './nations/turkey';
 
 /**
@@ -162,6 +167,11 @@ export const NATION_ROSTERS: Record<NationId, readonly GeneralDef[]> = {
   france,
   germany,
   poland,
+  egypt,
+  iran,
+  nigeria,
+  'saudi-arabia': saudiArabia,
+  'south-africa': southAfrica,
   turkey,
 };
 

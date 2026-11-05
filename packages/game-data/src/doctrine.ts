@@ -15,6 +15,11 @@ import { NATION_DOCTRINE as uk } from './nations/uk';
 import { NATION_DOCTRINE as france } from './nations/france';
 import { NATION_DOCTRINE as germany } from './nations/germany';
 import { NATION_DOCTRINE as poland } from './nations/poland';
+import { NATION_DOCTRINE as egypt } from './nations/egypt';
+import { NATION_DOCTRINE as iran } from './nations/iran';
+import { NATION_DOCTRINE as nigeria } from './nations/nigeria';
+import { NATION_DOCTRINE as saudiArabia } from './nations/saudi-arabia';
+import { NATION_DOCTRINE as southAfrica } from './nations/south-africa';
 import { NATION_DOCTRINE as turkey } from './nations/turkey';
 
 export const DOCTRINE = {
@@ -249,6 +254,11 @@ export const NATION_DOCTRINES: Record<NationId, NationDoctrine> = {
   france,
   germany,
   poland,
+  egypt,
+  iran,
+  nigeria,
+  'saudi-arabia': saudiArabia,
+  'south-africa': southAfrica,
   turkey,
 };
 

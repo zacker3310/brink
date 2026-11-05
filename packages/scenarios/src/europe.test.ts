@@ -188,7 +188,7 @@ describe('Europe', { timeout: 60_000 }, () => {
   it('asks a European power for as much as a Pacific one: its own victory bars', () => {
     const total = Object.values(w.sites).reduce((a, s) => a + s.victoryPoints, 0);
     const start = sitesOf('uk').reduce((a, s) => a + s.victoryPoints, 0);
-    const bars = victoryBars(w.maxTurns, EUROPE_ID);
+    const bars = victoryBars(w.maxTurns, w.barPowers, EUROPE_ID);
     expect(bars.dominationShare).toBeLessThan(VICTORY.dominationShare);
     // Domination is about twice a power's opening share, as in the Pacific (32% against 15%).
     const multiple = (bars.dominationShare * total) / 100 / start;

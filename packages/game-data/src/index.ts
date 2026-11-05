@@ -532,11 +532,26 @@ export const VICTORY = {
  * The bars a campaign is won by, by its length. Up to an epic 60 turns they are `VICTORY`'s; a longer
  * war (Total War) asks for a conquest: 60% of all victory points outright, or 55% standing held from
  * turn 50, so the war is not over while most of it is still to fight.
+ *
+ * `VICTORY`'s bars were measured on four level powers. With more (`powers`: the map's, fixed at
+ * build as `WorldState.barPowers`, so the bar never moves in a match), each starts with a smaller
+ * share, so the bars come down: domination in proportion, supremacy to a fair share of the standing
+ * plus the four-power margin. Six powers win at 21% of the points or 21% standing. (The Middle East
+ * and Africa's six played 20 AI-only matches to the limit at the four-power bars: no leader passed
+ * 18% standing or 14% of the points.)
  */
-export function victoryBars(maxTurns: number, theatre?: string): { dominationShare: number; supremacyShare: number; supremacyFromTurn: number } {
+export function victoryBars(maxTurns: number, powers = 4, theatre?: string): { dominationShare: number; supremacyShare: number; supremacyFromTurn: number } {
   if (maxTurns > 60) return { dominationShare: 60, supremacyShare: 55, supremacyFromTurn: 50 };
   const own = theatre === undefined ? undefined : THEATRE_VICTORY[theatre];
-  return { dominationShare: own?.dominationShare ?? VICTORY.dominationShare, supremacyShare: own?.supremacyShare ?? VICTORY.supremacyShare, supremacyFromTurn: VICTORY.supremacyFromTurn };
+  if (own) return { ...own, supremacyFromTurn: VICTORY.supremacyFromTurn };
+  if (powers <= 4) return { dominationShare: VICTORY.dominationShare, supremacyShare: VICTORY.supremacyShare, supremacyFromTurn: VICTORY.supremacyFromTurn };
+  // Domination in proportion to the points each starts with; supremacy keeps its four-power margin
+  // (4 points) over a fair share of the standing.
+  return {
+    dominationShare: Math.round((VICTORY.dominationShare * 4) / powers),
+    supremacyShare: Math.round(100 / powers) + VICTORY.supremacyShare - 25,
+    supremacyFromTurn: VICTORY.supremacyFromTurn,
+  };
 }
 
 /**

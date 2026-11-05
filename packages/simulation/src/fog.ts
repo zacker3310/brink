@@ -121,6 +121,11 @@ export function emptyIntel(): NationIntel {
   return { observed: {}, knownOwner: {}, lastKnown: {} };
 }
 
+/** The level powers the victory bars are scaled for: the map's, set when it is built (four when absent). */
+export function barPowers(world: Pick<WorldState, 'barPowers'>): number {
+  return world.barPowers ?? 4;
+}
+
 /** Record what `nation` saw at the end of this turn. Mutates `world.intel[nation]`. */
 export function updateIntel(world: WorldState, nation: NationId, vision: Vision, turn: number): void {
   const intel = (world.intel[nation] ??= emptyIntel());
@@ -167,7 +172,7 @@ export function totalVictoryPoints(world: WorldState): number {
 }
 
 export function victoryThreshold(world: WorldState): number {
-  return Math.ceil((totalVictoryPoints(world) * victoryBars(world.maxTurns, world.scenarioId).dominationShare) / 100);
+  return Math.ceil((totalVictoryPoints(world) * victoryBars(world.maxTurns, barPowers(world), world.scenarioId).dominationShare) / 100);
 }
 
 /**
@@ -318,6 +323,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     rulesetVersion: world.rulesetVersion,
     turn: world.turn,
     maxTurns: world.maxTurns,
+    ...(world.barPowers ? { barPowers: world.barPowers } : {}),
     self: clone(self),
     nations,
     relations,

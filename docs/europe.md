@@ -52,7 +52,9 @@ Each new power has a country file in `packages/game-data/src/nations/` (`uk`, `f
 `poland`, `turkey`): three invented generals, six signature cards in a sixteen-card deck (Storm Shadow
 and the carrier group, SCALP and the Rafale, Taurus, the Leopard 2A7 and the PzH 2000, the K2, the
 East Shield and the Chunmoo, the Bayraktar and the Tayfun), a blurb and an invented leader. Russia's
-file is the Pacific's.
+file is the Pacific's; Turkey's is the Middle East and Africa's too (one file, one government: the
+Directorate on both maps; KORAL Jamming came from that theatre's deck in place of the Bosphorus
+Bastion).
 
 ## Minor states
 

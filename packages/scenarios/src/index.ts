@@ -1,6 +1,7 @@
 import type { WorldState } from '@brink/contracts';
 import { seedCommanders } from '@brink/simulation';
 import { createEuropeScenario, EUROPE_ID, EUROPE_MAX_TURNS, EUROPE_NATIONS } from './europe';
+import { createMideastScenario, MIDEAST_ID, MIDEAST_MAX_TURNS, MIDEAST_NATIONS } from './mideast';
 import { createPacificScenario, MAX_TURNS, NATIONS, PACIFIC_ID } from './pacific';
 import { createTestbedScenario, TESTBED_ID } from './testbed';
 import { createFirstContact, FIRST_CONTACT_ID, FIRST_CONTACT_TURNS } from './blackfiles';
@@ -12,6 +13,7 @@ export * from './testbed';
 export * from './blackfiles';
 export * from './europe';
 export * from './theatres';
+export * from './mideast';
 
 export interface ScenarioInfo {
   id: string;
@@ -43,6 +45,13 @@ export const SCENARIOS: readonly ScenarioInfo[] = [
     nations: EUROPE_NATIONS.length,
     maxTurns: EUROPE_MAX_TURNS,
   },
+  {
+    id: MIDEAST_ID,
+    name: 'Middle East and Africa',
+    summary: 'Turkey, Iran, Saudi Arabia, Egypt, Nigeria and South Africa contest the oil, the minerals and the straits from the Mediterranean to the Cape.',
+    nations: MIDEAST_NATIONS.length,
+    maxTurns: MIDEAST_MAX_TURNS,
+  },
 ];
 
 export function createScenario(id: string, seed: number): WorldState {
@@ -50,6 +59,7 @@ export function createScenario(id: string, seed: number): WorldState {
   if (id === FIRST_CONTACT_ID) return seedCommanders(createFirstContact(seed));
   if (id === PACIFIC_ID) return seedCommanders(createPacificScenario(seed));
   if (id === EUROPE_ID) return seedCommanders(createEuropeScenario(seed));
+  if (id === MIDEAST_ID) return seedCommanders(createMideastScenario(seed));
   // The world-engine testbed: playable by the engine and the AI, never listed for a player.
   if (id === TESTBED_ID) return seedCommanders(createTestbedScenario(seed));
   throw new Error(`unknown scenario: ${id}`);

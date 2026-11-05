@@ -1,9 +1,13 @@
-// Turkey: the power that holds the straits between Europe and Asia. Its generals run the drones, the
-// marines and the line in the mountains; its signature cards are the Bayraktar, the Tayfun missile,
-// the Anadolu drone carrier, the closed straits, the Bosphorus bastion and the soldier the country
-// calls Mehmetçik. Balance data: integers only; a change is a ruleset change. Registered in
-// `commanders.ts`, `doctrine.ts`, `blurbs.ts` and `leaders.ts`; type-only imports keep that free of
-// cycles. Every person is fictional.
+// Turkey: the power that holds the straits between Europe and Asia, and the one nation two theatres
+// share: a power in Europe and in the Middle East and Africa, the same file in both (one deck, one set
+// of generals, one leader). Its generals run the drones, the marines and the line in the mountains;
+// its signature cards are the Bayraktar, the Tayfun missile, the Anadolu drone carrier, the closed
+// straits, KORAL jamming and the soldier the country calls Mehmetçik. Both maps give it the
+// Industrial Directorate (`government` in europe.map.json and mideast.map.json): the drone and arms
+// industry of its own (+20% industry), a doctrine of cross-border offensives (+10% attack) and a home
+// front worn by inflation and a divided vote (-8 stability). Balance data: integers only; a change is
+// a ruleset change. Registered in `commanders.ts`, `doctrine.ts`, `blurbs.ts` and `leaders.ts`;
+// type-only imports keep that free of cycles. Every person is fictional.
 
 import type { CardId } from '@brink/contracts';
 import type { GeneralDef } from '../commanders';
@@ -12,8 +16,9 @@ import type { LeaderDef } from '../leaders';
 
 /** A few lines on how Turkey plays, for the setup dossier. */
 export const BLURB =
-  'The keeper of the straits. Drones hunt the enemy from Anatolia to the Caucasus, the Tayfun reaches across the Black Sea, ' +
-  'the Anadolu puts marines and drones on any shore, and whoever holds the Bosphorus decides who sails it.';
+  'The keeper of the straits. Drones hunt the enemy from Anatolia to the Caucasus and the Syrian desert, the Tayfun reaches ' +
+  'across the Black Sea and the Levant, KORAL blinds the enemy column, the Anadolu puts marines and drones on any shore, ' +
+  'and whoever holds the Bosphorus decides who sails it.';
 
 /** Three fictional generals: the drone gunner, the marine and the mountain defender. */
 export const ROSTER: readonly (GeneralDef & { bio: string })[] = [
@@ -80,13 +85,13 @@ export const CARDS: readonly CardDef[] = [
     ],
   }),
   card({
-    id: 'turkey_bosphorus_bastion',
-    name: 'Bosphorus Bastion',
-    flavour: 'Every hill over the water a battery, every quay a bunker. The city has been besieged before.',
-    cost: 2,
-    target: 'own-hex',
-    duration: 1,
-    effects: [{ kind: 'entrench', amount: 50, radius: 2 }],
+    id: 'turkey_koral_jamming',
+    name: 'KORAL Jamming',
+    flavour: 'The enemy radars light up, then fill with snow. The convoys lose the road.',
+    cost: 3,
+    target: 'enemy-hex',
+    duration: 2,
+    effects: [{ kind: 'sabotage', radius: 2 }],
   }),
   card({
     id: 'turkey_mehmetcik',
@@ -106,7 +111,7 @@ const DECK: readonly CardId[] = [
   'turkey_tayfun_missile',
   'turkey_anadolu_landing',
   'turkey_straits_closed',
-  'turkey_bosphorus_bastion',
+  'turkey_koral_jamming',
   'turkey_mehmetcik',
   'turkey_mehmetcik',
   'missile_barrage',
@@ -118,7 +123,7 @@ const DECK: readonly CardId[] = [
   'propaganda',
 ];
 
-/** Turkey's doctrine: six signature cards and a sixteen-card deck of drones, missiles and the straits. */
+/** Turkey's doctrine: six signature cards and a sixteen-card deck of drones, missiles, jamming and the straits. */
 export const NATION_DOCTRINE: NationDoctrine = { nation: 'turkey', cards: [...CARDS], deck: [...DECK] };
 
 const L = (d: LeaderDef): LeaderDef => d;
