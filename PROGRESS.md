@@ -41,12 +41,20 @@ Updated 2026-11-05 (six theatres in one build: the Pacific, Europe, the Middle E
     supremacy a fair share plus four beyond (26/24 for five, 21/21 for six), the count fixed at build
     as `barPowers` (`fillBarPowers` migrates older saves). Chosen by recording 20 matches a theatre
     to the limit and scoring candidate bars: no rule of the count alone fits all three six-power
-    maps, so `THEATRE_BARS` gives Europe 15/18, the Indo-Pacific supremacy 21 and the Americas 28/23,
-    each with its measurement. The Americas' Colombia ring defends a regiment deeper (Venezuela kept
-    at two: a third overfilled a city's hex, which `buildScenario` now refuses).
-  - **Soaks**: one `tests/soak/invariants.ts` (plus the Black Files' checks and the Indo-Pacific's
-    ship-ashore check) and one match loop (`play.ts`) for every campaign soak; each theatre's file
-    reads `SOAK_<THEATRE>_MATCHES`, else `SOAK_MATCHES` up to 20, with a time budget per match.
+    maps, so `THEATRE_BARS` gives Europe 15/18, the Indo-Pacific supremacy 21, the Americas 28/23
+    and First Contact supremacy 21, each with its measurement; First Contact's Visitors win at 19% of
+    the points (`VISITORS_BARS`, `visitorsBars`; the Black Files toggle keeps `BLACK_FILES`' 30%).
+    The Americas' Colombia ring defends a regiment deeper (Venezuela kept at two: a third overfilled
+    a city's hex, which `buildScenario` now refuses).
+  - **Soaks**: one `tests/soak/invariants.ts` holding every check any theatre's own list had (the
+    Black Files' checks, the Indo-Pacific's ship-ashore check, and a formation's strength a whole
+    number, which the Black Files' and the Indo-Pacific's lists had and the first merge dropped;
+    `invariants.test.ts` breaks a turn-1 world of every campaign one way at a time and pins each
+    check), and one match loop (`play.ts`) for every campaign soak. Each theatre's file reads
+    `SOAK_<THEATRE>_MATCHES` (the Middle East and Africa also its lane's `MIDEAST_SOAK`), else
+    `SOAK_MATCHES`, else the count its lane played: 100 for the Pacific, First Contact and the
+    Indo-Pacific, 24 for the Middle East and Africa and the Americas, 20 for Europe (at most 20 there);
+    a time budget per match. Europe's soak fails on the turn an order is refused, as its lane's did.
   - **Maps**: every theatre imports its map with the JSON import attribute; the Indo-Pacific's
     tracing script is source now (`packages/mapgen/src/indopac.ts`, byte for byte); `pnpm map:check`
     passes for all seven files.
@@ -54,12 +62,23 @@ Updated 2026-11-05 (six theatres in one build: the Pacific, Europe, the Middle E
     median turn 24 (USA 6, China 5, Russia 3, Japan 1), as on 2.12.0; Europe 75%, median 26 (Poland
     9, Turkey 4, Germany 2); the Middle East and Africa 70%, median 29 (South Africa 11, Nigeria 3);
     the Indo-Pacific South 70%, median 23 (Indonesia 6, China 4, Australia 3, Pakistan 1); the
-    Americas 80%, median 24 (Colombia 10, Mexico 3, Canada 3); First Contact: the Visitors 2 of 20
-    (10%), the Accord once, 17 at the limit. Matrix 0 genuine failures. E2E: the four theatres' phone
-    specs (now following the one-tap turn), the Black Files, the menu, generals and the playthrough
-    pass. A 2.12.0 Pacific save resumes
-    unchanged and plays three turns with no order refused; the Pacific's turn-1 hashes moved with
-    the version stamp alone.
+    Americas 80%, median 24 (Colombia 10, Mexico 3, Canada 3); First Contact (before its own bars):
+    the Visitors 2 of 20 (10%), the Accord once, 17 at the limit. Matrix 0 genuine failures. E2E:
+    the four theatres' phone specs (now following the one-tap turn), the Black Files, the menu,
+    generals and the playthrough pass. A 2.12.0 Pacific save resumes unchanged and plays three turns
+    with no order refused; the Pacific's turn-1 hashes moved with the version stamp alone.
+  - **Review fixes** (still ruleset 2.13.0, unreleased): the whole-number strength check is back in
+    the shared invariants, the lanes' default soak counts and `MIDEAST_SOAK` are back, and Europe's
+    per-turn refusal check. First Contact was decided in 15% of its soak (2.12.0 too) and its Visitors
+    won 14 of 100 at the rule's bars; it now has its own supremacy (21%) and Visitors' share (19%),
+    chosen by recording 100 matches to the limit with every bar out of reach and scoring candidates
+    (the recorded line reproduces the real soak's exactly). Measured, First Contact on Normal: 100
+    matches 56% decided (supremacy 37, the Visitors 19), 44 at the limit, median turn 30, 0 rejected
+    AI orders; all wins the United Kingdom 34, China 26, the Visitors 19, the United States 18,
+    Russia 2, Australia 1; 50 to 65% decided in each twenty seeds; `SOAK_MATCHES=20` 50% (supremacy
+    7, the Visitors 3, 10 at the limit). The Pacific with the toggle (20 campaigns): 0 rejected.
+    The five theatres' soaks, played again with the restored check (`SOAK_MATCHES=20`), end as above
+    (the same endings and winners), 0 rejected AI orders, and no strength was ever fractional.
 
 - The Americas (Phase 6, `docs/americas.md`): a second theatre on the setup screen. A 32 x 41 map
   drawn as a character grid (`packages/mapgen/src/americas.ts`, `pnpm --filter @brink/mapgen
@@ -690,9 +709,18 @@ Updated 2026-11-05 (six theatres in one build: the Pacific, Europe, the Middle E
 - Theatres (2.13.0): the decided wars of three theatres go mostly to one power: Colombia in the
   Americas (ringed by minor states it takes faster than anyone), Poland in Europe, South Africa in the
   Middle East. In 20 AI-only matches each, decided or on score, the United States, Brazil and
-  Argentina, the United Kingdom, France and Russia, and Egypt, Iran and Saudi Arabia win none. Three theatres need bars of their own (`THEATRE_BARS`); a balance pass that brings them to the
-  rule would retire them. No Opening Crises outside the Pacific, and the Black Files' sites only on
-  its map.
+  Argentina, the United Kingdom, France and Russia, and Egypt, Iran and Saudi Arabia win none. Four
+  campaigns need bars of their own (`THEATRE_BARS`, First Contact also `VISITORS_BARS`); a balance
+  pass that brings them to the rule would retire them. They were fitted on the soaks' seeds 1 to 20:
+  on seeds 21 to 40 (measured in review on 2.13.0, the other theatres' play unchanged since) Europe
+  decides 90% (the upper edge), the Middle East and Africa 75%, the Indo-Pacific 60%, the Americas
+  50% (80% on its soak's seeds). No Opening Crises outside the Pacific, and the Black Files' sites
+  only on its map.
+- Campaign length: the bars do not scale with a campaign's length up to 60 turns, and the setup
+  screen opens on Quick (20 turns). Measured in review (AI only, seeds 1 to 20, 20 turns): the
+  Pacific 20% decided (as on 2.12.0), Europe 30%, the Middle East and Africa 0%, the Indo-Pacific
+  40%, the Americas 25%; at 30 turns 70 to 80%. A Quick war is mostly won on the score at the limit.
+  A pass on bars by length (or a Standard default) is open; First Contact always runs its 30 turns.
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
 ## Blockers

@@ -118,13 +118,41 @@ export const BLACK_FILES = {
    * The Visitors win holding this percent of all victory points, or at the turn limit still holding
    * `limitShare` percent: the incursion was never put down. Measured on First Contact, Normal, AI
    * against AI: at 12 the Visitors won 12 of 40 (seeds 1-40); 14 is about three incursions and a
-   * station held at the limit.
+   * station held at the limit. First Contact has its own `visitorsShare` (`VISITORS_BARS`).
    */
   visitorsShare: 30,
   limitShare: 14,
   /** Every Visitors formation regains this much strength a turn on crystal or its own ground. */
   regrowth: 50,
 } as const;
+
+/** What the Visitors win by: a share of all victory points at any time, or a smaller one at the turn limit. */
+export interface VisitorsBars {
+  visitorsShare: number;
+  limitShare: number;
+}
+
+/**
+ * The campaigns whose Visitors win by shares of their own (`visitorsBars`), keyed by scenario id;
+ * any other (the Pacific with the Black Files toggle) by `BLACK_FILES`'s. Measured, like
+ * `THEATRE_BARS`, on AI-only matches recorded to the limit with every share out of reach and then
+ * scored at candidate shares.
+ */
+export const VISITORS_BARS: Readonly<Record<string, Partial<VisitorsBars>>> = {
+  // First Contact: on ruleset 2.13.0 (the United Kingdom and Australia with their own country files,
+  // a supremacy bar of its own in `THEATRE_BARS`) the Visitors' best share in 100 matches recorded
+  // to the limit was 10 to 31%, past 30 once, so at 30% they won almost only at the limit: 14 of 100
+  // with the rule's bars, 9 at 21% supremacy, which decides more wars before it. At 19% (12 of the
+  // 100 reach it) they win 19 of 100 (MASTER-PLAN: about 15 to 25% on Normal), 3 to 6 in each twenty
+  // seeds, 11 of them before the limit (from turn 13).
+  'black-files-first-contact': { visitorsShare: 19 },
+};
+
+/** The Visitors' shares in a campaign: `BLACK_FILES`'s, or its own in `VISITORS_BARS` (`theatre`: its scenario id). */
+export function visitorsBars(theatre?: string): VisitorsBars {
+  const own = theatre === undefined ? undefined : VISITORS_BARS[theatre];
+  return { visitorsShare: BLACK_FILES.visitorsShare, limitShare: BLACK_FILES.limitShare, ...own };
+}
 
 /**
  * What a power's staff reads a Visitors formation as, where a table knows only the powers' classes:

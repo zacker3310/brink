@@ -5,8 +5,9 @@ import { budget, endings, matchCount, play, seeds } from './play';
 
 // The Middle East and Africa's AI-against-AI soak (docs/mideast.md): six powers and twenty-four minor
 // states on the theatre's own map, each match to its end, the world checked between every turn.
-// `SOAK_MIDEAST_MATCHES` sets the count, else `SOAK_MATCHES` up to 20. About 30 to 60 s a match.
-const MATCHES = matchCount('SOAK_MIDEAST_MATCHES', 20);
+// `SOAK_MIDEAST_MATCHES` (or the lane's `MIDEAST_SOAK`) sets the count, else `SOAK_MATCHES`, else 24.
+// About 30 to 60 s a match.
+const MATCHES = matchCount(['SOAK_MIDEAST_MATCHES', 'MIDEAST_SOAK'], 24);
 
 describe(`Middle East and Africa AI-vs-AI soak (${MATCHES} matches)`, () => {
   it('every match ends by the turn limit with no invalid state and no rejected AI order', { timeout: budget(MATCHES, 180) }, () => {

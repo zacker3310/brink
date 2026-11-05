@@ -77,8 +77,8 @@ for it.
 
 ## Measured
 
-`tests/soak/americas.soak.test.ts` (`SOAK_MATCHES`, 24 by default) plays AI-only matches to the
-end and prints the endings, the decisive rate and what the canal saw. A turn costs about twice the
+`tests/soak/americas.soak.test.ts` (`SOAK_AMERICAS_MATCHES`, else `SOAK_MATCHES`, 24 by default)
+plays AI-only matches to the end and prints the endings, the decisive rate and what the canal saw. A turn costs about twice the
 Pacific's (six powers, twenty nations, 1312 hexes). Results are in `PROGRESS.md`.
 
 ## Open

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { WorldState } from '@brink/contracts';
-import { BLACK_FILES, RULESET_VERSION, TECHS } from '@brink/game-data';
+import { BLACK_FILES, RULESET_VERSION, TECHS, visitorsBars, VISITORS_BARS } from '@brink/game-data';
 import { hexKey } from '@brink/map';
 import { accordOpen, dormantVisitors, newBlackFiles } from './blackfiles';
 import { makeWorld, orders, setRelation, site, unit } from './fixture.test-util';
-import { buildView, computeVision } from './fog';
+import { buildView, computeVision, totalVictoryPoints } from './fog';
 import { resolveTurn } from './resolve';
 import { checkDiplomacy, checkResearch, lockOrders } from './validate';
 import { evaluateVictory } from './victory';
@@ -226,6 +226,30 @@ describe('the Visitors', () => {
     expect(evaluateVictory(w)).toBeNull();
     w.blackFiles!.accord = ['a', 'c'];
     expect(evaluateVictory(w)).toMatchObject({ reason: 'accord', coalition: ['a', 'c'] });
+  });
+
+  it("win by their campaign's own share where it has one: First Contact's, not the toggle's", () => {
+    // The defaults (the Pacific with the toggle) and First Contact's own, measured (VISITORS_BARS).
+    expect(visitorsBars()).toEqual({ visitorsShare: BLACK_FILES.visitorsShare, limitShare: BLACK_FILES.limitShare });
+    expect(visitorsBars('pacific')).toEqual(visitorsBars());
+    const first = visitorsBars('black-files-first-contact');
+    expect(first).toEqual({ visitorsShare: VISITORS_BARS['black-files-first-contact']!.visitorsShare, limitShare: BLACK_FILES.limitShare });
+    expect(first.visitorsShare).toBeLessThan(BLACK_FILES.visitorsShare);
+    // The Visitors awake, holding a share between First Contact's and the toggle's.
+    const at = (scenarioId: string) => {
+      const w = blackWorld({ wakeAt: 0 });
+      w.blackFiles!.awake = 1;
+      w.scenarioId = scenarioId;
+      const others = totalVictoryPoints(w);
+      const vp = Math.ceil((others * first.visitorsShare) / (100 - first.visitorsShare));
+      site(w, 'inc', k(9, 4), 'visitors', 'city', vp);
+      const held = Math.floor((vp * 100) / totalVictoryPoints(w));
+      expect(held).toBeGreaterThanOrEqual(first.visitorsShare);
+      expect(held).toBeLessThan(BLACK_FILES.visitorsShare);
+      return evaluateVictory(w);
+    };
+    expect(at('black-files-first-contact')).toMatchObject({ winner: 'visitors', reason: 'visitors' });
+    expect(at('pacific')).toBeNull();
   });
 });
 

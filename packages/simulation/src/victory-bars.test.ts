@@ -55,11 +55,12 @@ describe('victory bars by campaign length', () => {
   });
 
   it("takes a theatre's own bars where the rule does not fit it, and only those it names", () => {
-    // THEATRE_BARS: measured overrides for Europe, the Indo-Pacific South and the Americas. A theatre
-    // not listed (the Pacific, the Middle East and Africa, First Contact) is the rule's.
+    // THEATRE_BARS: measured overrides for Europe, the Indo-Pacific South, the Americas and First
+    // Contact. A theatre not listed (the Pacific, the Middle East and Africa) is the rule's.
     expect(victoryBars(30, 4, 'pacific')).toEqual(victoryBars(30, 4));
     expect(victoryBars(30, 6, 'mideast')).toEqual(victoryBars(30, 6));
-    expect(victoryBars(30, 5, 'black-files-first-contact')).toEqual(victoryBars(30, 5));
+    // First Contact: the rule's domination for five powers, a supremacy of its own.
+    expect(victoryBars(30, 5, 'black-files-first-contact')).toEqual({ dominationShare: 26, supremacyShare: 21, supremacyFromTurn: 8 });
     for (const [theatre, own] of Object.entries(THEATRE_BARS)) {
       const bars = victoryBars(30, 6, theatre);
       if (own.dominationShare !== undefined) expect(bars.dominationShare, theatre).toBe(own.dominationShare);

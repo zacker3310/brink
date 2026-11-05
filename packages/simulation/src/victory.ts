@@ -1,6 +1,6 @@
 import type { NationId, VictoryState, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { BLACK_FILES, VICTORY } from '@brink/game-data';
+import { VICTORY, visitorsBars } from '@brink/game-data';
 import { grossYields } from './economy';
 import { barsOf, totalVictoryPoints, victoryPoints, victoryThreshold } from './fog';
 import { relationOf, sortedKeys } from './rules';
@@ -59,9 +59,10 @@ export function allianceBlocs(world: WorldState): NationId[][] {
 
 /**
  * Black Files, checked before every other way a war ends. Once the Visitors have woken: they win
- * holding `BLACK_FILES.visitorsShare` percent of all victory points, when no power is left, or at the
- * turn limit still holding `limitShare` percent. Destroyed, they hand the Accord's signatories a joint
- * victory (led by the one with most victory points); with nobody in the Accord the war goes on.
+ * holding `visitorsShare` percent of all victory points, when no power is left, or at the turn limit
+ * still holding `limitShare` percent (`visitorsBars`: `BLACK_FILES`'s, or the campaign's own).
+ * Destroyed, they hand the Accord's signatories a joint victory (led by the one with most victory
+ * points); with nobody in the Accord the war goes on.
  */
 function blackFilesVictory(world: WorldState, alive: NationId[], vp: Record<NationId, number>, total: number): VictoryState | null {
   const bf = world.blackFiles;
@@ -75,7 +76,8 @@ function blackFilesVictory(world: WorldState, alive: NationId[], vp: Record<Nati
     return { winner: ranked[0]!, reason: 'accord', turn, coalition: [...signed].sort() };
   }
   const held = share(vp[v] ?? 0, total);
-  if (alive.length === 0 || held >= BLACK_FILES.visitorsShare || (turn >= world.maxTurns && held >= BLACK_FILES.limitShare)) return { winner: v, reason: 'visitors', turn };
+  const bars = visitorsBars(world.scenarioId);
+  if (alive.length === 0 || held >= bars.visitorsShare || (turn >= world.maxTurns && held >= bars.limitShare)) return { winner: v, reason: 'visitors', turn };
   return null;
 }
 

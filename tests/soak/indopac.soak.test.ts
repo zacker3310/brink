@@ -5,11 +5,11 @@ import { budget, endings, matchCount, play, seeds } from './play';
 
 // The Indo-Pacific South, AI against AI (docs/indopac.md): five powers and fifteen minor states on
 // an archipelago. Every match must end by the turn limit with no invalid state and no rejected AI
-// order; the line on the console says who won, how, how often decisively, and who took what. Its
-// matches are the slowest of any theatre (convoys planned across two oceans), so it plays
-// `SOAK_INDOPAC_MATCHES`, else `SOAK_MATCHES` up to 20: a 100-match Pacific soak does not make it
-// play 100.
-const MATCHES = matchCount('SOAK_INDOPAC_MATCHES', 20);
+// order; the line on the console says who won, how, how often decisively, and who took what. It
+// plays as many matches as the Pacific's soak, `SOAK_MATCHES` (100 by default). Its matches are the
+// slowest of any theatre (convoys planned across two oceans, 70 to 90 s each on a busy four-core
+// machine), so `SOAK_INDOPAC_MATCHES` sets its own count for a shorter run.
+const MATCHES = matchCount('SOAK_INDOPAC_MATCHES', 100);
 
 describe(`Indo-Pacific South AI-vs-AI soak (${MATCHES} matches)`, () => {
   it('every match ends by the turn limit, with no invalid state and no rejected AI order', { timeout: budget(MATCHES, 240) }, () => {

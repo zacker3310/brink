@@ -547,8 +547,8 @@ export interface VictoryBars {
  * of the points, the armies and the output, so the bars come down with the count: domination in
  * proportion to it (21% for six, 26% for five), supremacy to a fair share of the standing
  * (100 / powers) plus the four-power margin (21% for six, 24% for five). The Middle East and Africa
- * and First Contact are won by the rule as it stands; a theatre whose map makes it the wrong size has
- * its own bars in `THEATRE_BARS`, measured (`theatre`: the campaign's scenario id). A longer war
+ * is won by the rule as it stands; a theatre whose map makes it the wrong size has its own bars in
+ * `THEATRE_BARS`, measured (`theatre`: the campaign's scenario id). A longer war
  * (Total War) asks for a conquest in every theatre: 60% of all victory points outright, or 55%
  * standing held from turn 50, so the war is not over while most of it is still to fight.
  */
@@ -569,9 +569,11 @@ export function victoryBars(maxTurns: number, powers: number = VICTORY.measuredP
  * AI-only matches a theatre from the same seeds the soaks play (every match recorded to the limit,
  * then scored at each candidate bar): the rule's bars for six powers end 70% of the Middle East and
  * Africa's wars before the limit, the same bars none of Europe's and every one of the Americas'; for
- * five, 15% of the Indo-Pacific's and of First Contact's (whose measure is the Visitors' wins, 2 in
- * 20, the same as at the four-power bars). No rule of the count of powers alone fits all three
- * six-power maps. Every number an integer percent; a change is a ruleset change.
+ * five, 15% of the Indo-Pacific's and of First Contact's (First Contact measured on 100). No rule of
+ * the count of powers alone fits all three six-power maps. Every number an integer percent; a change
+ * is a ruleset change. Fitted on the soaks' own seeds, the bars were also played on seeds 21 to 40:
+ * Europe 90% decided, the Middle East and Africa 75%, the Indo-Pacific 60%, the Americas 50% (80% on
+ * the soaks' seeds), First Contact 55%; all inside 40 to 90%, the Americas' the least sure.
  */
 export const THEATRE_BARS: Readonly<Record<string, Partial<Pick<VictoryBars, 'dominationShare' | 'supremacyShare'>>>> = {
   // Europe: forty minor states hold 60% of the victory points, so a power opens on 6.6% of them
@@ -586,6 +588,13 @@ export const THEATRE_BARS: Readonly<Record<string, Partial<Pick<VictoryBars, 'do
   // by turn 11. At 28% domination and 23% supremacy: 80% decided, median turn 24, Colombia 10, Mexico
   // 3, Canada 3.
   americas: { dominationShare: 28, supremacyShare: 23 },
+  // First Contact: five powers under the Antarctic Treaty, then against the Visitors, stay level: in
+  // 100 matches recorded to the limit the best standing from turn 8 on was 19 to 25, 20 or 21 in 85,
+  // and the rule's bars decided 18 (the Visitors 14, all but one at the limit; the four-power bars
+  // 16). At 21% supremacy, with the Visitors' own share (`VISITORS_BARS`): 56 decided (supremacy
+  // 37, the Visitors 19), the United Kingdom 34 in all, China 26, the United States 18; between 50%
+  // and 65% decided in each twenty of the hundred seeds.
+  'black-files-first-contact': { supremacyShare: 21 },
 };
 
 /** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */

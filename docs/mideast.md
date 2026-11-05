@@ -147,9 +147,9 @@ first power. `shortName` and `findNation` look across every theatre.
   sites, army and navy; minors and the stability of unaligned land; parity; seeds change only ground.
 - `packages/mapgen/src/mideast.test.ts`: the committed file is what the grid writes.
 - `packages/game-data/src/nations/mideast.test.ts`: the six country files and leaders.
-- `tests/soak/mideast.soak.test.ts`: AI-only matches (`SOAK_MIDEAST_MATCHES`, else `SOAK_MATCHES` up
-  to 20), 0 rejected orders and the soak's invariants between every turn (`tests/soak/invariants.ts`,
-  every soak's).
+- `tests/soak/mideast.soak.test.ts`: AI-only matches (`SOAK_MIDEAST_MATCHES` or `MIDEAST_SOAK`, else
+  `SOAK_MATCHES`, else 24), 0 rejected orders and the soak's invariants between every turn
+  (`tests/soak/invariants.ts`, every soak's).
 - `tests/e2e/mideast.spec.ts`: a phone picks the theatre, plays Egypt and ends two turns.
 
 ## Balance (20 AI-only matches, `SOAK_MIDEAST_MATCHES=20`)

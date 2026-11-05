@@ -8,12 +8,18 @@ import { GameSession } from '@brink/session';
 // a tally of how the wars ended. Each theatre's soak file says how many matches it plays, what it
 // expects of the war, and prints its endings line.
 
-/** How many matches a theatre's soak plays: its own variable, else `SOAK_MATCHES`, at most `cap`. */
-export function matchCount(own: string, cap: number, fallback = cap): number {
-  const set = process.env[own];
-  if (set !== undefined) return Number(set);
+/**
+ * How many matches a theatre's soak plays: its own variable (the first of `own` that is set: its
+ * name, then any older name a lane gave it), else `SOAK_MATCHES` up to `cap`, else `fallback`, the
+ * count the theatre's soak has always played by default.
+ */
+export function matchCount(own: string | readonly string[], fallback: number, cap = Infinity): number {
+  for (const name of typeof own === 'string' ? [own] : own) {
+    const set = process.env[name];
+    if (set !== undefined) return Number(set);
+  }
   const all = process.env.SOAK_MATCHES;
-  return Math.min(cap, all === undefined ? fallback : Number(all));
+  return all === undefined ? fallback : Math.min(cap, Number(all));
 }
 
 /** A test's time budget for `matches` matches of about `seconds` each on a busy runner (30 min at least). */

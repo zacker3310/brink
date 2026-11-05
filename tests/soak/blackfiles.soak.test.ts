@@ -11,7 +11,7 @@ import { budget, endings, matchCount, play, seeds } from './play';
 // `SOAK_FIRST_CONTACT_MATCHES` sets the First Contact count, else `SOAK_MATCHES` (100 by default; a
 // fifth of it, at least two, for the toggle).
 
-const MATCHES = matchCount('SOAK_FIRST_CONTACT_MATCHES', Infinity, 100);
+const MATCHES = matchCount('SOAK_FIRST_CONTACT_MATCHES', 100);
 const check = (w: WorldState) => [...invariants(w), ...blackFilesInvariants(w)];
 
 /** What the Black Files did in a soak: wakings, artefacts dug, studies, Accord signatures, splits, hexes turned. */

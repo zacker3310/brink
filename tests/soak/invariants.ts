@@ -4,7 +4,9 @@ import { CARDS, CITY_GROWTH, COMMANDER_RULES, DOCTRINE, FACILITY_SLOTS, LEVEL_SL
 import { handSizeOf } from '@brink/simulation';
 
 // The invariants every soak checks between turns, in every theatre: the one list, imported by every
-// soak file (soak.test.ts and each theatre's), with the Black Files' own beside it.
+// soak file (soak.test.ts and each theatre's), with the Black Files' own beside it. It holds every
+// check any theatre's own list had before they were merged (`invariants.test.ts` pins that): a
+// check is never dropped here, only added.
 
 /** Every invariant a world must satisfy between turns. Returns the broken ones. */
 export function invariants(w: WorldState): string[] {
@@ -30,7 +32,9 @@ export function invariants(w: WorldState): string[] {
     for (const v of [f.organization, f.morale, f.readiness, f.fuel, f.ammunition, f.experience, f.entrenchment, f.supply]) {
       if (!Number.isInteger(v) || v < 0 || v > 100) bad.push(`${f.id} stat out of range`);
     }
-    if (f.strength <= 0 || f.strength > 1000) bad.push(`${f.id} strength ${f.strength}`);
+    // A whole number in range: authoritative state holds integers only (the Black Files' and the
+    // Indo-Pacific's own lists checked it before they were merged into this one).
+    if (f.strength <= 0 || f.strength > 1000 || !Number.isInteger(f.strength)) bad.push(`${f.id} strength ${f.strength}`);
     // At sea: ships, and whoever rides in one, in that ship's own hex. Nothing else.
     if (w.tiles[f.key]?.terrain === 'water' && !UNITS[f.unitClass].naval && !f.aboard) bad.push(`${f.id} in water`);
     // And ships only at sea or in a port: never beached.

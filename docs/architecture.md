@@ -248,7 +248,8 @@ its version stamp (`scenarios/src/pacific-map.test.ts`).
   share vision; a signatory declaring war on another betrays it (out for good, stability, every other
   signatory at war with it). Victory (`victory.ts`, checked first): the Visitors destroyed hands the
   signatories a joint win; the Visitors win holding `visitorsShare` of the victory points, or
-  `limitShare` at the turn limit.
+  `limitShare` at the turn limit (`visitorsBars`: `BLACK_FILES`'s, or a campaign's own in
+  `VISITORS_BARS`, First Contact's 19%).
 - The Accord among the other deals (2.12): it binds like a pact (`accordBinds` in `diplomacy.ts`):
   no alliance against a fellow signatory and no joint operation on its city, since either takes one
   signatory to war with another without a declaration (`canPropose`, `jointOpProblem` code `accord`,

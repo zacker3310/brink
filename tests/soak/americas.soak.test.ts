@@ -7,8 +7,8 @@ import { budget, endings, matchCount, play, seeds } from './play';
 // The Americas played AI against AI to the end (docs/americas.md): six powers, fourteen minor
 // states, 1312 hexes, the world checked between every turn and no AI order refused. The line on the
 // console says how the war went and what the canal saw. `SOAK_AMERICAS_MATCHES` sets the count, else
-// `SOAK_MATCHES` up to 20.
-const MATCHES = matchCount('SOAK_AMERICAS_MATCHES', 20);
+// `SOAK_MATCHES`, else 24.
+const MATCHES = matchCount('SOAK_AMERICAS_MATCHES', 24);
 
 describe(`the Americas, AI against AI (${MATCHES} matches)`, () => {
   it('every match ends with a winner by the turn limit, with no invalid state and no rejected order', { timeout: budget(MATCHES, 120) }, () => {
