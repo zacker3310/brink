@@ -383,8 +383,16 @@ function UnitCard() {
   const selectFormation = useGame((s) => s.selectFormation);
   const resolving = useGame((s) => s.resolving);
   const planned = useGame((s) => s.planned);
+  const aimingLift = useGame((s) => s.aimingLift);
   const f = view.formations[fid];
   if (!f) return null;
+  // Choosing where to come down: the card shrinks to the lift's own panel, so the map shows the hexes.
+  if (aimingLift === fid)
+    return (
+      <div className="pointer-events-auto rounded-t-2xl border-t border-line bg-ink-900/97 pb-2 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]" data-testid="unit-panel">
+        <AirliftRow f={f} />
+      </div>
+    );
   const color = view.self.color;
   const members = (group.length ? group : [fid]).map((id) => view.formations[id]).filter((x): x is Formation => !!x);
   // What stands in the hex (passengers are cargo, listed on their ship), and the ship's cargo.

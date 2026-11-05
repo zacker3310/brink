@@ -36,7 +36,8 @@ import type { Mode } from './planning';
 import type { Response } from './protocol';
 import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type ActiveOperation, type MapStyle, type SlotInfo } from './saves';
 import { operationById, proposeOperations, type Operation } from '@brink/ai';
-import { LIFT_COST, liftFor, liftOrigin } from './airlift';
+import { liftFor, liftOrigin, liftTargets } from './airlift';
+import { keyDistance } from '@brink/map';
 
 /** The diplomacy the staff may sign for the player on its own: what calms a front and costs nothing. */
 const STAFF_DIPLOMACY: ReadonlySet<DiplomaticAction> = new Set<DiplomaticAction>(['propose_peace', 'propose_ceasefire', 'propose_nonaggression', 'propose_trade']);
@@ -667,7 +668,11 @@ export const useGame = create<State>((set, get) => {
       if (!from) return;
       sfx.arm();
       set({ aimingLift: id, armed: null, aimingCard: null, selectedFormation: id, group: [id] });
-      get().notify(`${f.name}: tap a highlighted hex to fly there from the ${from.name} (${from.range} hexes, ${LIFT_COST})`);
+      // Look where it can go: the running operation's prize when it is in reach, else the nearest landing.
+      const targets = liftTargets(view, f);
+      const op = get().operation ? operationById(view, get().operation!.id, get().operation!.kind) : null;
+      const near = op && targets.some((t) => keyDistance(t.key, op.at) <= 1) ? op.at : [...targets].sort((a, b) => keyDistance(a.key, f.key) - keyDistance(b.key, f.key) || (a.key < b.key ? -1 : 1))[0]?.key;
+      if (near) get().focusOn(near);
     },
     aimLift(key) {
       const { view, aimingLift } = get();

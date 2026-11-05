@@ -499,30 +499,32 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
         const head = pt(q);
         const ahead = pt(Math.min(1, q + 0.02));
         const ang = Math.atan2(ahead.y - head.y, ahead.x - head.x);
-        const rot = (dx: number, dy: number) => ({ x: head.x + dx * Math.cos(ang) - dy * Math.sin(ang), y: head.y + dx * Math.sin(ang) + dy * Math.cos(ang) });
+        // Drawn at a size that reads on a phone: the hex is about 2 x `size` across.
+        const k = size / 14;
+        const rot = (dx: number, dy: number) => ({ x: head.x + (dx * Math.cos(ang) - dy * Math.sin(ang)) * k, y: head.y + (dx * Math.sin(ang) + dy * Math.cos(ang)) * k });
         // Its shadow on the ground, and the track behind it.
         const ground = lerp(a, b, q);
-        fx.ellipse(ground.x, ground.y + 3, 6, 2.5).fill({ color: 0x000000, alpha: 0.3 });
+        fx.ellipse(ground.x, ground.y + 3, 6 * k, 2.5 * k).fill({ color: 0x000000, alpha: 0.3 });
         const tail = pt(Math.max(0, q - 0.1));
         fx.moveTo(tail.x, tail.y).lineTo(head.x, head.y).stroke({ width: 1.5, color: fl.hit && q > 0.5 ? 0x8a8a8a : 0xf4f1e8, alpha: 0.45, cap: 'round' });
         if (fl.deck) {
           // Helicopter: a body and a spinning rotor disc.
           const n = rot(7, 0);
           const tl0 = rot(-8, 0);
-          fx.moveTo(tl0.x, tl0.y).lineTo(n.x, n.y).stroke({ width: 4, color: fl.color, cap: 'round' });
-          fx.circle(head.x, head.y, 8).stroke({ width: 1.2, color: 0xf4f1e8, alpha: 0.7 });
+          fx.moveTo(tl0.x, tl0.y).lineTo(n.x, n.y).stroke({ width: 4 * k, color: fl.color, cap: 'round' });
+          fx.circle(head.x, head.y, 8 * k).fill({ color: 0xf4f1e8, alpha: 0.15 }).stroke({ width: 1.5, color: 0xf4f1e8, alpha: 0.8 });
         } else {
           // Transport aircraft: fuselage, swept wings, tailplane.
           const nose = rot(9, 0);
           const tail2 = rot(-9, 0);
-          fx.moveTo(tail2.x, tail2.y).lineTo(nose.x, nose.y).stroke({ width: 3.5, color: fl.color, cap: 'round' });
+          fx.moveTo(tail2.x, tail2.y).lineTo(nose.x, nose.y).stroke({ width: 3.5 * k, color: fl.color, cap: 'round' });
           const wl = rot(-1, -9);
           const wr = rot(-1, 9);
           const wc = rot(2, 0);
           fx.poly([wl.x, wl.y, wc.x, wc.y, wr.x, wr.y]).fill({ color: fl.color });
           const tlft = rot(-8, -4);
           const trgt = rot(-8, 4);
-          fx.moveTo(tlft.x, tlft.y).lineTo(trgt.x, trgt.y).stroke({ width: 2, color: fl.color });
+          fx.moveTo(tlft.x, tlft.y).lineTo(trgt.x, trgt.y).stroke({ width: 2 * k, color: fl.color });
         }
         // Hit on the way in: a flash at mid-flight, then smoke behind it.
         if (fl.hit && q > 0.45) {
@@ -540,13 +542,15 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
           if (u <= 0 || u >= 1) continue;
           const x = b.x + dx * size;
           const y = b.y - size * 1.3 * (1 - u);
+          const r = size * 0.32;
+          fx.ellipse(x, b.y + size * 0.15, r * (0.4 + 0.6 * u), r * 0.3).fill({ color: 0x000000, alpha: 0.25 });
           if (fl.deck) {
-            fx.circle(x, y, 5).stroke({ width: 1.2, color: 0xf4f1e8, alpha: 0.8 * (1 - u * 0.5) });
-            fx.circle(x, y, 1.8).fill({ color: fl.color });
+            fx.circle(x, y, r).fill({ color: 0xf4f1e8, alpha: 0.18 }).stroke({ width: 1.5, color: 0xf4f1e8, alpha: 0.85 * (1 - u * 0.4) });
+            fx.moveTo(x - r * 0.6, y).lineTo(x + r * 0.6, y).stroke({ width: r * 0.35, color: fl.color, cap: 'round' });
           } else {
-            fx.moveTo(x - 6, y - 7).arc(x, y - 7, 6, Math.PI, 0).lineTo(x - 6, y - 7).fill({ color: 0xf4f1e8, alpha: 0.9 * (1 - u * 0.4) });
-            fx.moveTo(x - 5, y - 7).lineTo(x, y).moveTo(x + 5, y - 7).lineTo(x, y).stroke({ width: 1, color: 0xf4f1e8, alpha: 0.8 });
-            fx.circle(x, y + 1, 1.8).fill({ color: fl.color });
+            fx.moveTo(x - r, y - r).arc(x, y - r, r, Math.PI, 0).lineTo(x - r, y - r).fill({ color: 0xf4f1e8, alpha: 0.92 * (1 - u * 0.4) });
+            fx.moveTo(x - r * 0.85, y - r).lineTo(x, y).moveTo(x + r * 0.85, y - r).lineTo(x, y).stroke({ width: 1.2, color: 0xf4f1e8, alpha: 0.85 });
+            fx.circle(x, y + 1, r * 0.3).fill({ color: fl.color });
           }
         }
       }

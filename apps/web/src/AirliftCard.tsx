@@ -47,9 +47,12 @@ export function AirliftRow({ f }: { f: Formation }) {
       <div className="font-display text-[13px] font-extrabold tracking-[0.06em] text-friend uppercase">
         Fly from the {from.name}: tap where to come down
       </div>
-      <div className="mt-1 text-[13px] text-muted">
-        {targets.length} landing hexes in reach. <span className="text-friend">Blue</span> clear, <span className="text-signal">amber</span> some risk, <span className="text-hostile">red</span> heavy risk of interception
-        {worst > 0 ? ` (up to ${worst}%)` : ''}. A drop comes down scattered ({AIRBORNE.dropOrganization} organization lost) and out of supply; onto a held hex it storms it at once, {AIRBORNE.assaultPenalty}% weaker.
+      <div className="mt-1 text-[13px] leading-snug text-muted">
+        {targets.length} hexes in reach, {LIFT_COST} a lift. <span className="text-friend">Blue</span> clear, <span className="text-signal">amber</span> some risk, <span className="text-hostile">red</span> heavy
+        {worst > 0 ? ` (up to ${worst}%)` : ''}; a bold edge air-lands at an airfield.
+      </div>
+      <div className="mt-1 text-[12px] leading-snug text-faint">
+        A drop comes down scattered (−{AIRBORNE.dropOrganization} organization) and out of supply until it takes a site or links up; onto a held hex it storms it at once, {AIRBORNE.assaultPenalty}% weaker.
       </div>
       {safest[0] && (
         <div className="mt-1 text-[12px]">

@@ -1,7 +1,7 @@
 import type { AirliftMode, Formation, GameEvent, HexKey, NationView } from '@brink/contracts';
 import { AIRBORNE, UNITS } from '@brink/game-data';
 import { airliftOrigin, airliftTargets, canAirlift, checkAirlift, liftContextOfView } from '@brink/simulation';
-import { hexLabel } from './insight';
+import { atPlace, hexLabel } from './insight';
 
 // Airlift on the map: where a formation can fly this turn, how it would come down and the risk the
 // player's own picture shows (the engine's `airliftTargets`, run on the view), and the words for it.
@@ -38,7 +38,7 @@ export function liftFor(view: NationView, f: Formation, key: HexKey): { target: 
     return { error: why ? why.charAt(0).toUpperCase() + why.slice(1) : 'A power at peace holds that ground: ask it for passage first' };
   }
   const risk = t.chance > 0 ? `, ${t.chance}% risk of interception` : '';
-  return { target: t, label: `${MODE_TEXT[t.mode]} at ${hexLabel(view, key)}${risk}` };
+  return { target: t, label: `${MODE_TEXT[t.mode]} ${atPlace(view, key)}${risk}` };
 }
 
 /** What a lift costs, in words. */
@@ -58,14 +58,14 @@ export function liftLines(view: NationView, events: readonly GameEvent[]): strin
   const own = events.filter((e): e is Extract<GameEvent, { kind: 'airlift' }> => e.kind === 'airlift' && e.owner === view.self.id);
   const down = own.filter((e) => !e.aborted);
   if (down.length > 0) {
-    const where = [...new Set(down.map((e) => hexLabel(view, e.to)))].join(', ');
+    const where = [...new Set(down.map((e) => atPlace(view, e.to)))].join(', ');
     const verb = down.every((e) => e.mode === 'airland') ? 'Air-landed' : 'Dropped';
     const hit = down.filter((e) => e.hit);
     const lost = hit.reduce((a, e) => a + e.strengthLoss, 0);
     const killed = down.filter((e) => e.destroyed).length;
     const by = [...new Set(hit.flatMap((e) => e.by))].map((n) => view.nations[n]?.name ?? n).join(' and ');
     out.push(
-      `${verb} ${down.length} unit${down.length === 1 ? '' : 's'} at ${where}` +
+      `${verb} ${down.length} unit${down.length === 1 ? '' : 's'} ${where}` +
         (hit.length ? `; ${hit.length} hit by ${by} on the way in (-${Math.round(lost / 10)}% strength${killed ? `, ${killed} lost` : ''})` : '; nobody hit on the way in'),
     );
   }

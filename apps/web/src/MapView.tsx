@@ -7,7 +7,7 @@ import { mainland } from './mainland';
 import { HEX_SIZE, useCamera } from './camera';
 import { addUnit, affiliationOf, keepScreenSize, setModelZoom, tickModels, type CounterLook } from './counters';
 import { AFFILIATION, FONT_DISPLAY, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
-import { buildTimeline, playReplay } from './replay';
+import { buildTimeline, playReplay, useReplay } from './replay';
 import { terrainTexture } from './design/terrain';
 import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
 import { sfx } from './sfx';
@@ -280,6 +280,11 @@ declare global {
       opSpot(): Spot | null;
       /** Hexes the formation waiting for its landing hex can fly to, with the risk shown. */
       liftTargets(): { key: HexKey; chance: number; mode: string }[];
+      /** Bring a hex to the middle of the screen, and select an own formation (as a tap on its chip would). */
+      focus(key: HexKey): void;
+      select(id: string): void;
+      /** Hold the turn's replay at `ms` into its film (paused), to look at one moment of it. */
+      holdReplay(ms: number): void;
     };
   }
 }
@@ -696,6 +701,15 @@ export function MapView() {
       opSpot() {
         const s = useGame.getState();
         return s.view ? opSpot(s.view, s.operation) : null;
+      },
+      focus(key) {
+        useGame.getState().focusOn(key);
+      },
+      select(id) {
+        useGame.getState().selectFormation(id);
+      },
+      holdReplay(ms) {
+        useReplay.setState({ paused: true, seek: ms });
       },
       liftTargets() {
         const s = useGame.getState();
