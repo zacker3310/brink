@@ -1153,6 +1153,11 @@ as a leak: its `stores` change refilled or emptied a seen tank's APS charges at 
 card shows the protection while it has charges by rule (the rule fixture in `fog.test.ts`). The
 change now keeps whether a seen tank has charges and varies only how many.
 
+The matrix then found a full nine-man western squad splitting into halves of five and four while a
+fireteam held four: the leader's half had more men than its type. The western fireteam is now five
+with the squad leader (`leader`, `team_leader`, `auto_rifleman`, `grenadier`, `rifleman`), its value
+unchanged; a fireteam listed on its own in a skirmish comes five strong.
+
 ## Sources
 
 Specifications: General Dynamics Land Systems (M1A2 SEPv3, M1126 Stryker, M10 Booker), Krauss-Maffei

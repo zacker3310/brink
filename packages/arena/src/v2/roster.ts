@@ -641,7 +641,8 @@ export const TYPES: Record<TypeId, UnitType> = {
     short: 'Fireteam',
     role: 'fireteam',
     faction: 'west',
-    men: ['team_leader', 'auto_rifleman', 'grenadier', 'rifleman'],
+    // A US squad is its leader and two teams of four: the half the leader goes with is five.
+    men: ['leader', 'team_leader', 'auto_rifleman', 'grenadier', 'rifleman'],
     move: 3,
     weapons: [fire('M4A1 and M249', 5, 65, 0.5, 12), m320(0.4, 10), at4(1)],
     value: 2,

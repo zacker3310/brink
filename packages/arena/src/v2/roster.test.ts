@@ -205,7 +205,9 @@ describe('roster', () => {
     expect(TYPES.squad_e.men).toHaveLength(8);
     expect(TYPES.squad_e.weapons.map((w) => w.range)).toEqual([6, 3, 3]);
     expect(weapon('squad_e', 'rpg')).toMatchObject({ pen: 650, ammo: 3 });
-    expect(TYPES.team_w.men).toEqual(['team_leader', 'auto_rifleman', 'grenadier', 'rifleman']);
+    // Was four without the squad leader: a full nine-man squad split into halves of five and four,
+    // and the leader's half held more men than its type (the matrix's state check, case 22).
+    expect(TYPES.team_w.men).toEqual(['leader', 'team_leader', 'auto_rifleman', 'grenadier', 'rifleman']);
     expect(TYPES.team_e.men).toEqual(['leader', 'gunner', 'at', 'rifleman']);
     expect(weapon('javelin', 'javelin')).toMatchObject({ range: 26, pen: 800, top: true, guidance: 'fnf', ammo: 4 });
     expect(weapon('kornet', 'kornet')).toMatchObject({ range: 36, pen: 1200, ammo: 4, setup: true });
@@ -473,7 +475,8 @@ describe('forces', () => {
     const blue = buildForce(s, 'blue');
     expect(typesOf(blue.units)).toEqual(['m2a3', 'squad_w', 'm1a2', 'javelin', 'stryker', 'team_w']);
     expect(blue.units.map((u) => u.carrier ?? null)).toEqual([null, 'd1:1', null, null, null, 'd1:5']);
-    expect(blue.units.map((u) => u.men ?? null)).toEqual([null, 6, null, 2, null, 4]);
+    // The fireteam is five with its squad leader (it was four; see the roster test above).
+    expect(blue.units.map((u) => u.men ?? null)).toEqual([null, 6, null, 2, null, 5]);
     expect(blue.units.every((u) => u.rank === 1)).toBe(true);
     const red = buildForce(s, 'red');
     expect(typesOf(red.units)).toEqual(['squad_e', 'bmp3', 'squad_e', 'kornet', 'mi8', 'squad_e']);
