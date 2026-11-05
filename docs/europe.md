@@ -67,9 +67,14 @@ Algeria, Morocco. Small states have fewer victory points; Kyiv, Brussels, Madrid
 
 ## Victory
 
-`THEATRE_VICTORY` in game-data: a European power opens with 7% of the victory points (a Pacific one
-with 15%), so Europe asks for 15% for domination and 18% standing for supremacy, the same multiple of
-a power's opening as the Pacific's 32% and 29%. Total War asks for a conquest everywhere. 30 turns.
+Every theatre is won by one rule, `victoryBars(maxTurns, powers, theatre)` in game-data: the Pacific's
+32% and 29% at four powers, scaled down with the count fixed at build (`barPowers`; 21% and 21% for
+six). Europe is one of three theatres the rule does not fit, so it keeps its own bars in
+`THEATRE_BARS`: a European power opens with 6.6% of the victory points (a Pacific one with 15%, one in
+the Middle East with 7.6%), forty minor states hold 60% of them, and in 20 AI-only matches played to
+the limit no power's standing passed 20, so at the rule's bars none was decided. Europe asks for 15%
+for domination and 18% standing for supremacy, about the same multiple of a power's opening as the
+Pacific's: 75% of the 20 matches decided. Total War asks for a conquest everywhere. 30 turns.
 
 ## Generalised for any theatre
 

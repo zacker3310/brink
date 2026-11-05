@@ -64,8 +64,10 @@ Civil War), when they fight with their own generals, decks and leaders.
 
 Guatemala, Nicaragua, Panama, Cuba, Haiti, the Dominican Republic, Venezuela, Guyana, Ecuador, Peru,
 Bolivia, Chile, Paraguay and Uruguay. Panama City, Havana and Santiago are worth 8 victory points,
-the other capitals 6. Venezuela raises an extra infantry and a mechanized regiment a city; Ecuador,
-Peru and Chile an infantry regiment, Cuba a mechanized one.
+the other capitals 6. Venezuela raises two extra infantry and a mechanized regiment a city; Ecuador and
+Peru two infantry regiments; Panama, Guyana, Bolivia and Chile one; Cuba a mechanized one. Colombia's
+ring is the deepest (ruleset 2.13.0): with a regiment less in each of its neighbours it won 13 of 20
+AI-only wars, all of them decided.
 
 ## Opening Crises
 
@@ -84,10 +86,11 @@ Pacific's (six powers, twenty nations, 1312 hexes). Results are in `PROGRESS.md`
 - **Straits in the engine.** The canal works through the port rule. A blockade of the Florida
   Strait or the Strait of Magellan as a strait (rather than ships in the way) waits for the
   trade-and-chokepoints lane.
-- **Balance.** Colombia, ringed by minor states (Panama, Venezuela, Guyana, Ecuador, Peru), wins
-  most AI-only wars on score; the United States, at war with Canada and Mexico at once, loses its
-  east coast by turn ten in most. Six powers rarely reach supremacy at 29% of the standing, a bar
-  set for four: no war was decided before the limit in the 20-match soak.
+- **Balance.** Colombia, ringed by minor states (Panama, Venezuela, Guyana, Ecuador, Peru), still
+  takes them faster than anyone takes anything; the United States, at war with Canada and Mexico at
+  once, loses its east coast by turn ten in most. The theatre is won by its own bars (`THEATRE_BARS`:
+  26% domination, 23% supremacy), not the six-power rule's 21% and 21%: at those Colombia took 21% of
+  the points by turn 11 in every war. The United States, Brazil and Argentina win none of 20.
 - **Crises for the Americas.** None yet.
 - **Scale.** The per-hex loops (`grossYields` counting hexes, supply, vision) dominate a turn on this
   map; the master plan's incremental work would halve it.

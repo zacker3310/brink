@@ -58,6 +58,9 @@ Thailand, the Philippines and Malaysia raise a second infantry militia per city.
 
 ## Measured
 
-See the soak (`tests/soak/indopac.soak.test.ts`) and PROGRESS.md for the decisive rate. With five
-powers the victory bars (`VICTORY`, fixed for four) are further off: a power starts near 18%
-standing against the 29% supremacy bar, where a Pacific power starts near 23%.
+See the soak (`tests/soak/indopac.soak.test.ts`) and PROGRESS.md for the decisive rate. The theatre
+is won by the one rule (`victoryBars`) but for supremacy: five powers would give 26% domination and
+24% supremacy, and a power opens near 16% standing (a Pacific one near 21%). The prizes are islands
+across the sea, so standings stay close: in 20 AI-only matches played to the limit none passed 25,
+and at the rule's 24% three were decided. `THEATRE_BARS` sets the theatre's supremacy at 21%: 70%
+decided (14 by supremacy), median turn 23.

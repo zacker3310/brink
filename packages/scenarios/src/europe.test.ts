@@ -184,15 +184,21 @@ describe('Europe', { timeout: 60_000 }, () => {
     expect(land('russia')).toBeGreaterThan(land('uk') * 10);
   });
 
-  it('is won by the bars of a six-power map: the one rule every theatre is won by', () => {
-    // The lane that built Europe set it bars of its own (15% domination, 18% supremacy, about twice a
-    // power's opening share of the points); ruleset 2.13.0 has one rule for every theatre, scaled by
-    // the count of powers fixed at build (`barPowers`), and Europe's six are its input.
+  it('asks a European power for about twice its opening share of the points: its own bars, below the six-power rule', () => {
+    // Ruleset 2.13.0 has one rule for every theatre, scaled by the count of powers fixed at build
+    // (`barPowers`). Europe is one of the three theatres it does not fit (`THEATRE_BARS`): forty minor
+    // states hold most of the points, and at the six-power rule's bars no AI war was decided.
     expect(w.barPowers).toBe(6);
-    const bars = victoryBars(w.maxTurns, w.barPowers);
-    expect(bars).toEqual(victoryBars(30, EUROPE_NATIONS.length));
+    const total = Object.values(w.sites).reduce((a, s) => a + s.victoryPoints, 0);
+    const start = sitesOf('uk').reduce((a, s) => a + s.victoryPoints, 0);
+    const bars = victoryBars(w.maxTurns, w.barPowers, w.scenarioId);
+    expect(bars.dominationShare).toBeLessThan(victoryBars(w.maxTurns, EUROPE_NATIONS.length).dominationShare);
+    expect(bars.supremacyShare).toBeLessThan(victoryBars(w.maxTurns, EUROPE_NATIONS.length).supremacyShare);
     expect(bars.dominationShare).toBeLessThan(VICTORY.dominationShare);
-    expect(bars.supremacyShare).toBeLessThan(VICTORY.supremacyShare);
+    // Domination is about twice a power's opening share, as in the Pacific (32% against 15%).
+    const multiple = (bars.dominationShare * total) / 100 / start;
+    expect(multiple).toBeGreaterThan(1.8);
+    expect(multiple).toBeLessThan(2.6);
     // Every power is at war with every other, and the minor states at peace with one another.
     for (const a of EUROPE_NATIONS) for (const b of EUROPE_MINORS) expect(w.relations[[a.id, b.id].sort().join('|')]).toBe('war');
     expect(w.relations[['spain', 'portugal'].sort().join('|')]).toBe('peace');

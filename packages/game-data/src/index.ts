@@ -542,22 +542,51 @@ export interface VictoryBars {
 /**
  * The bars a campaign is won by, by its length and by how many powers its map has: one rule for every
  * theatre. Up to an epic 60 turns, with the four powers `VICTORY`'s bars were measured with, they are
- * `VICTORY`'s exactly (the Pacific). A map of more powers (`powers`: its count, fixed at build as
- * `WorldState.barPowers`, so a bar never moves in a match) opens each power on a smaller share of the
- * points, the armies and the output, so the bars come down with the count: domination in proportion
- * to it, supremacy to a fair share of the standing (100 / powers) plus the four-power margin. A longer
- * war (Total War) asks for a conquest in every theatre: 60% of all victory points outright, or 55%
+ * `VICTORY`'s exactly (the Pacific: 32% and 29%). A map of more powers (`powers`: its count, fixed at
+ * build as `WorldState.barPowers`, so a bar never moves in a match) opens each power on a smaller share
+ * of the points, the armies and the output, so the bars come down with the count: domination in
+ * proportion to it (21% for six, 26% for five), supremacy to a fair share of the standing
+ * (100 / powers) plus the four-power margin (21% for six, 24% for five). The Middle East and Africa
+ * and First Contact are won by the rule as it stands; a theatre whose map makes it the wrong size has
+ * its own bars in `THEATRE_BARS`, measured (`theatre`: the campaign's scenario id). A longer war
+ * (Total War) asks for a conquest in every theatre: 60% of all victory points outright, or 55%
  * standing held from turn 50, so the war is not over while most of it is still to fight.
  */
-export function victoryBars(maxTurns: number, powers: number = VICTORY.measuredPowers): VictoryBars {
+export function victoryBars(maxTurns: number, powers: number = VICTORY.measuredPowers, theatre?: string): VictoryBars {
   if (maxTurns > 60) return { dominationShare: 60, supremacyShare: 55, supremacyFromTurn: 50 };
   const n = Math.max(VICTORY.measuredPowers, powers);
-  return {
+  const rule: VictoryBars = {
     dominationShare: Math.round((VICTORY.dominationShare * VICTORY.measuredPowers) / n),
     supremacyShare: Math.round(100 / n) + VICTORY.supremacyMargin,
     supremacyFromTurn: VICTORY.supremacyFromTurn,
   };
+  const own = theatre === undefined ? undefined : THEATRE_BARS[theatre];
+  return own ? { ...rule, ...own } : rule;
 }
+
+/**
+ * The theatres the rule (`victoryBars`) does not fit, each with its own bars and why. Measured on 20
+ * AI-only matches a theatre from the same seeds the soaks play (every match recorded to the limit,
+ * then scored at each candidate bar): the rule's bars for six powers end 70% of the Middle East and
+ * Africa's wars before the limit, the same bars none of Europe's and every one of the Americas'; for
+ * five, 15% of the Indo-Pacific's and of First Contact's (whose measure is the Visitors' wins, 2 in
+ * 20, the same as at the four-power bars). No rule of the count of powers alone fits all three
+ * six-power maps. Every number an integer percent; a change is a ruleset change.
+ */
+export const THEATRE_BARS: Readonly<Record<string, Partial<Pick<VictoryBars, 'dominationShare' | 'supremacyShare'>>>> = {
+  // Europe: forty minor states hold 60% of the victory points, so a power opens on 6.6% of them
+  // (7.6% in the Middle East) and no standing passed 20 in 20 matches to the limit; at the rule's 21%
+  // none was decided. Europe's own bars from its lane, 15% domination and 18% supremacy: 75% decisive.
+  europe: { dominationShare: 15, supremacyShare: 18 },
+  // The Indo-Pacific South: an archipelago, its prizes islands across the sea, so standings stay
+  // close (none passed 25) and the rule's 24% supremacy decided 3 matches of 20. At 21%: 70%.
+  indopac: { supremacyShare: 21 },
+  // The Americas: Colombia, ringed by minor states, takes them fast (with a deeper militia in its ring,
+  // still near 30% of the points by turn 15 in some wars): at the rule's 21% domination it wins every
+  // war by turn 11. At 26% domination (the five-power rule's) and 23% supremacy: 65% decided, won by
+  // Mexico 7, Colombia 5 and Canada 1.
+  americas: { dominationShare: 26, supremacyShare: 23 },
+};
 
 /** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */
 export const CAMPAIGN_TURNS: Record<CampaignLength, number> = { quick: 20, standard: 30, epic: 45, total: 250 };

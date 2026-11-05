@@ -65,8 +65,8 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
   const turns = CAMPAIGN_TURNS[length];
-  // The bars the campaign will be won by: by its length and the theatre's count of powers.
-  const bars = victoryBars(turns, nations.length);
+  // The bars the campaign will be won by: its length, the theatre's count of powers, the theatre's own.
+  const bars = victoryBars(turns, nations.length, theatreId);
   const [difficulty, setDifficulty] = useState<Difficulty>(() => readPrefs().difficulty ?? 'easy');
   const pickDifficulty = (d: Difficulty) => {
     setDifficulty(d);

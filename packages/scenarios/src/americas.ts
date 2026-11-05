@@ -31,9 +31,11 @@ const SETUP: ScenarioSetup = {
     brazil: { port: 'Rio de Janeiro', ships: ['fleet', 'transport', 'carrier'] },
     argentina: { port: 'Buenos Aires', ships: ['fleet', 'transport'] },
   },
-  // Big countries defend deeper: militia per city beyond the infantry every city has. Venezuela,
-  // Ecuador and Peru most of all: without it Colombia ate the northern Andes by turn ten.
-  militia: { venezuela: ['infantry', 'mechanized'], peru: ['infantry'], ecuador: ['infantry'], chile: ['infantry'], cuba: ['mechanized'] } satisfies Record<NationId, UnitClass[]>,
+  // Big countries defend deeper: militia per city beyond the infantry every city has. Colombia's ring
+  // most of all (Venezuela, Ecuador, Peru, Panama, Guyana, Bolivia): with one regiment less each it
+  // held 30% of the points by turn 15 and won 13 of 20 AI-only wars, every one decided (ruleset
+  // 2.13.0; with them, Mexico 7, Colombia 5, Canada 1 at this theatre's bars).
+  militia: { venezuela: ['infantry', 'infantry', 'mechanized'], peru: ['infantry', 'infantry'], ecuador: ['infantry', 'infantry'], panama: ['infantry'], guyana: ['infantry'], bolivia: ['infantry'], chile: ['infantry'], cuba: ['mechanized'] } satisfies Record<NationId, UnitClass[]>,
 };
 
 const ALL: readonly NationSpec[] = nationSpecs(AMERICAS_MAP, SETUP);

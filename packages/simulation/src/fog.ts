@@ -126,9 +126,9 @@ export function barPowers(world: Pick<WorldState, 'barPowers'>): number {
   return world.barPowers ?? VICTORY.measuredPowers;
 }
 
-/** The bars this campaign is won by: its length and its map's powers (`victoryBars`). */
-export function barsOf(world: Pick<WorldState, 'barPowers' | 'maxTurns'>): VictoryBars {
-  return victoryBars(world.maxTurns, barPowers(world));
+/** The bars this campaign is won by: its length, its map's powers and its theatre (`victoryBars`). */
+export function barsOf(world: Pick<WorldState, 'barPowers' | 'maxTurns' | 'scenarioId'>): VictoryBars {
+  return victoryBars(world.maxTurns, barPowers(world), world.scenarioId);
 }
 
 /** Record what `nation` saw at the end of this turn. Mutates `world.intel[nation]`. */

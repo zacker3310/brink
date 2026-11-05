@@ -117,12 +117,14 @@ unaligned; Malawi, too narrow at this scale, lies inside Mozambique's hexes.
 ## The war
 
 - **Turn limit:** 30 by default (`MIDEAST_MAX_TURNS`); the setup screen's lengths apply as everywhere.
-- **Victory bars:** `victoryBars(maxTurns, powers)`. The game's bars were measured on four level
-  powers; a map with more sets `WorldState.barPowers` at build, and the bars come down: domination in
-  proportion (21% of the points for six), supremacy to a fair share plus the four-power margin (21%
+- **Victory bars:** `victoryBars(maxTurns, powers, theatre)`, the one rule every theatre is won by
+  (this theatre's design, adopted for all in ruleset 2.13.0). The game's bars were measured on four
+  level powers; a map with more sets `WorldState.barPowers` at build, and the bars come down: domination
+  in proportion (21% of the points for six), supremacy to a fair share plus the four-power margin (21%
   standing for six), from turn 8. At the four-power bars no match of 20 was decided before the limit
-  (no leader passed 18% standing). Maps of four or fewer powers, the Pacific among them (its crises
-  too), are unchanged.
+  (no leader passed 18% standing); at the rule's, 70%. Maps of four powers, the Pacific (its crises
+  too), are unchanged. Europe, the Indo-Pacific South and the Americas have their own bars
+  (`THEATRE_BARS`); this theatre has none.
 - **Opening Crises:** none. The fourteen crises are written for the Pacific's places and powers, so
   the theatre (`crises: false` on its `THEATRES` entry) opens with the classic war, and the setup
   screen hides the crisis deck; `GameSession.create` refuses a crisis there.
