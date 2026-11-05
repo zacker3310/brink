@@ -9,6 +9,7 @@ import { addUnit, affiliationOf, keepScreenSize, setModelZoom, tickModels, type 
 import { AFFILIATION, FONT_DISPLAY, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay } from './replay';
 import { terrainTexture } from './design/terrain';
+import { FIRST_CONTACT_ID } from '@brink/scenarios';
 import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
 import { sfx } from './sfx';
 import { isPhone } from './phone';
@@ -919,7 +920,7 @@ export function MapView() {
       .sort()
       .map((id) => `${id}${sizeClass(v.sites[id]!)}${v.sites[id]!.facilities.join('')}`)
       .join(',');
-    const sig = `${style}${art ? 1 : 0}|${sites}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
+    const sig = `${style}${art ? 1 : 0}|${sites}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}${v.tiles[k]!.crystal ? 'x' : ''}`).join(',')}`;
     if (groundSig.current === sig) return;
     groundSig.current = sig;
     const layer = a.layers.terrain!;
@@ -974,6 +975,9 @@ export function MapView() {
         crisp.poly(poly(key)).fill({ texture: art!.ground.urban, textureSpace: 'global', matrix: m });
       } else if (satMatrix) terrain.poly(poly(key)).fill({ texture: art!.ground[t.terrain], textureSpace: 'global', matrix: satMatrix });
       else terrain.poly(poly(key)).fill({ texture: terrainTexture(t.terrain), textureSpace: 'global', matrix: groundMatrix });
+      // Black Files: the Antarctic ice under a white wash, and ground the Visitors turned to crystal.
+      if (t.terrain !== 'water' && v.scenarioId === FIRST_CONTACT_ID) terrain.poly(poly(key)).fill({ color: 0xeef5ff, alpha: 0.5 });
+      if (t.crystal) terrain.poly(poly(key)).fill({ color: 0x7df9e4, alpha: 0.32 });
       // Without imagery, vary the light hex to hex as tiles taken at different hours.
       if (!art) {
         const shade = jitter(key, 3);

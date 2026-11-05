@@ -185,6 +185,35 @@ generic leader per government, `LEADER_TUNING`); memory in `WorldState.memories`
   is the answer at resolution.
 - Saves before 2.6 gain `memories: {}` on load (keyed on the field being absent).
 
+## The Black Files (ruleset 2.10)
+
+The secret layer (MASTER-PLAN Phase 8). State: `WorldState.blackFiles` (contracts `blackfiles.ts`);
+data: game-data `blackfiles.ts` (`BLACK_FILES`, the Visitors' units) and the `black` branch of
+`research.ts`; rules: simulation `blackfiles.ts`, phase 10c after development; scenarios
+`blackfiles.ts` (First Contact on `maps/antarctica.map.json`, `applyBlackFiles` for the Pacific).
+Absent from a world, nothing of it runs: the Pacific without the toggle is the 2.9.0 world.
+
+- Digs: an excavation site (`Site.anomaly`) held by a power `digTurns` running yields an artefact
+  (public news). A black site taken seizes one of the loser's artefacts and leaks its programme; a
+  programme also leaks by `roll(seed, turn, 'leak', nation)`; the Black Bag card steals one (thefts
+  settle from one snapshot: two agencies after one artefact both fail and it leaks).
+- The reverse-engineered branch (railguns, point defence, cloaked drones, anti-gravity lift, quantum
+  radar): `checkResearch` asks for a black site and an artefact, the finished project spends one.
+  Rivals see a power's black technologies (`NationView.blackFiles.blackTechs`) only once it leaked.
+- The Visitors: a nation with `minor` and `visitors`, present from turn 1 but dormant (hidden from
+  every view, never eliminated) until `wakeAt` artefacts or `wakeTurn`. Their formations
+  (`FormationClass`: walker, swarm, emitter) are never recruited: incursions grow them, they regrow on
+  their ground, swarms split and re-form, held ground turns to crystal (hills), crystal far from the
+  incursions blooms into new ones. An emitter in a hex absorbs assaults and keeps the hex. Their
+  planner is `ai/src/visitors.ts`; as a minor they make no treaties.
+- The Accord: `propose_accord`, signed when mirrored. Signatories are at peace with each other and
+  share vision; a signatory declaring war on another betrays it (out for good, stability, every other
+  signatory at war with it). Victory (`victory.ts`, checked first): the Visitors destroyed hands the
+  signatories a joint win; the Visitors win holding `visitorsShare` of the victory points, or
+  `limitShare` at the turn limit.
+- The arena has no Visitors of its own: a hand-fought battle fields each as its stand-in
+  (`VISITOR_STAND_IN`, in `apps/web/src/arena/battle.ts`).
+
 ## Rejected alternatives
 
 - A tick per movement point: forces every unit onto one speed grid. The event clock handles mixed speeds.

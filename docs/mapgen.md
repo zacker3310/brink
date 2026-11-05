@@ -19,7 +19,7 @@ that will bake real coastlines into hexes.
 | `layers.seaZone` | Optional. Every sea hex belongs to one zone (the legend maps to zone ids); land maps to `null`. |
 | `layers.biome` | Optional. A hint for the arena and the renderer: sea, ice, tundra, boreal, temperate, steppe, desert, subtropical, tropical or highland. |
 | `nations` | `id`, `name`, `short`, `color`, `government`, `role` (`power` or `minor`) and `capital` (a site id). `terrainBias` is optional and is added to the seeded roughness. A map has 2 to 12 powers. |
-| `sites` | `id`, `kind` (capital, city, depot, objective), `name`, `at: [col, row]` and `owner`. `victoryPoints` is optional and overrides the kind's points. `profile: "outpost"` makes an island depot. |
+| `sites` | `id`, `kind` (capital, city, depot, objective), `name`, `at: [col, row]` and `owner`. `victoryPoints` is optional and overrides the kind's points. `profile: "outpost"` makes an island depot. `anomaly` (Black Files) marks an objective as an `excavation` or a nation's `blacksite`. |
 | `seaZones` | `id` and `name` for each zone the zone layer uses. |
 | `straits` | `id`, `name`, `kind` (strait, canal or land-bridge), `hexes`, and optionally `joins` (the zones it links). |
 | `resources` | `kind` (oil, rare-earths, chips, food), `at` and an optional `name`. |
@@ -70,6 +70,12 @@ authored map format...") wrote the file from the inline grid. The owner layer is
 character for character. The turn-1 world is identical for every seed: `pacific-map.test.ts` pins the
 hashes for seeds 1 to 20. The AI-against-AI soak is also identical, line for line, and the commit
 message records both runs.
+
+**Antarctica** (`maps/antarctica.map.json`, Black Files: First Contact) is drawn by
+`packages/mapgen/src/antarctica.ts` from a polar projection, not baked from coastline data:
+`pnpm --filter @brink/mapgen map:antarctica` writes it, and a test checks the committed file
+byte for byte. Ice shelves are plains, the Transantarctic Mountains mountains, the biome layer ice
+(tundra on Tierra del Fuego).
 
 **The testbed** (`testbed.ts`, `TESTBED_ID = 'testbed-six'`) has six powers and four minor states on
 64 x 32 hexes. `createScenario` builds it, but it is listed in neither `SCENARIOS` nor `THEATRES`, so
