@@ -29,6 +29,7 @@ export function ModeBanner() {
   const mode = useGame((s) => s.mode);
   const resolving = useGame((s) => s.resolving);
   const playback = useGame((s) => s.playback);
+  const lifting = useGame((s) => s.aimingLift);
   const f = fid ? view.formations[fid] : undefined;
   if (playback) return <ReplayBar />;
   if (resolving) {
@@ -40,6 +41,13 @@ export function ModeBanner() {
     );
   }
   if (!f) return null;
+  if (lifting === f.id)
+    return (
+      <div className="pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 border border-friend/70 bg-ink-950/85 px-3 py-1.5 text-xs whitespace-nowrap text-friend backdrop-blur" data-testid="lift-banner">
+        <span className="font-display font-bold tracking-[0.06em] uppercase">Airlift</span>
+        <span className="ml-2 text-muted">Click where to come down: blue clear, amber some risk, red heavy · right-click to cancel</span>
+      </div>
+    );
   const tone = mode === 'attack' ? 'border-hostile/70 text-hostile' : 'border-signal/60 text-signal';
   return (
     <div className={`pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 border bg-ink-950/85 px-3 py-1.5 text-xs whitespace-nowrap backdrop-blur ${tone}`}>
