@@ -16,7 +16,7 @@ const POWERS: [id: string, government: GovernmentId, file: typeof uk][] = [
   ['uk', 'commonwealth', uk],
   ['france', 'federation', france],
   ['germany', 'commonwealth', germany],
-  ['poland', 'union', poland],
+  ['poland', 'federation', poland],
   ['turkey', 'directorate', turkey],
 ];
 

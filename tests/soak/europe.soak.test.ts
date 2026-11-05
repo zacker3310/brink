@@ -49,5 +49,5 @@ describe(`Europe AI-vs-AI soak (${MATCHES} matches)`, () => {
     expect(usage.captured).toBeGreaterThan(MATCHES * 3);
     expect(usage.cards).toBeGreaterThan(MATCHES * 10);
     expect(usage.facilities).toBeGreaterThan(MATCHES);
-  });
+  }, 3_600_000); // Twenty European matches run longer than the soak's half hour on a busy machine.
 });

@@ -267,7 +267,7 @@
       "name": "Poland",
       "short": "Poland",
       "color": "#c75aa6",
-      "government": "union",
+      "government": "federation",
       "role": "power",
       "capital": "poland-capital",
       "terrainBias": -10
@@ -812,43 +812,43 @@
     {
       "id": "germany-city0",
       "kind": "city",
+      "name": "Dresden",
+      "at": [26, 16],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city1",
+      "kind": "city",
       "name": "Frankfurt",
       "at": [22, 17],
       "owner": "germany"
     },
     {
-      "id": "germany-city1",
+      "id": "germany-city2",
       "kind": "city",
       "name": "Munich",
       "at": [23, 18],
       "owner": "germany"
     },
     {
-      "id": "germany-city2",
+      "id": "germany-city3",
       "kind": "city",
       "name": "Hamburg",
       "at": [22, 14],
       "owner": "germany"
     },
     {
-      "id": "germany-city3",
+      "id": "germany-city4",
       "kind": "city",
       "name": "Kiel",
       "at": [24, 14],
       "owner": "germany"
     },
     {
-      "id": "germany-city4",
+      "id": "germany-city5",
       "kind": "city",
       "name": "Cologne",
       "at": [21, 16],
-      "owner": "germany"
-    },
-    {
-      "id": "germany-city5",
-      "kind": "city",
-      "name": "Dresden",
-      "at": [26, 16],
       "owner": "germany"
     },
     {
@@ -903,8 +903,8 @@
     {
       "id": "poland-city4",
       "kind": "city",
-      "name": "Szczecin",
-      "at": [26, 14],
+      "name": "Bydgoszcz",
+      "at": [28, 14],
       "owner": "poland"
     },
     {

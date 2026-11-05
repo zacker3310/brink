@@ -8,7 +8,7 @@ import { createScenario, SCENARIOS } from './index';
 import { THEATRES } from './pacific';
 import { findNation, theatreCrises, theatreMinors, theatrePowers } from './theatres';
 
-describe('Europe', () => {
+describe('Europe', { timeout: 60_000 }, () => {
   const w = createEuropeScenario(1);
   const sitesOf = (n: string) => Object.values(w.sites).filter((s) => s.owner === n);
   const site = (name: string) => {

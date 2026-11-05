@@ -50,6 +50,14 @@ const SETUP: ScenarioSetup = {
     sweden: ['infantry'],
     iran: ['infantry'],
     egypt: ['infantry'],
+    // The states of the central plain hold their capitals in depth, or the nearest power walks
+    // through them all by turn 12 (Poland did, in most soak matches).
+    czechia: ['infantry'],
+    slovakia: ['infantry'],
+    hungary: ['infantry'],
+    belarus: ['infantry'],
+    lithuania: ['infantry'],
+    balkans: ['infantry'],
   } satisfies Record<NationId, UnitClass[]>,
 };
 

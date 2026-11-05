@@ -38,7 +38,7 @@ checks the committed file matches byte for byte.
 | United Kingdom | Commonwealth | London | Portsmouth: carrier, fleet, two transports |
 | France | Federation | Paris | Toulon: carrier, fleet, transport; Brest: fleet, transport |
 | Germany | Commonwealth | Berlin | Kiel: fleet, transport |
-| Poland | Union | Warsaw | Gdańsk: fleet, transport |
+| Poland | Federation | Warsaw | Gdańsk: fleet, transport |
 | Russia | Directorate | Moscow | Kaliningrad, Murmansk (with the carrier), Novorossiysk |
 | Turkey | Directorate | Ankara | Istanbul: fleet, transport; Izmir: carrier, fleet, transport |
 
