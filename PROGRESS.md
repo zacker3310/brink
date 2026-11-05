@@ -25,6 +25,16 @@ Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and 
 
 ## Completed
 
+- The Indo-Pacific South (Phase 6, `docs/indopac.md`): a second theatre, `indopac`, on a 52 x 36
+  map file from Karachi to Wellington. Five powers (India, Pakistan, China, Indonesia, Australia;
+  four new nation files with invented leaders and generals) and fifteen minor states; the Himalaya
+  as fixed mountains; Malacca, Sunda, Lombok, Torres and the Taiwan approaches as straits; the
+  South China Sea's reefs as outposts; Australia reachable only by sea. Setup lists theatres and
+  each theatre's nations; the Pacific's crises are dealt only in the Pacific. AI: a convoy off a
+  shore whose only land in reach is a held city sails for an open beach. Soak, 20 AI-only matches:
+  0 rejected orders, every power captures sites (Australia only by landing), no decisive ending
+  (0%: five powers start near 18% standing against the 29% supremacy bar set for four); on
+  score China 10, Australia 8, Pakistan 2. Phone e2e: `indopac.spec.ts`.
 - Europe, the second theatre (docs/europe.md, Phase 5 first wave). A 56 x 32 map baked from Natural
   Earth and finished by hand (`packages/mapgen/src/europe.ts`): six powers (the United Kingdom,
   France, Germany, Poland, Russia, Turkey), forty minor states, the Channel, the Danish Straits,

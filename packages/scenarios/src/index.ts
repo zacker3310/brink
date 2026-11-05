@@ -3,11 +3,13 @@ import { seedCommanders } from '@brink/simulation';
 import { createEuropeScenario, EUROPE_ID, EUROPE_MAX_TURNS, EUROPE_NATIONS } from './europe';
 import { createMideastScenario, MIDEAST_ID, MIDEAST_MAX_TURNS, MIDEAST_NATIONS } from './mideast';
 import { createPacificScenario, MAX_TURNS, NATIONS, PACIFIC_ID } from './pacific';
+import { createIndoPacScenario, INDOPAC_ID, INDOPAC_MAX_TURNS, INDOPAC_NATIONS } from './indopac';
 import { createTestbedScenario, TESTBED_ID } from './testbed';
 import { createFirstContact, FIRST_CONTACT_ID, FIRST_CONTACT_TURNS } from './blackfiles';
 
 export * from './crises';
 export * from './pacific';
+export * from './indopac';
 export * from './build';
 export * from './testbed';
 export * from './blackfiles';
@@ -52,6 +54,13 @@ export const SCENARIOS: readonly ScenarioInfo[] = [
     nations: MIDEAST_NATIONS.length,
     maxTurns: MIDEAST_MAX_TURNS,
   },
+  {
+    id: INDOPAC_ID,
+    name: 'Indo-Pacific South',
+    summary: 'India, Pakistan, China, Indonesia and Australia fight from the Himalaya to the Tasman Sea, over the straits, reefs and islands between two oceans.',
+    nations: INDOPAC_NATIONS.length,
+    maxTurns: INDOPAC_MAX_TURNS,
+  },
 ];
 
 export function createScenario(id: string, seed: number): WorldState {
@@ -60,6 +69,7 @@ export function createScenario(id: string, seed: number): WorldState {
   if (id === PACIFIC_ID) return seedCommanders(createPacificScenario(seed));
   if (id === EUROPE_ID) return seedCommanders(createEuropeScenario(seed));
   if (id === MIDEAST_ID) return seedCommanders(createMideastScenario(seed));
+  if (id === INDOPAC_ID) return seedCommanders(createIndoPacScenario(seed));
   // The world-engine testbed: playable by the engine and the AI, never listed for a player.
   if (id === TESTBED_ID) return seedCommanders(createTestbedScenario(seed));
   throw new Error(`unknown scenario: ${id}`);

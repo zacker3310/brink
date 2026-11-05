@@ -1,0 +1,1224 @@
+{
+  "format": "brink-map",
+  "version": 1,
+  "id": "indopac",
+  "name": "Indo-Pacific South",
+  "cols": 52,
+  "rows": 36,
+  "layout": "odd-r",
+  "source": "Hand-traced lon/lat outlines (61E-179.5E, 37.5N-47S) rasterised to hexes, then hand-finished: islands widened past real scale, narrows kept as one sea hex. No external data.",
+  "layers": {
+    "owner": {
+      "legend": {
+        ".": null,
+        "A": "australia",
+        "B": "bangladesh",
+        "C": "china",
+        "D": "indonesia",
+        "F": "afghanistan",
+        "G": "png",
+        "H": "thailand",
+        "I": "india",
+        "K": "cambodia",
+        "L": "srilanka",
+        "M": "myanmar",
+        "N": "nepal",
+        "O": "laos",
+        "P": "pakistan",
+        "S": "singapore",
+        "T": "taiwan",
+        "V": "vietnam",
+        "X": "philippines",
+        "Y": "malaysia",
+        "Z": "newzealand"
+      },
+      "rows": [
+        "FFFFFPPCCCCCCCCCCCCCCCCCCCC.........................",
+        "FFFPPPIICCCCCCCCCCCCCCCCCC..........................",
+        "FFFFPPIICCCCCCCCCCCCCCCCCCC.........................",
+        "PPPPPIIINNNCCCCCCCCCCCCCCCC.........................",
+        "PPPPIIIIIIIIIIIIMCCCCCCCCC..........................",
+        "..PPIIIIIIIIBIMMCCCCCCCCC.T.........................",
+        "...IIIIIIIIIBBMMMCVVCCCC..TT........................",
+        "....IIIIIII..MMMHOOV.C..............................",
+        ".....IIIII....MMHHOOV.....X.........................",
+        ".....III.......MHHHOV.C..XX.........................",
+        "......III.......MHKKVV....XX........................",
+        "......II.....I..H.KV..C.X.X.........................",
+        ".......I.L......HH...V......X.......................",
+        "........L........Y.....YY...X.......................",
+        "...............D.YYY..YYY...........................",
+        "...............D..S..YDDD.DD.D......................",
+        "................DD...DDDD.D....DD...................",
+        ".................DD......DD..D.DDDDGG...............",
+        "....................DDDD..........DGGG..............",
+        "....................DDD.DD........DG.G..............",
+        "...................A.......DD.......................",
+        "..............................AAA..A................",
+        "............................AAAAA..AA...............",
+        "..........................AAAAAAAAAAAA..............",
+        "........................AAAAAAAAAAAAAAA.............",
+        ".......................AAAAAAAAAAAAAAAA.............",
+        ".......................AAAAAAAAAAAAAAAAAA...........",
+        ".......................AAAAAAAAAAAAAAAAAA...........",
+        "........................AAAAAAAAAAAAAAAAA...........",
+        ".......................AAAAAAAAAAAAAAAAA............",
+        "........................AAAA.....AAAAAAA.........Z..",
+        "..................................AAAAA..........ZZ.",
+        "...................................AAA............Z.",
+        "................................................Z.Z.",
+        ".....................................AA.........ZZ..",
+        "...............................................ZZ..."
+      ]
+    },
+    "terrain": {
+      "legend": {
+        "~": "water",
+        "*": "seeded",
+        "f": "forest",
+        "m": "mountains"
+      },
+      "rows": [
+        "***mm*mm*mmmm**************~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "*****m*mmmmmmm************~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "*******mmmmmmmmm***********~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "********mm*m*mmmm**********~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "**************mmm*********~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~***********************~*~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~***********f*f*******~~**~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~*******~~****f**~*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~*****~~~~*******~~~~~*~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~***~~~~~~~****f*~*~~**~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~***~~~~~~~**f*f*~~~~**~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~**~~~~~*~~*~**~~*~*~*~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~*~*~~~~~~**~~~*~~~~~~*~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~*~~~~~~~~*~~~~~**~~~*~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~*~***~~**f~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~f~~*~~*fff~**~*~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~ff~~~*ff*~f~~~~ff~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~f*~~~~~~*f~~*~fff*ff~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~****~~~~~~~~~~ff*f~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~***~f*~~~~~~~~*f~*~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~*~~~~~~~**~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~***~~*~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~*****~~**~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~************~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~***************~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~****************~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~******************~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~******************~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~*****************~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~*****************~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~****~~~~~*******~~~~~~~~~*~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*****~~~~~~~~~~**~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~***~~~~~~~~~~~~*~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*~*~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~**~~~~~~~~~**~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~**~~~"
+      ]
+    },
+    "seaZone": {
+      "legend": {
+        "-": null,
+        "a": "arabian-sea",
+        "b": "bay-of-bengal",
+        "c": "andaman-sea",
+        "d": "south-china-sea",
+        "e": "east-china-sea",
+        "f": "philippine-sea",
+        "g": "celebes-banda",
+        "h": "java-sea",
+        "i": "indian-ocean",
+        "j": "timor-arafura",
+        "k": "coral-sea",
+        "l": "southern-ocean",
+        "m": "tasman-sea",
+        "n": "south-pacific"
+      },
+      "rows": [
+        "---------------------------eefffffffffffffffffffffff",
+        "--------------------------eeefffffffffffffffffffffff",
+        "---------------------------eefffffffffffffffffffffff",
+        "---------------------------eefffffffffffffffffffffff",
+        "--------------------------eeefffffffffffffffffffffff",
+        "ee-----------------------e-eefffffffffffffffffffffff",
+        "aaa---------------------dd--ffffffffffffffffffffffff",
+        "aaaa-------bb-------d-ddddffffffffffffffffffffffffff",
+        "aaaaa-----bbbb-------ddddd-fffffffffffffffffffffffff",
+        "aaaaa---bbbbbbc------d-dd--fffffffffffffffffffffffff",
+        "aaaaaa---bbbbbcc------dddd--ffffffffffffffffffffffff",
+        "aaaaaa--bbbbb-cc-d--dd-d-d-fffffffffffffffffffffffff",
+        "aaaaaaa-b-bbbbcc--ddd-dddggg-fffffffffffffffffffffff",
+        "aaaaaaab-bbbbbccc-ddddd--ggg-fffffffffffffffffffffff",
+        "aaaaaaabbbbbbbc-c---dd---gggffffffffffffffffffffffff",
+        "iiiiiiiiiiiiiii-dd-dd----g--g-gfffffffkkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiii--ddd----g-gggg--fffffkkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiii--hhhhhh--gg-g------fkkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiiiiih----hggggggjjj----kkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiiiiii---h--jjjjjjjj--k-kkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiiiii-iiiijjj--jjjjjjkkkkkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiiiiiiiiiiiijjjj---jj-kkkkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiiiiiiiiiiiijj-----jj--kkkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiiiiiiiiiiii------------kkkkkkkkkkkkkk",
+        "iiiiiiiiiiiiiiiiiiiiiiii---------------kkkkkkkkkkknn",
+        "iiiiiiiiiiiiiiiiiiiiiii----------------kkkkkkkkkkknn",
+        "iiiiiiiiiiiiiiiiiiiiiii------------------kkkkkkkkknn",
+        "iiiiiiiiiiiiiiiiiiiiiii------------------kkkkkkkkknn",
+        "iiiiiiiiiiiiiiiiiiiiiiii-----------------mmmmmmmmmnn",
+        "iiiiiiiiiiiiiiiiiiiiiii-----------------mmmmmmmmmmnn",
+        "llllllllllllllllllllllll----lllll-------mmmmmmmmm-nn",
+        "llllllllllllllllllllllllllllllllll-----mmmmmmmmmm--n",
+        "lllllllllllllllllllllllllllllllllll---mmmmmmmmmmmm-n",
+        "llllllllllllllllllllllllllllllllllllllmmmmmmmmmm-m-n",
+        "lllllllllllllllllllllllllllllllllllll--mmmmmmmmm--nn",
+        "llllllllllllllllllllllllllllllllllllllmmmmmmmmm--mnn"
+      ]
+    },
+    "biome": {
+      "legend": {
+        "~": "sea",
+        "m": "temperate",
+        "s": "steppe",
+        "d": "desert",
+        "u": "subtropical",
+        "r": "tropical",
+        "h": "highland"
+      },
+      "rows": [
+        "hhhhhhhhhhhhhhhhhhmmmmmmmmm~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "hhhsshhhhhhhhhhhhhmmmmmmmm~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "hhhhssuhhhhhhhhhhhmmmmmmmmm~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "dddddduuhhhhhhhhhhmmmmmmmmm~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "dddddduuuuuuuuhhhuuuuuuuuu~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~dddduuuuuuuuuuuuuuuuuuu~u~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~uuuuuuuuurrrrrurruuuu~~uu~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~rrrrrrr~~rrrrrrr~u~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~rrrrr~~~~rrrrrrr~~~~~r~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~rrr~~~~~~~rrrrrr~u~~rr~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~rrr~~~~~~~rrrrrr~~~~rr~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~rr~~~~~r~~r~rr~~u~r~r~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~r~r~~~~~~rr~~~r~~~~~~r~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~r~~~~~~~~r~~~~~rr~~~r~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~r~rrr~~rrr~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~r~~r~~rrrr~rr~r~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~rr~~~rrrr~r~~~~rr~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~rr~~~~~~rr~~r~rrrrrr~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~rrrr~~~~~~~~~~rrrr~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~rrr~rr~~~~~~~~rr~r~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~r~~~~~~~rr~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~rrr~~r~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~rrrrr~~rr~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~rrrrrrrrrrrr~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~ssdddddddddddsu~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~sssdddddddddddsu~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~sssdddddddddddsuuu~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~sssdddddddddddsuuu~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~ssdddddddddddsuuu~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~mmmdddddddddddsuu~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~mmmm~~~~~mmmmmmm~~~~~~~~~m~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~mmmmm~~~~~~~~~~mm~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~mmm~~~~~~~~~~~~m~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~m~m~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~mm~~~~~~~~~mm~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~mm~~~"
+      ]
+    }
+  },
+  "nations": [
+    {
+      "id": "india",
+      "name": "India",
+      "short": "India",
+      "color": "#e8743b",
+      "government": "federation",
+      "role": "power",
+      "capital": "india-capital"
+    },
+    {
+      "id": "pakistan",
+      "name": "Pakistan",
+      "short": "Pakistan",
+      "color": "#2f9e5a",
+      "government": "directorate",
+      "role": "power",
+      "capital": "pakistan-capital",
+      "terrainBias": 15
+    },
+    {
+      "id": "china",
+      "name": "China",
+      "short": "China",
+      "color": "#e0b43c",
+      "government": "union",
+      "role": "power",
+      "capital": "china-capital"
+    },
+    {
+      "id": "indonesia",
+      "name": "Indonesia",
+      "short": "Indonesia",
+      "color": "#d23c3c",
+      "government": "union",
+      "role": "power",
+      "capital": "indonesia-capital",
+      "terrainBias": 25
+    },
+    {
+      "id": "australia",
+      "name": "Australia",
+      "short": "Australia",
+      "color": "#3d7fd6",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "australia-capital",
+      "terrainBias": -30
+    },
+    {
+      "id": "afghanistan",
+      "name": "Afghanistan",
+      "short": "Afghan.",
+      "color": "#9c8458",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "afghanistan-capital",
+      "terrainBias": 45
+    },
+    {
+      "id": "nepal",
+      "name": "Nepal",
+      "short": "Nepal",
+      "color": "#8f6fb0",
+      "government": "federation",
+      "role": "minor",
+      "capital": "nepal-capital",
+      "terrainBias": 60
+    },
+    {
+      "id": "bangladesh",
+      "name": "Bangladesh",
+      "short": "Bangla.",
+      "color": "#5f9e8f",
+      "government": "federation",
+      "role": "minor",
+      "capital": "bangladesh-capital",
+      "terrainBias": -20
+    },
+    {
+      "id": "srilanka",
+      "name": "Sri Lanka",
+      "short": "Sri Lanka",
+      "color": "#a35d9e",
+      "government": "federation",
+      "role": "minor",
+      "capital": "srilanka-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "myanmar",
+      "name": "Myanmar",
+      "short": "Myanmar",
+      "color": "#7f9f3a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "myanmar-capital",
+      "terrainBias": 35
+    },
+    {
+      "id": "thailand",
+      "name": "Thailand",
+      "short": "Thailand",
+      "color": "#5a6fbf",
+      "government": "federation",
+      "role": "minor",
+      "capital": "thailand-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "laos",
+      "name": "Laos",
+      "short": "Laos",
+      "color": "#c49a52",
+      "government": "union",
+      "role": "minor",
+      "capital": "laos-capital",
+      "terrainBias": 45
+    },
+    {
+      "id": "cambodia",
+      "name": "Cambodia",
+      "short": "Cambodia",
+      "color": "#6e5aa8",
+      "government": "union",
+      "role": "minor",
+      "capital": "cambodia-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "vietnam",
+      "name": "Vietnam",
+      "short": "Vietnam",
+      "color": "#b4486e",
+      "government": "union",
+      "role": "minor",
+      "capital": "vietnam-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "malaysia",
+      "name": "Malaysia",
+      "short": "Malaysia",
+      "color": "#3fa7b5",
+      "government": "federation",
+      "role": "minor",
+      "capital": "malaysia-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "singapore",
+      "name": "Singapore",
+      "short": "Singapore",
+      "color": "#e06fa0",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "singapore-capital"
+    },
+    {
+      "id": "philippines",
+      "name": "Philippines",
+      "short": "Phil.",
+      "color": "#4fb3d9",
+      "government": "federation",
+      "role": "minor",
+      "capital": "philippines-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "png",
+      "name": "Papua New Guinea",
+      "short": "PNG",
+      "color": "#a8744a",
+      "government": "federation",
+      "role": "minor",
+      "capital": "png-capital",
+      "terrainBias": 50
+    },
+    {
+      "id": "newzealand",
+      "name": "New Zealand",
+      "short": "N. Zealand",
+      "color": "#bfc6cc",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "newzealand-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "taiwan",
+      "name": "Taiwan",
+      "short": "Taiwan",
+      "color": "#c97ab0",
+      "government": "federation",
+      "role": "minor",
+      "capital": "taiwan-capital",
+      "terrainBias": 40
+    }
+  ],
+  "sites": [
+    {
+      "id": "india-capital",
+      "kind": "capital",
+      "name": "New Delhi",
+      "at": [6, 3],
+      "owner": "india"
+    },
+    {
+      "id": "india-city0",
+      "kind": "city",
+      "name": "Amritsar",
+      "at": [6, 2],
+      "owner": "india"
+    },
+    {
+      "id": "india-city1",
+      "kind": "city",
+      "name": "Mumbai",
+      "at": [4, 7],
+      "owner": "india"
+    },
+    {
+      "id": "india-city2",
+      "kind": "city",
+      "name": "Kolkata",
+      "at": [11, 6],
+      "owner": "india"
+    },
+    {
+      "id": "india-city3",
+      "kind": "city",
+      "name": "Chennai",
+      "at": [8, 10],
+      "owner": "india"
+    },
+    {
+      "id": "india-city4",
+      "kind": "city",
+      "name": "Hyderabad",
+      "at": [7, 8],
+      "owner": "india"
+    },
+    {
+      "id": "india-depot0",
+      "kind": "depot",
+      "name": "Leh",
+      "at": [6, 1],
+      "owner": "india"
+    },
+    {
+      "id": "india-depot1",
+      "kind": "depot",
+      "name": "Port Blair",
+      "at": [13, 11],
+      "owner": "india",
+      "profile": "outpost"
+    },
+    {
+      "id": "pakistan-capital",
+      "kind": "capital",
+      "name": "Islamabad",
+      "at": [4, 1],
+      "owner": "pakistan"
+    },
+    {
+      "id": "pakistan-city0",
+      "kind": "city",
+      "name": "Lahore",
+      "at": [5, 2],
+      "owner": "pakistan"
+    },
+    {
+      "id": "pakistan-city1",
+      "kind": "city",
+      "name": "Karachi",
+      "at": [2, 5],
+      "owner": "pakistan"
+    },
+    {
+      "id": "pakistan-city2",
+      "kind": "city",
+      "name": "Quetta",
+      "at": [2, 3],
+      "owner": "pakistan"
+    },
+    {
+      "id": "pakistan-city3",
+      "kind": "city",
+      "name": "Multan",
+      "at": [4, 3],
+      "owner": "pakistan"
+    },
+    {
+      "id": "pakistan-depot0",
+      "kind": "depot",
+      "name": "Gilgit",
+      "at": [5, 0],
+      "owner": "pakistan"
+    },
+    {
+      "id": "pakistan-depot1",
+      "kind": "depot",
+      "name": "Gwadar",
+      "at": [0, 4],
+      "owner": "pakistan"
+    },
+    {
+      "id": "china-capital",
+      "kind": "capital",
+      "name": "Beijing",
+      "at": [24, 0],
+      "owner": "china"
+    },
+    {
+      "id": "china-city0",
+      "kind": "city",
+      "name": "Guangzhou",
+      "at": [22, 6],
+      "owner": "china"
+    },
+    {
+      "id": "china-city1",
+      "kind": "city",
+      "name": "Kunming",
+      "at": [17, 5],
+      "owner": "china"
+    },
+    {
+      "id": "china-city2",
+      "kind": "city",
+      "name": "Shanghai",
+      "at": [26, 2],
+      "owner": "china"
+    },
+    {
+      "id": "china-city3",
+      "kind": "city",
+      "name": "Chengdu",
+      "at": [18, 3],
+      "owner": "china"
+    },
+    {
+      "id": "china-city4",
+      "kind": "city",
+      "name": "Xiamen",
+      "at": [24, 5],
+      "owner": "china"
+    },
+    {
+      "id": "china-depot0",
+      "kind": "depot",
+      "name": "Lhasa",
+      "at": [12, 3],
+      "owner": "china"
+    },
+    {
+      "id": "china-depot1",
+      "kind": "depot",
+      "name": "Hotan",
+      "at": [8, 0],
+      "owner": "china"
+    },
+    {
+      "id": "china-depot2",
+      "kind": "depot",
+      "name": "Woody Island",
+      "at": [22, 9],
+      "owner": "china",
+      "profile": "outpost"
+    },
+    {
+      "id": "china-depot3",
+      "kind": "depot",
+      "name": "Fiery Cross Reef",
+      "at": [22, 11],
+      "owner": "china",
+      "profile": "outpost"
+    },
+    {
+      "id": "indonesia-capital",
+      "kind": "capital",
+      "name": "Jakarta",
+      "at": [20, 18],
+      "owner": "indonesia"
+    },
+    {
+      "id": "indonesia-city0",
+      "kind": "city",
+      "name": "Pontianak",
+      "at": [21, 16],
+      "owner": "indonesia"
+    },
+    {
+      "id": "indonesia-city1",
+      "kind": "city",
+      "name": "Medan",
+      "at": [15, 14],
+      "owner": "indonesia"
+    },
+    {
+      "id": "indonesia-city2",
+      "kind": "city",
+      "name": "Surabaya",
+      "at": [23, 18],
+      "owner": "indonesia"
+    },
+    {
+      "id": "indonesia-city3",
+      "kind": "city",
+      "name": "Makassar",
+      "at": [25, 17],
+      "owner": "indonesia"
+    },
+    {
+      "id": "indonesia-depot0",
+      "kind": "depot",
+      "name": "Jayapura",
+      "at": [34, 17],
+      "owner": "indonesia"
+    },
+    {
+      "id": "indonesia-depot1",
+      "kind": "depot",
+      "name": "Kupang",
+      "at": [27, 20],
+      "owner": "indonesia",
+      "profile": "outpost"
+    },
+    {
+      "id": "indonesia-depot2",
+      "kind": "depot",
+      "name": "Ambon",
+      "at": [29, 17],
+      "owner": "indonesia",
+      "profile": "outpost"
+    },
+    {
+      "id": "australia-capital",
+      "kind": "capital",
+      "name": "Canberra",
+      "at": [38, 31],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-city0",
+      "kind": "city",
+      "name": "Darwin",
+      "at": [30, 21],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-city1",
+      "kind": "city",
+      "name": "Brisbane",
+      "at": [40, 27],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-city2",
+      "kind": "city",
+      "name": "Sydney",
+      "at": [39, 30],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-city3",
+      "kind": "city",
+      "name": "Perth",
+      "at": [23, 29],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-city4",
+      "kind": "city",
+      "name": "Melbourne",
+      "at": [37, 32],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-depot0",
+      "kind": "depot",
+      "name": "Townsville",
+      "at": [37, 23],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-depot1",
+      "kind": "depot",
+      "name": "Alice Springs",
+      "at": [32, 26],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-depot2",
+      "kind": "depot",
+      "name": "Hobart",
+      "at": [38, 34],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-depot3",
+      "kind": "depot",
+      "name": "Christmas Island",
+      "at": [19, 20],
+      "owner": "australia",
+      "profile": "outpost"
+    },
+    {
+      "id": "afghanistan-capital",
+      "kind": "capital",
+      "name": "Kabul",
+      "at": [2, 1],
+      "owner": "afghanistan"
+    },
+    {
+      "id": "afghanistan-city0",
+      "kind": "city",
+      "name": "Kandahar",
+      "at": [1, 2],
+      "owner": "afghanistan"
+    },
+    {
+      "id": "nepal-capital",
+      "kind": "capital",
+      "name": "Kathmandu",
+      "at": [10, 3],
+      "owner": "nepal"
+    },
+    {
+      "id": "bangladesh-capital",
+      "kind": "capital",
+      "name": "Dhaka",
+      "at": [12, 5],
+      "owner": "bangladesh",
+      "victoryPoints": 7
+    },
+    {
+      "id": "bangladesh-city0",
+      "kind": "city",
+      "name": "Chittagong",
+      "at": [13, 6],
+      "owner": "bangladesh"
+    },
+    {
+      "id": "srilanka-capital",
+      "kind": "capital",
+      "name": "Colombo",
+      "at": [8, 13],
+      "owner": "srilanka"
+    },
+    {
+      "id": "myanmar-capital",
+      "kind": "capital",
+      "name": "Naypyidaw",
+      "at": [14, 7],
+      "owner": "myanmar"
+    },
+    {
+      "id": "myanmar-city0",
+      "kind": "city",
+      "name": "Yangon",
+      "at": [15, 8],
+      "owner": "myanmar"
+    },
+    {
+      "id": "myanmar-city1",
+      "kind": "city",
+      "name": "Myitkyina",
+      "at": [15, 5],
+      "owner": "myanmar"
+    },
+    {
+      "id": "thailand-capital",
+      "kind": "capital",
+      "name": "Bangkok",
+      "at": [17, 10],
+      "owner": "thailand",
+      "victoryPoints": 7
+    },
+    {
+      "id": "thailand-city0",
+      "kind": "city",
+      "name": "Chiang Mai",
+      "at": [16, 8],
+      "owner": "thailand"
+    },
+    {
+      "id": "thailand-city1",
+      "kind": "city",
+      "name": "Hat Yai",
+      "at": [17, 12],
+      "owner": "thailand"
+    },
+    {
+      "id": "laos-capital",
+      "kind": "capital",
+      "name": "Vientiane",
+      "at": [18, 8],
+      "owner": "laos"
+    },
+    {
+      "id": "cambodia-capital",
+      "kind": "capital",
+      "name": "Phnom Penh",
+      "at": [19, 10],
+      "owner": "cambodia"
+    },
+    {
+      "id": "vietnam-capital",
+      "kind": "capital",
+      "name": "Hanoi",
+      "at": [19, 7],
+      "owner": "vietnam",
+      "victoryPoints": 8
+    },
+    {
+      "id": "vietnam-city0",
+      "kind": "city",
+      "name": "Da Nang",
+      "at": [20, 9],
+      "owner": "vietnam"
+    },
+    {
+      "id": "vietnam-city1",
+      "kind": "city",
+      "name": "Ho Chi Minh City",
+      "at": [19, 11],
+      "owner": "vietnam"
+    },
+    {
+      "id": "vietnam-depot0",
+      "kind": "depot",
+      "name": "Truong Sa",
+      "at": [21, 12],
+      "owner": "vietnam",
+      "profile": "outpost"
+    },
+    {
+      "id": "malaysia-capital",
+      "kind": "capital",
+      "name": "Kuala Lumpur",
+      "at": [18, 14],
+      "owner": "malaysia",
+      "victoryPoints": 7
+    },
+    {
+      "id": "malaysia-city0",
+      "kind": "city",
+      "name": "George Town",
+      "at": [17, 13],
+      "owner": "malaysia"
+    },
+    {
+      "id": "malaysia-city1",
+      "kind": "city",
+      "name": "Kuching",
+      "at": [21, 15],
+      "owner": "malaysia"
+    },
+    {
+      "id": "malaysia-city2",
+      "kind": "city",
+      "name": "Kota Kinabalu",
+      "at": [23, 13],
+      "owner": "malaysia"
+    },
+    {
+      "id": "singapore-capital",
+      "kind": "capital",
+      "name": "Singapore",
+      "at": [18, 15],
+      "owner": "singapore",
+      "victoryPoints": 9
+    },
+    {
+      "id": "philippines-capital",
+      "kind": "capital",
+      "name": "Manila",
+      "at": [25, 9],
+      "owner": "philippines",
+      "victoryPoints": 8
+    },
+    {
+      "id": "philippines-city0",
+      "kind": "city",
+      "name": "Cebu",
+      "at": [26, 11],
+      "owner": "philippines"
+    },
+    {
+      "id": "philippines-city1",
+      "kind": "city",
+      "name": "Davao",
+      "at": [28, 12],
+      "owner": "philippines"
+    },
+    {
+      "id": "png-capital",
+      "kind": "capital",
+      "name": "Port Moresby",
+      "at": [37, 19],
+      "owner": "png"
+    },
+    {
+      "id": "png-city0",
+      "kind": "city",
+      "name": "Mount Hagen",
+      "at": [36, 18],
+      "owner": "png"
+    },
+    {
+      "id": "newzealand-capital",
+      "kind": "capital",
+      "name": "Wellington",
+      "at": [50, 33],
+      "owner": "newzealand",
+      "victoryPoints": 7
+    },
+    {
+      "id": "newzealand-city0",
+      "kind": "city",
+      "name": "Auckland",
+      "at": [49, 31],
+      "owner": "newzealand"
+    },
+    {
+      "id": "newzealand-city1",
+      "kind": "city",
+      "name": "Christchurch",
+      "at": [49, 34],
+      "owner": "newzealand"
+    },
+    {
+      "id": "taiwan-capital",
+      "kind": "capital",
+      "name": "Taipei",
+      "at": [26, 5],
+      "owner": "taiwan",
+      "victoryPoints": 9
+    },
+    {
+      "id": "taiwan-city0",
+      "kind": "city",
+      "name": "Kaohsiung",
+      "at": [26, 6],
+      "owner": "taiwan"
+    }
+  ],
+  "seaZones": [
+    {
+      "id": "arabian-sea",
+      "name": "Arabian Sea"
+    },
+    {
+      "id": "bay-of-bengal",
+      "name": "Bay of Bengal"
+    },
+    {
+      "id": "andaman-sea",
+      "name": "Andaman Sea"
+    },
+    {
+      "id": "south-china-sea",
+      "name": "South China Sea"
+    },
+    {
+      "id": "east-china-sea",
+      "name": "East China Sea"
+    },
+    {
+      "id": "philippine-sea",
+      "name": "Philippine Sea and the Western Pacific"
+    },
+    {
+      "id": "celebes-banda",
+      "name": "Celebes and Banda Seas"
+    },
+    {
+      "id": "java-sea",
+      "name": "Java Sea"
+    },
+    {
+      "id": "indian-ocean",
+      "name": "Indian Ocean"
+    },
+    {
+      "id": "timor-arafura",
+      "name": "Timor and Arafura Seas"
+    },
+    {
+      "id": "coral-sea",
+      "name": "Coral Sea"
+    },
+    {
+      "id": "southern-ocean",
+      "name": "Southern Ocean"
+    },
+    {
+      "id": "tasman-sea",
+      "name": "Tasman Sea"
+    },
+    {
+      "id": "south-pacific",
+      "name": "South Pacific"
+    }
+  ],
+  "straits": [
+    {
+      "id": "malacca",
+      "name": "Strait of Malacca",
+      "kind": "strait",
+      "hexes": [
+        [16, 14],
+        [16, 15],
+        [17, 15]
+      ],
+      "joins": [
+        "andaman-sea",
+        "south-china-sea"
+      ]
+    },
+    {
+      "id": "sunda",
+      "name": "Sunda Strait",
+      "kind": "strait",
+      "hexes": [
+        [19, 18]
+      ],
+      "joins": [
+        "java-sea",
+        "indian-ocean"
+      ]
+    },
+    {
+      "id": "lombok",
+      "name": "Lombok Strait",
+      "kind": "strait",
+      "hexes": [
+        [23, 19]
+      ],
+      "joins": [
+        "java-sea",
+        "indian-ocean"
+      ]
+    },
+    {
+      "id": "makassar",
+      "name": "Makassar Strait",
+      "kind": "strait",
+      "hexes": [
+        [25, 16]
+      ],
+      "joins": [
+        "celebes-banda",
+        "java-sea"
+      ]
+    },
+    {
+      "id": "taiwan-strait",
+      "name": "Taiwan Strait",
+      "kind": "strait",
+      "hexes": [
+        [25, 5],
+        [25, 6]
+      ],
+      "joins": [
+        "east-china-sea",
+        "south-china-sea"
+      ]
+    },
+    {
+      "id": "luzon-strait",
+      "name": "Luzon Strait",
+      "kind": "strait",
+      "hexes": [
+        [26, 7],
+        [27, 7]
+      ],
+      "joins": [
+        "south-china-sea",
+        "philippine-sea"
+      ]
+    },
+    {
+      "id": "palk",
+      "name": "Palk Strait",
+      "kind": "strait",
+      "hexes": [
+        [8, 12]
+      ]
+    },
+    {
+      "id": "torres",
+      "name": "Torres Strait",
+      "kind": "strait",
+      "hexes": [
+        [35, 20],
+        [36, 20]
+      ],
+      "joins": [
+        "timor-arafura",
+        "coral-sea"
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass Strait",
+      "kind": "strait",
+      "hexes": [
+        [36, 33],
+        [37, 33]
+      ],
+      "joins": [
+        "southern-ocean",
+        "tasman-sea"
+      ]
+    },
+    {
+      "id": "cook",
+      "name": "Cook Strait",
+      "kind": "strait",
+      "hexes": [
+        [49, 33]
+      ],
+      "joins": [
+        "tasman-sea",
+        "south-pacific"
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "kind": "oil",
+      "at": [17, 17],
+      "name": "Sumatran fields"
+    },
+    {
+      "kind": "oil",
+      "at": [24, 13],
+      "name": "Sabah fields"
+    },
+    {
+      "kind": "oil",
+      "at": [25, 24],
+      "name": "North West Shelf"
+    },
+    {
+      "kind": "oil",
+      "at": [0, 3],
+      "name": "Balochistan gas"
+    },
+    {
+      "kind": "rare-earths",
+      "at": [14, 5],
+      "name": "Kachin mines"
+    },
+    {
+      "kind": "rare-earths",
+      "at": [27, 28],
+      "name": "Mount Weld"
+    },
+    {
+      "kind": "chips",
+      "at": [27, 6],
+      "name": "Hsinchu"
+    },
+    {
+      "kind": "chips",
+      "at": [7, 9],
+      "name": "Bengaluru"
+    },
+    {
+      "kind": "chips",
+      "at": [18, 15],
+      "name": "Singapore fabs"
+    },
+    {
+      "kind": "food",
+      "at": [5, 3],
+      "name": "The Punjab"
+    },
+    {
+      "kind": "food",
+      "at": [17, 9],
+      "name": "The Chao Phraya rice bowl"
+    },
+    {
+      "kind": "food",
+      "at": [22, 19],
+      "name": "Java rice terraces"
+    },
+    {
+      "kind": "food",
+      "at": [35, 30],
+      "name": "Murray-Darling Basin"
+    }
+  ]
+}

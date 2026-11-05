@@ -2,6 +2,7 @@ import type { NationId } from '@brink/contracts';
 import type { NationSpec } from './build';
 import { CRISES, type Crisis } from './crises';
 import { EUROPE_ID, EUROPE_MINORS, EUROPE_NATIONS } from './europe';
+import { INDOPAC_ID, INDOPAC_MINORS, INDOPAC_NATIONS } from './indopac';
 import { MIDEAST_ID, MIDEAST_MINORS, MIDEAST_NATIONS } from './mideast';
 import { MINORS, NATIONS, PACIFIC_ID } from './pacific';
 
@@ -20,6 +21,7 @@ export const THEATRE_CAST: Readonly<Record<string, TheatreCast>> = {
   [PACIFIC_ID]: { powers: NATIONS, minors: MINORS, crises: CRISES },
   [EUROPE_ID]: { powers: EUROPE_NATIONS, minors: EUROPE_MINORS, crises: [] },
   [MIDEAST_ID]: { powers: MIDEAST_NATIONS, minors: MIDEAST_MINORS, crises: [] },
+  [INDOPAC_ID]: { powers: INDOPAC_NATIONS, minors: INDOPAC_MINORS, crises: [] },
 };
 
 const castOf = (theatre: string): TheatreCast => THEATRE_CAST[theatre] ?? THEATRE_CAST[PACIFIC_ID]!;

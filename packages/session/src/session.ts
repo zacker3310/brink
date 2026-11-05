@@ -275,6 +275,10 @@ const ALLY: Record<NationId, readonly NationId[]> = {
   germany: ['poland'],
   poland: ['germany'],
   turkey: ['russia'],
+  // The Indo-Pacific South: India and Australia; Pakistan and China. Indonesia stands alone.
+  india: ['australia'],
+  australia: ['india'],
+  pakistan: ['china'],
 };
 
 function allyOf(world: WorldState, me: NationId): NationId | undefined {

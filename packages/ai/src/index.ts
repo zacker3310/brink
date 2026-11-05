@@ -1049,6 +1049,11 @@ function planSea(
   // Off the beach, in a sea hex no ship at peace with us lies in (it would stop ours dead).
   const bar = barred(view);
   const offshore = beach ? (neighborKeys(beach).filter(isWater).sort((a, b) => Number(bar.has(a)) - Number(bar.has(b)) || (a < b ? -1 : 1))[0] ?? null) : null;
+  // The open beach nearest the goal (ground beside the city, not the city), and the sea off it: where
+  // a convoy goes when the only shore it lies off is held. (Off Jakarta in the Sunda Strait the
+  // only land in reach was the capital itself, and the transports waited there for twenty turns.)
+  const openBeach = beaches.find((k) => !held(k)) ?? null;
+  const offOpen = openBeach ? (neighborKeys(openBeach).filter(isWater).sort((a, b) => Number(bar.has(a)) - Number(bar.has(b)) || (a < b ? -1 : 1))[0] ?? null) : null;
 
   // Hexes next to an enemy ship: a ship that sails into one is stopped there (contact).
   const screened = new Set(avoid);
@@ -1112,6 +1117,10 @@ function planSea(
     const worth = storm ? (previewAssault(view, aboard.map((x) => x.id), storm)?.share[0] ?? 0) >= 450 : false;
     if (shore.length > 0 && !open && !worth && offshore && offshore !== t.key) {
       sail(t, offshore);
+      continue;
+    }
+    if (shore.length > 0 && !open && !worth && offOpen && offOpen !== t.key) {
+      sail(t, offOpen);
       continue;
     }
     if (shore.length > 0) {

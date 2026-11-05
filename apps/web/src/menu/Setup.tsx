@@ -90,6 +90,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const crisis = crisisPick === 'none' || CRISES.length === 0 ? CLASSIC : crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
   /** The next crisis in the deck from this one: a fresh deal that never repeats the current one. */
   const dealAnother = () => {
+    if (CRISES.length < 2) return;
     const i = Math.max(0, CRISES.findIndex((c) => c.id === crisis.id));
     pickCrisis(CRISES[(i + 1 + (seed % (CRISES.length - 1))) % CRISES.length]!.id);
   };

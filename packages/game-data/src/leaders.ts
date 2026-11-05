@@ -8,6 +8,10 @@ import { LEADER as france } from './nations/france';
 import { LEADER as germany } from './nations/germany';
 import { LEADER as poland } from './nations/poland';
 import { LEADER as turkey } from './nations/turkey';
+import { LEADER as india } from './nations/india';
+import { LEADER as pakistan } from './nations/pakistan';
+import { LEADER as indonesia } from './nations/indonesia';
+import { LEADER as australia } from './nations/australia';
 
 /** What makes a leader speak. Greetings go by stance; the rest answer a deal or an event. */
 export type LineTrigger =
@@ -415,6 +419,11 @@ export const LEADERS: Record<LeaderId, LeaderDef> = {
   [germany.id]: germany,
   [poland.id]: poland,
   [turkey.id]: turkey,
+  // Leaders written in their nation's file (nations/<id>.ts).
+  [india.id]: india,
+  [pakistan.id]: pakistan,
+  [indonesia.id]: indonesia,
+  [australia.id]: australia,
 };
 
 /** Each power's own leader. A new nation is one entry here and one in `LEADERS`. */
@@ -433,6 +442,10 @@ export const NATION_LEADERS: Record<NationId, LeaderId> = {
   nigeria: 'nigeria_okafor',
   'saudi-arabia': 'saudi_qahtani',
   'south-africa': 'southafrica_mokoena',
+  india: india.id,
+  pakistan: pakistan.id,
+  indonesia: indonesia.id,
+  australia: australia.id,
 };
 
 export const GOVERNMENT_LEADERS: Record<GovernmentId, LeaderId> = {
