@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and right of passage together, ruleset 2.12.0). Milestone 1 (first playable).
+Updated 2026-11-05 (six theatres in one build: the Pacific, Europe, the Middle East and Africa, the Indo-Pacific South, the Americas and Black Files: First Contact, ruleset 2.13.0). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -24,6 +24,40 @@ Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and 
 | 16 | Playable without editing source | done | |
 
 ## Completed
+
+- Six theatres in one build (ruleset 2.13.0): Europe, the Middle East and Africa, the Indo-Pacific
+  South and the Americas merged onto the Black Files, with one design for each thing the four lanes
+  had solved apart (the four entries below are the lanes' own, as they measured them).
+  - **Theatres** are one table, `packages/scenarios/src/theatres.ts`: each campaign's powers, minor
+    states, Opening Crises (the Pacific's only; `classicOnly` elsewhere), Easy's natural allies in
+    pairs, whether the Black Files toggle seeds it, the treaty and the ice (First Contact), and how
+    its world is built. The setup screen, title, menu and deploy screen, archive, map, worker and
+    session read it; save slots record their theatre, so a nation is drawn in its own colours.
+  - **Turkey** is one nation file in Europe and the Middle East: Europe's (generals, leader, deck),
+    with KORAL Jamming from the Middle East's deck, and the Industrial Directorate on both maps (its
+    own arms and drone industry, cross-border offensives, a home front worn by inflation).
+  - **Victory bars** are one rule (`victoryBars(maxTurns, powers, theatre)`): the Pacific's 32% and
+    29% at four powers exactly (its soak line for line as on 2.12.0), domination in proportion and
+    supremacy a fair share plus four beyond (26/24 for five, 21/21 for six), the count fixed at build
+    as `barPowers` (`fillBarPowers` migrates older saves). Chosen by recording 20 matches a theatre
+    to the limit and scoring candidate bars: no rule of the count alone fits all three six-power
+    maps, so `THEATRE_BARS` gives Europe 15/18, the Indo-Pacific supremacy 21 and the Americas 28/23,
+    each with its measurement. The Americas' Colombia ring defends a regiment deeper (Venezuela kept
+    at two: a third overfilled a city's hex, which `buildScenario` now refuses).
+  - **Soaks**: one `tests/soak/invariants.ts` (plus the Black Files' checks and the Indo-Pacific's
+    ship-ashore check) and one match loop (`play.ts`) for every campaign soak; each theatre's file
+    reads `SOAK_<THEATRE>_MATCHES`, else `SOAK_MATCHES` up to 20, with a time budget per match.
+  - **Maps**: every theatre imports its map with the JSON import attribute; the Indo-Pacific's
+    tracing script is source now (`packages/mapgen/src/indopac.ts`, byte for byte); `pnpm map:check`
+    passes for all seven files.
+  - **Measured** (SOAK_MATCHES=20, 0 rejected AI orders in every theatre): the Pacific 75% decisive,
+    median turn 24 (USA 6, China 5, Russia 3, Japan 1), as on 2.12.0; Europe 75%, median 26 (Poland
+    9, Turkey 4, Germany 2); the Middle East and Africa 70%, median 29 (South Africa 11, Nigeria 3);
+    the Indo-Pacific South 70%, median 23 (Indonesia 6, China 4, Australia 3, Pakistan 1); the
+    Americas 80%, median 24 (Colombia 10, Mexico 3, Canada 3); First Contact: the Visitors 2 of 20
+    (10%), the Accord once, 17 at the limit. Matrix 0 genuine failures. A 2.12.0 Pacific save resumes
+    unchanged and plays three turns with no order refused; the Pacific's turn-1 hashes moved with
+    the version stamp alone.
 
 - The Americas (Phase 6, `docs/americas.md`): a second theatre on the setup screen. A 32 x 41 map
   drawn as a character grid (`packages/mapgen/src/americas.ts`, `pnpm --filter @brink/mapgen
@@ -52,7 +86,7 @@ Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and 
   France, Germany, Poland, Russia, Turkey), forty minor states, the Channel, the Danish Straits,
   Gibraltar, the Bosphorus and Dardanelles as straits and the Suwałki corridor as a land bridge.
   Country files with invented generals, doctrine decks and leaders for the five new powers; navies
-  off several home ports; victory bars per theatre (`THEATRE_VICTORY`: 15% domination, 18%
+  off several home ports; victory bars per theatre (`THEATRE_VICTORY`, now `THEATRE_BARS`: 15% domination, 18%
   supremacy). The setup screen lists each theatre's own nations; Easy's natural ally is per theatre.
   Soak (`tests/soak/europe.soak.test.ts`), 20 AI-only matches: 0 refused orders, 17 decisive (85%:
   supremacy 10, domination 7), median turn 21; winners Poland 13, Germany 5, the United Kingdom 2.
@@ -651,6 +685,12 @@ Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and 
   T-80BVM and T-72B3 look alike, close-up paint is too clean, trees and house fronts repeat close up,
   rotor wash and the biggest fireballs are the weakest effects. The AI never splits squads; a lone
   weak formation (guns only, drones only, one platoon) still often runs to the round limit. New nations per theatre not done.
+- Theatres (2.13.0): the decided wars of three theatres go mostly to one power: Colombia in the
+  Americas (ringed by minor states it takes faster than anyone), Poland in Europe, South Africa in the
+  Middle East. In 20 AI-only matches each, decided or on score, the United States, Brazil and
+  Argentina, the United Kingdom, France and Russia, and Egypt, Iran and Saudi Arabia win none. Three theatres need bars of their own (`THEATRE_BARS`); a balance pass that brings them to the
+  rule would retire them. No Opening Crises outside the Pacific, and the Black Files' sites only on
+  its map.
 - PostgreSQL, Drizzle, Docker Compose, shadcn/ui: not needed for M1, not added.
 
 ## Blockers

@@ -133,10 +133,11 @@ unaligned; Malawi, too narrow at this scale, lies inside Mozambique's hexes.
 
 ## Setup screen
 
-`THEATRES` now has two entries, so the theatre picker shows. A theatre entry may carry its own
-`nations` and `minors` (`theatreNations`, `theatreMinors`; the Pacific's when absent), which the
-roster, the dossier's fronts and the keyboard shortcuts read. A nation picked in one theatre falls
-back to the next theatre's first power. `shortName` and `powerSpec` look across every theatre.
+The theatre is an entry in the one table of theatres (`packages/scenarios/src/theatres.ts`): its
+powers and minors (`theatrePowers`, `theatreMinors`), which the roster, the dossier's fronts and the
+keyboard shortcuts read, no crises (`classicOnly`), and Easy's pairs (Egypt and Saudi Arabia, Nigeria
+and South Africa, Turkey and Iran). A nation picked in one theatre falls back to the next theatre's
+first power. `shortName` and `findNation` look across every theatre.
 
 ## Tests
 
@@ -146,19 +147,20 @@ back to the next theatre's first power. `shortName` and `powerSpec` look across 
   sites, army and navy; minors and the stability of unaligned land; parity; seeds change only ground.
 - `packages/mapgen/src/mideast.test.ts`: the committed file is what the grid writes.
 - `packages/game-data/src/nations/mideast.test.ts`: the six country files and leaders.
-- `tests/soak/mideast.soak.test.ts`: AI-only matches (`MIDEAST_SOAK`, else `SOAK_MATCHES`, else 24),
-  0 rejected orders and the soak's invariants between every turn (`tests/soak/invariants.ts`, shared
-  with the Pacific's soak).
+- `tests/soak/mideast.soak.test.ts`: AI-only matches (`SOAK_MIDEAST_MATCHES`, else `SOAK_MATCHES` up
+  to 20), 0 rejected orders and the soak's invariants between every turn (`tests/soak/invariants.ts`,
+  every soak's).
 - `tests/e2e/mideast.spec.ts`: a phone picks the theatre, plays Egypt and ends two turns.
 
-## Balance (20 AI-only matches, `MIDEAST_SOAK=20`)
+## Balance (20 AI-only matches, `SOAK_MIDEAST_MATCHES=20`)
 
 | Pass | Decided before the limit | Winners | Rejected AI orders |
 |---|---|---|---|
 | Four-power bars, nineteen minors | 0 of 20 | Nigeria 11, South Africa 8, Iran 1 (all at the limit) | 0 |
 | Scaled bars (21 / 19), twenty-four minors | 20 of 20, median turn 14 | Nigeria 12, South Africa 8 | 0 |
 | Supremacy at a fair share plus 4 (21), a regiment more in every minor city, no Egypt-Saudi border | 17 of 20, median turn 25 | South Africa 13, Nigeria 6, Iran 1 | 0 |
-| Prizes weighted to the north (shipped) | 14 of 20, median turn 29 | South Africa 11, Nigeria 6, Saudi Arabia, Turkey, Iran 1 each | 0 |
+| Prizes weighted to the north (the lane's) | 14 of 20, median turn 29 | South Africa 11, Nigeria 6, Saudi Arabia, Turkey, Iran 1 each | 0 |
+| Ruleset 2.13.0: merged, Turkey the shared Directorate file | 14 of 20, median turn 29 | South Africa 11, Nigeria 3 (on score: South Africa 4, Turkey 1, Nigeria 1) | 0 |
 
 The southern powers still win most AI-only matches: they meet no rival power, the minor states and
 unaligned land around them are theirs to take, and the four northern powers wear each other down.

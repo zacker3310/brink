@@ -46,9 +46,9 @@ Thailand, the Philippines and Malaysia raise a second infantry militia per city.
 
 ## What changed outside the theatre
 
-- `createScenario` dispatches by theatre; `nationsOf`, `minorsOf` and `findNation` give the setup
-  screen and the menus each theatre's nations.
-- The Pacific's crises are written for the Pacific's map: `crisesFor(theatre)` deals them only
+- `createScenario` dispatches by theatre through the one table (`theatres.ts`); `theatrePowers`,
+  `theatreMinors` and `findNation` give the setup screen and the menus each theatre's nations.
+- The Pacific's crises are written for the Pacific's map: `theatreCrises(theatre)` deals them only
   there, and `GameSession.create` refuses one for another theatre. The setup screen opens a theatre
   without crises on the classic war.
 - The AI (no power named): a convoy lying off a shore where the only land in reach is a held city

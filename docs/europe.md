@@ -89,6 +89,9 @@ Pacific's: 75% of the 20 matches decided. Total War asks for a conquest everywhe
 
 20 AI-only matches (`tests/soak/europe.soak.test.ts`, `SOAK_EUROPE_MATCHES`): 0 refused orders, 85% decisive (supremacy 10, domination 7, turn limit 3), median turn 21. Winners: Poland 13, Germany 5, the United Kingdom 2. Before the balance pass (Union Poland, Szczecin beside Berlin): Poland 15 of 20.
 
+Ruleset 2.13.0 (merged with the other theatres; Turkey's file shared with the Middle East): 75% decisive
+(domination 11, supremacy 4, turn limit 5), median turn 26; Poland 9, Turkey 4, Germany 2.
+
 ## Still open
 
 - Europe's own crises (*Suwałki Gap*, *Baltic Gambit*, *Black Sea Fleet*, *Bosphorus Crisis*).
