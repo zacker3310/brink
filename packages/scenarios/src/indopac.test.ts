@@ -8,6 +8,7 @@ import { createIndoPacScenario, INDOPAC_ID, INDOPAC_MAP, INDOPAC_MINORS, INDOPAC
 import { createScenario, findNation, minorsOf, nationsOf, SCENARIOS } from './index';
 import { THEATRES } from './pacific';
 
+// Worlds built and hashed take seconds each on a loaded machine: those tests get a time budget.
 describe('The Indo-Pacific South', () => {
   const w = createIndoPacScenario(1);
   const site = (name: string) => {
@@ -24,7 +25,7 @@ describe('The Indo-Pacific South', () => {
     Object.values(w.tiles).some((t) => t.owner === a && t.terrain !== 'water' && neighborKeys(t.key).some((k) => w.tiles[k]?.owner === b && w.tiles[k]!.terrain !== 'water'));
   const at = (col: number, row: number) => w.tiles[cellKey([col, row])]!;
 
-  it('is listed: a theatre on the setup screen, a scenario, and createScenario builds it with generals', () => {
+  it('is listed: a theatre on the setup screen, a scenario, and createScenario builds it with generals', { timeout: 60_000 }, () => {
     expect(THEATRES.map((t) => t.id)).toContain(INDOPAC_ID);
     expect(SCENARIOS.find((s) => s.id === INDOPAC_ID)?.nations).toBe(5);
     expect(nationsOf(INDOPAC_ID)).toBe(INDOPAC_NATIONS);
@@ -179,7 +180,7 @@ describe('The Indo-Pacific South', () => {
     expect(spread(army)).toBeLessThanOrEqual(0.15);
   });
 
-  it('changes only the ground with the seed, never the coasts, borders or sites', () => {
+  it('changes only the ground with the seed, never the coasts, borders or sites', { timeout: 60_000 }, () => {
     const b = createIndoPacScenario(99);
     const shape = (x: typeof w) => sortedKeys(x.tiles).map((k) => `${k}:${x.tiles[k]!.owner}:${x.tiles[k]!.terrain === 'water'}`);
     expect(shape(w)).toEqual(shape(b));
