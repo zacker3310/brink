@@ -14,7 +14,7 @@ import { ACTION_TEXT } from './leaders';
 // The order review: what the turn commits before it commits it. Built from the draft, the engine's
 // own legality check and last turn's ledger. Nothing here changes the orders; Commit sends them.
 
-const ORDER_NAME: Record<OrderType, string> = { move: 'Move', attack: 'Attack', defend: 'Dig in', hold: 'Hold', recon: 'Scout', withdraw: 'Withdraw', embark: 'Board' };
+const ORDER_NAME: Record<OrderType, string> = { move: 'Move', attack: 'Attack', defend: 'Dig in', hold: 'Hold', recon: 'Scout', withdraw: 'Withdraw', embark: 'Board', airlift: 'Airlift' };
 const ACTION_NAME: Record<DiplomaticAction, string> = ACTION_TEXT;
 const RES_NAME: Record<Resource, string> = { credits: 'Credits', energy: 'Energy', materials: 'Materials', food: 'Food' };
 

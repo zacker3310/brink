@@ -51,6 +51,8 @@ export interface Operation {
   phases: OperationPhase[];
   /** A unit the operation is missing and where it can be built (an amphibious group, say). */
   needs?: { unitClass: UnitClass; siteId: SiteId; site: string };
+  /** Airborne: where the carrier group stages (or the airfield it flies from), the drop zone, the interception risk in percent. */
+  air?: { stage?: HexKey; field?: SiteId; zone: HexKey; risk: number };
   /** Higher is better; the list is sorted by it. */
   score: number;
 }
@@ -363,6 +365,7 @@ function judgeAirborne(view: NationView, site: SiteView, air: AirbornePlan): Ope
     odds,
     garrison,
     phases,
+    air: { ...(air.stage ? { stage: air.stage } : {}), ...(air.field ? { field: air.field.id } : {}), zone, risk: air.risk },
     score,
   };
 }

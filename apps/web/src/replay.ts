@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Text, type Application, type Texture } from 'pixi.js';
 import { create } from 'zustand';
-import type { HexKey, UnitClass } from '@brink/contracts';
+import type { AirliftMode, HexKey, UnitClass } from '@brink/contracts';
 import type { Point } from '@brink/map';
 import { getArt } from './art';
 import { addUnit, affiliationOf, keepScreenSize, slotOffsets, type CounterLook, type UnitModel } from './counters';
@@ -49,6 +49,20 @@ interface Actor {
   /** Formation slot at its resting hex, and how many share it. */
   slot: number;
   slots: number;
+  /** Flown in this turn: hidden while the lift is in the air, it comes down at the end. */
+  flown?: boolean;
+}
+
+/** A lift in the air: the aircraft (a helicopter from a deck) from where it took off to where it comes down. */
+interface Flight {
+  from: HexKey;
+  to: HexKey;
+  color: number;
+  mode: AirliftMode;
+  hit: boolean;
+  /** From a carrier's deck: helicopters and tiltrotors, not a transport plane. */
+  deck: boolean;
+  delay: number;
 }
 
 interface Battle {
@@ -69,6 +83,7 @@ export interface Timeline {
   actors: Actor[];
   battles: Battle[];
   strikes: Strike[];
+  flights: Flight[];
   /** Sites that changed hands: where, the new owner's colour, the site's and the new owner's name. */
   captures: { at: HexKey; color: number; name?: string; by?: string }[];
   /** Phase boundaries in ms. */
@@ -139,6 +154,7 @@ export function buildTimeline(pb: Playback): Timeline {
     } else byHex.set(at, { at, ours, theirs, delay });
   };
   const strikes: Strike[] = [];
+  const flights: Flight[] = [];
   const captures: Timeline['captures'] = [];
   let hasMove = false;
   let hasAfter = false;
@@ -212,6 +228,39 @@ export function buildTimeline(pb: Playback): Timeline {
         hasAfter = true;
         break;
       }
+      case 'airlift': {
+        if (e.aborted) break;
+        hasMove = true;
+        flights.push({ from: e.from, to: e.landed, color: colorOf(e.owner), mode: e.mode, hit: e.hit, deck: before.tiles[e.from]?.terrain === 'water', delay: (flights.length % 4) * 90 });
+        const a = actors.get(e.formation);
+        if (a) {
+          a.route = [e.landed];
+          a.flown = true;
+          a.confirmed = true;
+        } else {
+          const c = after.contacts[e.formation];
+          actors.set(e.formation, {
+            id: e.formation,
+            cls: e.unitClass,
+            color: colorOf(e.owner),
+            fill: before.nations[e.owner]?.color ?? '#888888',
+            aff: affiliationOf(e.owner === me, before.relations[e.owner]),
+            own: e.owner === me,
+            confirmed: true,
+            s0: c?.estimatedStrength ?? 1000,
+            s1: c?.estimatedStrength ?? 1000,
+            route: [e.landed],
+            lunge: null,
+            retreat: null,
+            destroyed: false,
+            appears: false,
+            flown: true,
+            slot: 0,
+            slots: 1,
+          });
+        }
+        break;
+      }
       case 'site_captured':
         captures.push({ at: e.key, color: colorOf(e.to), name: before.sites[e.site]?.name ?? after.sites[e.site]?.name, by: before.nations[e.to]?.name });
         hasAfter = true;
@@ -236,7 +285,7 @@ export function buildTimeline(pb: Playback): Timeline {
   const move: [number, number] = [0, moveDur];
   const combat: [number, number] = [moveDur, moveDur + combatDur];
   const aft: [number, number] = [combat[1], combat[1] + afterDur];
-  return { actors: [...actors.values()], battles, strikes, captures, move, combat, after: aft, end: aft[1] + 250 };
+  return { actors: [...actors.values()], battles, strikes, flights, captures, move, combat, after: aft, end: aft[1] + 250 };
 }
 
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
@@ -404,6 +453,8 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       if (a.retreat) pos = lerp(pos, center(a.retreat[1]), pa);
       let fade = 1;
       if (a.appears) fade = clamp(pm * 4);
+      // A lift comes down at the end of the flight.
+      if (a.flown) fade = clamp((span(t, tl.move) - 0.78) / 0.22);
       if (a.destroyed) fade *= 1 - pa;
       const sprite = sprites.get(a.id)!;
       if (fade <= 0.01) {
@@ -433,6 +484,71 @@ export function playReplay(app: Application, layer: Container, tl: Timeline, opt
       if (a.destroyed && pa > 0 && pa < 1) {
         fx.circle(pos.x, pos.y, size * (0.3 + pa)).stroke({ width: 3, color: 0xf2a65a, alpha: 1 - pa });
         fx.circle(pos.x, pos.y, size * 0.5 * pa).fill({ color: 0xffd28a, alpha: 0.5 * (1 - pa) });
+      }
+    }
+
+    // Lifts: the aircraft cross the map, and over the landing hex the canopies come down (or the
+    // helicopters set down, or the transport lands on the runway); a hit flares and trails smoke.
+    for (const fl of tl.flights) {
+      const q = clamp((span(t, tl.move) * tl.move[1] - fl.delay) / Math.max(1, tl.move[1] * 0.72));
+      const a = center(fl.from);
+      const b = center(fl.to);
+      const mid = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - size * 1.2 };
+      const pt = (u: number) => ({ x: (1 - u) ** 2 * a.x + 2 * (1 - u) * u * mid.x + u * u * b.x, y: (1 - u) ** 2 * a.y + 2 * (1 - u) * u * mid.y + u * u * b.y });
+      if (q > 0 && q < 1) {
+        const head = pt(q);
+        const ahead = pt(Math.min(1, q + 0.02));
+        const ang = Math.atan2(ahead.y - head.y, ahead.x - head.x);
+        const rot = (dx: number, dy: number) => ({ x: head.x + dx * Math.cos(ang) - dy * Math.sin(ang), y: head.y + dx * Math.sin(ang) + dy * Math.cos(ang) });
+        // Its shadow on the ground, and the track behind it.
+        const ground = lerp(a, b, q);
+        fx.ellipse(ground.x, ground.y + 3, 6, 2.5).fill({ color: 0x000000, alpha: 0.3 });
+        const tail = pt(Math.max(0, q - 0.1));
+        fx.moveTo(tail.x, tail.y).lineTo(head.x, head.y).stroke({ width: 1.5, color: fl.hit && q > 0.5 ? 0x8a8a8a : 0xf4f1e8, alpha: 0.45, cap: 'round' });
+        if (fl.deck) {
+          // Helicopter: a body and a spinning rotor disc.
+          const n = rot(7, 0);
+          const tl0 = rot(-8, 0);
+          fx.moveTo(tl0.x, tl0.y).lineTo(n.x, n.y).stroke({ width: 4, color: fl.color, cap: 'round' });
+          fx.circle(head.x, head.y, 8).stroke({ width: 1.2, color: 0xf4f1e8, alpha: 0.7 });
+        } else {
+          // Transport aircraft: fuselage, swept wings, tailplane.
+          const nose = rot(9, 0);
+          const tail2 = rot(-9, 0);
+          fx.moveTo(tail2.x, tail2.y).lineTo(nose.x, nose.y).stroke({ width: 3.5, color: fl.color, cap: 'round' });
+          const wl = rot(-1, -9);
+          const wr = rot(-1, 9);
+          const wc = rot(2, 0);
+          fx.poly([wl.x, wl.y, wc.x, wc.y, wr.x, wr.y]).fill({ color: fl.color });
+          const tlft = rot(-8, -4);
+          const trgt = rot(-8, 4);
+          fx.moveTo(tlft.x, tlft.y).lineTo(trgt.x, trgt.y).stroke({ width: 2, color: fl.color });
+        }
+        // Hit on the way in: a flash at mid-flight, then smoke behind it.
+        if (fl.hit && q > 0.45) {
+          const flare = clamp((q - 0.45) / 0.15);
+          if (flare < 1) fx.circle(head.x, head.y, 5 + 10 * flare).fill({ color: 0xffb347, alpha: 0.7 * (1 - flare) });
+          burst(art?.smoke, head.x, head.y, (q - 0.45) / 0.55, size * 0.7, 0.6);
+          if (q > 0.46 && q < 0.5) impact(`lh${fl.from}${fl.to}${fl.delay}`, 'strike');
+        }
+      }
+      // Coming down over the landing hex.
+      const down = clamp((span(t, tl.move) - 0.62) / 0.36);
+      if (down > 0 && down < 1 && fl.mode !== 'airland') {
+        for (const [dx, k] of [[-0.3, 0], [0.05, 0.12], [0.32, 0.06]] as const) {
+          const u = clamp((down - k) / (1 - k));
+          if (u <= 0 || u >= 1) continue;
+          const x = b.x + dx * size;
+          const y = b.y - size * 1.3 * (1 - u);
+          if (fl.deck) {
+            fx.circle(x, y, 5).stroke({ width: 1.2, color: 0xf4f1e8, alpha: 0.8 * (1 - u * 0.5) });
+            fx.circle(x, y, 1.8).fill({ color: fl.color });
+          } else {
+            fx.moveTo(x - 6, y - 7).arc(x, y - 7, 6, Math.PI, 0).lineTo(x - 6, y - 7).fill({ color: 0xf4f1e8, alpha: 0.9 * (1 - u * 0.4) });
+            fx.moveTo(x - 5, y - 7).lineTo(x, y).moveTo(x + 5, y - 7).lineTo(x, y).stroke({ width: 1, color: 0xf4f1e8, alpha: 0.8 });
+            fx.circle(x, y + 1, 1.8).fill({ color: fl.color });
+          }
+        }
       }
     }
 

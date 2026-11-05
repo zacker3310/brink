@@ -34,6 +34,7 @@ import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
 import { crisisOf, shortName } from '@brink/scenarios';
 import { minorsOf, powersOf, signed } from './ui';
 import { RANKS, rankOf } from '@brink/arena';
+import { AirliftRow } from './AirliftCard';
 
 // The game on a phone: the map edge to edge, a slim status strip under the notch, and everything
 // you do within reach of a thumb. Tap your units, tap where they go; enemies you can hit already say
@@ -473,6 +474,7 @@ function UnitCard() {
           </span>
         )}
       </div>
+      {!armed && members.length === 1 && <AirliftRow f={f} />}
       {armed ? (
         <div className="lock-in mx-4 mt-2 rounded-lg border-2 border-hostile bg-hostile/10 px-3 py-2.5" data-testid="armed">
           <div className="font-display text-[13px] font-extrabold tracking-[0.06em] text-hostile uppercase">

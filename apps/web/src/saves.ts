@@ -78,7 +78,7 @@ export interface Prefs {
 /** An operation the player launched: the staff plans toward its prize every turn until it falls. */
 export interface ActiveOperation {
   id: string;
-  kind: 'overland' | 'amphibious';
+  kind: 'overland' | 'amphibious' | 'airborne';
   codename: string;
   name: string;
 }

@@ -1,6 +1,6 @@
 import type { DealTerms, DiplomaticAction, GameEvent, MoodReason, NationId, NationView, ProposalKind, Stance, TreatyKind, TurnReport } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { LEADER_TUNING, LEADERS, leaderFor, TREATIES, type LeaderDef, type LineTrigger } from '@brink/game-data';
+import { LEADER_TUNING, LEADERS, leaderFor, PASSAGE, TREATIES, type LeaderDef, type LineTrigger } from '@brink/game-data';
 
 // Words for the leaders and their deals: what each reason for a mood means, what each deal is,
 // and the lines a leader speaks. Everything here reads the player's NationView only.
@@ -22,6 +22,7 @@ export const PROPOSAL_TEXT: Record<ProposalKind, string> = {
   exchange: 'an exchange of resources',
   tribute: 'tribute',
   joint_op: `a joint operation (${LEADER_TUNING.jointOpTurns} turns)`,
+  passage: `right of passage (${PASSAGE.turns} turns: march through, supply across, base aircraft)`,
 };
 
 export const ACTION_TEXT: Record<DiplomaticAction, string> = {
@@ -36,6 +37,7 @@ export const ACTION_TEXT: Record<DiplomaticAction, string> = {
   demand_tribute: 'Demand tribute from',
   pay_tribute: 'Pay tribute to',
   propose_joint_op: 'Offer a joint operation to',
+  propose_passage: 'Ask for passage from',
 };
 
 export const TREATY_TEXT: Record<TreatyKind, string> = {
@@ -44,6 +46,7 @@ export const TREATY_TEXT: Record<TreatyKind, string> = {
   embargo: 'embargo',
   ceasefire: 'ceasefire',
   joint_op: 'joint operation',
+  passage: 'right of passage',
 };
 
 const RES_SHORT: Record<string, string> = { credits: 'cr', energy: 'en', materials: 'mat', food: 'food' };
@@ -61,6 +64,7 @@ export function dealText(view: Pick<NationView, 'nations' | 'sites'>, kind: Prop
   if (kind === 'tribute') return terms?.get ? `tribute of ${stockText(terms.get)}` : `a payment of ${stockText(terms?.give)}`;
   if (kind === 'alliance' && terms?.against) return `an alliance against ${view.nations[terms.against]?.name ?? terms.against}`;
   if (kind === 'joint_op' && terms?.site) return `a joint operation on ${view.sites[terms.site]?.name ?? terms.site}`;
+  if (kind === 'passage' && terms?.against) return `right of passage toward ${view.nations[terms.against]?.name ?? terms.against}`;
   return PROPOSAL_TEXT[kind];
 }
 
