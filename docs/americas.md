@@ -84,6 +84,10 @@ Pacific's (six powers, twenty nations, 1312 hexes). Results are in `PROGRESS.md`
 - **Straits in the engine.** The canal works through the port rule. A blockade of the Florida
   Strait or the Strait of Magellan as a strait (rather than ships in the way) waits for the
   trade-and-chokepoints lane.
+- **Balance.** Colombia, ringed by minor states (Panama, Venezuela, Guyana, Ecuador, Peru), wins
+  most AI-only wars on score; the United States, at war with Canada and Mexico at once, loses its
+  east coast by turn ten in most. Six powers rarely reach supremacy at 29% of the standing, a bar
+  set for four: no war was decided before the limit in the 20-match soak.
 - **Crises for the Americas.** None yet.
 - **Scale.** The per-hex loops (`grossYields` counting hexes, supply, vision) dominate a turn on this
   map; the master plan's incremental work would halve it.
