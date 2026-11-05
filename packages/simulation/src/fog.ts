@@ -12,11 +12,11 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { TERRAIN, victoryBars } from '@brink/game-data';
-import { rangeKeys } from '@brink/map';
+import { keyDistance, rangeKeys } from '@brink/map';
 import { leaderEffects, leaderOf } from './commanders';
 import { revealedHexes } from './doctrine';
 import { attitudesFor } from './leaders';
-import { clone, nationModifiers, relationOf, sortedKeys, visionRadius } from './rules';
+import { clone, nationModifiers, pairKey, relationOf, sortedKeys, visionRadius } from './rules';
 import { supremacyStanding } from './victory';
 
 export interface Vision {
@@ -70,7 +70,34 @@ export function computeVision(world: WorldState, nation: NationId, reconActive: 
   }
   // A Recon Flight sees all of its circle, cover or not.
   for (const n of [...eyes].sort()) for (const k of revealedHexes(world, n)) add(k, true);
+  // Partners in a joint operation share what they see of its prize: the city and the ring around it.
+  for (const t of world.treaties) {
+    if (t.kind !== 'joint_op' || !t.site || (t.a !== nation && t.b !== nation)) continue;
+    const prize = world.sites[t.site];
+    const partner = t.a === nation ? t.b : t.a;
+    if (!prize || world.nations[partner]?.eliminated) continue;
+    const near = rangeKeys(prize.key, 1);
+    const theirs = new Set(sharers(world, partner));
+    for (const id of sortedKeys(world.formations)) {
+      const f = world.formations[id]!;
+      if (!theirs.has(f.owner) || keyDistance(f.key, prize.key) > 8) continue;
+      const radius = visionRadius(f.unitClass, nationModifiers(world.nations[f.owner]!), false) + (leaders[id]?.vision ?? 0);
+      for (const k of near) if (keyDistance(f.key, k) <= radius) add(k, f.unitClass === 'recon' || f.key === k);
+    }
+  }
   return { visible, detect };
+}
+
+/**
+ * Who `nation` believes holds `siteId`: the truth where it sees the site now, else what it last saw
+ * (its view shows the same). A joint operation is judged on this: a deal made on a prize that
+ * changed hands out of sight is not an illegal order, it simply does not sign.
+ */
+export function knownSiteOwner(world: WorldState, nation: NationId, siteId: string, vision: Vision = computeVision(world, nation)): NationId | null {
+  const s = world.sites[siteId];
+  if (!s) return null;
+  if (vision.visible.has(s.key)) return s.owner;
+  return world.intel[nation]?.knownOwner[s.key] ?? s.originalOwner;
 }
 
 export function canDetect(world: WorldState, vision: Vision, key: HexKey): boolean {
@@ -269,6 +296,11 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     };
     if (id !== nation) relations[id] = relationOf(world.relations, nation, id);
   }
+  // Wars and alliances are public, like the treaties: every pair, so a leader asked to join a war
+  // knows whether the one asking is already in it.
+  const ids = sortedKeys(world.nations);
+  const publicRelations: Record<string, Relation> = {};
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) publicRelations[pairKey(ids[i]!, ids[j]!)] = relationOf(world.relations, ids[i]!, ids[j]!);
 
   const standing = supremacyStanding(world);
   return {
@@ -279,6 +311,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     self: clone(self),
     nations,
     relations,
+    publicRelations,
     proposals: world.proposals.filter((p) => p.from === nation || p.to === nation).map((p) => ({ ...p })),
     treaties: world.treaties.map((t) => ({ ...t })),
     tiles,

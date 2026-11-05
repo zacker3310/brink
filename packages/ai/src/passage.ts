@@ -1,7 +1,7 @@
-import type { AiMemory, NationId, NationOrders, NationView, Relation, SiteId, Temperament } from '@brink/contracts';
+import type { AiMemory, NationId, NationOrders, NationView, SiteId, Temperament } from '@brink/contracts';
 import { LEADER_TUNING, PASSAGE, UNITS } from '@brink/game-data';
 import { findPath, keyDistance } from '@brink/map';
-import { checkDiplomacy, enterCost, hasPassage, pairKey, sortedKeys } from '@brink/simulation';
+import { checkDiplomacy, diplomacyWorldOf, enterCost, hasPassage, sortedKeys } from '@brink/simulation';
 import type { Verdict } from './diplomacy-ai';
 import { landmasses } from './land';
 
@@ -10,14 +10,14 @@ import { landmasses } from './land';
 
 /**
  * How a leader answers a request for passage. Never toward a friend: an ally, or a power the leader
- * feels warmly about, is not marched on through its land. Never for the power its own army marches
- * on. Otherwise by mood, which a hawk wants high and a dove forgives; a request that will not say
- * whom it is for wants more warmth.
+ * feels warmly about, is not marched on through its land (`likes_target`). Never for the power its
+ * own army marches on. Otherwise by mood (with any sweetener already added by `consider`), which a
+ * hawk wants high and a dove forgives; a request that will not say whom it is for wants more warmth.
  */
 export function considerPassage(view: NationView, mood: number, temper: Temperament, isFocus: boolean, against: NationId | undefined, spared: boolean): Verdict {
   if (spared) return { accept: true, reason: 'agreed' };
   if (isFocus) return { accept: false, reason: 'focus' };
-  if (against && (view.relations[against] === 'alliance' || (view.attitudes?.[against]?.mood ?? 0) > LEADER_TUNING.stances.neutral)) return { accept: false, reason: 'mood' };
+  if (against && (view.relations[against] === 'alliance' || (view.attitudes?.[against]?.mood ?? 0) > LEADER_TUNING.stances.neutral)) return { accept: false, reason: 'likes_target' };
   const bar = PASSAGE.mood[temper] + (against ? 0 : PASSAGE.unnamed);
   return mood >= bar ? { accept: true, reason: 'agreed' } : { accept: false, reason: 'mood' };
 }
@@ -64,9 +64,7 @@ export function seekPassage(view: NationView, memory: AiMemory, orders: NationOr
   if (orders.diplomacy.some((d) => d.target === want.target)) return orders;
   if (view.proposals.some((p) => p.from === view.self.id && p.to === want.target && p.kind === 'passage')) return orders;
   if ((view.turn + want.target.length) % 3 !== 0) return orders;
-  const relations: Record<string, Relation> = {};
-  for (const n of sortedKeys(view.relations)) relations[pairKey(view.self.id, n)] = view.relations[n]!;
   const terms = want.against ? { against: want.against } : undefined;
-  if (checkDiplomacy({ relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites, tiles: view.tiles }, view.self.id, want.target, 'propose_passage', terms)) return orders;
+  if (checkDiplomacy(diplomacyWorldOf(view), view.self.id, want.target, 'propose_passage', terms)) return orders;
   return { ...orders, diplomacy: [...orders.diplomacy, { target: want.target, action: 'propose_passage', ...(terms ? { terms } : {}) }] };
 }

@@ -1,8 +1,9 @@
-import type { AiMemory, DealTerms, DiplomacyOrder, NationId, NationOrders, NationView, ProposalKind, Relation, Resource, SiteId, Stockpile } from '@brink/contracts';
+import type { AiMemory, DealTerms, DiplomacyOrder, NationId, NationOrders, NationView, ProposalKind, Resource, SiteId, Stockpile } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { FACILITIES, LEADER_TUNING, leaderFor, type LineTrigger } from '@brink/game-data';
+import { FACILITIES, LEADER_TUNING, leaderFor, PASSAGE, type LineTrigger } from '@brink/game-data';
+import { keyDistance } from '@brink/map';
+import { answerTo, bindingTreaty, checkDiplomacy, dealGives, diplomacyWorldOf, mirrors, pairKey, PROPOSAL_OF, recruitCost, sortedKeys, stockTotal, treatyIn } from '@brink/simulation';
 import { considerPassage } from './passage';
-import { answerTo, bindingTreaty, checkDiplomacy, mirrors, pairKey, PROPOSAL_OF, recruitCost, sortedKeys, stockTotal, treatyIn } from '@brink/simulation';
 
 // The leaders' side of the AI: how a rival's head of government answers an offer, what deals they
 // seek themselves, and the restraint their mood puts on the war plan. Sees only its own NationView
@@ -18,8 +19,13 @@ export interface Offer {
   terms?: DealTerms;
 }
 
-/** Why a leader answered as they did; the screen turns it into one of their lines. */
-export type VerdictReason = 'agreed' | 'mood' | 'terms' | 'strength' | 'focus' | 'cannot';
+/**
+ * Why a leader answered as they did; the screen turns it into one of their lines and plain words.
+ * Asked to join a war: `likes_target` (they like the power named, or spare it), `stretched` (they
+ * have wars enough), `strength` (it is too strong for the two of you), `terms` (a sweetener might
+ * do it), `mood` (they do not like you enough).
+ */
+export type VerdictReason = 'agreed' | 'mood' | 'terms' | 'strength' | 'focus' | 'cannot' | 'likes_target' | 'stretched';
 
 export interface Verdict {
   accept: boolean;
@@ -29,7 +35,7 @@ export interface Verdict {
 /** The line trigger a verdict speaks with. */
 export function verdictLine(v: Verdict): LineTrigger {
   if (v.accept) return 'accept';
-  return v.reason === 'strength' ? 'reject_strength' : v.reason === 'terms' || v.reason === 'cannot' ? 'reject_terms' : 'reject_mood';
+  return v.reason === 'strength' || v.reason === 'stretched' ? 'reject_strength' : v.reason === 'terms' || v.reason === 'cannot' ? 'reject_terms' : 'reject_mood';
 }
 
 export interface LeaderOptions {
@@ -48,11 +54,7 @@ export function offerOf(from: NationId, d: DiplomacyOrder): Offer | null {
 }
 
 /** The view's public facts in the shape the engine's diplomacy checks read. */
-function asWorld(view: NationView) {
-  const relations: Record<string, Relation> = {};
-  for (const n of sortedKeys(view.relations)) relations[pairKey(view.self.id, n)] = view.relations[n]!;
-  return { relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites, tiles: view.tiles };
-}
+const asWorld = diplomacyWorldOf;
 
 function powers(view: NationView): NationId[] {
   return sortedKeys(view.nations).filter((n) => n !== view.self.id && !view.nations[n]!.eliminated && !view.nations[n]!.minor);
@@ -71,6 +73,54 @@ function worth(view: NationView, s: Partial<Stockpile> | undefined): number {
     total += a * (have < 120 ? 200 : have > 500 ? 50 : 100);
   }
   return total;
+}
+
+/** The power running away with the race: the highest standing of every power, ourselves included. */
+function raceLeader(view: NationView): NationId | undefined {
+  return [view.self.id, ...powers(view)].sort((a, b) => standing(view, b) - standing(view, a) || (a < b ? -1 : 1))[0];
+}
+
+/** Whether `x` holds a city within reach of one of ours: a threat on the doorstep. */
+function neighbourOf(view: NationView, x: NationId): boolean {
+  const ours = sortedKeys(view.sites).filter((id) => view.sites[id]!.owner === view.self.id);
+  const theirs = sortedKeys(view.sites).filter((id) => view.sites[id]!.owner === x);
+  return ours.some((a) => theirs.some((b) => keyDistance(view.sites[a]!.key, view.sites[b]!.key) <= AI.joinWar.neighbourHexes));
+}
+
+/**
+ * Asked to go to war with `x` beside `from` (an alliance against it, or a joint operation on its
+ * city), not already fighting it. Weighed, not a rule: how we feel about the one asking and about
+ * `x`, whether `x` leads the race, stands ahead of us, took a city of ours or sits on our doorstep,
+ * the wars already on our hands, an ally asking, our temper, and what the deal pays.
+ */
+function joinWar(view: NationView, from: NationId, x: NationId, terms: DealTerms | undefined, opts: LeaderOptions): Verdict {
+  const J = AI.joinWar;
+  const self = view.self.id;
+  if (opts.spare?.includes(x)) return { accept: false, reason: 'likes_target' };
+  const moodFrom = moodOf(view, from);
+  const moodX = moodOf(view, x);
+  if (moodFrom < J.minMood) return { accept: false, reason: 'mood' };
+  const temper = leaderFor(self, view.self.government).temperament;
+  const wars = powers(view).filter((n) => view.relations[n] === 'war').length;
+  const leads = raceLeader(view) === x;
+  const sweet = Math.min(J.sweetenerMax, Math.trunc((worth(view, terms?.give) - worth(view, terms?.get)) / 1000) * J.sweetenerPer1000);
+  const score =
+    Math.trunc(Math.min(moodFrom, J.moodFromCap) / 2) -
+    Math.trunc(moodX / 2) +
+    (leads ? J.raceLeader : 0) +
+    (standing(view, x) > standing(view, self) ? J.stronger : 0) +
+    ((view.attitudes?.[x]?.reasons ?? []).some((r) => r.id === 'took_city') ? J.tookOurCity : 0) +
+    (neighbourOf(view, x) ? J.neighbour : 0) -
+    wars * J.perWar +
+    (view.relations[from] === 'alliance' ? J.ally : 0) +
+    (temper === 'hawk' ? J.hawk : temper === 'dove' ? J.dove : leads ? J.opportunistOnLeader : 0) +
+    sweet;
+  if (score >= J.threshold) return { accept: true, reason: 'agreed' };
+  // The weightiest reason against, in the leader's words; with none, a better deal might do it.
+  if (moodX >= J.likesTarget) return { accept: false, reason: 'likes_target' };
+  if (wars * J.perWar >= J.stretched) return { accept: false, reason: 'stretched' };
+  if (moodFrom < AI.allianceMood) return { accept: false, reason: 'mood' };
+  return { accept: false, reason: 'terms' };
 }
 
 /** The site this nation's army marches on (its memory's objective), and whose it is. */
@@ -92,21 +142,24 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
   if (!them || from === self || them.eliminated || them.minor || view.self.minor) return { accept: false, reason: 'cannot' };
   const answer = answerTo({ from, kind: offer.kind, ...(offer.terms ? { terms: offer.terms } : {}) });
   if (checkDiplomacy(asWorld(view), self, from, answer.action, answer.terms)) return { accept: false, reason: 'cannot' };
-  const give = answer.action === 'propose_exchange' || answer.action === 'pay_tribute' ? answer.terms?.give : undefined;
-  if (RESOURCES.some((r) => (give?.[r] ?? 0) > view.self.stockpile[r])) return { accept: false, reason: 'cannot' };
+  const give = dealGives(answer.action, answer.terms);
+  if (RESOURCES.some((r) => (give[r] ?? 0) > view.self.stockpile[r])) return { accept: false, reason: 'cannot' };
 
   const leader = leaderFor(self, view.self.government);
   const temper = leader.temperament;
   const mood = moodOf(view, from);
   const focus = focusOf(view, memory, opts);
   const enemies = powers(view).filter((n) => view.relations[n] === 'war');
-  const losing = standing(view, self) + 5 < standing(view, from) || view.self.stability < 30;
+  const losing = losingTo(view, from);
   const yes: Verdict = { accept: true, reason: 'agreed' };
 
   switch (offer.kind) {
     case 'peace':
     case 'ceasefire': {
       if (opts.spare?.includes(from)) return yes;
+      // Not with the holder of a joint operation's prize while it runs, nor with a power an ally
+      // fights, unless the war goes badly: a partner who makes peace the turn after is no partner.
+      if (!losing && (jointOpHolder(view) === from || alliesAtWarWith(view, from))) return { accept: false, reason: 'focus' };
       // An operation ordered onto their city is not called off by a peace offer.
       if (from === focus && opts.target) return { accept: false, reason: 'focus' };
       if (from === focus && !losing && standing(view, self) >= standing(view, from)) return { accept: false, reason: 'focus' };
@@ -116,11 +169,12 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
     }
     case 'alliance': {
       const x = offer.terms?.against;
-      if (!x) return mood >= AI.allianceMood ? yes : { accept: false, reason: 'mood' };
-      if (mood < AI.allianceMood - 10) return { accept: false, reason: 'mood' };
-      const hate = view.relations[x] === 'war' || moodOf(view, x) <= -20;
-      if (!hate) return { accept: false, reason: 'mood' };
-      return standing(view, x) <= standing(view, self) + standing(view, from) ? yes : { accept: false, reason: 'strength' };
+      const asks = worth(view, offer.terms?.get) > worth(view, offer.terms?.give);
+      if (!x) return mood >= AI.allianceMood && !asks ? yes : { accept: false, reason: asks ? 'terms' : 'mood' };
+      if (standing(view, x) > standing(view, self) + standing(view, from)) return { accept: false, reason: 'strength' };
+      // Already fighting it: an ally against a common enemy is welcome to anyone not hostile.
+      if (view.relations[x] === 'war') return mood >= AI.joinWar.alreadyAtWarMood && !asks ? yes : { accept: false, reason: asks ? 'terms' : 'mood' };
+      return joinWar(view, from, x, offer.terms, opts);
     }
     case 'nonaggression':
       if (opts.spare?.includes(from)) return yes;
@@ -146,11 +200,38 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
       const need = temper === 'hawk' ? AI.tributeGap * 2 : AI.tributeGap;
       return gap >= need ? yes : { accept: false, reason: 'strength' };
     }
-    case 'joint_op':
-      return mood >= AI.jointOpMood ? yes : { accept: false, reason: 'mood' };
-    case 'passage':
-      return considerPassage(view, mood, temper, from === focus, offer.terms?.against, opts.spare?.includes(from) ?? false);
+    case 'joint_op': {
+      const holder = offer.terms?.site ? view.sites[offer.terms.site]?.owner : null;
+      const asks = worth(view, offer.terms?.get) > worth(view, offer.terms?.give);
+      if (!holder || view.relations[holder] === 'war') return mood >= AI.jointOpMood && !asks ? yes : { accept: false, reason: asks ? 'terms' : 'mood' };
+      return joinWar(view, from, holder, offer.terms, opts);
+    }
+    case 'passage': {
+      // A sweetener warms a leader to it as mood does (`PASSAGE.sweetener*`); asking to be paid for
+      // the favour of marching through is a matter of terms.
+      if (opts.spare?.includes(from)) return yes;
+      if (worth(view, offer.terms?.get) > worth(view, offer.terms?.give)) return { accept: false, reason: 'terms' };
+      const sweet = Math.min(PASSAGE.sweetenerMax, Math.trunc(worth(view, offer.terms?.give) / 1000) * PASSAGE.sweetenerPer1000);
+      return considerPassage(view, mood + sweet, temper, from === focus, offer.terms?.against, false);
+    }
   }
+}
+
+/** Whether the war with `n` goes badly: it stands well ahead of us, or our home front is cracking. */
+function losingTo(view: NationView, n: NationId): boolean {
+  return standing(view, view.self.id) + 5 < standing(view, n) || view.self.stability < 30;
+}
+
+/** The holder of the prize of a joint operation this nation is in, if any. */
+function jointOpHolder(view: NationView): NationId | null {
+  const site = jointOpTarget(view);
+  return site ? (view.sites[site]?.owner ?? null) : null;
+}
+
+/** Whether an ally of ours is at war with `n` (wars and alliances are public). */
+function alliesAtWarWith(view: NationView, n: NationId): boolean {
+  const rel = view.publicRelations ?? {};
+  return powers(view).some((a) => a !== n && view.relations[a] === 'alliance' && rel[pairKey(a, n)] === 'war');
 }
 
 /** The prize of a joint operation this nation is in, if any: its army marches on it. */
@@ -216,6 +297,8 @@ export function leaderDiplomacy(view: NationView, memory: AiMemory, planned: Nat
     if (kind && refused.has(`${d.target}|${kind}`)) return false;
     // No peace, truce or pact with the power an ordered operation marches on.
     if (opts.target && d.target === focusOf(view, memory, opts) && (kind === 'peace' || kind === 'ceasefire' || kind === 'nonaggression')) return false;
+    // Nor with the holder of a joint operation's prize, or a power an ally fights, while the war goes well.
+    if ((kind === 'peace' || kind === 'ceasefire') && !spare.includes(d.target) && !losingTo(view, d.target) && (jointOpHolder(view) === d.target || alliesAtWarWith(view, d.target))) return false;
     if ((d.action === 'propose_trade' || d.action === 'propose_nonaggression') && mood < AI.sulkMood) return false;
     return true;
   });
@@ -273,7 +356,7 @@ export function leaderDiplomacy(view: NationView, memory: AiMemory, planned: Nat
 
   // Make room for what we hand over: deals after recruits and buildings, as the validator reserves.
   const out: NationOrders = { ...planned, recruit: [...planned.recruit], ...(planned.build ? { build: [...planned.build] } : {}) };
-  const gives = (d: DiplomacyOrder) => (d.action === 'propose_exchange' || d.action === 'pay_tribute' ? (d.terms?.give ?? {}) : {});
+  const gives = (d: DiplomacyOrder) => dealGives(d.action, d.terms);
   const reservedBy = (o: NationOrders): Stockpile => {
     const r: Stockpile = { credits: 0, energy: 0, materials: 0, food: 0 };
     for (const x of o.recruit) for (const res of RESOURCES) r[res] += recruitCost(view.self, x.unitClass)[res];

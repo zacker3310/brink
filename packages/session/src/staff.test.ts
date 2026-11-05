@@ -12,8 +12,10 @@ import { GameSession } from './session';
 
 /**
  * What the web store takes from the staff's suggestion each turn (`autoCommand` in
- * apps/web/src/store.ts): every formation's order, the recruits, research and the diplomacy, never
- * a declaration of war.
+ * apps/web/src/store.ts, `staffDiplomacy` in apps/web/src/staff-diplomacy.ts): every formation's
+ * order, the recruits, research, and trade and pacts with powers at peace. Since ruleset 2.10 the
+ * staff never makes peace or a ceasefire for the player (it advises them): it drafted peace with a
+ * power the player had just declared war on.
  */
 function staffTurn(s: GameSession, target?: string): NationOrders {
   const view = s.view();
@@ -23,7 +25,7 @@ function staffTurn(s: GameSession, target?: string): NationOrders {
     turn: view.turn,
     formations: sug.formations,
     recruit: sug.recruit,
-    diplomacy: sug.diplomacy.filter((d) => d.action !== 'declare_war'),
+    diplomacy: sug.diplomacy.filter((d) => (d.action === 'propose_trade' || d.action === 'propose_nonaggression') && view.relations[d.target] !== 'war'),
     ...(sug.research ? { research: sug.research } : {}),
   };
 }

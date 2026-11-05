@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { NationOrders } from '@brink/contracts';
-import { AIRBORNE, PASSAGE } from '@brink/game-data';
+import type { DealTerms, NationOrders } from '@brink/contracts';
+import { AIRBORNE, LEADER_TUNING, PASSAGE } from '@brink/game-data';
 import { createPacificScenario } from '@brink/scenarios';
 import { buildView, lockOrders, pairKey } from '@brink/simulation';
+import { makeWorld, setRelation } from '../../simulation/src/fixture.test-util';
 import { fundAirlifts, holdTheGates } from './airborne';
 import { consider } from './diplomacy-ai';
 import { emptyMemory } from './index';
@@ -31,10 +32,32 @@ describe('passage, the leaders', () => {
     const view = buildView(w, 'china');
     // However warm toward the asker, toward its ally Russia the answer is no.
     expect(consider(view, emptyMemory(), { from: 'usa', kind: 'passage', terms: { against: 'russia' } }).accept).toBe(false);
-    expect(considerPassage(view, 100, 'dove', false, 'russia', false)).toEqual({ accept: false, reason: 'mood' });
+    expect(considerPassage(view, 100, 'dove', false, 'russia', false)).toEqual({ accept: false, reason: 'likes_target' });
     // At war, it cannot even be asked.
     w.relations[pairKey('china', 'usa')] = 'war';
     expect(consider(buildView(w, 'china'), emptyMemory(), { from: 'usa', kind: 'passage' })).toEqual({ accept: false, reason: 'cannot' });
+  });
+
+  it('counts a sweetener as goodwill, up to a cap; never buys passage toward a friend; a request that asks to be paid is refused on terms', () => {
+    // Ruleset 2.11.0: passage is a deal like an alliance, and may carry resources paid on signing.
+    const w = makeWorld(8, 6, ['a', 'b', 'c']);
+    setRelation(w, 'a', 'b', 'peace');
+    setRelation(w, 'a', 'c', 'war');
+    setRelation(w, 'b', 'c', 'peace');
+    w.nations.b!.government = 'directorate'; // a hawk: it wants PASSAGE.mood.hawk
+    const view = buildView(w, 'b');
+    const att = (n: 'a' | 'c', mood: number) => ({ ...view.attitudes![n]!, mood, reasons: [] });
+    const ask = (moodA: number, terms: DealTerms, moodC = 0) => consider({ ...view, attitudes: { a: att('a', moodA), c: att('c', moodC) } }, emptyMemory(), { from: 'a', kind: 'passage', terms });
+    const bar = PASSAGE.mood.hawk;
+    // 100 credits, held at par (500 in the bank), is worth 10 points of mood.
+    expect(ask(bar - 5, { against: 'c' })).toEqual({ accept: false, reason: 'mood' });
+    expect(ask(bar - 5, { against: 'c', give: { credits: 100 } })).toEqual({ accept: true, reason: 'agreed' });
+    // The cap: however much is offered, it counts PASSAGE.sweetenerMax at most.
+    expect(ask(bar - PASSAGE.sweetenerMax - 1, { against: 'c', give: { credits: 400 } })).toEqual({ accept: false, reason: 'mood' });
+    expect(ask(bar - PASSAGE.sweetenerMax, { against: 'c', give: { credits: 400 } })).toEqual({ accept: true, reason: 'agreed' });
+    // Toward a power it likes, no price will do; asking it to pay is a matter of terms.
+    expect(ask(100, { against: 'c', give: { credits: 400 } }, LEADER_TUNING.stances.neutral + 1)).toEqual({ accept: false, reason: 'likes_target' });
+    expect(ask(100, { against: 'c', get: { credits: 50 } })).toEqual({ accept: false, reason: 'terms' });
   });
 
   it('asks the power at peace whose land lies across the way to its objective, and the engine takes the request', () => {

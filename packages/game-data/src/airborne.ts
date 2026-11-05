@@ -66,4 +66,11 @@ export const PASSAGE = {
   mood: { hawk: 15, opportunist: 0, dove: -5 },
   /** Asked without naming whom it is for: a leader wants this much more warmth. */
   unnamed: 10,
+  /**
+   * A sweetener handed over on signing (ruleset 2.11.0) counts as mood: this much per 1000 of its
+   * worth at the leader's prices (100 credits at par is 10 000), up to `sweetenerMax`. It buys no
+   * passage toward a friend of theirs, nor for the power their army marches on.
+   */
+  sweetenerPer1000: 1,
+  sweetenerMax: 20,
 } as const;

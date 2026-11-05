@@ -21,7 +21,8 @@ import { AIR_REBASE_RANGE, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
 import { checkAirlift, liftContext, lockAirlifts } from './airborne';
 import { lockCommanderOrders } from './commanders';
-import { bindingTreaty, canPropose, cleanTerms, PROPOSAL_OF, termsProblem, type DiplomacyWorld } from './diplomacy';
+import { bindingTreaty, canPropose, cleanTerms, dealGives, jointOpProblem, PROPOSAL_OF, termsProblem, type DiplomacyWorld } from './diplomacy';
+import { computeVision, knownSiteOwner, type Vision } from './fog';
 import { checkPlays, marchBonus } from './doctrine';
 import { hasPassage } from './passage';
 import { buildBlocker, facilityCost } from './progression';
@@ -238,12 +239,23 @@ export function checkDiplomacy(
     case 'propose_joint_op': {
       const site = world.sites?.[terms!.site!];
       if (!site) return 'no such prize';
-      const seen = world.tiles?.[site.key]?.visibility;
-      if (seen !== undefined && seen !== 'visible') return 'you cannot see that prize now: who holds it may have changed';
-      if (!site.owner || site.owner === nation || site.owner === target) return 'a joint operation is against a third power';
-      if (rel === 'war') return `at war with ${t.name}`;
-      if (relationOf(world.relations, nation, site.owner) !== 'war') return 'a joint operation needs you at war with its holder';
-      return canPropose(world, nation, target, 'joint_op', terms) ? null : `a joint operation with ${t.name} is already under way`;
+      // Judged on who holds it as last seen: a prize never seen at all is no prize to name.
+      if (world.tiles?.[site.key]?.visibility === 'unknown') return 'you have never seen that prize';
+      const holder = site.owner ? world.nations[site.owner] : undefined;
+      switch (jointOpProblem(world, nation, target, terms!.site!)) {
+        case 'no_prize':
+          return 'no such prize';
+        case 'not_third':
+          return 'a joint operation is against a third power';
+        case 'partners_at_war':
+          return `at war with ${t.name}`;
+        case 'neither_at_war':
+          return `a joint operation needs you or ${t.name} at war with ${holder?.name ?? 'its holder'}`;
+        case 'bound':
+          return bindingTreaty(world, nation, site.owner!) ? `bound by a treaty with ${holder?.name ?? 'its holder'}` : `${t.name} is bound by a treaty with ${holder?.name ?? 'its holder'}`;
+        default:
+          return canPropose(world, nation, target, 'joint_op', terms) ? null : `a joint operation with ${t.name} is already under way`;
+      }
     }
     case 'propose_passage': {
       if (rel !== 'peace') return rel === 'war' ? `at war with ${t.name}` : `${t.name} is an ally: its ground is already open to you`;
@@ -398,6 +410,17 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
     }
 
     const dip = Array.isArray(sub.diplomacy) ? sub.diplomacy : [];
+    // A joint operation is checked against the prize's holder as this nation knows it (its view shows
+    // the same): one that changed hands out of sight makes the deal void at resolution, not illegal.
+    let vision: Vision | null = null;
+    const judgedOn = (d: (typeof dip)[number]) => {
+      const id = d.action === 'propose_joint_op' && typeof d.terms?.site === 'string' ? d.terms.site : undefined;
+      const s = id ? world.sites[id] : undefined;
+      if (!id || !s) return world;
+      vision ??= computeVision(world, nation);
+      const owner = knownSiteOwner(world, nation, id, vision);
+      return owner === s.owner ? world : { ...world, sites: { ...world.sites, [id]: { ...s, owner } } };
+    };
     const perTarget = new Map<NationId, number>();
     for (const d of dip) perTarget.set(d.target, (perTarget.get(d.target) ?? 0) + 1);
     for (const d of [...dip].sort((a, b) => (a.target < b.target ? -1 : a.target > b.target ? 1 : 0))) {
@@ -409,10 +432,10 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
       else if (t.minor) reject(`${t.name} is a minor state: it makes no treaties`);
       else {
         const terms = PROPOSAL_OF[d.action] ? d.terms : undefined;
-        const why = checkDiplomacy(world, nation, d.target, d.action, terms);
+        const why = checkDiplomacy(judgedOn(d), nation, d.target, d.action, terms);
         const clean = why ? undefined : cleanTerms(d.action, terms);
         // What a deal hands over is reserved like a recruit's cost: it must fit what is left.
-        const gives = d.action === 'propose_exchange' || d.action === 'pay_tribute' ? (clean?.give ?? {}) : {};
+        const gives = dealGives(d.action, clean);
         if (why) reject(why);
         else if (RESOURCES.some((r) => reserved[r] + (gives[r] ?? 0) > n.stockpile[r])) reject(`not enough in the stockpile for the deal with ${t.name}`);
         else {

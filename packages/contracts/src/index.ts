@@ -599,6 +599,11 @@ export interface NationView {
   self: Nation;
   nations: Record<NationId, PublicNation>;
   relations: Record<NationId, Relation>;
+  /**
+   * Who is at war or allied with whom, every pair (`pairKey`): public, like the treaties. A leader
+   * asked to join a war or a joint operation must know whether the one asking is already in it.
+   */
+  publicRelations?: Record<string, Relation>;
   proposals: Proposal[];
   /** Treaties are public: every agreement in force between any two powers. */
   treaties: Treaty[];

@@ -378,5 +378,45 @@ export const LEADER_TUNING = {
     /** A leader asks for a ceasefire only from this turn, and only this far behind its enemy in standing. */
     ceasefireFromTurn: 6,
     ceasefireGap: 10,
+    /**
+     * Asked to start a war (an alliance against a power, or a joint operation on its city, when not
+     * already fighting it): the score is half the mood toward the one asking, less half the mood
+     * toward the target, plus each reason the target is worth fighting, less each war already on our
+     * hands, plus the temperament and any sweetener in the deal. At `threshold` or more, yes.
+     */
+    joinWar: {
+      threshold: 30,
+      /** Friendship counts up to this mood: a war needs a reason beyond it. */
+      moodFromCap: 40,
+      /** Refusals: they like the target this much... */
+      likesTarget: 20,
+      /** ...or their wars already weigh this much (two at `perWar`). */
+      stretched: 30,
+      /** Never for a power we like less than this... */
+      minMood: 0,
+      /** ...and the alliance or joint operation with a power we already fight beside needs this. */
+      alreadyAtWarMood: 0,
+      /** The target leads the race toward Supremacy. */
+      raceLeader: 20,
+      /** The target stands ahead of us. */
+      stronger: 10,
+      /** The target took a city of ours (a memory). */
+      tookOurCity: 15,
+      /** The target's cities lie within this many hexes of ours... */
+      neighbourHexes: 6,
+      /** ...worth this much: a threat on the doorstep. */
+      neighbour: 10,
+      /** Each war (with a power, not a minor state) already being fought. */
+      perWar: 15,
+      /** The one asking is already our ally. */
+      ally: 10,
+      hawk: 10,
+      dove: -10,
+      /** An opportunist joins a war on the race leader readily. */
+      opportunistOnLeader: 10,
+      /** A sweetener: score per 1000 of its worth at the leader's prices (100 credits at par is 10 000). */
+      sweetenerPer1000: 1,
+      sweetenerMax: 40,
+    },
   },
 } as const;

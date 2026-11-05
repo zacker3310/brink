@@ -346,4 +346,33 @@ describe('right of passage', () => {
     w.treaties.push({ kind: 'passage', a: 'a', b: 'b', from: 1, until: 8 });
     expect(buildView(w, 'c').treaties.some((t) => t.kind === 'passage')).toBe(true);
   });
+
+  it('may carry a sweetener (ruleset 2.11.0): it signs only when mirrored, is paid on signing and reserved like a recruit', () => {
+    const w = peaceful();
+    const terms = { give: { credits: 100 } };
+    const back = { get: { credits: 100 } };
+    const both = (x: typeof terms | undefined, y: typeof back | undefined) =>
+      resolveTurn(w, [
+        orders(w, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_passage', ...(x ? { terms: x } : {}) }] }),
+        orders(w, 'b', {}, { diplomacy: [{ target: 'a', action: 'propose_passage', ...(y ? { terms: y } : {}) }] }),
+      ]);
+    // Offered back without the payment named: terms that do not mirror sign nothing.
+    expect(hasPassage(both(terms, undefined).world, 'a', 'b')).toBe(false);
+    const r = both(terms, back);
+    expect(hasPassage(r.world, 'a', 'b')).toBe(true);
+    expect(r.events).toContainEqual(expect.objectContaining({ kind: 'exchange', a: 'a', b: 'b', aGave: { credits: 100 } }));
+    const plain = resolveTurn(w, []);
+    expect(r.world.nations.b!.stockpile.credits - plain.world.nations.b!.stockpile.credits).toBe(100);
+    expect(plain.world.nations.a!.stockpile.credits - r.world.nations.a!.stockpile.credits).toBe(100);
+    // Whom it is for and the payment both ride in the deal.
+    const named = resolveTurn(w, [
+      orders(w, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_passage', terms: { against: 'b', give: { credits: 1 } } }] }),
+    ]);
+    expect(named.events).toContainEqual(expect.objectContaining({ kind: 'order_rejected', nation: 'a', reason: 'passage toward whom?' }));
+    // More than the stockpile holds: refused, as an alliance's sweetener is.
+    const poor = resolveTurn({ ...w, nations: { ...w.nations, a: { ...w.nations.a!, stockpile: { ...w.nations.a!.stockpile, credits: 50 } } } }, [
+      orders(w, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_passage', terms }] }),
+    ]);
+    expect(poor.events).toContainEqual(expect.objectContaining({ kind: 'order_rejected', nation: 'a', reason: expect.stringContaining('not enough in the stockpile') }));
+  });
 });

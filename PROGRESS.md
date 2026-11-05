@@ -1,7 +1,6 @@
 # PROGRESS
 
-Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.9.0). Milestone 1 (first playable).
-Updated 2026-11-05 (airborne warfare and right of passage, ruleset 2.9.0). Milestone 1 (first playable).
+Updated 2026-11-05 (diplomacy that works merged with airborne warfare and right of passage, ruleset 2.11.0). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -25,6 +24,55 @@ Updated 2026-11-05 (airborne warfare and right of passage, ruleset 2.9.0). Miles
 | 16 | Playable without editing source | done | |
 
 ## Completed
+
+- Diplomacy that works, merged with airborne warfare and right of passage (ruleset 2.11.0; both
+  lanes had set 2.10.0 on their own). Right of passage is a deal like the others the diplomacy
+  fixes restructured: it may carry a sweetener (`cleanTerms`, `mirrors`, `dealGives`, paid on
+  signing), `canPropose` still wants peace and no passage running, and `consider` counts a
+  sweetener as goodwill (`PASSAGE.sweetenerPer1000`, `sweetenerMax`) while a request toward a
+  power the leader likes is refused as `likes_target`. The diplomacy screen keeps passage in sight
+  at war and between allies, disabled with the reason ("Make peace with China first", "China is an
+  ally: its ground is already open to you"), and a refusal of passage says why in plain words.
+  The staff still signs only trade and pacts (it never asks for passage or makes peace for the
+  player); the plans and Enter Battle UX are untouched by the merge.
+- Diplomacy that works (ruleset 2.10.0). Playtest: "alliances and joint operations are not
+  working, and when I declare war it often gets overwritten by the staff". Root causes:
+  1. The store copied the staff's peace and ceasefires into the player's draft for any power the
+     player had no order for, so the turn after a declaration the staff drafted peace (its
+     objective lay elsewhere) and the rival accepted (on Easy always). Now the staff signs only
+     trade and pacts with powers at peace (`apps/web/src/staff-diplomacy.ts`); peace and
+     ceasefires are advice, taken with one tap on the diplomacy screen. A declaration already
+     drops every offer pending between the two (test added).
+  2. An alliance against X needed the answering leader to be at war with X or to hate it (mood
+     -20): Japan, the US ally at +41, refused one against China ('mood'). Now `consider` weighs
+     joining a war (`joinWar`, `LEADER_TUNING.ai.joinWar`): mood toward the asker (capped) and
+     toward X, X leading the race, ahead, holding a city of ours or on our doorstep, our wars, an
+     ally asking, temperament, and a sweetener (resources in the deal, paid on signing). Refusals
+     say why: `likes_target`, `stretched`, `strength`, `terms`, `mood`.
+  3. A joint operation needed both sides already at war with the prize's holder (the answer is
+     the same offer back), and a prize in sight now. Now one partner at war is enough and the
+     other goes to war on signing (perfidy applies); still illegal against a power either has a
+     pact or ceasefire with. A prize known but out of sight may be named: `lockOrders` checks
+     the holder as the proposer knows it, and one that changed hands out of sight voids the deal
+     instead of refusing the order. Partners share what they see of the prize. Wars and
+     alliances are public in the view (`publicRelations`), so a leader knows whether the asker
+     already fights X. The partner AI marches on the prize (`jointOpTarget`), as does the
+     player's staff; Operations put the prize first. A leader in a joint operation, or allied to
+     a power at war with X, makes no peace with X unless losing (Japan on Easy used to make peace
+     with China by turn 3, leaving the alliance against China hollow).
+  4. The screen said "Cannot" or hid the deal. Now every deal stays in sight, disabled with the
+     reason in plain words ("Make peace with Japan first", "Shanghai isn't held by a power you or
+     Japan are fighting"), and a refusal says why ("Japan won't start a war with China for you:
+     they like China"). At war, peace comes first on the screen.
+  Tests: `simulation/src/leaders.test.ts` (joint op rules, sweetener, stale prize, shared vision,
+  declaration), `ai/src/diplomacy-ai.test.ts` (joining a war), `session/src/diplomacy.test.ts`
+  (USA asks Japan, at peace with China, for an alliance and a joint op; Japan goes to war and
+  lands on the city; a 2.9.0 save loads unchanged), `web/src/staff-diplomacy.test.ts`,
+  `web/src/leaders.test.ts`, e2e `alliance.spec.ts`.
+  Measured: soak (20 matches) 13 decisive, median turn 28, 0 rejected AI orders and actions;
+  matrix 0 genuine failures; human win rates (32 a level) Easy 91%, Normal 69%, Hard 25%
+  (2.9.0: 88, 59, 28). Normal rose because the AI in the human seat now finds partners who join
+  its wars; `LEADER_TUNING.ai.joinWar.threshold` is the knob if that is too generous.
 
 - Balance after research, leaders and the staff AI (ruleset 2.9.0). Measured on 2.8.0: of 40 soak
   matches 15 decisive (China 12, Russia 3), median turn 30; after the first ten turns the wars

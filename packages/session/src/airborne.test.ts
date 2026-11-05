@@ -109,7 +109,7 @@ describe('airborne: saves', () => {
     const loaded = parseSave(JSON.stringify(old));
     expect(loaded.migratedFrom).toBe('2.8.0');
     expect(loaded.rulesetVersion).toBe(RULESET_VERSION);
-    expect(RULESET_VERSION).toBe('2.10.0');
+    expect(RULESET_VERSION).toBe('2.11.0');
     expect(loaded.hash).toBe(hashState(loaded.world));
     expect(hashState(migrateSave({ ...loaded, saveVersion: SAVE_VERSION }).world)).toBe(loaded.hash);
     const resumed = GameSession.fromSave(loaded);

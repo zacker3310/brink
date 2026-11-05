@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import type { DealTerms, DiplomaticAction, NationId, NationView, ProposalKind, Resource, TurnReport } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { AGENDA_TEXT, LEADER_TUNING, RULES, TEMPERAMENT_TEXT } from '@brink/game-data';
+import { AGENDA_TEXT, LEADER_TUNING, PASSAGE, RULES, TEMPERAMENT_TEXT } from '@brink/game-data';
 import { verdictLine, type Verdict } from '@brink/ai';
-import { answerTo } from '@brink/simulation';
+import { answerTo, checkDiplomacy, diplomacyWorldOf } from '@brink/simulation';
 import { Label } from './chrome';
 import { engine } from './engine';
 import { Emblem } from './glyphs';
-import { ACTION_TEXT, dealText, initials, leaderOfNation, leaderReactions, lineOf, reasonText, STANCE_TEXT, stockText, TREATY_TEXT } from './leaders';
+import { ACTION_TEXT, blockedText, dealText, initials, leaderOfNation, leaderReactions, lineOf, reasonText, refusalText, STANCE_TEXT, stockText, TREATY_TEXT } from './leaders';
 import { diplomacyBlocked } from './rules-view';
 import { sfx } from './sfx';
 import { useGame } from './store';
@@ -62,9 +62,14 @@ function signedText(n: number): string {
 export function Diplomacy() {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
+  const advice = useGame((s) => s.staffAdvice);
+  const setDiplomacy = useGame((s) => s.setDiplomacy);
   const [open, setOpen] = useState<NationId | null>(null);
   const rivals = powersOf(view).filter((n) => n.id !== view.self.id);
   const wars = rivals.filter((n) => !n.eliminated && view.relations[n.id] === 'war').length;
+  const alive = rivals.filter((n) => !n.eliminated).length;
+  // The staff never makes peace for you: it advises, and one tap takes its advice.
+  const advised = advice && advice.turn === view.turn ? advice.orders.filter((d) => view.relations[d.target] === 'war' && !draft.diplomacy.some((x) => x.target === d.target)) : [];
   if (open && view.nations[open] && !view.nations[open]!.eliminated) return <LeaderScreen view={view} nation={open} onBack={() => setOpen(null)} />;
   return (
     <section className="px-3 py-3" data-testid="diplomacy">
@@ -76,6 +81,33 @@ export function Diplomacy() {
         Every rival is run by a leader with a temper and a memory. Tap one to see how they feel about you and why, and to put a deal to them.
         {view.difficulty === 'easy' ? ' On Easy, any leader grants you peace.' : ''}
       </p>
+      {alive > 0 && wars === alive && (
+        <p className="mb-3 rounded-lg border border-signal/50 bg-ink-850 p-2.5 text-[13px] leading-snug" data-testid="peace-first-all">
+          You are at war with every power. An alliance or a joint operation needs peace first: open a leader and propose peace.
+        </p>
+      )}
+      {advised.length > 0 && (
+        <ul className="mb-3 space-y-2" data-testid="staff-advice">
+          {advised.map((d) => (
+            <li key={d.target} className="flex items-center gap-2 rounded-lg border border-friend/60 bg-friend/10 p-2.5" data-testid={`staff-advice-${d.target}`}>
+              <span className="min-w-0 flex-1 text-[13px] leading-snug">
+                Staff advises {d.action === 'propose_ceasefire' ? 'a ceasefire' : 'peace'} with {view.nations[d.target]?.name}: one front fewer for the army.
+              </span>
+              <button
+                type="button"
+                className={`${big} shrink-0 bg-signal text-ink-950`}
+                data-testid={`staff-advice-accept-${d.target}`}
+                onClick={() => {
+                  setDiplomacy(d.target, d.action);
+                  sfx.order();
+                }}
+              >
+                {d.action === 'propose_ceasefire' ? 'Offer ceasefire' : 'Offer peace'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <ul className="space-y-2">
         {rivals.map((n) => {
           const leader = leaderOfNation(view, n.id);
@@ -141,10 +173,17 @@ interface DealOption {
 }
 
 function optionsFor(rel: string): DealOption[] {
+  // At war, peace comes first; the deals that need it stay in sight, each saying so.
   if (rel === 'war')
     return [
-      { action: 'propose_ceasefire', kind: 'ceasefire', label: 'Ceasefire' },
       { action: 'propose_peace', kind: 'peace', label: 'Peace' },
+      { action: 'propose_ceasefire', kind: 'ceasefire', label: 'Ceasefire' },
+      { action: 'propose_alliance', kind: 'alliance', label: 'Alliance' },
+      { action: 'propose_alliance', kind: 'alliance', label: 'Alliance against…', needs: 'against' },
+      { action: 'propose_joint_op', kind: 'joint_op', label: 'Joint operation', needs: 'site' },
+      { action: 'propose_passage', kind: 'passage', label: 'Right of passage', needs: 'toward' },
+      { action: 'propose_trade', kind: 'trade', label: 'Trade agreement' },
+      { action: 'embargo', label: 'Embargo', tone: 'danger' },
     ];
   return [
     { action: 'propose_trade', kind: 'trade', label: 'Trade agreement' },
@@ -153,20 +192,22 @@ function optionsFor(rel: string): DealOption[] {
     { action: 'propose_alliance', kind: 'alliance', label: 'Alliance' },
     { action: 'propose_alliance', kind: 'alliance', label: 'Alliance against…', needs: 'against' },
     { action: 'propose_joint_op', kind: 'joint_op', label: 'Joint operation', needs: 'site' },
-    // Military access: march through, supply across, base aircraft. Allies have it already.
-    ...(rel === 'peace' ? [{ action: 'propose_passage', kind: 'passage', label: 'Right of passage', needs: 'toward' } as DealOption] : []),
+    // Military access: march through, supply across, base aircraft. Allies have it already (the
+    // option says so).
+    { action: 'propose_passage', kind: 'passage', label: 'Right of passage', needs: 'toward' },
     { action: 'demand_tribute', kind: 'tribute', label: 'Demand tribute', needs: 'tribute' },
     { action: 'embargo', label: 'Embargo', tone: 'danger' },
     { action: 'declare_war', label: 'Declare war', tone: 'danger' },
   ];
 }
 
-function Stepper({ label, value, onChange, max }: { label: string; value: number; onChange: (v: number) => void; max: number }) {
+function Stepper({ label, value, onChange, max, min }: { label: string; value: number; onChange: (v: number) => void; max: number; min?: number }) {
   const step = 20;
+  const floor = min ?? step;
   return (
     <div className="flex items-center gap-2">
       <span className="w-14 text-[12px] text-muted">{label}</span>
-      <button type="button" className={`${big} w-11 border border-line bg-ink-800 px-0`} onClick={() => onChange(Math.max(step, value - step))} aria-label={`Less ${label}`}>
+      <button type="button" className={`${big} w-11 border border-line bg-ink-800 px-0`} onClick={() => onChange(Math.max(floor, value - step))} aria-label={`Less ${label}`}>
         −
       </button>
       <span className="w-12 text-center font-mono text-[15px] tabular-nums">{value}</span>
@@ -216,7 +257,9 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
   const [against, setAgainst] = useState<NationId | null>(null);
   const [site, setSite] = useState<string | null>(null);
   const [toward, setToward] = useState<NationId | null>(null);
-  const [reply, setReply] = useState<{ verdict: Verdict; order: { action: DiplomaticAction; terms?: DealTerms } } | null>(null);
+  // An optional sweetener on an alliance against a power, a joint operation or a right of passage: 0 is none.
+  const [sweet, setSweet] = useState<{ r: Resource; n: number }>({ r: 'credits', n: 0 });
+  const [reply, setReply] = useState<{ verdict: Verdict; kind?: ProposalKind; order: { action: DiplomaticAction; terms?: DealTerms } } | null>(null);
   const [asking, setAsking] = useState(false);
 
   // The leader greets by stance; after an answer they speak to it; after the turn they react to it.
@@ -226,18 +269,33 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
   const termsFor = (o: DealOption): DealTerms | undefined => {
     if (o.needs === 'exchange') return { give: { [give.r]: give.n }, get: { [get.r]: get.n } };
     if (o.needs === 'tribute') return { get: { [get.r]: get.n } };
-    if (o.needs === 'against') return against ? { against } : undefined;
-    if (o.needs === 'site') return site ? { site } : undefined;
-    if (o.needs === 'toward') return toward ? { against: toward } : undefined;
+    const bonus = sweet.n > 0 ? { give: { [sweet.r]: sweet.n } } : {};
+    if (o.needs === 'against') return against ? { against, ...bonus } : undefined;
+    if (o.needs === 'site') return site ? { site, ...bonus } : undefined;
+    // Passage may name whom it is for, or not, and may be sweetened either way.
+    if (o.needs === 'toward') return toward || sweet.n > 0 ? { ...(toward ? { against: toward } : {}), ...bonus } : undefined;
     return undefined;
   };
-  const enemiesOfMine = Object.keys(view.relations).filter((n) => view.relations[n] === 'war');
+  // Why a deal cannot be offered, in plain words (null when it can).
+  const whyNot = (action: DiplomaticAction, t?: DealTerms) => blockedText(view, nation, action, t, diplomacyBlocked(view, nation, action, t));
+  // Prizes: the cities of third powers you know of, those a joint operation can take first.
   const prizes = Object.values(view.sites)
-    .filter((s) => s.owner && s.owner !== me && s.owner !== nation && enemiesOfMine.includes(s.owner) && (s.kind === 'capital' || s.kind === 'city') && view.tiles[s.key]?.visibility === 'visible')
-    .sort((a, b) => b.victoryPoints - a.victoryPoints || (a.name < b.name ? -1 : 1))
-    .slice(0, 6);
-  const thirdPowers = powersOf(view).filter((n) => n.id !== me && n.id !== nation && !n.eliminated);
-  const options = optionsFor(rel).filter((o) => (o.needs === 'site' ? prizes.length > 0 : o.needs === 'against' ? thirdPowers.length > 0 : true));
+    .filter((s) => s.owner && s.owner !== me && s.owner !== nation && !view.nations[s.owner]?.minor && (s.kind === 'capital' || s.kind === 'city') && view.tiles[s.key]?.visibility !== 'unknown')
+    .map((s) => ({ s, why: whyNot('propose_joint_op', { site: s.id }) }))
+    .sort((a, b) => Number(!!a.why) - Number(!!b.why) || b.s.victoryPoints - a.s.victoryPoints || (a.s.name < b.s.name ? -1 : 1))
+    .slice(0, 8);
+  const thirdPowers = powersOf(view)
+    .filter((n) => n.id !== me && n.id !== nation && !n.eliminated)
+    .map((n) => ({ n, why: whyNot('propose_alliance', { against: n.id }) }));
+  // A whole kind of deal that cannot be offered now, and why.
+  const optionWhy = (o: DealOption): string | null => {
+    if (o.needs === 'site') return prizes.some((p) => !p.why) ? null : (prizes[0]?.why ?? `No city of a power you or ${them.name} fight is known`);
+    if (o.needs === 'against') return thirdPowers.some((p) => !p.why) ? null : (thirdPowers[0]?.why ?? 'No other power to ally against');
+    if (o.needs === 'exchange') return whyNot(o.action, { give: { credits: 20 }, get: { food: 20 } });
+    if (o.needs === 'tribute') return whyNot(o.action, { get: { credits: 20 } });
+    return whyNot(o.action);
+  };
+  const options = optionsFor(rel);
 
   const terms = deal ? termsFor(deal) : undefined;
   // Passage may name whom it is for, or not (a leader wants more warmth to grant it unnamed).
@@ -246,11 +304,13 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
     .filter((n) => view.relations[n] === 'war' && n !== nation && view.nations[n] && !view.nations[n]!.eliminated)
     .sort((a, b) => (view.nations[a]!.name < view.nations[b]!.name ? -1 : 1))
     .slice(0, 7);
-  const blocked = deal && ready ? diplomacyBlocked(view, nation, deal.action, terms) : null;
+  const blocked = deal && ready ? whyNot(deal.action, terms) : null;
+  const sweetened = deal?.needs === 'against' || deal?.needs === 'site' || deal?.needs === 'toward';
+  const sweetShort = sweetened && sweet.n > view.self.stockpile[sweet.r] ? `You hold only ${view.self.stockpile[sweet.r]} ${RES_NAME[sweet.r].toLowerCase()}` : null;
   const short = deal?.needs === 'exchange' && view.self.stockpile[give.r] < give.n ? `You hold only ${view.self.stockpile[give.r]} ${RES_NAME[give.r].toLowerCase()}` : null;
 
   const ask = async () => {
-    if (!deal || !ready || blocked || short) return;
+    if (!deal || !ready || blocked || short || sweetShort) return;
     if (!deal.kind) {
       // War and embargoes are not offers: they take effect when the turn resolves.
       setDiplomacy(nation, deal.action);
@@ -263,7 +323,7 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
     setAsking(false);
     if (r.type !== 'verdict') return;
     const order = { action: deal.action, ...(terms ? { terms } : {}) };
-    setReply({ verdict: r.verdict, order });
+    setReply({ verdict: r.verdict, kind: deal.kind, order });
     if (r.verdict.accept) {
       setDiplomacy(nation, deal.action, terms);
       sfx.order();
@@ -302,6 +362,18 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
       {reply && (
         <div className={`mt-2 rounded-lg border p-2.5 text-[13px] ${reply.verdict.accept ? 'border-good/60 text-good' : 'border-hostile/60 text-hostile'}`} data-testid={reply.verdict.accept ? 'deal-agreed' : 'deal-refused'}>
           {reply.verdict.accept ? 'Agreed. It is signed when the turn ends.' : `${leader.name} said no.`}
+          {!reply.verdict.accept && (
+            <p className="mt-1 text-[13px] text-text" data-testid="deal-refused-why">
+              {reply.verdict.reason === 'cannot' && reply.kind
+                ? (() => {
+                    // Their side of it: the answer they would have to give, checked as the engine checks it.
+                    const answer = answerTo({ from: me, kind: reply.kind, ...(reply.order.terms ? { terms: reply.order.terms } : {}) });
+                    const why = checkDiplomacy(diplomacyWorldOf(view), nation, me, answer.action, answer.terms);
+                    return why ? `${them.name} cannot: ${why}.` : refusalText(view, nation, 'cannot', reply.kind, reply.order.terms);
+                  })()
+                : refusalText(view, nation, reply.verdict.reason, reply.kind ?? 'peace', reply.order.terms)}
+            </p>
+          )}
           {!reply.verdict.accept && reply.verdict.reason !== 'cannot' && (
             <button
               type="button"
@@ -403,22 +475,36 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
       <div className="mt-4">
         <Label>Put a deal to {leader.name.split(' ')[0]}</Label>
         <p className="mt-1 text-[12px] text-faint">One move toward each power a turn{planned ? ': this replaces the one above' : ''}.</p>
+        {rel === 'war' && (
+          <p className="mt-2 rounded-lg border border-signal/50 bg-ink-850 p-2.5 text-[13px] leading-snug" data-testid="peace-first">
+            You are at war with {them.name}. An alliance, a joint operation, passage or trade needs peace first: propose peace.
+          </p>
+        )}
         <div className="mt-2 grid grid-cols-2 gap-2">
           {options.map((o) => {
             const on = deal?.label === o.label;
+            const slug = o.label.toLowerCase().replace(/[^a-z]+/g, '-').replace(/-$/, '');
+            const why = optionWhy(o);
             return (
               <button
                 key={o.label}
                 type="button"
                 aria-pressed={on}
-                data-testid={`deal-${o.label.toLowerCase().replace(/[^a-z]+/g, '-').replace(/-$/, '')}`}
+                disabled={!!why}
+                title={why ?? undefined}
+                data-testid={`deal-${slug}`}
                 onClick={() => {
                   setReply(null);
                   setDeal(on ? null : o);
                 }}
-                className={`${big} border text-[13px] ${on ? 'border-friend bg-friend/15 text-friend' : o.tone === 'danger' ? 'border-hostile/60 text-hostile' : 'border-line bg-ink-800'}`}
+                className={`min-h-11 rounded-lg border px-3 py-1.5 text-[13px] font-semibold disabled:opacity-60 ${on ? 'border-friend bg-friend/15 text-friend' : o.tone === 'danger' ? 'border-hostile/60 text-hostile' : 'border-line bg-ink-800'}`}
               >
-                {o.label}
+                <span className="block">{o.label}</span>
+                {why && (
+                  <span className="block text-[11px] leading-tight font-normal text-faint" data-testid={`deal-why-${slug}`}>
+                    {why}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -446,9 +532,20 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
             )}
             {deal.needs === 'against' && (
               <div className="grid grid-cols-2 gap-1.5">
-                {thirdPowers.map((n) => (
-                  <button key={n.id} type="button" aria-pressed={against === n.id} onClick={() => setAgainst(n.id)} className={`h-11 rounded-lg border text-[13px] font-semibold ${against === n.id ? 'border-friend bg-friend/15 text-friend' : 'border-line bg-ink-800'}`}>
-                    Against {n.name}
+                {thirdPowers.map(({ n, why }) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    aria-pressed={against === n.id}
+                    disabled={!!why}
+                    title={why ?? undefined}
+                    data-testid={`against-${n.id}`}
+                    onClick={() => setAgainst(n.id)}
+                    className={`min-h-11 rounded-lg border px-2 py-1 text-[13px] font-semibold disabled:opacity-60 ${against === n.id ? 'border-friend bg-friend/15 text-friend' : 'border-line bg-ink-800'}`}
+                  >
+                    <span className="block">Against {n.name}</span>
+                    {view.relations[n.id] === 'war' && !why && <span className="block text-[11px] font-normal text-faint">you are at war with them</span>}
+                    {why && <span className="block text-[11px] leading-tight font-normal text-faint">{why}</span>}
                   </button>
                 ))}
               </div>
@@ -467,12 +564,38 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
             )}
             {deal.needs === 'site' && (
               <div className="grid grid-cols-2 gap-1.5">
-                {prizes.map((s) => (
-                  <button key={s.id} type="button" aria-pressed={site === s.id} onClick={() => setSite(s.id)} className={`h-11 truncate rounded-lg border px-2 text-[13px] font-semibold ${site === s.id ? 'border-friend bg-friend/15 text-friend' : 'border-line bg-ink-800'}`}>
-                    {s.name} · {s.victoryPoints} VP
+                {prizes.map(({ s, why }) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    aria-pressed={site === s.id}
+                    disabled={!!why}
+                    title={why ?? undefined}
+                    data-testid={`prize-${s.id}`}
+                    onClick={() => setSite(s.id)}
+                    className={`min-h-11 rounded-lg border px-2 py-1 text-[13px] font-semibold disabled:opacity-60 ${site === s.id ? 'border-friend bg-friend/15 text-friend' : 'border-line bg-ink-800'}`}
+                  >
+                    <span className="block truncate">
+                      {s.name} · {s.victoryPoints} VP
+                    </span>
+                    <span className="block truncate text-[11px] leading-tight font-normal text-faint">{why ?? view.nations[s.owner!]?.name}</span>
                   </button>
                 ))}
               </div>
+            )}
+            {sweetened && (
+              <>
+                <div className="text-[12px] font-semibold text-muted">Sweeten it (optional): you give on signing</div>
+                <ResourcePicker value={sweet.r} onChange={(r) => setSweet({ ...sweet, r })} testId="sweet-resource" />
+                <Stepper label="Amount" value={sweet.n} onChange={(n) => setSweet({ ...sweet, n })} max={LEADER_TUNING.dealMax} min={0} />
+                <p className="text-[12px] text-faint">
+                  {deal.needs === 'site'
+                    ? `Both armies march on the city for ${LEADER_TUNING.jointOpTurns} turns; whoever of you is not at war with its holder goes to war on signing, and you share what you see of it.`
+                    : deal.needs === 'toward'
+                      ? `For ${PASSAGE.turns} turns each of you may march through the other's land, supply across it and base aircraft there; it takes no ground. A sweetener warms them to it as goodwill does.`
+                      : 'Whoever of you is not yet at war with them goes to war on signing.'}
+                </p>
+              </>
             )}
             <p className="text-[13px] text-muted">
               {deal.action === 'declare_war'
@@ -483,10 +606,14 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
                     ? `You propose ${dealText(view, deal.kind!, terms)}.`
                     : 'Choose the terms.'}
             </p>
-            {(blocked || short) && <p className="text-[13px] font-semibold text-hostile">{short ?? blocked}</p>}
+            {(blocked || short || sweetShort) && (
+              <p className="text-[13px] font-semibold text-hostile" data-testid="deal-blocked">
+                {short ?? sweetShort ?? blocked}
+              </p>
+            )}
             <button
               type="button"
-              disabled={!ready || !!blocked || !!short || asking}
+              disabled={!ready || !!blocked || !!short || !!sweetShort || asking}
               onClick={() => void ask()}
               data-testid="deal-ask"
               className={`${big} w-full disabled:opacity-50 ${deal.tone === 'danger' ? 'bg-hostile text-white' : 'bg-signal text-ink-950'}`}
