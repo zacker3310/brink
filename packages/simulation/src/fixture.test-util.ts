@@ -1,4 +1,4 @@
-import type { Formation, NationId, NationOrders, Relation, Site, SiteKind, Terrain, UnitClass, WorldState } from '@brink/contracts';
+import type { Formation, FormationClass, NationId, NationOrders, Relation, Site, SiteKind, Terrain, WorldState } from '@brink/contracts';
 import { RULESET_VERSION } from '@brink/game-data';
 import { hexKey } from '@brink/map';
 import { emptyIntel } from './fog';
@@ -91,7 +91,7 @@ export function site(world: WorldState, id: string, key: string, owner: NationId
   return s;
 }
 
-export function unit(world: WorldState, id: string, owner: NationId, unitClass: UnitClass, key: string, over: Partial<Formation> = {}): Formation {
+export function unit(world: WorldState, id: string, owner: NationId, unitClass: FormationClass, key: string, over: Partial<Formation> = {}): Formation {
   const f: Formation = {
     id,
     name: id,

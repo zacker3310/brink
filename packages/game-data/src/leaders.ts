@@ -365,6 +365,8 @@ export const LEADER_TUNING = {
     pactGap: 4,
     tradeMood: -25,
     jointOpMood: 0,
+    /** Black Files: a leader signs the Accord with anyone it feels better than this about. */
+    accordMood: -70,
     /** Percent of what they give a leader wants back in an exchange, before mood. */
     exchangeMargin: 110,
     /** A tribute is paid only when the demander leads by this much standing (hawks need twice). */

@@ -405,7 +405,7 @@ function parity(world: WorldState, specs: readonly NationSpec[], capitalOf: Read
   const kinds: UnitClass[] = ['infantry', 'mechanized', 'artillery'];
   for (const n of specs) {
     const counts = new Map<UnitClass, number>();
-    for (const f of Object.values(world.formations)) if (f.owner === n.id) counts.set(f.unitClass, (counts.get(f.unitClass) ?? 0) + 1);
+    for (const f of Object.values(world.formations)) if (f.owner === n.id) counts.set(f.unitClass as UnitClass, (counts.get(f.unitClass as UnitClass) ?? 0) + 1);
     const places = sitesOf(n.id).filter((s) => s.kind !== 'depot').map((s) => s.id);
     let i = 0;
     for (let guard = 0; guard < 40 && weight(n.id) + 500 < heaviest; guard++) {

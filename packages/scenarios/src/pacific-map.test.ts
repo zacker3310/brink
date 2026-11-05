@@ -34,6 +34,8 @@ const PINNED: readonly (readonly [seed: number, hash: string])[] = [
 
 describe('the Pacific from its map file', () => {
   it('builds the same turn-1 world as the inline grid did, seed for seed', () => {
-    for (const [seed, hash] of PINNED) expect(hashState(createScenario(PACIFIC_ID, seed)), `seed ${seed}`).toBe(hash);
+    // Ruleset 2.10.0 (the Black Files) changed no ground and no opening of the Pacific without them:
+    // the world is the 2.9.0 world but for its version stamp, so the pins hold with the stamp put back.
+    for (const [seed, hash] of PINNED) expect(hashState({ ...createScenario(PACIFIC_ID, seed), rulesetVersion: '2.9.0' }), `seed ${seed}`).toBe(hash);
   });
 });

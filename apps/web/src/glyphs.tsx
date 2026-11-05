@@ -1,4 +1,4 @@
-import type { GovernmentId, UnitClass } from '@brink/contracts';
+import type { FormationClass, GovernmentId } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { unitImage } from './art';
 import { pictogramSvg } from './design/pictograms';
@@ -6,14 +6,14 @@ import { pictogramSvg } from './design/pictograms';
 // Small SVG marks shared by the menus and the game screen.
 
 /** The top-down render of a unit class, as the map draws it. */
-export function ModelPortrait({ unitClass, color = '#ededed', className = 'h-10 w-10' }: { unitClass: UnitClass; color?: string; className?: string }) {
+export function ModelPortrait({ unitClass, color = '#ededed', className = 'h-10 w-10' }: { unitClass: FormationClass; color?: string; className?: string }) {
   // Ships have no rendered model yet: their pictogram stands in, upright.
-  if (UNITS[unitClass].naval) return <UnitGlyph unitClass={unitClass} color={color} className={className.replace('-rotate-90', '')} />;
+  if (UNITS[unitClass].naval || UNITS[unitClass].short.startsWith('X')) return <UnitGlyph unitClass={unitClass} color={color} className={className.replace('-rotate-90', '')} />;
   return <img src={unitImage(unitClass)} alt="" draggable={false} className={`shrink-0 object-contain ${className}`} />;
 }
 
 /** A unit's pictogram, inline, as the map's counters show it. */
-export function UnitGlyph({ unitClass, color, className = 'h-3.5 w-5', planned = false }: { unitClass: UnitClass; color: string; className?: string; affiliation?: string; planned?: boolean }) {
+export function UnitGlyph({ unitClass, color, className = 'h-3.5 w-5', planned = false }: { unitClass: FormationClass; color: string; className?: string; affiliation?: string; planned?: boolean }) {
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full ${planned ? 'opacity-50' : ''} ${className}`}

@@ -8,7 +8,8 @@ import type { TechId } from '@brink/contracts';
 import type { CardSupportAsset } from './doctrine';
 import type { Modifiers } from './index';
 
-export type TechBranch = 'economy' | 'armour' | 'air' | 'naval' | 'cyber';
+/** `black`: the reverse-engineered branch (Black Files), researched only from an artefact at a black site. */
+export type TechBranch = 'economy' | 'armour' | 'air' | 'naval' | 'cyber' | 'black';
 
 export interface TechBranchDef {
   name: string;
@@ -16,7 +17,7 @@ export interface TechBranchDef {
 }
 
 /** Display order of the branches. */
-export const TECH_BRANCHES: readonly TechBranch[] = ['economy', 'armour', 'air', 'naval', 'cyber'];
+export const TECH_BRANCHES: readonly TechBranch[] = ['economy', 'armour', 'air', 'naval', 'cyber', 'black'];
 
 export const BRANCHES: Record<TechBranch, TechBranchDef> = {
   economy: { name: 'Logistics & Economy', summary: 'Supply, industry and growing cities.' },
@@ -24,6 +25,7 @@ export const BRANCHES: Record<TechBranch, TechBranchDef> = {
   air: { name: 'Air & Missiles', summary: 'Strikes from the sky and from far away.' },
   naval: { name: 'Naval', summary: 'Ports, fleets and carriers.' },
   cyber: { name: 'Cyber & Intel', summary: 'Seeing more, planning better, thinking faster.' },
+  black: { name: 'Reverse-Engineered', summary: 'What the artefacts teach, studied at a black site. Hidden from rivals until it leaks.' },
 };
 
 /** Off-map support a technology puts over every hand-fought battle (`coastal`: only a battle on the coast). */
@@ -47,6 +49,11 @@ export interface TechDef {
   modifiers: Modifiers;
   /** Support missions in the player's hand-fought battles. */
   support?: TechSupport[];
+  /**
+   * Black Files: started only by a power holding a black site and an unstudied artefact, which the
+   * finished project uses up. Rivals do not learn of it until the programme leaks.
+   */
+  artefact?: true;
 }
 
 export const TECHS: Record<TechId, TechDef> = {
@@ -304,6 +311,64 @@ export const TECHS: Record<TechId, TechDef> = {
     cost: 320,
     requires: ['electronic_warfare', 'command_networks'],
     modifiers: { research: 25 },
+  },
+
+  // --- Reverse-Engineered (Black Files) -------------------------------------------------------
+  railguns: {
+    name: 'Railguns',
+    summary: '+15% armour and ship attack, +10% strikes.',
+    gives: 'Rails from a lattice that should not conduct: tanks, ships and guns hit harder.',
+    branch: 'black',
+    tier: 1,
+    cost: 200,
+    requires: [],
+    modifiers: { armorAttack: 15, navalAttack: 15, ranged: 10 },
+    artefact: true,
+  },
+  point_defence: {
+    name: 'Directed-Energy Point Defence',
+    summary: 'Strikes on your formations do 35% less damage.',
+    gives: 'Beams swat shells and missiles out of the sky over your units.',
+    branch: 'black',
+    tier: 1,
+    cost: 200,
+    requires: [],
+    modifiers: { pointDefense: 35 },
+    artefact: true,
+  },
+  cloaked_drones: {
+    name: 'Cloaked Drones',
+    summary: '+15% strikes, +1 vision; a kamikaze swarm in every battle.',
+    gives: 'Drones that bend light: they see further, strike harder and arrive unseen.',
+    branch: 'black',
+    tier: 2,
+    cost: 260,
+    requires: ['railguns'],
+    modifiers: { ranged: 15, vision: 1 },
+    support: [{ asset: 'kamikaze', missions: 1 }],
+    artefact: true,
+  },
+  antigrav_lift: {
+    name: 'Anti-Gravity Lift',
+    summary: '+3 movement for armour and mechanized infantry.',
+    gives: 'Helicopter-class lift for tanks: armour skims over ground that would stop it.',
+    branch: 'black',
+    tier: 2,
+    cost: 280,
+    requires: ['point_defence'],
+    modifiers: { armorMove: 3 },
+    artefact: true,
+  },
+  quantum_radar: {
+    name: 'Quantum Radar',
+    summary: '+2 vision; every formation detects units in cover as far as it sees.',
+    gives: 'Entangled pulses that see through forest, cities, mountains and the fog of war.',
+    branch: 'black',
+    tier: 3,
+    cost: 320,
+    requires: ['cloaked_drones', 'antigrav_lift'],
+    modifiers: { vision: 2, trueSight: 1 },
+    artefact: true,
   },
 };
 

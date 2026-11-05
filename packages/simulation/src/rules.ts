@@ -9,6 +9,7 @@ import type {
   Terrain,
   Treaty,
   TreatyKind,
+  FormationClass,
   UnitClass,
   WorldState,
 } from '@brink/contracts';
@@ -74,6 +75,8 @@ export function nationModifiers(nation: Pick<Nation, 'government' | 'research'> 
     commandPoints: 0,
     buildDiscount: 0,
     growth: 0,
+    pointDefense: 0,
+    trueSight: 0,
   };
   const sources: Modifiers[] = [GOVERNMENTS[nation.government].modifiers];
   if (nation.edge) sources.push(DIFFICULTY_EDGE[nation.edge]);
@@ -104,6 +107,8 @@ export function nationModifiers(nation: Pick<Nation, 'government' | 'research'> 
     out.commandPoints += m.commandPoints ?? 0;
     out.buildDiscount += m.buildDiscount ?? 0;
     out.growth += m.growth ?? 0;
+    out.pointDefense += m.pointDefense ?? 0;
+    out.trueSight += m.trueSight ?? 0;
   }
   return out;
 }
@@ -125,12 +130,12 @@ export interface TerrainInfo {
 }
 
 /** Ships: move on water and through ports. */
-export function isNaval(unitClass: UnitClass): boolean {
+export function isNaval(unitClass: FormationClass): boolean {
   return UNITS[unitClass].naval === true;
 }
 
 /** Aircraft and drones: neither hold ground nor sail; they rebase between sites and carriers. */
-export function isAir(unitClass: UnitClass): boolean {
+export function isAir(unitClass: FormationClass): boolean {
   return !UNITS[unitClass].ground && !UNITS[unitClass].naval;
 }
 
@@ -138,7 +143,7 @@ export function isAir(unitClass: UnitClass): boolean {
  * Movement points for a formation to enter `tile`; null when it cannot. Ground formations walk
  * land; ships sail the sea and put in at ports, and never cross other land.
  */
-export function enterCost(tile: TerrainInfo | undefined, unitClass: UnitClass): number | null {
+export function enterCost(tile: TerrainInfo | undefined, unitClass: FormationClass): number | null {
   if (!tile || tile.terrain === null) return null;
   if (isNaval(unitClass)) return tile.terrain === 'water' || tile.port ? NAVAL_MOVE_COST : null;
   const def = TERRAIN[tile.terrain];
@@ -161,7 +166,7 @@ export function movementAllowance(f: Pick<Formation, 'unitClass' | 'readiness' |
 /** Total cost of a contiguous path starting next to `from`; null when any step is illegal. */
 export function pathCost(
   tiles: Record<HexKey, TerrainInfo>,
-  unitClass: UnitClass,
+  unitClass: FormationClass,
   from: HexKey,
   path: readonly HexKey[],
 ): number | null {
@@ -177,11 +182,11 @@ export function pathCost(
   return total;
 }
 
-export function visionRadius(unitClass: UnitClass, mods: FullModifiers, onRecon: boolean): number {
+export function visionRadius(unitClass: FormationClass, mods: FullModifiers, onRecon: boolean): number {
   return UNITS[unitClass].vision + mods.vision + (onRecon ? 1 : 0);
 }
 
-export function isRanged(unitClass: UnitClass): boolean {
+export function isRanged(unitClass: FormationClass): boolean {
   return UNITS[unitClass].range > 0;
 }
 
@@ -209,7 +214,7 @@ export function passengersOf(world: Pick<WorldState, 'formations'>, carrier: str
  * Formations in a hex that count against the stacking limit alongside one of class `cls`. Two
  * layers: ships, and everything else (a harbour holds its garrison and its ships). Those aboard ride free.
  */
-export function stackAt(world: Pick<WorldState, 'formations'>, key: string, cls: UnitClass): Formation[] {
+export function stackAt(world: Pick<WorldState, 'formations'>, key: string, cls: FormationClass): Formation[] {
   return Object.values(world.formations).filter((f) => f.key === key && !f.aboard && sameLayer(f.unitClass, cls));
 }
 
@@ -218,6 +223,6 @@ export function alongside(world: { tiles: Record<string, { terrain: Terrain | nu
   return c.key === f.key || (world.tiles[f.key]?.port === true && areAdjacent(f.key, c.key) && world.tiles[c.key]?.terrain === 'water');
 }
 
-export function sameLayer(a: UnitClass, b: UnitClass): boolean {
+export function sameLayer(a: FormationClass, b: FormationClass): boolean {
   return isNaval(a) === isNaval(b);
 }

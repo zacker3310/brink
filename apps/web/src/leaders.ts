@@ -22,6 +22,7 @@ export const PROPOSAL_TEXT: Record<ProposalKind, string> = {
   exchange: 'an exchange of resources',
   tribute: 'tribute',
   joint_op: `a joint operation (${LEADER_TUNING.jointOpTurns} turns)`,
+  accord: 'the Accord (shared vision, no war between signatories, a joint victory over the Visitors)',
 };
 
 export const ACTION_TEXT: Record<DiplomaticAction, string> = {
@@ -36,6 +37,7 @@ export const ACTION_TEXT: Record<DiplomaticAction, string> = {
   demand_tribute: 'Demand tribute from',
   pay_tribute: 'Pay tribute to',
   propose_joint_op: 'Offer a joint operation to',
+  propose_accord: 'Sign the Accord with',
 };
 
 export const TREATY_TEXT: Record<TreatyKind, string> = {

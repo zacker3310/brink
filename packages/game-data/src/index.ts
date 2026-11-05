@@ -5,7 +5,8 @@
 // 0..1000; organization, morale, readiness, fuel, ammunition, experience, entrenchment and
 // supply are 0..100. One turn is six simulated hours.
 
-import type { CampaignLength, Difficulty, FacilityId, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, UnitClass, WorldEventId, Yields } from '@brink/contracts';
+import type { CampaignLength, Difficulty, FacilityId, FormationClass, GovernmentId, Resource, SiteKind, Stockpile, TechId, Terrain, WorldEventId, Yields } from '@brink/contracts';
+import { VISITOR_UNITS } from './blackfiles';
 import { PROGRESSION_FACILITIES, type FacilitySupport } from './cities';
 
 export * from './commanders';
@@ -14,8 +15,9 @@ export * from './blurbs';
 export * from './research';
 export * from './cities';
 export * from './leaders';
+export * from './blackfiles';
 
-export const RULESET_VERSION = '2.9.0';
+export const RULESET_VERSION = '2.10.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -91,7 +93,8 @@ const stock = (credits: number, energy: number, materials: number, food: number)
   food,
 });
 
-export const UNITS: Record<UnitClass, UnitDef> = {
+export const UNITS: Record<FormationClass, UnitDef> = {
+  ...VISITOR_UNITS,
   infantry: {
     name: 'Infantry',
     short: 'INF',
@@ -337,6 +340,10 @@ export interface Modifiers {
   buildDiscount?: number;
   /** Percent added to city development. */
   growth?: number;
+  /** Black Files: percent removed from the strike damage the nation's formations take (directed energy). */
+  pointDefense?: number;
+  /** Black Files: every formation detects formations in cover as far as it sees (quantum radar). */
+  trueSight?: number;
 }
 
 export interface GovernmentDef {

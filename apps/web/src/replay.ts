@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Text, type Application, type Texture } from 'pixi.js';
 import { create } from 'zustand';
-import type { HexKey, UnitClass } from '@brink/contracts';
+import type { FormationClass, HexKey } from '@brink/contracts';
 import type { Point } from '@brink/map';
 import { getArt } from './art';
 import { addUnit, affiliationOf, keepScreenSize, slotOffsets, type CounterLook, type UnitModel } from './counters';
@@ -28,7 +28,7 @@ export const useReplay = create<{
 
 interface Actor {
   id: string;
-  cls: UnitClass;
+  cls: FormationClass;
   color: number;
   /** Fill as #rrggbb, and affiliation, for the APP-6 symbol. */
   fill: string;

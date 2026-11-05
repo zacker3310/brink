@@ -7,6 +7,8 @@ import type { CardPlay, CardPlayedEvent, DoctrineState, PublicDoctrine } from '.
 export * from './doctrine';
 import type { Attitude, DealTerms, LeaderMemory } from './leaders';
 export * from './leaders';
+import type { Anomaly, BlackFilesEvent, BlackFilesState, BlackFilesView, VisitorClass } from './blackfiles';
+export * from './blackfiles';
 
 export type NationId = string;
 export type FormationId = string;
@@ -31,6 +33,9 @@ export const UNIT_CLASSES: readonly UnitClass[] = [
   'transport',
   'carrier',
 ];
+
+/** Any formation on the map: the powers' classes, and the Visitors' own (`blackfiles.ts`). */
+export type FormationClass = UnitClass | VisitorClass;
 
 export type GovernmentId = 'commonwealth' | 'directorate' | 'federation' | 'union';
 
@@ -62,6 +67,8 @@ export interface Tile {
   siteId: SiteId | null;
   /** A site on the coast: ships may enter it, build there, and supply may put to sea from it. */
   port?: boolean;
+  /** Ground the Visitors turned to crystal (Black Files). Its terrain is changed with it. */
+  crystal?: true;
 }
 
 export type SiteKind = 'capital' | 'city' | 'depot' | 'objective';
@@ -84,6 +91,8 @@ export interface Site {
    * Absent in worlds made before city development, and on depots and objectives: 0.
    */
   development?: number;
+  /** Black Files: an excavation, a black-site laboratory or a Visitors' incursion. */
+  anomaly?: Anomaly;
 }
 
 /** Buildings a nation can put up at its sites. Effects and costs live in game-data `FACILITIES`. */
@@ -109,10 +118,12 @@ export type DiplomaticAction =
   /** Answer a demand: hand over `terms.give`. */
   | 'pay_tribute'
   /** Both march on `terms.site` (`LEADER_TUNING.jointOpTurns`). */
-  | 'propose_joint_op';
+  | 'propose_joint_op'
+  /** Black Files: sign the Accord against the Visitors with `target` (both join it). */
+  | 'propose_accord';
 
 /** Tribute is one kind both ways: a demand (`get`) is met by a payment (`give`) that mirrors it. */
-export type ProposalKind = 'peace' | 'alliance' | 'nonaggression' | 'trade' | 'ceasefire' | 'exchange' | 'tribute' | 'joint_op';
+export type ProposalKind = 'peace' | 'alliance' | 'nonaggression' | 'trade' | 'ceasefire' | 'exchange' | 'tribute' | 'joint_op' | 'accord';
 
 export interface Proposal {
   from: NationId;
@@ -212,6 +223,8 @@ export interface Nation {
   edge?: Difficulty;
   /** Doctrine cards and Command Points (`doctrine.ts`). Absent for minor states and older worlds. */
   doctrine?: DoctrineState;
+  /** The Visitors (Black Files): also `minor`, so they make no treaties and count for no human victory. */
+  visitors?: true;
 }
 
 export type WorldEventId =
@@ -248,7 +261,7 @@ export interface Formation {
   id: FormationId;
   name: string;
   owner: NationId;
-  unitClass: UnitClass;
+  unitClass: FormationClass;
   key: HexKey;
   /** 0..1000, personnel and equipment as tenths of a percent. */
   strength: number;
@@ -323,7 +336,7 @@ export interface NationOrders {
 
 export interface LastKnownContact {
   owner: NationId;
-  unitClass: UnitClass;
+  unitClass: FormationClass;
   key: HexKey;
   strength: number;
   turn: number;
@@ -338,7 +351,8 @@ export interface NationIntel {
   lastKnown: Record<FormationId, LastKnownContact>;
 }
 
-export type VictoryReason = 'victory_points' | 'supremacy' | 'coalition' | 'last_standing' | 'turn_limit';
+/** `accord`: the Visitors destroyed, every signatory wins together. `visitors`: they won. */
+export type VictoryReason = 'victory_points' | 'supremacy' | 'coalition' | 'last_standing' | 'turn_limit' | 'accord' | 'visitors';
 
 export interface VictoryState {
   winner: NationId;
@@ -388,6 +402,8 @@ export interface WorldState {
   commanders?: Record<CommanderId, Commander>;
   /** What each power's leader remembers of the others. Absent before leaders (saves gain it on load). */
   memories?: Record<NationId, LeaderMemory[]>;
+  /** The Black Files, when the campaign has them (`blackfiles.ts`). Absent: no anomaly. */
+  blackFiles?: BlackFilesState;
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +412,7 @@ export interface WorldState {
 export interface EngagementParticipant {
   formation: FormationId;
   owner: NationId;
-  unitClass: UnitClass;
+  unitClass: FormationClass;
   role: 'attacker' | 'defender' | 'meeting';
   from: HexKey;
   strengthBefore: number;
@@ -423,7 +439,7 @@ export type GameEvent =
       kind: 'movement';
       formation: FormationId;
       owner: NationId;
-      unitClass: UnitClass;
+      unitClass: FormationClass;
       path: HexKey[];
       halted: 'enemy' | 'contact' | 'contested' | 'stacking' | null;
     }
@@ -444,13 +460,13 @@ export type GameEvent =
       kind: 'strike';
       source: FormationId;
       owner: NationId;
-      unitClass: UnitClass;
+      unitClass: FormationClass;
       target: HexKey;
       victims: { formation: FormationId; owner: NationId; strengthLoss: number }[];
       sourceLoss: number;
     }
   | { kind: 'retreat'; formation: FormationId; owner: NationId; from: HexKey; to: HexKey }
-  | { kind: 'destroyed'; formation: FormationId; owner: NationId; unitClass: UnitClass; at: HexKey }
+  | { kind: 'destroyed'; formation: FormationId; owner: NationId; unitClass: FormationClass; at: HexKey }
   | { kind: 'territory'; key: HexKey; from: NationId | null; to: NationId }
   | { kind: 'site_captured'; site: SiteId; key: HexKey; from: NationId | null; to: NationId }
   | {
@@ -465,7 +481,7 @@ export type GameEvent =
   | { kind: 'recruitment_queued'; nation: NationId; item: string; unitClass: UnitClass; site: SiteId }
   | { kind: 'economy'; nation: NationId; ledger: Ledger }
   | { kind: 'supply'; nation: NationId; formation: FormationId; key: HexKey; supply: number }
-  | { kind: 'intel'; nation: NationId; formation: FormationId; owner: NationId; unitClass: UnitClass; key: HexKey }
+  | { kind: 'intel'; nation: NationId; formation: FormationId; owner: NationId; unitClass: FormationClass; key: HexKey }
   | { kind: 'research'; nation: NationId; tech: TechId }
   /** `broke` is the treaty a declaration of war tore up, if any. */
   | { kind: 'diplomacy'; a: NationId; b: NationId; relation: Relation; proposedBy: NationId; broke?: 'peace' | 'alliance' }
@@ -489,7 +505,8 @@ export type GameEvent =
   | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
   | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string }
   | CommanderEvent
-  | CardPlayedEvent;
+  | CardPlayedEvent
+  | BlackFilesEvent;
 
 export interface TurnReport {
   turn: number;
@@ -515,6 +532,8 @@ export interface TileView {
   owner: NationId | null;
   siteId: SiteId | null;
   port?: boolean;
+  /** Crystal ground (Black Files), as last seen. */
+  crystal?: true;
   lastObserved: number | null;
 }
 
@@ -532,12 +551,13 @@ export interface SiteView {
   facilities: FacilityId[];
   /** Development, known like facilities: your own sites and ones you can see now. */
   development?: number;
+  anomaly?: Anomaly;
 }
 
 export interface Contact {
   formation: FormationId;
   owner: NationId;
-  unitClass: UnitClass;
+  unitClass: FormationClass;
   key: HexKey;
   /** Exact strength is never shown for enemies; this is a rounded estimate. */
   estimatedStrength: number;
@@ -557,6 +577,8 @@ export interface PublicNation {
   minor?: boolean;
   /** Command Points and hand size: public. The cards themselves are not. */
   doctrine?: PublicDoctrine;
+  /** The Visitors (Black Files). */
+  visitors?: true;
 }
 
 export interface NationView {
@@ -590,6 +612,8 @@ export interface NationView {
   moods?: Record<NationId, Attitude>;
   /** How your own leader feels about each rival power (the AI decides by it). */
   attitudes?: Record<NationId, Attitude>;
+  /** The Black Files, as far as the viewer may know them. Absent: the campaign has none. */
+  blackFiles?: BlackFilesView;
 }
 
 export interface TurnResult {

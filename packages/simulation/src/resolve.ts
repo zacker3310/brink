@@ -13,6 +13,7 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { RULESET_VERSION } from '@brink/game-data';
+import { dormant, resolveBlackFiles } from './blackfiles';
 import { applyCommanderOrders, applyLeaderSupply, resolveCommanders } from './commanders';
 import { settleEconomy } from './economy';
 import { resolveDiplomacy, resolveJointOps } from './diplomacy';
@@ -44,6 +45,7 @@ export const PHASES = [
   'territory',
   'economy',
   'development',
+  'black_files',
   'victory',
   'reports',
 ] as const;
@@ -84,6 +86,8 @@ function separateNewEnemies(world: WorldState, events: GameEvent[]): void {
  */
 function resolveEliminations(world: WorldState, events: GameEvent[]): void {
   for (const nation of living(world)) {
+    // The Visitors hold nothing while they sleep, and are not out of a war they have not joined.
+    if (dormant(world, nation)) continue;
     const holds = Object.values(world.sites).some((s) => s.owner === nation && (s.kind === 'capital' || s.kind === 'city'));
     if (holds) continue;
     const n = world.nations[nation]!;
@@ -176,6 +180,17 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
       case 'city_grew':
       case 'commander':
         if (e.nation === nation) out.push(e);
+        break;
+      // Black Files: a dig, a leak, the waking and the Accord are news; a programme's work is its own;
+      // what the Visitors do on the ground is told to those who see it.
+      case 'black_files':
+        if (e.what === 'studied') {
+          if (e.nation === nation) out.push(e);
+        } else if (e.what === 'stolen') {
+          if (e.nation === nation || e.other === nation) out.push(e);
+        } else if (e.what === 'converted' || e.what === 'split') {
+          if (e.key && sees(e.key)) out.push(e);
+        } else out.push(e);
         break;
       case 'proposal':
       case 'proposal_lapsed':
@@ -272,6 +287,8 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   resolveWorldEvents(world, orders, events);
   // 10b. Development: cities held in good order grow.
   growCities(world, shortages, events);
+  // 10c. Black Files: digs, black sites, the waking, the Visitors' own turn.
+  resolveBlackFiles(world, events);
 
   // 11. Victory.
   resolveEliminations(world, events);

@@ -18,7 +18,7 @@ import type {
   UnitClass,
 } from '@brink/contracts';
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
-import { AIR_REBASE_RANGE, EVENTS, FACILITIES, PERKS, STACK_LIMIT, UNITS, type CommanderEffect, type EventEffect } from '@brink/game-data';
+import { AIR_REBASE_RANGE, EVENTS, FACILITIES, PERKS, STACK_LIMIT, standIn, UNITS, type CommanderEffect, type EventEffect } from '@brink/game-data';
 import { areAdjacent, findPath, keyDistance, neighborKeys, pathFromReach, reachable } from '@brink/map';
 import { balanceOf, enterCost, isNaval, movementAllowance, previewAssault, recruitCost, roll, sortedKeys, treatyIn } from '@brink/simulation';
 
@@ -26,9 +26,11 @@ import { planCards } from './doctrine';
 import { landmasses, seas } from './land';
 import { buildSaving, chooseResearch, planCityBuilds } from './research';
 import { jointOpTarget, leaderDiplomacy, type Offer } from './diplomacy-ai';
+import { planVisitors } from './visitors';
 
 export { planCards } from './doctrine';
 export * from './diplomacy-ai';
+export { planVisitors } from './visitors';
 export { proposeOperations, operationById, ODDS_WORDS, type Operation, type OperationPhase } from './operations';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
@@ -289,7 +291,7 @@ function nearestOwnSite(view: NationView, key: HexKey, kinds: readonly SiteView[
 function wantedClass(memory: AiMemory, own: Formation[], queued: UnitClass[], overseas = false, island = false): UnitClass {
   const have = new Map<UnitClass, number>();
   for (const c of UNIT_CLASSES) have.set(c, 0);
-  for (const f of own) have.set(f.unitClass, have.get(f.unitClass)! + 1);
+  for (const f of own) have.set(standIn(f.unitClass), have.get(standIn(f.unitClass))! + 1);
   for (const c of queued) have.set(c, have.get(c)! + 1);
   const seen = memory.enemySightings;
   const hard = seen.armor + seen.mechanized;
@@ -455,7 +457,8 @@ function chooseEvent(view: NationView): 0 | 1 | undefined {
 export function updateMemory(memory: AiMemory, view: NationView, events: readonly GameEvent[]): AiMemory {
   const m: AiMemory = JSON.parse(JSON.stringify(memory)) as AiMemory;
   for (const c of UNIT_CLASSES) m.enemySightings[c] = Math.floor((m.enemySightings[c] * 3) / 4);
-  for (const c of recentContacts(view)) if (c.confirmed) m.enemySightings[c.unitClass] += 1;
+  // The Visitors' formations are tallied as what they fight like (`standIn`): walkers as armour.
+  for (const c of recentContacts(view)) if (c.confirmed) m.enemySightings[standIn(c.unitClass)] += 1;
   for (const [site] of threatsTo(view, recentContacts(view))) m.pressure[site] = view.turn;
   for (const e of events) {
     if (e.kind === 'engagement') {
@@ -609,6 +612,7 @@ function planMinor(view: NationView): NationOrders {
  * nation has seen, within the formation's allowance.
  */
 export function planOrders(view: NationView, memory: AiMemory, seed: number, opts: { spare?: readonly NationId[]; target?: SiteId; incoming?: readonly Offer[] } = {}): NationOrders {
+  if (view.self.visitors) return planVisitors(view);
   if (view.self.minor) return planMinor(view);
   const self = view.self.id;
   const own = sortedKeys(view.formations).map((id) => view.formations[id]!);

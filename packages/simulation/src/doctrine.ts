@@ -10,7 +10,7 @@ import type {
   NationId,
   NationOrders,
   Terrain,
-  UnitClass,
+  FormationClass,
   WorldState,
 } from '@brink/contracts';
 import { CARDS, deckFor, DOCTRINE, isLasting, UNITS, type CardDef, type CardEffect, type CardSupportAsset } from '@brink/game-data';
@@ -30,7 +30,7 @@ export interface PlayBoard {
   tiles: Record<HexKey, { terrain: Terrain | null; owner: NationId | null } | undefined>;
   sites: Record<string, { kind: string; owner: NationId | null; key: HexKey }>;
   /** Only the nation's own formations are read. */
-  formations: Record<FormationId, { owner: NationId; unitClass: UnitClass; key: HexKey; aboard?: FormationId }>;
+  formations: Record<FormationId, { owner: NationId; unitClass: FormationClass; key: HexKey; aboard?: FormationId }>;
   nations: Record<NationId, { eliminated: boolean; minor?: boolean } | undefined>;
 }
 
@@ -223,7 +223,7 @@ export function effectsInForce(nation: Pick<Nation, 'doctrine'> | undefined, tur
 export function marchBonus(
   nation: (Pick<Nation, 'doctrine'> & { research?: Nation['research'] }) | undefined,
   turn: number,
-  f: { unitClass: UnitClass; aboard?: FormationId },
+  f: { unitClass: FormationClass; aboard?: FormationId },
   plays: readonly CardPlay[] = [],
 ): number {
   const tech = techMovement(nation?.research?.unlocked ?? [], f);
@@ -234,9 +234,9 @@ export function marchBonus(
 }
 
 /** Percent added to war-map strikes by `unitClass`. Cards of one kind do not stack: the best counts. */
-export function strikeBonus(nation: Pick<Nation, 'doctrine'> | undefined, turn: number, unitClass: UnitClass): number {
+export function strikeBonus(nation: Pick<Nation, 'doctrine'> | undefined, turn: number, unitClass: FormationClass): number {
   let best = 0;
-  for (const x of effectsInForce(nation, turn)) if (x.effect.kind === 'strike_bonus' && x.effect.classes.includes(unitClass)) best = Math.max(best, x.effect.percent);
+  for (const x of effectsInForce(nation, turn)) if (x.effect.kind === 'strike_bonus' && (x.effect.classes as readonly FormationClass[]).includes(unitClass)) best = Math.max(best, x.effect.percent);
   return best;
 }
 

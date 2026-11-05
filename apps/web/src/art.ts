@@ -1,5 +1,5 @@
 import { Assets, type Texture } from 'pixi.js';
-import type { SiteView, Terrain, UnitClass } from '@brink/contracts';
+import type { FormationClass, SiteView, Terrain, UnitClass } from '@brink/contracts';
 
 // Imported art (public/art, credits in public/art/CREDITS.md): Sentinel-2 ground per terrain,
 // top-down renders of real 3D models per unit class, and effect frames for the replay. Loaded
@@ -53,7 +53,7 @@ export function getArt(): Art | null {
 }
 
 /** URL of a unit's rendered portrait, for React. */
-export function unitImage(cls: UnitClass): string {
+export function unitImage(cls: FormationClass): string {
   return `${BASE}units/${cls}.png`;
 }
 

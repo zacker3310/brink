@@ -13,6 +13,7 @@ import type {
 } from '@brink/contracts';
 import { TERRAIN, victoryBars } from '@brink/game-data';
 import { rangeKeys } from '@brink/map';
+import { blackFilesView, dormant } from './blackfiles';
 import { leaderEffects, leaderOf } from './commanders';
 import { revealedHexes } from './doctrine';
 import { attitudesFor } from './leaders';
@@ -26,10 +27,11 @@ export interface Vision {
   detect: Set<HexKey>;
 }
 
-/** Nations whose eyes `nation` shares: itself and its allies. */
+/** Nations whose eyes `nation` shares: itself, its allies and, in the Accord (Black Files), every signatory. */
 function sharers(world: WorldState, nation: NationId): NationId[] {
+  const accord = world.blackFiles?.accord.includes(nation) ? world.blackFiles.accord : [];
   return sortedKeys(world.nations).filter(
-    (n) => !world.nations[n]!.eliminated && relationOf(world.relations, nation, n) === 'alliance',
+    (n) => !world.nations[n]!.eliminated && (relationOf(world.relations, nation, n) === 'alliance' || accord.includes(n)),
   );
 }
 
@@ -63,7 +65,8 @@ export function computeVision(world: WorldState, nation: NationId, reconActive: 
     const mods = nationModifiers(world.nations[f.owner]!);
     const onRecon = reconActive.has(id);
     const radius = visionRadius(f.unitClass, mods, onRecon) + (leaders[id]?.vision ?? 0);
-    const sharpEyed = f.unitClass === 'recon' || onRecon;
+    // Quantum radar (Black Files): every formation sees into cover as far as it sees.
+    const sharpEyed = f.unitClass === 'recon' || onRecon || mods.trueSight > 0;
     for (const k of rangeKeys(f.key, radius)) add(k, sharpEyed);
     // Everyone sees into their own hex; only reconnaissance sees into cover beyond it.
     add(f.key, true);
@@ -166,6 +169,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
         owner: visible ? t.owner : (intel.knownOwner[key] ?? null),
         siteId: t.siteId,
         ...(t.port ? { port: true } : {}),
+        ...(t.crystal ? { crystal: true as const } : {}),
         lastObserved: visible ? world.turn : (last ?? null),
       };
     } else {
@@ -200,6 +204,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
       yields: { ...s.yields },
       facilities: s.owner === nation || visible ? [...s.facilities] : [],
       ...((s.owner === nation || visible) && s.development !== undefined ? { development: s.development } : {}),
+      ...(s.anomaly ? { anomaly: s.anomaly } : {}),
     };
     tiles[s.key]!.siteId = id;
   }
@@ -256,6 +261,8 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
   const relations: Record<NationId, Relation> = {};
   for (const id of sortedKeys(world.nations)) {
     const n = world.nations[id]!;
+    // The Visitors are unknown to everyone until they wake.
+    if (dormant(world, id) && id !== nation) continue;
     nations[id] = {
       id,
       name: n.name,
@@ -264,6 +271,7 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
       eliminated: n.eliminated,
       victoryPoints: vp[id]!,
       ...(n.minor ? { minor: true } : {}),
+      ...(n.visitors ? { visitors: true as const } : {}),
       // Command Points and hand size are public; the cards are not.
       ...(n.doctrine ? { doctrine: { cp: n.doctrine.cp, hand: n.doctrine.hand.length } } : {}),
     };
@@ -294,5 +302,6 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
     ...(world.commanders ? { commanders, enemyCommanders } : {}),
     // Leaders' moods: how every rival feels about you (their envoys make no secret of it), and how you feel about them.
     ...(self.minor ? {} : attitudesFor(world, nation, standing)),
+    ...(world.blackFiles ? { blackFiles: blackFilesView(world, nation) } : {}),
   };
 }

@@ -1,4 +1,4 @@
-import type { UnitClass } from '@brink/contracts';
+import type { FormationClass } from '@brink/contracts';
 
 // Unit pictograms: side profiles (a quadcopter from above) on a 32 x 24 grid, drawn to read at 20 px
 // on a counter. One set for the map (Path2D) and the interface (SVG), so a unit looks the same
@@ -15,7 +15,7 @@ interface Shape {
 
 const ring = (x: number, y: number, r: number) => `M${x - r} ${y}a${r} ${r} 0 1 0 ${r * 2} 0a${r} ${r} 0 1 0 ${-r * 2} 0z`;
 
-export const PICTOGRAMS: Record<UnitClass, Shape[]> = {
+export const PICTOGRAMS: Record<FormationClass, Shape[]> = {
   infantry: [
     { d: ring(13.6, 4.6, 2.6) },
     { d: 'M10 8h7l1.2 7.2H8.8z' },
@@ -79,10 +79,30 @@ export const PICTOGRAMS: Record<UnitClass, Shape[]> = {
     { d: 'M20.5 5.5h4v6h-4z' },
     { d: 'M6 9.6h7.5l1.5-1.2h1v1.2h1.5v1.1H6z' },
   ],
+  // The Visitors (Black Files) have their own language: facets and lattices, nothing with a hull,
+  // a wheel or a flag. A walker: a cut crystal on three splayed legs.
+  walker: [
+    { d: 'M16 1.5l7 5.5-7 7-7-7z' },
+    { d: 'M9 7l7 7 7-7', stroke: 1.2 },
+    { d: 'M12 12L5 22.5M16 14v8.5M20 12l7 10.5', stroke: 1.8 },
+  ],
+  // A swarm: a scatter of motes round a bright one, one cloud about to become two.
+  swarm: [
+    { d: `${ring(16, 12, 2.6)}` },
+    { d: `${ring(8, 6, 1.6)}${ring(24, 6, 1.6)}${ring(6, 15, 1.4)}${ring(26, 16, 1.4)}${ring(12, 20, 1.4)}${ring(21, 20.5, 1.6)}${ring(16, 3.5, 1.2)}` },
+    { d: 'M10 8l4 2.5M22 8l-4 2.5M8 15l5-2M24 15.6l-5-2.4', stroke: 0.8 },
+  ],
+  // An emitter: a spire throwing a dome over the ground it stands on.
+  emitter: [
+    { d: 'M14.4 22h3.2l-.6-13h-2z' },
+    { d: 'M16 3l2.2 4.5L16 9l-2.2-1.5z' },
+    { d: 'M3 22a13 13 0 0 1 26 0', stroke: 1.6 },
+    { d: 'M1.5 22.2h29', stroke: 1.2 },
+  ],
 };
 
 /** The pictogram as SVG markup, for the interface. */
-export function pictogramSvg(cls: UnitClass, color: string): string {
+export function pictogramSvg(cls: FormationClass, color: string): string {
   const body = PICTOGRAMS[cls]
     .map((s) => (s.stroke ? `<path d="${s.d}" fill="none" stroke="${color}" stroke-width="${s.stroke}" stroke-linecap="round"/>` : `<path d="${s.d}" fill="${color}"/>`))
     .join('');
@@ -90,7 +110,7 @@ export function pictogramSvg(cls: UnitClass, color: string): string {
 }
 
 /** The pictogram on a transparent canvas, `scale` pixels per grid unit, for the map. */
-export function pictogramCanvas(cls: UnitClass, color: string, scale: number): HTMLCanvasElement {
+export function pictogramCanvas(cls: FormationClass, color: string, scale: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = Math.ceil(PICTO_W * scale);
   c.height = Math.ceil(PICTO_H * scale);

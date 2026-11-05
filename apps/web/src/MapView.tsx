@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Application, BlurFilter, CanvasSource, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
-import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
+import type { Formation, FormationClass, FormationOrder, HexKey, NationView, Terrain } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
 import { mainland } from './mainland';
@@ -249,7 +249,7 @@ declare global {
       hexToClient(key: HexKey): { x: number; y: number };
       reachable(): HexKey[];
       enemies(): HexKey[];
-      formations(): { id: string; cls: UnitClass; key: HexKey }[];
+      formations(): { id: string; cls: FormationClass; key: HexKey }[];
       /** The map's zoom. */
       scale(): number;
       /** A site's hex centre on screen. */
@@ -1272,7 +1272,7 @@ export function MapView() {
 
     // Planned orders: path, arrowhead and a ghost of the unit where it will end up.
     const paths = new Graphics();
-    const ghosts: { key: HexKey; cls: UnitClass; strength: number; facing: number }[] = [];
+    const ghosts: { key: HexKey; cls: FormationClass; strength: number; facing: number }[] = [];
     const orders = s.submitted ?? s.draft;
     if (orders && !replaying) {
       for (const id of Object.keys(orders.formations).sort()) {
@@ -1405,7 +1405,7 @@ export function MapView() {
 }
 
 /** Unit stats line for tooltips and the unit panel. */
-export function unitLine(cls: UnitClass): string {
+export function unitLine(cls: FormationClass): string {
   const d = UNITS[cls];
   return `${d.movement ? `${d.movement} MP` : 'rebases'} · atk ${d.softAttack}/${d.hardAttack} · def ${d.defense}${d.range ? ` · range ${d.range}` : ''}`;
 }

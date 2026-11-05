@@ -1,6 +1,7 @@
 import type { DealTerms, DiplomaticAction, GameEvent, NationId, NationOrders, Proposal, ProposalKind, SiteId, Stockpile, Treaty, TreatyKind, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { LEADER_TUNING, TREATIES } from '@brink/game-data';
+import { BLACK_FILES, LEADER_TUNING, TREATIES } from '@brink/game-data';
+import { accordOpen } from './blackfiles';
 import { facilityCost } from './progression';
 import { pairKey, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
@@ -18,6 +19,7 @@ export const PROPOSAL_OF: Partial<Record<DiplomaticAction, ProposalKind>> = {
   demand_tribute: 'tribute',
   pay_tribute: 'tribute',
   propose_joint_op: 'joint_op',
+  propose_accord: 'accord',
 };
 
 /** The terms the other side offers to agree to `t`: what one gives the other gets. */
@@ -126,6 +128,8 @@ export type DiplomacyWorld = Pick<WorldState, 'relations' | 'treaties' | 'turn'>
   sites?: Record<SiteId, { owner: NationId | null; key: string }>;
   /** A view's tiles: a joint operation is only offered on a prize seen now (its holder may have changed). */
   tiles?: Record<string, { key: string; visibility?: 'visible' | 'observed' | 'unknown' }>;
+  /** Black Files: who is in the Accord and who broke it (a world's state or a view's). */
+  blackFiles?: { awake: boolean | number | null; accord: readonly NationId[]; betrayers: readonly NationId[] };
 };
 
 /** A treaty in force between `a` and `b` that forbids war: a non-aggression pact or a ceasefire. */
@@ -170,6 +174,8 @@ export function canPropose(world: DiplomacyWorld, from: NationId, to: NationId, 
       if (!owner || owner === from || owner === to || world.nations?.[owner]?.eliminated) return false;
       return rel !== 'war' && relationOf(world.relations, from, owner) === 'war' && !running('joint_op');
     }
+    case 'accord':
+      return accordOpen(world.blackFiles, from, to);
   }
 }
 
@@ -260,6 +266,7 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
       if (declared.has(key)) continue;
       declared.add(key);
       goToWar(world, nation, d.target, events);
+      betrayAccord(world, nation, d.target, events);
     }
   }
 
@@ -347,6 +354,9 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
       case 'joint_op':
         sign(world, 'joint_op', a, b, LEADER_TUNING.jointOpTurns, events, undefined, p.terms!.site!);
         break;
+      case 'accord':
+        joinAccord(world, [a, b], events);
+        break;
       case 'nonaggression':
       case 'trade':
         sign(world, p.kind, a, b, p.kind === 'nonaggression' ? TREATIES.nonaggressionTurns : TREATIES.tradeTurns, events);
@@ -365,6 +375,53 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
   }
   world.proposals = [...dedup.keys()].sort().map((k) => dedup.get(k)!);
   world.treaties.sort((x, y) => (x.a + x.b + x.kind < y.a + y.b + y.kind ? -1 : x.a + x.b + x.kind > y.a + y.b + y.kind ? 1 : x.from - y.from));
+}
+
+/**
+ * Black Files: `members` join the Accord. Every signatory is at peace with every other (a war between
+ * them ends at once); they share their eyes (`fog.ts`) and win together if the Visitors fall (`victory.ts`).
+ */
+function joinAccord(world: WorldState, members: NationId[], events: GameEvent[]): void {
+  const bf = world.blackFiles;
+  if (!bf) return;
+  for (const n of [...members].sort()) {
+    if (bf.accord.includes(n)) continue;
+    for (const m of bf.accord) {
+      if (relationOf(world.relations, n, m) !== 'war') continue;
+      const [x, y] = n < m ? [n, m] : [m, n];
+      world.relations[pairKey(x, y)] = 'peace';
+      events.push({ kind: 'diplomacy', a: x, b: y, relation: 'peace', proposedBy: n });
+    }
+    bf.accord = [...bf.accord, n].sort();
+    events.push({ kind: 'black_files', what: 'accord', nation: n });
+  }
+  // The two who signed together may have been at war with each other.
+  const [a, b] = [...members].sort();
+  if (a && b && relationOf(world.relations, a, b) === 'war') {
+    world.relations[pairKey(a, b)] = 'peace';
+    events.push({ kind: 'diplomacy', a, b, relation: 'peace', proposedBy: a });
+  }
+}
+
+/**
+ * Black Files: a signatory that declares war on another breaks the Accord. It is out for good, loses
+ * `BLACK_FILES.betrayalStability` stability at once (on top of perfidy), and every other signatory
+ * goes to war with it.
+ */
+function betrayAccord(world: WorldState, declarer: NationId, target: NationId, events: GameEvent[]): void {
+  const bf = world.blackFiles;
+  if (!bf || !bf.accord.includes(declarer) || !bf.accord.includes(target)) return;
+  bf.accord = bf.accord.filter((n) => n !== declarer);
+  bf.betrayers = [...bf.betrayers, declarer].sort();
+  const n = world.nations[declarer]!;
+  n.stability = Math.max(0, n.stability - BLACK_FILES.betrayalStability);
+  events.push({ kind: 'black_files', what: 'betrayal', nation: declarer, other: target });
+  for (const m of bf.accord) {
+    if (m === target || relationOf(world.relations, m, declarer) === 'war') continue;
+    world.relations[pairKey(m, declarer)] = 'war';
+    events.push({ kind: 'diplomacy', a: m, b: declarer, relation: 'war', proposedBy: m });
+    end(world, ['trade', 'nonaggression', 'ceasefire', 'joint_op'], m, declarer, 'war', events);
+  }
 }
 
 /**

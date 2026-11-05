@@ -9,7 +9,7 @@ import type {
   NationOrders,
   WorldState,
 } from '@brink/contracts';
-import { AIR_REBASE_RANGE, RULES, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { AIR_REBASE_RANGE, BLACK_FILES, RULES, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance, neighborKeys } from '@brink/map';
 import {
   airDefenseLoss,
@@ -27,7 +27,7 @@ import { amphibiousInForce, strikeBonus } from './doctrine';
 import { canDetect, type Vision } from './fog';
 import { rollRange } from './rng';
 import { siteDefense } from './progression';
-import { clamp, enterCost, fortressFloor, isAir, isNaval, nationModifiers, passengersOf, relationOf, sameLayer, sortedKeys } from './rules';
+import { clamp, enterCost, fortressFloor, isAir, isNaval, nationModifiers, passengersOf, pct, relationOf, sameLayer, sortedKeys } from './rules';
 
 /** Per-formation effects computed from a snapshot, then committed together. */
 interface Effects {
@@ -157,7 +157,9 @@ export function resolveStrikes(
       const hits: { formation: FormationId; owner: NationId; strengthLoss: number }[] = [];
       for (const v of victims) {
         const swing = rollRange(100 - RULES.combatSwing, 100 + RULES.combatSwing, seed, world.turn, 'strike', id, v.id);
-        const loss = strikeLoss(f, v, ctx, swing);
+        // Directed-energy point defence (Black Files) takes the edge off every strike on its owner.
+        const shieldPct = Math.min(90, nationModifiers(world.nations[v.owner]!).pointDefense);
+        const loss = pct(strikeLoss(f, v, ctx, swing), 100 - shieldPct);
         book.add(v.id, { strength: loss, organization: Math.floor(loss / 3) + 5, entrenchment: RULES.strikeEntrenchment });
         hits.push({ formation: v.id, owner: v.owner, strengthLoss: loss });
         engaged.add(v.id);
@@ -288,10 +290,14 @@ export function resolveEngagements(
     };
     const power = { attack: attackerPower(a.attackers, defenders, ctx), defense: defenderPower(defenders, ctx) };
     const res = assaultLosses(power, swing(id, 'attacker'), swing(id, 'defender'));
+    // A shield emitter (Black Files) absorbs most of an assault and keeps the hex: only strikes break it.
+    const shield = defenders.some((d) => d.unitClass === 'emitter');
+    if (shield) res.defenderLoss = pct(res.defenderLoss, 100 - BLACK_FILES.shieldAbsorb);
     const aLoss = spreadLoss(a.attackers, res.attackerLoss);
     const dLoss = spreadLoss(defenders, res.defenderLoss);
     const broken = defenders.every((d) => d.organization - (Math.floor(dLoss.get(d.id)! / 4) + 10) <= RULES.breakOrganization);
-    const outcome: AssaultOutcome = assaultOutcome(res.share, broken);
+    const rolled: AssaultOutcome = assaultOutcome(res.share, broken);
+    const outcome: AssaultOutcome = shield && rolled === 'attacker_victory' ? 'inconclusive' : rolled;
     const won = outcome === 'attacker_victory';
     const held = outcome === 'defender_held';
     const participants: EngagementParticipant[] = [];
