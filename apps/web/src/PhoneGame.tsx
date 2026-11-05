@@ -30,6 +30,7 @@ import { useGame, type Tab } from './store';
 import { EventCard } from './UnitPanel';
 import { CommandRow, GeneralsRoster, PromotionModal } from './Generals';
 import { AimBanner, HandChip, PhoneHand } from './Hand';
+import { BlackFilesChip } from './BlackFiles';
 import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
 import { crisisOf, shortName } from '@brink/scenarios';
 import { minorsOf, powersOf, signed } from './ui';
@@ -122,6 +123,7 @@ function Hud({ onMenu, onEconomy, onWorld, onHand }: { onMenu: () => void; onEco
           {short.length > 0 && <span className="text-xs font-semibold text-hostile">· short of {short.map((r) => RES_NAME[r]).join(', ')}</span>}
         </button>
         {!resolving && !view.victory && <HandChip onOpen={onHand} />}
+        {!resolving && !view.victory && <BlackFilesChip />}
         {goal && !resolving && !operation && (
           <button
             type="button"

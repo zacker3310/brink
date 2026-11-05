@@ -5,6 +5,13 @@ interface Window {
     reachable(): string[];
     enemies(): string[];
     formations(): { id: string; cls: string; key: string }[];
+    /** The player's view (only the fields the specs read). */
+    view(): {
+      scenarioId: string;
+      nations: Record<string, { id: string; minor?: boolean }>;
+      relations: Record<string, string>;
+      sites: Record<string, { name: string; owner: string | null; anomaly?: string }>;
+    };
     scale(): number;
     siteToClient(siteId: string): { x: number; y: number };
     targets(): string[];

@@ -250,6 +250,8 @@ declare global {
       reachable(): HexKey[];
       enemies(): HexKey[];
       formations(): { id: string; cls: FormationClass; key: HexKey }[];
+      /** The player's current view, for specs that check what the screen is built from. */
+      view(): NationView | null;
       /** The map's zoom. */
       scale(): number;
       /** A site's hex centre on screen. */
@@ -654,6 +656,9 @@ export function MapView() {
       formations() {
         const v = useGame.getState().view;
         return v ? Object.values(v.formations).map((f) => ({ id: f.id, cls: f.unitClass, key: f.key })) : [];
+      },
+      view() {
+        return useGame.getState().view;
       },
       scale() {
         return world.scale.x;

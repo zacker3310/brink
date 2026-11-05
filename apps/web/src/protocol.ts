@@ -14,7 +14,7 @@ export interface SeatState {
 
 export type Request =
   /** `others` are further human seats; every other nation is AI. `theatre` picks the map, `crisis` the opening. */
-  | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number; difficulty?: Difficulty; theatre?: string; crisis?: string }
+  | { type: 'new'; seed: number; nation: NationId; others?: NationId[]; maxTurns?: number; difficulty?: Difficulty; theatre?: string; crisis?: string; /** The Black Files toggle. */ blackFiles?: boolean }
   /** What the AI would order for this seat now (the Auto button). */
   /** `target`: the site of the operation the player launched; the staff plans toward it. */
   | { type: 'suggest'; nation: NationId; target?: SiteId }

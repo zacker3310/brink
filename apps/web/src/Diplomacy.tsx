@@ -3,7 +3,7 @@ import type { DealTerms, DiplomaticAction, NationId, NationView, ProposalKind, R
 import { RESOURCES } from '@brink/contracts';
 import { AGENDA_TEXT, LEADER_TUNING, RULES, TEMPERAMENT_TEXT } from '@brink/game-data';
 import { verdictLine, type Verdict } from '@brink/ai';
-import { answerTo } from '@brink/simulation';
+import { accordOpen, answerTo } from '@brink/simulation';
 import { Label } from './chrome';
 import { engine } from './engine';
 import { Emblem } from './glyphs';
@@ -140,13 +140,17 @@ interface DealOption {
   tone?: 'danger';
 }
 
-function optionsFor(rel: string): DealOption[] {
+function optionsFor(rel: string, accord: boolean): DealOption[] {
+  // Black Files: once the Visitors are awake, the Accord can be signed with anyone, even an enemy.
+  const signing: DealOption[] = accord ? [{ action: 'propose_accord', kind: 'accord', label: 'Sign the Accord' }] : [];
   if (rel === 'war')
     return [
+      ...signing,
       { action: 'propose_ceasefire', kind: 'ceasefire', label: 'Ceasefire' },
       { action: 'propose_peace', kind: 'peace', label: 'Peace' },
     ];
   return [
+    ...signing,
     { action: 'propose_trade', kind: 'trade', label: 'Trade agreement' },
     { action: 'propose_nonaggression', kind: 'nonaggression', label: 'Non-aggression' },
     { action: 'propose_exchange', kind: 'exchange', label: 'Exchange', needs: 'exchange' },
@@ -233,7 +237,7 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
     .sort((a, b) => b.victoryPoints - a.victoryPoints || (a.name < b.name ? -1 : 1))
     .slice(0, 6);
   const thirdPowers = powersOf(view).filter((n) => n.id !== me && n.id !== nation && !n.eliminated);
-  const options = optionsFor(rel).filter((o) => (o.needs === 'site' ? prizes.length > 0 : o.needs === 'against' ? thirdPowers.length > 0 : true));
+  const options = optionsFor(rel, accordOpen(view.blackFiles, view.self.id, nation)).filter((o) => (o.needs === 'site' ? prizes.length > 0 : o.needs === 'against' ? thirdPowers.length > 0 : true));
 
   const terms = deal ? termsFor(deal) : undefined;
   const ready = deal && (!deal.needs || terms);

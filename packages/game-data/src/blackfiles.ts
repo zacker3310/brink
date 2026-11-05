@@ -84,10 +84,10 @@ export const BLACK_FILES = {
   /** Hexes round an incursion's centre that are the Visitors' from the moment it opens. */
   incursionRadius: 1,
   /** Victory points an incursion is worth to whoever takes it. */
-  incursionVp: 4,
+  incursionVp: 6,
   /** Each incursion grows a formation every this many turns, while it holds fewer than `incursionCap` near it. */
-  spawnEvery: 2,
-  incursionCap: 4,
+  spawnEvery: 1,
+  incursionCap: 5,
   /** What an incursion grows, in turn: `roll` picks from this list. */
   spawnMix: ['walker', 'swarm', 'swarm', 'walker', 'emitter'] as readonly VisitorClass[],
   /** The incursion's first wave, per incursion, on the turn it opens. */
@@ -121,7 +121,7 @@ export const BLACK_FILES = {
   visitorsShare: 30,
   limitShare: 12,
   /** Every Visitors formation regains this much strength a turn on crystal or its own ground. */
-  regrowth: 40,
+  regrowth: 50,
 } as const;
 
 /**
