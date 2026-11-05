@@ -1,0 +1,596 @@
+{
+  "format": "brink-map",
+  "version": 1,
+  "id": "antarctica",
+  "name": "Antarctica",
+  "cols": 44,
+  "rows": 38,
+  "layout": "odd-r",
+  "source": "Hand-drawn from a polar projection by packages/mapgen/src/antarctica.ts (no coastline data). Station names are the real stations’ or invented; black sites invented.",
+  "layers": {
+    "owner": {
+      "legend": {
+        "~": null,
+        ".": null,
+        "A": "australia",
+        "C": "china",
+        "K": "uk",
+        "L": "chile",
+        "N": "norway",
+        "R": "russia",
+        "U": "usa"
+      },
+      "rows": [
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "LLL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "LLLLL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "LLLLL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "LLLLLL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "LLLLLL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "LLLLLLL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "LLLLLLL~~~~~~~~~~~~~~~~~~~NNN~~~~~~~~~~~~~~~",
+        "LLLLLLLL~~~~~~~~~~~~~~~~~NNNNNN~~~~~~~~~~~~~",
+        "LLLLLLL~~KK~~~~~~~~~~~~NNNNNNNNN~~~~~~~~~~~~",
+        "LLLLLLLL~KKK~~~~~~~~~~KNNNNNNNNNCC~~~~~~~~~~",
+        "LLLLLLL~~KKKK~~~~~~~~KKNNNNNNNNCCCC~~~~~~~~~",
+        "LLLLLLL~~~~KKK~~~~~~~~KNNNNNNNNCCCCCC~~~~~~~",
+        "LLLLLL~~~~~KKKK~~~~~~~KNNNNNNNCCCCCCC~~~~~~~",
+        "LLLLLL~~~~~~~KKKK~~~~~~KNNNNNNCCCCCCCC~~~~~~",
+        "LLLLL~~~~~~~~KKKK~~~~~KKNNNNNCCCCCCCC~~~~~~~",
+        "LLLL~~~~~~~~~~~KKKK~~~KKKNNNNCCCCCCCCC~~~~~~",
+        "~~~~~~~~~~~~~~~KKKKKKKKK....CCCCCCCCC~~~~~~~",
+        "~~~~~~~~~~~~~~~~~KKKKKK.......CCCCCCC~~~~~~~",
+        "~~~~~~~~~~~~~~~~~KKKKK........CCCCCCC~~~~~~~",
+        "~~~~~~~~~~~~~~~~~KKKKK.........CCCCCCC~~~~~~",
+        "~~~~~~~~~~~~~~~~....K..........CCCCCR~~~~~~~",
+        "~~~~~~~~~~~~~~~~...............RRRRRRR~~~~~~",
+        "~~~~~~~~~~~~~~~~...............RRRRRRR~~~~~~",
+        "~~~~~~~~~~~~~~~~...............RRRRRRR~~~~~~",
+        "~~~~~~~~~~~~~~~~....UU........RRRRRRRR~~~~~~",
+        "~~~~~~~~~~~~~~~~~~UUUUU.......ARRRRRRR~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~UUUUU....AAAARRRRRR~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~UUUUUUUUAAAAAARRRR~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~UUUUUUUUAAAAAAARR~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~UUUU~~UAAAAAAAAR~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~U~~~~UAAAAAAAA~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~AAAAAAA~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~AAAAA~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~AAAAA~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~AAAA~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~AAA~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+      ]
+    },
+    "terrain": {
+      "legend": {
+        "~": "water",
+        "p": "plains",
+        "f": "forest",
+        "h": "hills",
+        "m": "mountains"
+      },
+      "rows": [
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "hhh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "hhhph~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "hphfp~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "phfpph~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "hphfhh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "phhffhh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "hhfpfhh~~~~~~~~~~~~~~~~~~~pph~~~~~~~~~~~~~~~",
+        "hhhhfphh~~~~~~~~~~~~~~~~~hhphhh~~~~~~~~~~~~~",
+        "hhphhhp~~pp~~~~~~~~~~~~hpphhpphp~~~~~~~~~~~~",
+        "hffhfpph~hhp~~~~~~~~~~phhppmmhphhp~~~~~~~~~~",
+        "hhfhhff~~pphh~~~~~~~~pphhhmmmphhphp~~~~~~~~~",
+        "hphhhhp~~~~ppp~~~~~~~~hhphhphhphhpppp~~~~~~~",
+        "hfhhhh~~~~~hphh~~~~~~~phhhhphhhphhphp~~~~~~~",
+        "phhppf~~~~~~~hmmh~~~~~~hhhhhphhhphpphp~~~~~~",
+        "fhhpp~~~~~~~~hhmp~~~~~ppphhhhhppphhhh~~~~~~~",
+        "hhhp~~~~~~~~~~~hhhh~~~phphhhpphhhhpphh~~~~~~",
+        "~~~~~~~~~~~~~~~ppphhppphhpphhphhhhhhp~~~~~~~",
+        "~~~~~~~~~~~~~~~~~hpphhhppphhphhppphhp~~~~~~~",
+        "~~~~~~~~~~~~~~~~~hpphhmhhphphphhmhhhh~~~~~~~",
+        "~~~~~~~~~~~~~~~~~hphhhhmhhhhpppphmhpph~~~~~~",
+        "~~~~~~~~~~~~~~~~phhppphmmphphhhmhphhp~~~~~~~",
+        "~~~~~~~~~~~~~~~~phhhhhhhmmhhpphhhhhphp~~~~~~",
+        "~~~~~~~~~~~~~~~~phhphhpphmhhphhpphhphp~~~~~~",
+        "~~~~~~~~~~~~~~~~hphhpppphhmmhphppphhhh~~~~~~",
+        "~~~~~~~~~~~~~~~~phphhhphphmmhhhhhpphhh~~~~~~",
+        "~~~~~~~~~~~~~~~~~~phhmhphpppmhhppppphh~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~hmhphpphmhhpphphpph~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~hmmphhphmmhpphpppp~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~hphhppphmhphhhhhh~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~pppp~~phmhhhhhhh~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~p~~~~pmmhppphp~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~mhhhhph~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~mppph~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~hhhpp~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~hpph~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~phh~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+      ]
+    },
+    "seaZone": {
+      "legend": {
+        "-": null,
+        "a": "southern-ocean",
+        "b": "ross-sea",
+        "c": "weddell-sea",
+        "d": "drake-passage"
+      },
+      "rows": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "---aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "-----aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "-----aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "------aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "------aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "-------aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "-------dddaaaaaaaacccaaaaa---aaaaaaaaaaaaaaa",
+        "--------ddddaaaaaaccccaaa------aaaaaaaaaaaaa",
+        "-------dd--daaaacccccca---------aaaaaaaaaaaa",
+        "--------d---daaacccccc------------aaaaaaaaaa",
+        "-------dd----accccccc--------------aaaaaaaaa",
+        "-------dddd---cccccccc---------------aaaaaaa",
+        "------ddddd----ccccccc---------------aaaaaaa",
+        "------dddddaa----cccccc---------------aaaaaa",
+        "-----dddddaaa----ccccc---------------aaaaaaa",
+        "----aaaaadaaaaa----ccc----------------aaaaaa",
+        "aaaaaaaaaaaaaaa----------------------aaaaaaa",
+        "aaaaaaaaaaaaaaaaa--------------------aaaaaaa",
+        "aaaaaaaaaaaaaaaaa--------------------aaaaaaa",
+        "aaaaaaaaaaaaaaaaa---------------------aaaaaa",
+        "aaaaaaaaaaaaaaaa---------------------aaaaaaa",
+        "aaaaaaaaaaaaaaaa----------------------aaaaaa",
+        "aaaaaaaaaaaaaaaa----------------------aaaaaa",
+        "aaaaaaaaaaaaaaaa----------------------aaaaaa",
+        "aaaaaaaaaaaaaaaa----------------------aaaaaa",
+        "aaaaaaaaaaaaaaaaaa--------------------aaaaaa",
+        "aaaaaaaaaaaaaaaaaaa-------------------aaaaaa",
+        "aaaaaaaaaaaaaaaaaaaa------------------aaaaaa",
+        "aaaaaaaaaaaaaaaaaaaa-----------------aaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaa----bb----------aaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaa-bbbb---------aaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaabbbbbbb-------aaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaabbbbbbbb-----aaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaabbbbbbbb-----aaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaabbbbbbbbb----aaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaabbbbbbbbbb---aaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbaaaaaaaaaaa"
+      ]
+    },
+    "biome": {
+      "legend": {
+        "~": "sea",
+        "i": "ice",
+        "t": "tundra"
+      },
+      "rows": [
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "ttt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "ttttt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "ttttt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "tttttt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "tttttt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "ttttttt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "ttttttt~~~~~~~~~~~~~~~~~~~iii~~~~~~~~~~~~~~~",
+        "tttttttt~~~~~~~~~~~~~~~~~iiiiii~~~~~~~~~~~~~",
+        "ttttttt~~ii~~~~~~~~~~~~iiiiiiiii~~~~~~~~~~~~",
+        "tttttttt~iii~~~~~~~~~~iiiiiiiiiiii~~~~~~~~~~",
+        "ttttttt~~iiii~~~~~~~~iiiiiiiiiiiiii~~~~~~~~~",
+        "ttttttt~~~~iii~~~~~~~~iiiiiiiiiiiiiii~~~~~~~",
+        "tttttt~~~~~iiii~~~~~~~iiiiiiiiiiiiiii~~~~~~~",
+        "tttttt~~~~~~~iiii~~~~~~iiiiiiiiiiiiiii~~~~~~",
+        "ttttt~~~~~~~~iiii~~~~~iiiiiiiiiiiiiii~~~~~~~",
+        "tttt~~~~~~~~~~~iiii~~~iiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiiiii~~~~~~~",
+        "~~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiii~~~~~~~",
+        "~~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiii~~~~~~~",
+        "~~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiiii~~~~~~~",
+        "~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiiii~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~iiiiiiiiiiiiiiiii~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~iiii~~iiiiiiiiii~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~i~~~~iiiiiiiii~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~iiiiiii~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~iiiii~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~iiiii~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~iiii~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~iii~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+      ]
+    }
+  },
+  "nations": [
+    {
+      "id": "usa",
+      "name": "United States",
+      "short": "USA",
+      "color": "#4f8fe0",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "usa-capital"
+    },
+    {
+      "id": "russia",
+      "name": "Russia",
+      "short": "Russia",
+      "color": "#d0543e",
+      "government": "directorate",
+      "role": "power",
+      "capital": "russia-capital"
+    },
+    {
+      "id": "china",
+      "name": "China",
+      "short": "China",
+      "color": "#e0b43c",
+      "government": "union",
+      "role": "power",
+      "capital": "china-capital"
+    },
+    {
+      "id": "uk",
+      "name": "United Kingdom",
+      "short": "UK",
+      "color": "#9a6fd6",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "uk-capital"
+    },
+    {
+      "id": "australia",
+      "name": "Australia",
+      "short": "Australia",
+      "color": "#38b07a",
+      "government": "federation",
+      "role": "power",
+      "capital": "australia-capital"
+    },
+    {
+      "id": "norway",
+      "name": "Norway",
+      "short": "Norway",
+      "color": "#c46a7a",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "norway-capital"
+    },
+    {
+      "id": "chile",
+      "name": "Chile",
+      "short": "Chile",
+      "color": "#d9924a",
+      "government": "union",
+      "role": "minor",
+      "capital": "chile-capital"
+    }
+  ],
+  "sites": [
+    {
+      "id": "usa-capital",
+      "kind": "capital",
+      "name": "McMurdo Station",
+      "at": [27, 31],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-byrd",
+      "kind": "city",
+      "name": "Byrd Station",
+      "at": [20, 26],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-siple",
+      "kind": "city",
+      "name": "Siple Station",
+      "at": [21, 30],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-little-america",
+      "kind": "depot",
+      "name": "Little America",
+      "at": [25, 29],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-kestrel",
+      "kind": "objective",
+      "name": "Site Kestrel",
+      "at": [27, 28],
+      "owner": "usa",
+      "anomaly": "blacksite"
+    },
+    {
+      "id": "russia-capital",
+      "kind": "capital",
+      "name": "Mirny Observatory",
+      "at": [37, 23],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-vostok",
+      "kind": "city",
+      "name": "Vostok Station",
+      "at": [32, 24],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-leningradskaya",
+      "kind": "city",
+      "name": "Leningradskaya",
+      "at": [36, 29],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-komsomolskaya",
+      "kind": "depot",
+      "name": "Komsomolskaya",
+      "at": [35, 24],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-object",
+      "kind": "objective",
+      "name": "Object 17",
+      "at": [34, 26],
+      "owner": "russia",
+      "anomaly": "blacksite"
+    },
+    {
+      "id": "china-capital",
+      "kind": "capital",
+      "name": "Zhongshan Station",
+      "at": [36, 19],
+      "owner": "china"
+    },
+    {
+      "id": "china-kunlun",
+      "kind": "city",
+      "name": "Kunlun Station",
+      "at": [31, 20],
+      "owner": "china"
+    },
+    {
+      "id": "china-taishan",
+      "kind": "city",
+      "name": "Taishan Station",
+      "at": [35, 12],
+      "owner": "china"
+    },
+    {
+      "id": "china-qinling",
+      "kind": "depot",
+      "name": "Qinling Depot",
+      "at": [30, 15],
+      "owner": "china"
+    },
+    {
+      "id": "china-station-9",
+      "kind": "objective",
+      "name": "Station 9",
+      "at": [32, 17],
+      "owner": "china",
+      "anomaly": "blacksite"
+    },
+    {
+      "id": "uk-capital",
+      "kind": "capital",
+      "name": "Rothera Station",
+      "at": [15, 16],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-halley",
+      "kind": "city",
+      "name": "Halley Station",
+      "at": [22, 13],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-fossil-bluff",
+      "kind": "city",
+      "name": "Fossil Bluff",
+      "at": [18, 20],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-signy",
+      "kind": "depot",
+      "name": "Signy Depot",
+      "at": [11, 11],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-halley-annex",
+      "kind": "objective",
+      "name": "Halley Annex",
+      "at": [22, 17],
+      "owner": "uk",
+      "anomaly": "blacksite"
+    },
+    {
+      "id": "australia-capital",
+      "kind": "capital",
+      "name": "Casey Station",
+      "at": [35, 31],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-commonwealth-bay",
+      "kind": "city",
+      "name": "Commonwealth Bay",
+      "at": [33, 34],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-edgeworth",
+      "kind": "city",
+      "name": "Edgeworth Station",
+      "at": [30, 28],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-wilkes",
+      "kind": "depot",
+      "name": "Wilkes Depot",
+      "at": [33, 28],
+      "owner": "australia"
+    },
+    {
+      "id": "australia-law-dome",
+      "kind": "objective",
+      "name": "Law Dome Annex",
+      "at": [30, 30],
+      "owner": "australia",
+      "anomaly": "blacksite"
+    },
+    {
+      "id": "norway-capital",
+      "kind": "capital",
+      "name": "Troll Station",
+      "at": [26, 12],
+      "owner": "norway"
+    },
+    {
+      "id": "chile-capital",
+      "kind": "capital",
+      "name": "Punta Arenas",
+      "at": [0, 10],
+      "owner": "chile"
+    },
+    {
+      "id": "chile-puerto-williams",
+      "kind": "city",
+      "name": "Puerto Williams",
+      "at": [6, 9],
+      "owner": "chile"
+    },
+    {
+      "id": "dig-pole",
+      "kind": "objective",
+      "name": "Amundsen Shaft",
+      "at": [26, 22],
+      "owner": null,
+      "victoryPoints": 4,
+      "anomaly": "excavation"
+    },
+    {
+      "id": "dig-ellsworth",
+      "kind": "objective",
+      "name": "Ellsworth Anomaly",
+      "at": [19, 23],
+      "owner": null,
+      "victoryPoints": 4,
+      "anomaly": "excavation"
+    },
+    {
+      "id": "dig-dome-argus",
+      "kind": "objective",
+      "name": "Dome Argus Bore",
+      "at": [28, 21],
+      "owner": null,
+      "victoryPoints": 4,
+      "anomaly": "excavation"
+    },
+    {
+      "id": "dig-recovery",
+      "kind": "objective",
+      "name": "Recovery Lakes Cut",
+      "at": [25, 18],
+      "owner": null,
+      "victoryPoints": 4,
+      "anomaly": "excavation"
+    }
+  ],
+  "seaZones": [
+    {
+      "id": "southern-ocean",
+      "name": "Southern Ocean"
+    },
+    {
+      "id": "ross-sea",
+      "name": "Ross Sea"
+    },
+    {
+      "id": "weddell-sea",
+      "name": "Weddell Sea"
+    },
+    {
+      "id": "drake-passage",
+      "name": "Drake Passage"
+    }
+  ],
+  "straits": [
+    {
+      "id": "drake",
+      "name": "Drake Passage",
+      "kind": "strait",
+      "hexes": [
+        [7, 7],
+        [8, 7],
+        [9, 7],
+        [8, 8],
+        [9, 8],
+        [10, 8],
+        [11, 8],
+        [7, 9],
+        [8, 9],
+        [11, 9],
+        [8, 10],
+        [12, 10],
+        [7, 11],
+        [8, 11],
+        [7, 12],
+        [8, 12],
+        [9, 12],
+        [10, 12],
+        [6, 13],
+        [7, 13],
+        [8, 13],
+        [9, 13],
+        [10, 13],
+        [6, 14],
+        [7, 14],
+        [8, 14],
+        [9, 14],
+        [10, 14],
+        [5, 15],
+        [6, 15],
+        [7, 15],
+        [8, 15],
+        [9, 15],
+        [9, 16]
+      ],
+      "joins": [
+        "drake-passage",
+        "southern-ocean"
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "kind": "rare-earths",
+      "at": [32, 24],
+      "name": "Lake Vostok cores"
+    },
+    {
+      "kind": "oil",
+      "at": [25, 29],
+      "name": "Ross shelf basin"
+    },
+    {
+      "kind": "food",
+      "at": [0, 10],
+      "name": "Magallanes fisheries"
+    }
+  ]
+}

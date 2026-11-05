@@ -205,6 +205,8 @@ function grow(world: WorldState, bf: BlackFilesState, cls: VisitorClass, key: He
   f.readiness = 100;
   f.organization = 80;
   f.morale = 100;
+  // A swarm is born small and grows on crystal until it splits.
+  if (cls === 'swarm') f.strength = BLACK_FILES.swarmBirth;
   return f;
 }
 
@@ -221,42 +223,69 @@ function awaken(world: WorldState, bf: BlackFilesState, events: GameEvent[]): vo
   const v = bf.visitors;
   world.nations[v]!.eliminated = false;
   events.push({ kind: 'black_files', what: 'awakening', nation: v });
-  bf.incursions.forEach((inc, i) => {
-    const at = [inc.key, ...rangeKeys(inc.key, 3).filter((k) => k !== inc.key).sort((a, b) => keyDistance(a, inc.key) - keyDistance(b, inc.key) || (a < b ? -1 : 1))].find((k) => {
+  for (const inc of bf.incursions) {
+    const near = rangeKeys(inc.key, 3)
+      .filter((k) => k !== inc.key)
+      .sort((a, b) => keyDistance(a, inc.key) - keyDistance(b, inc.key) || (a < b ? -1 : 1));
+    const at = [inc.key, ...near].find((k) => {
       const t = world.tiles[k];
       return !!t && t.terrain !== 'water' && !t.siteId && humansIn(world, k, v).length === 0;
     });
-    if (!at) return;
-    const id = `incursion-${i + 1}`;
-    world.sites[id] = {
-      id,
-      name: inc.name,
-      kind: 'city',
-      key: at,
-      owner: v,
-      originalOwner: v,
-      population: 0,
-      victoryPoints: BLACK_FILES.incursionVp,
-      yields: { credits: 0, energy: 0, materials: 4, food: 0, industry: 0, research: 0 },
-      facilities: [],
-      anomaly: 'incursion',
-    };
-    const t = world.tiles[at]!;
-    t.siteId = id;
-    t.terrain = 'hills';
-    t.crystal = true;
-    claim(world, at, v, events);
-    for (const k of rangeKeys(at, BLACK_FILES.incursionRadius).sort()) {
-      const n = world.tiles[k];
-      if (!n || n.terrain === 'water' || n.siteId || humansIn(world, k, v).length > 0) continue;
-      claim(world, k, v, events);
+    if (at) openIncursion(world, bf, at, inc.name, BLACK_FILES.firstWave, events);
+  }
+}
+
+const incursionCount = (world: WorldState) => Object.values(world.sites).filter((s) => s.anomaly === 'incursion').length;
+
+/** An incursion opens at `at`: a Visitors' site on crystal, the ground round it theirs, a wave out of it. */
+function openIncursion(world: WorldState, bf: BlackFilesState, at: HexKey, name: string, wave: readonly VisitorClass[], events: GameEvent[]): void {
+  const v = bf.visitors;
+  const id = `incursion-${incursionCount(world) + 1}`;
+  world.sites[id] = {
+    id,
+    name,
+    kind: 'city',
+    key: at,
+    owner: v,
+    originalOwner: v,
+    population: 0,
+    victoryPoints: BLACK_FILES.incursionVp,
+    yields: { credits: 0, energy: 0, materials: 4, food: 0, industry: 0, research: 0 },
+    facilities: [],
+    anomaly: 'incursion',
+  };
+  const t = world.tiles[at]!;
+  t.siteId = id;
+  t.terrain = 'hills';
+  t.crystal = true;
+  claim(world, at, v, events);
+  for (const k of rangeKeys(at, BLACK_FILES.incursionRadius).sort()) {
+    const n = world.tiles[k];
+    if (!n || n.terrain === 'water' || n.siteId || humansIn(world, k, v).length > 0) continue;
+    claim(world, k, v, events);
+  }
+  events.push({ kind: 'black_files', what: 'incursion', nation: v, site: id, key: at });
+  for (const cls of wave) {
+    const k = roomNear(world, at, v, 2, cls);
+    if (k) grow(world, bf, cls, k);
+  }
+}
+
+/** The zone spreads: crystal held far from every incursion blooms into a new one. Null when none is far enough. */
+function bloomAt(world: WorldState, v: NationId): HexKey | null {
+  const sites = Object.values(world.sites).filter((s) => s.anomaly === 'incursion' && s.owner === v);
+  let best: HexKey | null = null;
+  let bestD = BLACK_FILES.bloomDistance - 1;
+  for (const k of sortedKeys(world.tiles)) {
+    const t = world.tiles[k]!;
+    if (t.owner !== v || !t.crystal || t.siteId || humansIn(world, k, v).length > 0) continue;
+    const d = Math.min(99, ...sites.map((s) => keyDistance(s.key, k)));
+    if (d > bestD) {
+      bestD = d;
+      best = k;
     }
-    events.push({ kind: 'black_files', what: 'incursion', nation: v, site: id, key: at });
-    for (const cls of BLACK_FILES.firstWave) {
-      const k = roomNear(world, at, v, 2, cls);
-      if (k) grow(world, bf, cls, k);
-    }
-  });
+  }
+  return best;
 }
 
 /** Phase 10c: digs, black sites, the waking and the Visitors' own turn. */
@@ -308,7 +337,7 @@ export function resolveBlackFiles(world: WorldState, events: GameEvent[]): void 
   if (!living(world, v)) return;
 
   // 4a. Incursions grow: one formation every `spawnEvery` turns while few stand near.
-  if ((turn - bf.awake!) % BLACK_FILES.spawnEvery === 0) {
+  if (turn > bf.awake! && (turn - bf.awake!) % BLACK_FILES.spawnEvery === 0) {
     for (const id of sortedKeys(world.sites)) {
       const s = world.sites[id]!;
       if (s.anomaly !== 'incursion' || s.owner !== v) continue;
@@ -373,6 +402,12 @@ export function resolveBlackFiles(world: WorldState, events: GameEvent[]): void 
     }
   }
   bf.held = held;
+
+  // 4e. The zone spreads: every `bloomEvery` turns, crystal far from every incursion blooms into one.
+  if ((turn - bf.awake!) % BLACK_FILES.bloomEvery === 0 && turn > bf.awake! && incursionCount(world) < BLACK_FILES.maxIncursions) {
+    const at = bloomAt(world, v);
+    if (at) openIncursion(world, bf, at, `Bloom ${incursionCount(world) + 1 - bf.incursions.length}`, BLACK_FILES.bloomWave, events);
+  }
 }
 
 /** Whether the Accord could be signed between `from` and `to` (both join it): they are awake, neither betrayed it, not both in. */

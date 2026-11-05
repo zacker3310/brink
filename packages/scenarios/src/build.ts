@@ -174,7 +174,7 @@ export function buildScenario(map: MapFile, seed: number, setup: ScenarioSetup):
   for (const s of map.sites) {
     const key = cellKey(s.at);
     const profile = profileOf(s, s.owner ? !!spec.get(s.owner)!.minor : false);
-    sites[s.id] = { id: s.id, name: s.name, kind: s.kind, key, owner: s.owner, originalOwner: s.owner, population: profile.pop, victoryPoints: s.victoryPoints ?? profile.vp, yields: { ...profile.yields }, facilities: [] };
+    sites[s.id] = { id: s.id, name: s.name, kind: s.kind, key, owner: s.owner, originalOwner: s.owner, population: profile.pop, victoryPoints: s.victoryPoints ?? profile.vp, yields: { ...profile.yields }, facilities: [], ...(s.anomaly ? { anomaly: s.anomaly } : {}) };
     const t = tiles[key]!;
     t.siteId = s.id;
     const open = s.kind === 'depot' || s.kind === 'objective';

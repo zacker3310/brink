@@ -94,8 +94,18 @@ export const BLACK_FILES = {
   firstWave: ['walker', 'swarm', 'emitter'] as readonly VisitorClass[],
   /** A swarm this strong (of 1000) or more splits into two at half strength, into a free hex next to it. */
   splitAt: 800,
+  /** A new swarm's strength: it regrows to `splitAt` and splits. */
+  swarmBirth: 600,
   /** Two swarms in one hex whose strength sums to at most this re-form into one. */
   reformAt: 1000,
+  /**
+   * The incursion zone spreads: every `bloomEvery` turns, crystal at least `bloomDistance` from every
+   * incursion the Visitors hold blooms into a new one with `bloomWave`, up to `maxIncursions` ever.
+   */
+  bloomEvery: 3,
+  bloomDistance: 3,
+  maxIncursions: 6,
+  bloomWave: ['walker', 'swarm'] as readonly VisitorClass[],
   /** Turns the Visitors must hold a hex running before it turns to crystal (rough hills). */
   convertTurns: 3,
   /** Percent of the damage an assault deals that is absorbed when a shield emitter stands in the hex: only strikes break it. */
