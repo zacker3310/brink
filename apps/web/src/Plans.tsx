@@ -139,7 +139,7 @@ export function PlanRow({ plan, rank, compact = false, onAdopt }: { plan: Plan; 
       )}
       <span className="min-w-0 flex-1 leading-tight">
         <span className="block truncate text-[15px] font-semibold">{plan.title}</span>
-        <span className={`block truncate text-[12px] ${plan.odds ? TONE[plan.odds] : 'text-muted'}`}>{plan.line}</span>
+        <span className={`block text-[12px] leading-snug ${plan.odds ? TONE[plan.odds] : 'text-muted'}`}>{plan.line}</span>
         {!compact && <span className="mt-0.5 block text-[12px] leading-snug text-muted">{plan.why}</span>}
       </span>
       <button
@@ -269,7 +269,9 @@ export function EnterBattle({ className = '' }: { className?: string }) {
       data-count={fights.length}
       data-target={best.target}
     >
-      <Icon name="attack" className="h-7 w-7 shrink-0" />
+      {/* A hazard edge sets it apart from End Turn, the other amber key. */}
+      <span className="absolute inset-y-0 left-0 w-2" style={{ background: 'repeating-linear-gradient(135deg, #0d1114 0 5px, transparent 5px 10px)' }} aria-hidden />
+      <Icon name="attack" className="ml-1.5 h-7 w-7 shrink-0" />
       <span className="min-w-0 flex-1 leading-none">
         <span className="block text-[22px] font-black tracking-wide uppercase">Enter battle</span>
         <span className="mt-1 block truncate text-[13px] font-bold tracking-wide uppercase opacity-80" data-testid="enter-battle-target">
@@ -337,7 +339,8 @@ export function planLine(view: NationView, report: TurnReport, operation: Active
     if (site && site.owner !== view.self.id) return { text: `${was.hold.name} fell: the line did not hold.`, tone: 'bad' };
     return { text: `${was.hold.name} held.`, tone: 'good' };
   }
-  return null;
+  if (view.victory) return null;
+  return { text: 'No plan running: pick one and the staff drafts every order for it.', tone: 'info' };
 }
 
 /**
