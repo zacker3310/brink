@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, NATION_BLURB, UNITS, VICTORY, victoryBars } from '@brink/game-data';
-import { CRISES, crisisOf, dealCrisis, MINORS, NATIONS, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
+import { CRISES, crisisOf, dealCrisis, THEATRES, createScenario, theatreNations, type CrisisId } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Kbd, Mark, useKeys } from '../chrome';
@@ -46,14 +46,15 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     return t && t.unlock <= wars ? t.id : THEATRES[0]!.id;
   });
   const theatre = THEATRES.find((t) => t.id === theatreId)!;
+  // Each theatre has its own powers and minor states.
+  const { powers: NATIONS, minors: MINORS } = theatreNations(theatreId);
   const pickTheatre = (id: string) => {
     setTheatreId(id);
     writePrefs({ theatre: id });
   };
-  const [nation, setNation] = useState<NationId>(() => {
-    const p = readPrefs().nation;
-    return NATIONS.some((n) => n.id === p) ? p! : NATIONS[0]!.id;
-  });
+  const [chosen, setNation] = useState<NationId | undefined>(() => readPrefs().nation);
+  // The nation picked, if this theatre has it; else the theatre's first power.
+  const nation: NationId = NATIONS.some((n) => n.id === chosen) ? chosen! : NATIONS[0]!.id;
   const [seed, setSeed] = useState(randomSeed);
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
@@ -79,7 +80,8 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     setCrisisPick(c);
     writePrefs({ crisis: c });
   };
-  const crisis = crisisPick === 'none' ? CLASSIC : crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
+  // The Opening Crises are written for the Pacific: a theatre without them opens the classic way.
+  const crisis = crisisPick === 'none' || theatre.classicOnly ? CLASSIC : crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
   /** The next crisis in the deck from this one: a fresh deal that never repeats the current one. */
   const dealAnother = () => {
     const i = Math.max(0, CRISES.findIndex((c) => c.id === crisis.id));
@@ -382,7 +384,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               Mission parameters
             </SectionHead>
 
-            <SubHead first aside={crisisPick === 'random' ? 'dealt from the seed' : crisisPick === 'none' ? 'no crisis' : 'your pick'}>
+            <SubHead first aside={theatre.classicOnly ? 'none in this theatre' : crisisPick === 'random' ? 'dealt from the seed' : crisisPick === 'none' ? 'no crisis' : 'your pick'}>
               Opening crisis
             </SubHead>
             <div className="wr-crisis" data-testid="crisis-card" data-crisis={crisis.id}>
@@ -408,12 +410,14 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                   </button>
                 )}
                 {crisis.recommended === nation && <span className="wr-chip wr-chip-on">Recommended side</span>}
-                <button type="button" className="wr-chip" onClick={dealAnother} data-testid="crisis-deal">
-                  Deal another
-                </button>
+                {!theatre.classicOnly && (
+                  <button type="button" className="wr-chip" onClick={dealAnother} data-testid="crisis-deal">
+                    Deal another
+                  </button>
+                )}
               </div>
             </div>
-            <div className="wr-crisis-deck" role="radiogroup" aria-label="Opening crisis">
+            <div className={`wr-crisis-deck ${theatre.classicOnly ? 'hidden' : ''}`} role="radiogroup" aria-label="Opening crisis">
               <button type="button" role="radio" aria-checked={crisisPick === 'random'} onClick={() => pickCrisis('random')} data-testid="crisis-random">
                 Random
               </button>

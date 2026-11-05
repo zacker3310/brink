@@ -2,7 +2,7 @@ import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationVie
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { consider, emptyMemory, offerOf, planOrders, updateMemory, type Offer, type Verdict } from '@brink/ai';
 import { HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
-import { applyCrisis, createScenario, type CrisisId, crisisOf } from '@brink/scenarios';
+import { applyCrisis, createScenario, type CrisisId, crisisOf, theatreOf } from '@brink/scenarios';
 import { keyDistance } from '@brink/map';
 import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys } from '@brink/simulation';
 
@@ -60,6 +60,7 @@ export class GameSession {
     // After the difficulty, which sets who is at war on Easy: the crisis's wars are the story.
     if (opts.crisis) {
       if (!crisisOf(opts.crisis)) throw new Error(`unknown crisis: ${opts.crisis}`);
+      if (theatreOf(scenarioId)?.classicOnly) throw new Error(`the Opening Crises are not written for ${scenarioId}`);
       applyCrisis(world, opts.crisis as CrisisId);
     }
     // Easy keeps its ally through any crisis that does not set the two at war.
@@ -255,13 +256,18 @@ export class GameSession {
   }
 }
 
-/** Each power's natural ally, who fights beside a human player on Easy. */
+/** Each power's natural ally, who fights beside a human player on Easy (the Pacific's). */
 const ALLY: Record<NationId, NationId> = { japan: 'usa', usa: 'japan', russia: 'china', china: 'russia' };
+
+/** The natural ally of `nation` in this world's theatre: the theatre's own table, else the Pacific's. */
+function allyOf(world: WorldState, nation: NationId): NationId | undefined {
+  return (theatreOf(world.scenarioId)?.allies ?? ALLY)[nation];
+}
 
 /** Easy, single player: the ally the difficulty gave stays an ally unless the crisis set them at war. */
 function easyAlly(world: WorldState, humans: readonly NationId[]): void {
   const me = humans[0];
-  const ally = me ? ALLY[me] : undefined;
+  const ally = me ? allyOf(world, me) : undefined;
   if (humans.length !== 1 || !me || !ally || !world.nations[ally]) return;
   if (world.relations[pairKey(me, ally)] === 'peace') world.relations[pairKey(me, ally)] = 'alliance';
 }
@@ -294,7 +300,7 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
     };
     // Your natural ally fights beside you (Japan and the United States, Russia and China); the
     // enemy is the nearest power of the other side; the last stays out of it.
-    const ally = ALLY[me];
+    const ally = allyOf(world, me);
     const enemies = rivals.filter((n) => n !== ally);
     const nearest = [...enemies].sort((a, b) => far(a) - far(b) || (a < b ? -1 : 1))[0];
     for (const n of rivals) if (n !== nearest && n !== ally) world.relations[pairKey(me, n)] = 'peace';

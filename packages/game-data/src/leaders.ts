@@ -3,6 +3,11 @@
 // `GOVERNMENT_LEADERS` entry. Every number is an integer; a change is a ruleset change.
 
 import type { AgendaId, GovernmentId, LeaderId, MemoryKind, NationId, Stance, Temperament } from '@brink/contracts';
+import { LEADER as argentina } from './nations/argentina';
+import { LEADER as brazil } from './nations/brazil';
+import { LEADER as canada } from './nations/canada';
+import { LEADER as colombia } from './nations/colombia';
+import { LEADER as mexico } from './nations/mexico';
 
 /** What makes a leader speak. Greetings go by stance; the rest answer a deal or an event. */
 export type LineTrigger =
@@ -262,6 +267,12 @@ export const LEADERS: Record<LeaderId, LeaderDef> = {
       paid: ['There. Leave us be.'],
     },
   }),
+  // The Americas' powers keep their leaders in their country files.
+  [canada.id]: canada,
+  [mexico.id]: mexico,
+  [colombia.id]: colombia,
+  [brazil.id]: brazil,
+  [argentina.id]: argentina,
 };
 
 /** Each power's own leader. A new nation is one entry here and one in `LEADERS`. */
@@ -270,6 +281,11 @@ export const NATION_LEADERS: Record<NationId, LeaderId> = {
   china: 'china_gao',
   japan: 'japan_tsujimoto',
   russia: 'russia_severin',
+  canada: canada.id,
+  mexico: mexico.id,
+  colombia: colombia.id,
+  brazil: brazil.id,
+  argentina: argentina.id,
 };
 
 export const GOVERNMENT_LEADERS: Record<GovernmentId, LeaderId> = {
