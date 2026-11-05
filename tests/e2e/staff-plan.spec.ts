@@ -32,7 +32,9 @@ test('the staff plans every turn: change any of it, then execute', async ({ page
   // Execute: the turn resolves and the next one opens with a fresh plan.
   await page.getByTestId('end-turn').tap();
   const commit = page.getByTestId('commit-turn');
-  if (await commit.isVisible({ timeout: 3000 }).catch(() => false)) await commit.tap();
+  // The order review opens on End turn: wait for it (`isVisible` does not wait, and on a loaded
+  // machine the sheet was still opening, Commit was never tapped and the turn never ended).
+  if (await commit.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) await commit.tap();
   await expect(page.getByTestId('turn')).toContainText('2/', { timeout: 90_000 });
   await page.getByTestId('debrief-close').tap({ timeout: 30_000 }).catch(() => undefined);
   await expect(page.getByTestId('end-turn')).toContainText('Execute', { timeout: 30_000 });

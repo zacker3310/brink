@@ -20,7 +20,9 @@ async function endTurn(page: Page, turn: number, at = 700): Promise<string> {
   await expect(page.getByTestId('end-turn')).toContainText('Execute', { timeout: 30_000 });
   await page.getByTestId('end-turn').tap();
   const commit = page.getByTestId('commit-turn');
-  if (await commit.isVisible({ timeout: 3000 }).catch(() => false)) await commit.tap();
+  // The order review opens on End turn: wait for it (`isVisible` does not wait, and on a loaded
+  // machine the sheet was still opening, Commit was never tapped and the turn never ended).
+  if (await commit.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) await commit.tap();
   const replay = await page
     .getByTestId('replay')
     .waitFor({ state: 'visible', timeout: 60_000 })
@@ -36,7 +38,9 @@ async function endTurn(page: Page, turn: number, at = 700): Promise<string> {
       await page.waitForTimeout(400);
     } else await page.waitForTimeout(at);
     await shot(page, `t${turn}-replay`);
-    await page.getByTestId('skip-replay').tap({ timeout: 3000 }).catch(() => undefined);
+    // Play on (a held film never ends by itself), then skip to the debrief.
+    await page.evaluate(() => window.__brink!.holdReplay(null));
+    await page.getByTestId('skip-replay').tap({ timeout: 10_000 }).catch(() => undefined);
   }
   const debrief = page.getByTestId('debrief');
   await expect(debrief).toBeVisible({ timeout: 90_000 });

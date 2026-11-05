@@ -283,8 +283,8 @@ declare global {
       /** Bring a hex to the middle of the screen, and select an own formation (as a tap on its chip would). */
       focus(key: HexKey): void;
       select(id: string): void;
-      /** Hold the turn's replay at `ms` into its film (paused), to look at one moment of it. */
-      holdReplay(ms: number): void;
+      /** Hold the turn's replay at `ms` into its film (paused), to look at one moment of it; null plays on. */
+      holdReplay(ms: number | null): void;
     };
   }
 }
@@ -709,7 +709,8 @@ export function MapView() {
         useGame.getState().selectFormation(id);
       },
       holdReplay(ms) {
-        useReplay.setState({ paused: true, seek: ms });
+        if (ms === null) useReplay.setState({ paused: false });
+        else useReplay.setState({ paused: true, seek: ms });
       },
       liftTargets() {
         const s = useGame.getState();

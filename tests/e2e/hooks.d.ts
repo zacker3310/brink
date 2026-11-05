@@ -17,7 +17,7 @@ interface Window {
     /** Bring a hex to the middle of the screen; select an own formation. */
     focus(key: string): void;
     select(id: string): void;
-    holdReplay(ms: number): void;
+    holdReplay(ms: number | null): void;
   };
   // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.
   __arena?: {
