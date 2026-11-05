@@ -221,7 +221,7 @@ describe('AI in the Opening Crises', () => {
         expect(lockOrders(w, subs).rejected, `turn ${w.turn}`).toEqual([]);
         w = resolveTurn(w, subs).world;
       }
-    });
+    }, 60_000); // five turns of every power planning: 1-2 s alone, 3-6 s on a loaded machine; the 5 s default is too tight
   }
 });
 
