@@ -55,6 +55,7 @@ export function createFirstContact(seed: number): WorldState {
   for (const n of ids) if (!w.nations[n]!.minor) w.nations[n]!.objectives = sortedKeys(w.sites).filter((s) => w.sites[s]!.anomaly === 'excavation');
   dormantVisitors(w);
   w.blackFiles = newBlackFiles(w, { wakeAt: 3, wakeTurn: 9, incursions: ANTARCTICA_INCURSIONS.map((i) => ({ key: cellKey(i.at), name: i.name })) });
+  dealBlackBag(w);
   refreshIntel(w);
   return w;
 }
@@ -80,7 +81,7 @@ const PACIFIC_INCURSIONS: readonly { at: [number, number]; name: string }[] = [
  * Seed the Black Files into a Pacific campaign (the setup screen's toggle, off by default): Area 51,
  * a Bermuda deep site, Tunguska and a Gobi site as black sites; digs in the Yukon, the Gobi and the
  * Kazakh steppe, held by the states there until a power takes them. Three artefacts wake the
- * Visitors (or turn 16, whatever was dug).
+ * Visitors (or turn 16, whatever was dug). Each power's deck gains a Black Bag job.
  */
 export function applyBlackFiles(w: WorldState): void {
   if (w.blackFiles) return;
@@ -113,7 +114,16 @@ export function applyBlackFiles(w: WorldState): void {
   }
   dormantVisitors(w);
   w.blackFiles = newBlackFiles(w, { wakeAt: BLACK_FILES.wakeAt, wakeTurn: 16, incursions: PACIFIC_INCURSIONS.map((i) => ({ key: cellKey(i.at), name: i.name })) });
+  dealBlackBag(w);
   refreshIntel(w);
+}
+
+/** Every power's deck gains a Black Bag job: agents to steal an artefact or leak a rival's programme. */
+function dealBlackBag(w: WorldState): void {
+  for (const id of sortedKeys(w.nations)) {
+    const d = w.nations[id]!.doctrine;
+    if (d && !w.nations[id]!.minor) d.deck = [...d.deck, 'black_bag'].sort();
+  }
 }
 
 /** Every power's atlas again, now that the anomalies are on it (as of turn 0, like the builder's). */

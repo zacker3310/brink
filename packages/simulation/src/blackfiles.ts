@@ -410,6 +410,32 @@ export function resolveBlackFiles(world: WorldState, events: GameEvent[]): void 
   }
 }
 
+/**
+ * Doctrine phase, Black Bag jobs: each power's agents take one artefact from their target, if it
+ * held one as the phase began. A target with none, or with fewer than the agents sent for them, has
+ * its programme leak instead and keeps what it has (nobody's agents outrank anybody else's).
+ */
+export function blackBag(world: WorldState, thefts: readonly { thief: NationId; from: NationId }[], events: GameEvent[]): void {
+  const bf = world.blackFiles;
+  if (!bf) return;
+  const held = { ...bf.artefacts };
+  const byTarget = new Map<NationId, NationId[]>();
+  for (const t of thefts) byTarget.set(t.from, [...new Set([...(byTarget.get(t.from) ?? []), t.thief])].sort());
+  for (const from of [...byTarget.keys()].sort()) {
+    const thieves = byTarget.get(from)!;
+    if ((held[from] ?? 0) < thieves.length) {
+      leak(world, bf, from, events);
+      continue;
+    }
+    for (const thief of thieves) {
+      bf.artefacts[from] = (bf.artefacts[from] ?? 0) - 1;
+      bf.artefacts[thief] = (bf.artefacts[thief] ?? 0) + 1;
+      events.push({ kind: 'black_files', what: 'stolen', nation: thief, other: from });
+    }
+    if (bf.artefacts[from] === 0) delete bf.artefacts[from];
+  }
+}
+
 /** Whether the Accord could be signed between `from` and `to` (both join it): they are awake, neither betrayed it, not both in. */
 export function accordOpen(bf: { awake: boolean | number | null; accord: readonly NationId[]; betrayers: readonly NationId[] } | undefined, from: NationId, to: NationId): boolean {
   if (!bf || bf.awake === null || bf.awake === false || from === to) return false;

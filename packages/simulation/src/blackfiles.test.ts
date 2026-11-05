@@ -229,6 +229,58 @@ describe('the Visitors', () => {
   });
 });
 
+describe('determinism', () => {
+  it('the Black Files phase gives the same world whatever order the orders came in', () => {
+    let w = blackWorld({ wakeAt: 0 });
+    w = turn(w).world;
+    w.blackFiles!.artefacts = { a: 1, b: 1 };
+    for (const n of ['a', 'b', 'c']) w.nations[n]!.doctrine = { cp: 5, hand: ['black_bag'], deck: [], discard: [], effects: [] };
+    unit(w, 'a1', 'a', 'infantry', k(5, 3));
+    unit(w, 'b1', 'b', 'armor', k(7, 5));
+    const subs = () => [
+      orders(w, 'a', { a1: { type: 'move', path: [k(6, 3)] } }, { play: [{ card: 'black_bag', nation: 'b' }], diplomacy: [{ target: 'b', action: 'propose_accord' }] }),
+      orders(w, 'b', { b1: { type: 'attack', target: k(8, 4), path: [] } }, { play: [{ card: 'black_bag', nation: 'a' }], diplomacy: [{ target: 'a', action: 'propose_accord' }] }),
+      orders(w, 'c', {}, { play: [{ card: 'black_bag', nation: 'a' }] }),
+    ];
+    const r1 = resolveTurn(w, subs());
+    const reversed = subs()
+      .reverse()
+      .map((o) => ({ ...o, formations: Object.fromEntries(Object.entries(o.formations).reverse()) }));
+    expect(resolveTurn(w, reversed).hash).toBe(r1.hash);
+    expect(r1.world.blackFiles!.accord).toEqual(['a', 'b']);
+  });
+});
+
+describe('the Black Bag job', () => {
+  const agents = (w: WorldState, n: string) => (w.nations[n]!.doctrine = { cp: 5, hand: ['black_bag'], deck: [], discard: [], effects: [] });
+  const job = (w: WorldState, thief: string, from: string) => orders(w, thief, {}, { play: [{ card: 'black_bag', nation: from }] });
+
+  it('steals an artefact from a rival that holds one', () => {
+    const w = blackWorld();
+    w.blackFiles!.artefacts.a = 2;
+    agents(w, 'b');
+    const r = resolveTurn(w, [job(w, 'b', 'a')]);
+    expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    expect(r.world.blackFiles!.artefacts).toEqual({ a: 1, b: 1 });
+    expect(r.reports.a!.events.some((e) => e.kind === 'black_files' && e.what === 'stolen' && e.nation === 'b')).toBe(true);
+  });
+
+  it('leaks the programme of a rival with nothing to take, and two agencies after one artefact both come home empty', () => {
+    let w = blackWorld();
+    w.nations.a!.research.unlocked = ['point_defence'];
+    agents(w, 'b');
+    w = resolveTurn(w, [job(w, 'b', 'a')]).world;
+    expect(w.blackFiles!.leaked).toEqual(['a']);
+    w = blackWorld();
+    w.blackFiles!.artefacts.a = 1;
+    agents(w, 'b');
+    agents(w, 'c');
+    const r = resolveTurn(w, [job(w, 'c', 'a'), job(w, 'b', 'a')]);
+    expect(r.world.blackFiles!.artefacts).toEqual({ a: 1 });
+    expect(r.world.blackFiles!.leaked).toEqual(['a']);
+  });
+});
+
 describe('the Accord', () => {
   const awake = () => {
     const w = blackWorld();
