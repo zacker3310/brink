@@ -25,6 +25,17 @@ Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and 
 
 ## Completed
 
+- Europe, the second theatre (docs/europe.md, Phase 5 first wave). A 56 x 32 map baked from Natural
+  Earth and finished by hand (`packages/mapgen/src/europe.ts`): six powers (the United Kingdom,
+  France, Germany, Poland, Russia, Turkey), forty minor states, the Channel, the Danish Straits,
+  Gibraltar, the Bosphorus and Dardanelles as straits and the Suwałki corridor as a land bridge.
+  Country files with invented generals, doctrine decks and leaders for the five new powers; navies
+  off several home ports; victory bars per theatre (`THEATRE_VICTORY`: 15% domination, 18%
+  supremacy). The setup screen lists each theatre's own nations; Easy's natural ally is per theatre.
+  Soak (`tests/soak/europe.soak.test.ts`), 20 AI-only matches: 0 refused orders, 17 decisive (85%:
+  supremacy 10, domination 7), median turn 21; winners Poland 13, Germany 5, the United Kingdom 2.
+  Open: Poland still wins too often, Russia, France and Turkey not at all; a European turn costs
+  three to four times a Pacific one (46 nations).
 - The Black Files merged with diplomacy that works, airborne warfare and right of passage
   (ruleset 2.12.0; the Black Files lane had set 2.10.0 on its own). How the Accord meets the
   other deals: it binds like a pact, so a signatory can be neither party to an alliance against a

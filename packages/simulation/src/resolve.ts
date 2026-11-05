@@ -30,7 +30,7 @@ import { growCities } from './progression';
 import { clone, relationOf, sortedKeys } from './rules';
 import { allocateLogistics } from './supply';
 import { resolveTerritory } from './territory';
-import { evaluateVictory } from './victory';
+import { evaluateVictory, supremacyStanding } from './victory';
 import { lockOrders } from './validate';
 
 export const PHASES = [
@@ -334,8 +334,9 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   const vp = victoryPoints(world);
   const observations: Record<NationId, NationView> = {};
   const reports: Record<NationId, TurnReport> = {};
+  const standing = supremacyStanding(world);
   for (const n of sortedKeys(world.nations)) {
-    observations[n] = buildView(world, n, finalVision[n]!);
+    observations[n] = buildView(world, n, finalVision[n]!, standing);
     reports[n] = { turn: resolved, events: reportFor(world, n, finalVision[n]!, events), victoryPoints: vp };
   }
   return { world, events, observations, reports, hash: hashState(world) };

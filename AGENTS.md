@@ -14,7 +14,7 @@ Run from the repo root. Node 22+, pnpm 10.
 | api | `pnpm dev:api` (http://127.0.0.1:8787/api/health) |
 | all checks | `pnpm check` (typecheck, lint, unit tests) |
 | unit tests | `pnpm test` |
-| soak | `pnpm test:soak` (100 AI matches, `SOAK_MATCHES=20` for a quick run; 60 battle setups at each of three difficulties, `ARENA_SOAK=20`) |
+| soak | `pnpm test:soak` (100 Pacific AI matches, `SOAK_MATCHES=20` for a quick run; up to 20 European ones, `SOAK_EUROPE_MATCHES`; 60 battle setups at each of three difficulties, `ARENA_SOAK=20`) |
 | battle matrix | `pnpm test:matrix` (24 seeded battles to their end across every dimension, `ARENA_MATRIX=60` for more; failing seeds go to `tests/soak/arena-failing-seeds.json` and run first next time) |
 | difficulty | `pnpm test:difficulty` (human win rate per level, the AI's own planner in the human seat; `DIFFICULTY_MATCHES=32` a level, `DIFFICULTY_LEVELS=hard` for one) |
 | e2e | `pnpm test:e2e` (builds the web app, serves it on :4173, runs Chromium) |

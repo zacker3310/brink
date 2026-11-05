@@ -167,14 +167,16 @@ export function totalVictoryPoints(world: WorldState): number {
 }
 
 export function victoryThreshold(world: WorldState): number {
-  return Math.ceil((totalVictoryPoints(world) * victoryBars(world.maxTurns).dominationShare) / 100);
+  return Math.ceil((totalVictoryPoints(world) * victoryBars(world.maxTurns, world.scenarioId).dominationShare) / 100);
 }
 
 /**
  * Everything `nation` is allowed to know, built only from current vision and its own intel.
- * The client and the AI never receive anything else.
+ * The client and the AI never receive anything else. `standing` is the public supremacy standing
+ * (`supremacyStanding(world)`), the same for every nation's view of one world: a caller building
+ * every view of a turn computes it once (a theatre of forty nations spent a sixth of its turn on it).
  */
-export function buildView(world: WorldState, nation: NationId, vision: Vision = computeVision(world, nation)): NationView {
+export function buildView(world: WorldState, nation: NationId, vision: Vision = computeVision(world, nation), standing: Record<NationId, number> = supremacyStanding(world)): NationView {
   const self = world.nations[nation];
   if (!self) throw new Error(`no such nation: ${nation}`);
   const intel = world.intel[nation] ?? emptyIntel();
@@ -311,7 +313,6 @@ export function buildView(world: WorldState, nation: NationId, vision: Vision = 
   const publicRelations: Record<string, Relation> = {};
   for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) publicRelations[pairKey(ids[i]!, ids[j]!)] = relationOf(world.relations, ids[i]!, ids[j]!);
 
-  const standing = supremacyStanding(world);
   return {
     scenarioId: world.scenarioId,
     rulesetVersion: world.rulesetVersion,

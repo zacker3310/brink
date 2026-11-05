@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RULESET_VERSION } from '@brink/game-data';
-import { CRISES, NATIONS, SCENARIOS } from '@brink/scenarios';
+import { CRISES, findNation, SCENARIOS } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { tutorialDone } from '../coach';
 import { latestSlot, type SlotInfo } from '../saves';
@@ -42,7 +42,7 @@ export function Title({
 }) {
   const scenario = SCENARIOS[0]!;
   const last = latestSlot(slots);
-  const lastNation = last ? NATIONS.find((n) => n.id === last.nation) : undefined;
+  const lastNation = last ? findNation(last.nation) : undefined;
   const career = readCareer();
   const [muted, setMute] = useState(isMuted());
   const [intro] = useState(() => {

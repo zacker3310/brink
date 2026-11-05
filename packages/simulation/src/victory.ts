@@ -97,7 +97,7 @@ export function evaluateVictory(world: WorldState): VictoryState | null {
   const leaders = alive.filter((n) => vp[n]! >= victoryThreshold(world));
   if (leaders.length === 1) return { winner: leaders[0]!, reason: 'victory_points', turn };
 
-  const bars = victoryBars(world.maxTurns);
+  const bars = victoryBars(world.maxTurns, world.scenarioId);
   if (turn >= bars.supremacyFromTurn) {
     const blocs = allianceBlocs(world)
       .map((members) => ({ members, held: members.reduce((a, n) => a + vp[n]!, 0) }))
