@@ -83,10 +83,9 @@ describe('The Middle East and Africa', () => {
 
   it('makes the straits chokepoints: the seas they join meet nowhere else, and Suez is a port, not a channel', () => {
     const sea = (k: HexKey) => w.tiles[k]?.terrain === 'water';
-    const zone = (k: HexKey) => {
-      for (let r = 0; r < MIDEAST_MAP.rows; r++) for (let c = 0; c < MIDEAST_MAP.cols; c++) if (cell(c, r) === k) return layerAt(MIDEAST_MAP.layers.seaZone!, c, r);
-      return null;
-    };
+    const zones = new Map<HexKey, string | null>();
+    for (let r = 0; r < MIDEAST_MAP.rows; r++) for (let c = 0; c < MIDEAST_MAP.cols; c++) zones.set(cell(c, r), layerAt(MIDEAST_MAP.layers.seaZone!, c, r));
+    const zone = (k: HexKey) => zones.get(k) ?? null;
     /** The sea hexes a ship reaches from `from` by water alone, never through `blocked`. */
     const reach = (from: HexKey, blocked: ReadonlySet<HexKey>) => {
       const seen = new Set<HexKey>([from]);
