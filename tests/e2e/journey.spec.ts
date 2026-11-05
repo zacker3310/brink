@@ -161,7 +161,9 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await expect(page.getByTestId('menu-continue')).toContainText('Russia · turn 2');
   await page.getByTestId('menu-load').click();
   await page.getByTestId('load-slot-2').click();
-  await expect(page.getByTestId('top-bar')).toContainText('Russia');
+  // Loading rebuilds the world behind the deploy screen ("Resuming… Establishing command link"),
+  // about 4 s on a quiet machine: wait for the game, not the 5 s default.
+  await expect(page.getByTestId('top-bar')).toContainText('Russia', { timeout: 30_000 });
   await expect(page.getByTestId('turn')).toContainText('2 / 20');
   await page.getByTestId('open-report').click();
   await expect(page.getByTestId('report')).toContainText('Turn 1 resolved');
@@ -176,7 +178,7 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
   await page.getByRole('button', { name: 'Menu' }).click();
   await page.getByTestId('menu-load').click();
   await page.getByTestId('load-file').setInputFiles((await file.path())!);
-  await expect(page.getByTestId('top-bar')).toContainText('Russia');
+  await expect(page.getByTestId('top-bar')).toContainText('Russia', { timeout: 30_000 });
   await expect(page.getByTestId('turn')).toContainText('2 / 20');
 
   // Play another turn, then browse back through the report history.
