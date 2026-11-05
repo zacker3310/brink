@@ -121,6 +121,9 @@ test('start, order, resolve, report, save and resume', async ({ page }) => {
       }),
     )
     .toBe(true);
+  // Results arrive when the replay is over: it ends on its own (a stalled frame slows it rather than
+  // skipping, so a slow machine plays it longer), and then the notifications are up.
+  await expect(page.getByTestId('replay')).toHaveCount(0, { timeout: 60_000 });
   await expect(page.getByTestId('notifications')).toBeVisible();
   await page.getByTestId('open-report').click();
   const report = page.getByTestId('report');
