@@ -329,6 +329,8 @@ export function buildScenario(map: MapFile, seed: number, setup: ScenarioSetup):
     const capital = capitalOf.get(n.id)!;
     raise(n, 'infantry', capital, counts, 60);
     raise(n, 'recon', capital, counts, 60);
+    // A city's infantry and its militia stand in one hex: never more than the stack holds.
+    if (1 + (n.militia?.length ?? 0) > STACK_LIMIT) throw new Error(`${map.id}: ${n.id}'s militia (${n.militia!.join(', ')}) and its city infantry overfill a hex of ${STACK_LIMIT}`);
     for (const city of siteIds(n.id, 'city')) {
       raise(n, 'infantry', city, counts, 60);
       for (const c of n.militia ?? []) raise(n, c, city, counts, 60);

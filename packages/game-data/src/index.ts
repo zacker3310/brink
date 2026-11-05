@@ -581,11 +581,11 @@ export const THEATRE_BARS: Readonly<Record<string, Partial<Pick<VictoryBars, 'do
   // The Indo-Pacific South: an archipelago, its prizes islands across the sea, so standings stay
   // close (none passed 25) and the rule's 24% supremacy decided 3 matches of 20. At 21%: 70%.
   indopac: { supremacyShare: 21 },
-  // The Americas: Colombia, ringed by minor states, takes them fast (with a deeper militia in its ring,
-  // still near 30% of the points by turn 15 in some wars): at the rule's 21% domination it wins every
-  // war by turn 11. At 26% domination (the five-power rule's) and 23% supremacy: 65% decided, won by
-  // Mexico 7, Colombia 5 and Canada 1.
-  americas: { dominationShare: 26, supremacyShare: 23 },
+  // The Americas: Colombia, ringed by minor states, takes them fast (near 30% of the points by turn 15
+  // in some wars, its ring defending deeper or not): at the rule's 21% domination it won 18 wars of 20
+  // by turn 11. At 28% domination and 23% supremacy: 80% decided, median turn 24, Colombia 10, Mexico
+  // 3, Canada 3.
+  americas: { dominationShare: 28, supremacyShare: 23 },
 };
 
 /** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */
