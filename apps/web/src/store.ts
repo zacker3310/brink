@@ -5,6 +5,7 @@ import type {
   CardPlay,
   Difficulty,
   DealTerms,
+  DiplomacyOrder,
   DiplomaticAction,
   FacilityId,
   FormationId,
@@ -36,9 +37,8 @@ import type { Mode } from './planning';
 import type { Response } from './protocol';
 import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type ActiveOperation, type MapStyle, type SlotInfo } from './saves';
 import { operationById, proposeOperations, type Operation } from '@brink/ai';
+import { staffDiplomacy } from './staff-diplomacy';
 
-/** The diplomacy the staff may sign for the player on its own: what calms a front and costs nothing. */
-const STAFF_DIPLOMACY: ReadonlySet<DiplomaticAction> = new Set<DiplomaticAction>(['propose_peace', 'propose_ceasefire', 'propose_nonaggression', 'propose_trade']);
 
 export type Tab = 'overview' | 'military' | 'economy' | 'research' | 'diplomacy' | 'generals';
 
@@ -126,6 +126,8 @@ interface State {
   cancelOperation(): void;
   /** The Operations sheet is open. */
   opsOpen: boolean;
+  /** Peace or a ceasefire the staff advises this turn (it never makes one for the player): the diplomacy screen offers each with one tap. */
+  staffAdvice: { turn: number; orders: DiplomacyOrder[] } | null;
   setOpsOpen(open: boolean): void;
   /** Load a save. Seats other players held in an old multiplayer save go to the AI. */
   loadGame(text: string): Promise<boolean>;
@@ -476,6 +478,7 @@ export const useGame = create<State>((set, get) => {
       if (get().staffPlan) void get().autoCommand(true);
     },
     opsOpen: false,
+    staffAdvice: null,
     setOpsOpen(open) {
       set({ opsOpen: open });
     },
@@ -524,21 +527,27 @@ export const useGame = create<State>((set, get) => {
         n += 1;
       }
       if (next.research === undefined && !view.self.research.current && r.orders.research) next.research = r.orders.research;
-      // The staff's diplomacy too: peace with a power it is not fighting for, pacts and trade, so a
-      // war on every front at once does not pin the army to its borders. Only what calms a front:
-      // never a war, an alliance (it can carry one), an embargo, an ultimatum or a payment of the
-      // player's stockpile. Those are the player's to make. A nation the player already has an order
-      // for is left alone.
-      for (const d of r.orders.diplomacy) {
-        if (!STAFF_DIPLOMACY.has(d.action) || next.diplomacy.some((x) => x.target === d.target)) continue;
+      // The staff's diplomacy: trade and pacts with powers already at peace. Peace and ceasefires it
+      // only advises (a player who declared war had the staff draft peace the turn after, and the
+      // rival took it); never a war, an alliance, an embargo, an ultimatum or a payment. A nation the
+      // player already has an order for is left alone (staff-diplomacy.ts).
+      const dip = staffDiplomacy(view, next, r.orders.diplomacy, get().report);
+      for (const d of dip.orders) {
         next.diplomacy.push(d);
         n += 1;
       }
+      // Said once a turn: advice already given this turn is not repeated.
+      const before = get().staffAdvice;
+      const advised = dip.advice.filter((d) => before?.turn !== view.turn || !before.orders.some((x) => x.target === d.target && x.action === d.action));
       // A turn that moved on while the staff was thinking keeps the new turn's draft. The guided
       // first match teaches giving orders by hand: no plan while the coach is on.
       if (get().view !== view || (auto && useCoach.getState().active)) return;
       // The plan is the picture: nothing selected, so every arrow on the map is the staff's.
-      set({ draft: next, planned, armed: null, selectedFormation: null, ...(auto ? { group: [], selectedHex: null } : {}) });
+      set({ draft: next, planned, armed: null, selectedFormation: null, staffAdvice: { turn: view.turn, orders: dip.advice }, ...(auto ? { group: [], selectedHex: null } : {}) });
+      if (advised.length > 0) {
+        const names = advised.map((d) => view.nations[d.target]?.name ?? d.target).join(' and ');
+        get().notify(`Staff advises ${advised[0]!.action === 'propose_ceasefire' && advised.length === 1 ? 'a ceasefire' : 'peace'} with ${names}: one tap in Diplomacy`);
+      }
       void recheck();
       if (!auto) get().notify(n ? `Staff drafted ${n} order${n === 1 ? '' : 's'}. Change any, then execute.` : 'Every unit already has orders.');
     },

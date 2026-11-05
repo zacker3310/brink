@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DiplomacyOrder, NationId, WorldState } from '@brink/contracts';
 import { LEADER_TUNING, leaderFor } from '@brink/game-data';
 import { hexKey } from '@brink/map';
-import { makeWorld, orders, setRelation, site } from './fixture.test-util';
+import { makeWorld, orders, setRelation, site, unit } from './fixture.test-util';
 import { buildView } from './fog';
 import { attitude, memoryValue, recordMemories, stanceOf } from './leaders';
 import { resolveTurn } from './resolve';
@@ -134,11 +134,101 @@ describe('deals', () => {
     expect(r2.events).toContainEqual(expect.objectContaining({ kind: 'treaty_ended', treaty: 'joint_op', reason: 'fulfilled' }));
     expect(treatyIn(r2.world.treaties, 'joint_op', 'a', 'b', r2.world.turn)).toBeUndefined();
     expect(r2.world.memories!.a).toContainEqual(expect.objectContaining({ about: 'b', kind: 'comrades' }));
-    // Only against a power the proposer is at war with.
+    // Only against a power one of the partners is at war with. (Until ruleset 2.10 the proposer had
+    // to be, and so did the answering side, whose answer is the same offer back: a partner at peace
+    // with the holder could never agree. Now one of the two fighting it is enough; see below.)
     const peace = clone(w);
     setRelation(peace, 'a', 'c', 'peace');
+    setRelation(peace, 'b', 'c', 'peace');
     const no = resolveTurn(peace, [orders(peace, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_joint_op', terms }] })]);
-    expect(no.events).toContainEqual(expect.objectContaining({ kind: 'order_rejected', reason: expect.stringContaining('at war with its holder') }));
+    expect(no.events).toContainEqual(expect.objectContaining({ kind: 'order_rejected', reason: expect.stringContaining('at war with Nation C') }));
+  });
+
+  it('a partner at peace with the prize\'s holder can join a joint operation: it goes to war on signing', () => {
+    const w = makeWorld(8, 6, ['a', 'b', 'c']);
+    setRelation(w, 'a', 'b', 'peace');
+    setRelation(w, 'b', 'c', 'peace');
+    site(w, 'prize', k(4, 3), 'c', 'city', 1);
+    const terms = { site: 'prize' };
+    const r = deal(w, 'a', { target: 'b', action: 'propose_joint_op', terms }, 'b', { target: 'a', action: 'propose_joint_op', terms });
+    expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    expect(treatyIn(r.world.treaties, 'joint_op', 'a', 'b', r.world.turn)).toMatchObject({ site: 'prize' });
+    expect(r.world.relations['b|c']).toBe('war');
+    // A peace broken: perfidy and a betrayal remembered, as for an alliance against a power.
+    expect(r.events).toContainEqual(expect.objectContaining({ kind: 'diplomacy', a: 'b', b: 'c', relation: 'war', broke: 'peace', proposedBy: 'b' }));
+    expect(r.world.memories!.c).toContainEqual({ about: 'b', kind: 'betrayed', turn: 1 });
+    // Not against a power either partner holds a pact or ceasefire with.
+    for (const [x, y] of [['a', 'c'], ['b', 'c']] as const) {
+      const v = clone(w);
+      v.treaties.push({ kind: x === 'a' ? 'ceasefire' : 'nonaggression', a: x, b: y, from: 1, until: 5 });
+      if (x === 'a') setRelation(v, 'a', 'c', 'peace');
+      const blocked = resolveTurn(v, [orders(v, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_joint_op', terms }] })]);
+      expect(blocked.events).toContainEqual(expect.objectContaining({ kind: 'order_rejected', nation: 'a', reason: expect.stringContaining('bound by a treaty') }));
+    }
+  });
+
+  it('a joint operation on a prize that changed hands out of sight is no illegal order: it just does not sign', () => {
+    const w = makeWorld(8, 6, ['a', 'b', 'c', 'd']);
+    setRelation(w, 'a', 'b', 'peace');
+    site(w, 'prize', k(4, 3), 'c', 'city', 1);
+    // a last saw c holding it; d has taken it since, out of a's sight (and a is at peace with d).
+    setRelation(w, 'a', 'd', 'peace');
+    setRelation(w, 'b', 'd', 'peace');
+    w.intel.a = { observed: { [k(4, 3)]: 0 }, knownOwner: { [k(4, 3)]: 'c' }, lastKnown: {} };
+    w.sites.prize!.owner = 'd';
+    w.tiles[k(4, 3)]!.owner = 'd';
+    expect(buildView(w, 'a').sites.prize!.owner).toBe('c');
+    const terms = { site: 'prize' };
+    const r = resolveTurn(w, [orders(w, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_joint_op', terms }] })]);
+    expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
+    expect(r.world.treaties.some((t) => t.kind === 'joint_op')).toBe(false);
+    expect(r.world.proposals).toEqual([]);
+  });
+
+  it('partners in a joint operation share what they see of its prize', () => {
+    const w = makeWorld(12, 8, ['a', 'b', 'c']);
+    setRelation(w, 'a', 'b', 'peace');
+    site(w, 'prize', k(5, 4), 'c', 'city', 1);
+    unit(w, 'b-inf', 'b', 'infantry', k(4, 4));
+    const before = buildView(w, 'a').tiles[k(5, 4)]!.visibility;
+    w.treaties.push({ kind: 'joint_op', a: 'a', b: 'b', from: 1, until: 5, site: 'prize' });
+    const after = buildView(w, 'a').tiles[k(5, 4)]!.visibility;
+    expect([before, after]).toEqual([expect.not.stringMatching(/^visible$/), 'visible']);
+  });
+
+  it('an alliance or joint operation can carry a sweetener, paid on signing and reserved like a recruit', () => {
+    const w = makeWorld(8, 6, ['a', 'b', 'c']);
+    setRelation(w, 'a', 'b', 'peace');
+    setRelation(w, 'b', 'c', 'peace');
+    const terms = { against: 'c', give: { credits: 100 } };
+    const back = { against: 'c', get: { credits: 100 } };
+    // Terms that do not mirror (no payment named back): nothing signs.
+    const miss = deal(w, 'a', { target: 'b', action: 'propose_alliance', terms }, 'b', { target: 'a', action: 'propose_alliance', terms: { against: 'c' } });
+    expect(miss.world.relations['a|b']).toBe('peace');
+    const r = deal(w, 'a', { target: 'b', action: 'propose_alliance', terms }, 'b', { target: 'a', action: 'propose_alliance', terms: back });
+    expect(r.world.relations['a|b']).toBe('alliance');
+    expect(r.world.relations['b|c']).toBe('war');
+    expect(r.events).toContainEqual(expect.objectContaining({ kind: 'exchange', a: 'a', b: 'b', aGave: { credits: 100 } }));
+    const plain = resolveTurn(clone(w), []);
+    expect(r.world.nations.b!.stockpile.credits - plain.world.nations.b!.stockpile.credits).toBe(100);
+    // More than the stockpile holds after recruits: refused.
+    const poor = clone(w);
+    poor.nations.a!.stockpile.credits = 50;
+    const no = resolveTurn(poor, [orders(poor, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_alliance', terms }] })]);
+    expect(no.events).toContainEqual(expect.objectContaining({ kind: 'order_rejected', nation: 'a', reason: expect.stringContaining('not enough in the stockpile') }));
+  });
+
+  it('a declaration of war cancels every offer still waiting between the two', () => {
+    const w = makeWorld(8, 6, ['a', 'b', 'c']);
+    setRelation(w, 'a', 'b', 'peace');
+    const first = resolveTurn(w, [orders(w, 'a', {}, { diplomacy: [{ target: 'b', action: 'propose_trade' }] }), orders(w, 'b', {}, { diplomacy: [{ target: 'a', action: 'propose_nonaggression' }] })]);
+    expect(first.world.proposals.map((p) => `${p.from}>${p.to}:${p.kind}`)).toEqual(['a>b:trade', 'b>a:nonaggression']);
+    const war = resolveTurn(first.world, [orders(first.world, 'a', {}, { diplomacy: [{ target: 'b', action: 'declare_war' }] })]);
+    expect(war.world.relations['a|b']).toBe('war');
+    expect(war.world.proposals).toEqual([]);
+    // The turn after, b's matching answer to a's old offer finds nothing to sign.
+    const after = resolveTurn(war.world, [orders(war.world, 'b', {}, { diplomacy: [{ target: 'a', action: 'propose_peace' }] })]);
+    expect(after.world.relations['a|b']).toBe('war');
   });
 
   it('deals resolve the same whatever order the submissions arrive in', () => {

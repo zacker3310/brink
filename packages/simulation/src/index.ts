@@ -17,3 +17,4 @@ export * from './doctrine';
 export * from './progression';
 export * from './leaders';
 export { answerTo, bindingTreaty, canPropose, cleanTerms, mirrors, mirrorTerms, PROPOSAL_LIFETIME, PROPOSAL_OF, stockTotal, termsProblem, type DiplomacyWorld } from './diplomacy';
+export { dealGives, diplomacyWorldOf, jointOpProblem } from './diplomacy';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { NationOrders, WorldState } from '@brink/contracts';
+import type { DealTerms, NationOrders, WorldState } from '@brink/contracts';
 import { hexKey } from '@brink/map';
 import { buildView, lockOrders, resolveTurn } from '@brink/simulation';
 import { makeWorld, setRelation, site } from '../../simulation/src/fixture.test-util';
@@ -71,8 +71,92 @@ describe('leaders answering offers', () => {
     const view = buildView(w, 'b');
     expect(view.attitudes!.a!.mood).toBeGreaterThanOrEqual(20);
     expect(consider(view, emptyMemory(), { from: 'a', kind: 'alliance', terms: { against: 'c' } }).accept).toBe(true);
+    // Against a friend: no, and the reason says so. (Until ruleset 2.10 any power not already hated
+    // was refused with 'mood', even with a friend asking: joining a war was never a real ask. The
+    // case kept here is the one the name means: c is b's friend.)
     setRelation(w, 'b', 'c', 'peace');
-    expect(consider(buildView(w, 'b'), emptyMemory(), { from: 'a', kind: 'alliance', terms: { against: 'c' } })).toEqual({ accept: false, reason: 'mood' });
+    w.memories.b!.push({ about: 'c', kind: 'comrades', turn: 1 }, { about: 'c', kind: 'comrades', turn: 1 }, { about: 'c', kind: 'dealt', turn: 1 });
+    w.treaties.push({ kind: 'trade', a: 'b', b: 'c', from: 1, until: 8 });
+    expect(buildView(w, 'b').attitudes!.c!.mood).toBeGreaterThanOrEqual(20);
+    expect(consider(buildView(w, 'b'), emptyMemory(), { from: 'a', kind: 'alliance', terms: { against: 'c' } })).toEqual({ accept: false, reason: 'likes_target' });
+  });
+});
+
+describe('leaders asked to join a war', () => {
+  /** a asks b to fight c; b likes a (comrades, trade). */
+  function asked(): WorldState {
+    const w = peaceful();
+    w.nations.b!.government = 'union';
+    w.memories = { b: [{ about: 'a', kind: 'comrades', turn: 1 }, { about: 'a', kind: 'comrades', turn: 1 }, { about: 'a', kind: 'dealt', turn: 1 }] };
+    w.treaties.push({ kind: 'trade', a: 'a', b: 'b', from: 1, until: 8 });
+    return w;
+  }
+  const against = (view: ReturnType<typeof buildView>, terms: DealTerms = { against: 'c' }) => consider(view, emptyMemory(), { from: 'a', kind: 'alliance', terms });
+
+  it('a friendly dove joins its ally against the power running away with the race', () => {
+    const w = asked();
+    setRelation(w, 'a', 'b', 'alliance');
+    const view = buildView(w, 'b');
+    expect(view.attitudes!.a!.mood).toBeGreaterThanOrEqual(20);
+    view.supremacy = { a: 30, b: 25, c: 45 };
+    expect(against(view)).toEqual({ accept: true, reason: 'agreed' });
+    // Not when it is no threat at all: a small power far behind.
+    view.supremacy = { a: 40, b: 40, c: 20 };
+    expect(against(view).accept).toBe(false);
+  });
+
+  it('says why it will not: it likes the target, or has wars enough', () => {
+    const w = asked();
+    w.memories!.b!.push({ about: 'c', kind: 'comrades', turn: 1 }, { about: 'c', kind: 'comrades', turn: 1 });
+    w.treaties.push({ kind: 'trade', a: 'b', b: 'c', from: 1, until: 8 });
+    expect(against(buildView(w, 'b')).reason).toBe('likes_target');
+    // Two wars on its hands already (d and e): stretched.
+    const x = makeWorld(8, 6, ['a', 'b', 'c', 'd']);
+    x.nations.e = { ...structuredClone(x.nations.d!), id: 'e', name: 'Nation E' };
+    x.intel.e = { observed: {}, knownOwner: {}, lastKnown: {} };
+    site(x, 'e-home', hexKey(3, 3), 'e');
+    for (const [p, q] of [['a', 'b'], ['a', 'c'], ['b', 'c'], ['a', 'd'], ['a', 'e'], ['c', 'd'], ['c', 'e'], ['d', 'e']] as const) setRelation(x, p, q, 'peace');
+    setRelation(x, 'b', 'e', 'war');
+    x.memories = { b: [{ about: 'a', kind: 'comrades', turn: 1 }, { about: 'a', kind: 'dealt', turn: 1 }] };
+    expect(consider(buildView(x, 'b'), emptyMemory(), { from: 'a', kind: 'alliance', terms: { against: 'c' } })).toEqual({ accept: false, reason: 'stretched' });
+    // A power it spares (a human on Easy) it never goes to war with.
+    expect(consider(buildView(w, 'b'), emptyMemory(), { from: 'a', kind: 'alliance', terms: { against: 'c' } }, { spare: ['c'] })).toEqual({ accept: false, reason: 'likes_target' });
+  });
+
+  it('a sweetener can carry the deal, and what it is asked to pay it must hold', () => {
+    const w = asked();
+    const view = buildView(w, 'b');
+    view.supremacy = { a: 34, b: 33, c: 33 };
+    const plain = against(view);
+    expect(plain.accept).toBe(false);
+    expect(against(view, { against: 'c', give: { credits: 300, materials: 200 } })).toEqual({ accept: true, reason: 'agreed' });
+    // Asked to pay more than it holds: it cannot.
+    expect(against(view, { against: 'c', get: { credits: 900 } })).toEqual({ accept: false, reason: 'cannot' });
+  });
+
+  it('a partner at peace with the holder accepts a joint operation, goes to war, and marches on the prize', () => {
+    const w = asked();
+    setRelation(w, 'a', 'c', 'war');
+    site(w, 'prize', hexKey(4, 3), 'c', 'city', 1);
+    // b has seen the prize (it is known, if not in sight now).
+    w.intel.b = { observed: { [hexKey(4, 3)]: 0 }, knownOwner: { [hexKey(4, 3)]: 'c' }, lastKnown: {} };
+    const view = buildView(w, 'b');
+    view.supremacy = { a: 30, b: 25, c: 45 };
+    const offer = { from: 'a', kind: 'joint_op' as const, terms: { site: 'prize' } };
+    expect(consider(view, emptyMemory(), offer)).toEqual({ accept: true, reason: 'agreed' });
+    const out = leaderDiplomacy(view, emptyMemory(), blank(w, 'b'), { incoming: [offer] });
+    expect(out.diplomacy).toContainEqual({ target: 'a', action: 'propose_joint_op', terms: { site: 'prize' } });
+    const subs = [blank(w, 'a', { diplomacy: [{ target: 'b', action: 'propose_joint_op', terms: { site: 'prize' } }] }), out];
+    expect(lockOrders(w, subs).rejected).toEqual([]);
+    const r = resolveTurn(w, subs);
+    expect(r.world.relations['b|c']).toBe('war');
+    expect(jointOpTarget(buildView(r.world, 'b'))).toBe('prize');
+    // And while it runs, no peace with the holder: neither offered nor accepted, unless losing.
+    const after = buildView(r.world, 'b');
+    after.supremacy = { a: 30, b: 30, c: 30 };
+    expect(consider(after, emptyMemory(), { from: 'c', kind: 'peace' })).toEqual({ accept: false, reason: 'focus' });
+    const planned = blank(r.world, 'b', { diplomacy: [{ target: 'c', action: 'propose_peace' }] });
+    expect(leaderDiplomacy(after, emptyMemory(), planned).diplomacy.some((d) => d.target === 'c' && d.action === 'propose_peace')).toBe(false);
   });
 });
 
