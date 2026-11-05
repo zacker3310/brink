@@ -4,7 +4,7 @@ import { consider, emptyMemory, offerOf, planOrders, updateMemory, type Offer, t
 import { HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
 import { applyCrisis, createScenario, type CrisisId, crisisOf } from '@brink/scenarios';
 import { keyDistance } from '@brink/map';
-import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys } from '@brink/simulation';
+import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys, supremacyStanding } from '@brink/simulation';
 
 export interface AdvanceResult {
   /** The player's report, or every nation's when there is no player. */
@@ -166,6 +166,8 @@ export class GameSession {
    */
   aiOrders(human: readonly NationOrders[] = []): NationOrders[] {
     const out: NationOrders[] = [];
+    // One world, so one public standing for every AI's view of it.
+    const standing = supremacyStanding(this.world);
     for (const n of sortedKeys(this.memory)) {
       if (this.world.nations[n]!.eliminated) continue;
       const incoming: Offer[] = [];
@@ -176,7 +178,7 @@ export class GameSession {
           if (offer) incoming.push(offer);
         }
       }
-      out.push(planOrders(buildView(this.world, n), this.memory[n]!, this.world.seed, { spare: this.spare, ...(incoming.length ? { incoming } : {}) }));
+      out.push(planOrders(buildView(this.world, n, undefined, standing), this.memory[n]!, this.world.seed, { spare: this.spare, ...(incoming.length ? { incoming } : {}) }));
     }
     return out;
   }
@@ -255,13 +257,30 @@ export class GameSession {
   }
 }
 
-/** Each power's natural ally, who fights beside a human player on Easy. */
-const ALLY: Record<NationId, NationId> = { japan: 'usa', usa: 'japan', russia: 'china', china: 'russia' };
+/**
+ * Each power's natural allies, who fight beside a human player on Easy: the first that is a power in
+ * the campaign's theatre (Russia's is China in the Pacific, Turkey in Europe).
+ */
+const ALLY: Record<NationId, readonly NationId[]> = {
+  japan: ['usa'],
+  usa: ['japan'],
+  russia: ['china', 'turkey'],
+  china: ['russia'],
+  uk: ['france'],
+  france: ['uk'],
+  germany: ['poland'],
+  poland: ['germany'],
+  turkey: ['russia'],
+};
+
+function allyOf(world: WorldState, me: NationId): NationId | undefined {
+  return (ALLY[me] ?? []).find((n) => world.nations[n] && !world.nations[n]!.minor);
+}
 
 /** Easy, single player: the ally the difficulty gave stays an ally unless the crisis set them at war. */
 function easyAlly(world: WorldState, humans: readonly NationId[]): void {
   const me = humans[0];
-  const ally = me ? ALLY[me] : undefined;
+  const ally = me ? allyOf(world, me) : undefined;
   if (humans.length !== 1 || !me || !ally || !world.nations[ally]) return;
   if (world.relations[pairKey(me, ally)] === 'peace') world.relations[pairKey(me, ally)] = 'alliance';
 }
@@ -294,7 +313,7 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
     };
     // Your natural ally fights beside you (Japan and the United States, Russia and China); the
     // enemy is the nearest power of the other side; the last stays out of it.
-    const ally = ALLY[me];
+    const ally = allyOf(world, me);
     const enemies = rivals.filter((n) => n !== ally);
     const nearest = [...enemies].sort((a, b) => far(a) - far(b) || (a < b ? -1 : 1))[0];
     for (const n of rivals) if (n !== nearest && n !== ally) world.relations[pairKey(me, n)] = 'peace';

@@ -26,6 +26,8 @@ export interface NationSpec {
   rough: number;
   /** The opening navy, at sea off the named port. */
   navy?: { port: string; ships: UnitClass[] };
+  /** Further squadrons off other home ports (a power with more than one sea: Europe's Russia). */
+  squadrons?: { port: string; ships: UnitClass[] }[];
   /** A minor state's militia per city, beyond the one every city has: big countries defend deeper. */
   militia?: UnitClass[];
 }
@@ -34,7 +36,8 @@ export interface NationSpec {
 export interface ScenarioSetup {
   scenarioId: string;
   maxTurns: number;
-  navies?: Readonly<Record<NationId, { port: string; ships: UnitClass[] }>>;
+  /** A power's opening navy off one home port, or a list of squadrons off several. */
+  navies?: Readonly<Record<NationId, { port: string; ships: UnitClass[] } | readonly { port: string; ships: UnitClass[] }[]>>;
   militia?: Readonly<Record<NationId, UnitClass[]>>;
 }
 
@@ -45,7 +48,9 @@ export function nationSpecs(map: MapFile, setup: Pick<ScenarioSetup, 'navies' | 
   return map.nations.map((n) => {
     const own = map.sites.filter((s) => s.owner === n.id);
     const capital = map.sites.find((s) => s.id === n.capital)!;
-    const navy = setup.navies?.[n.id];
+    const given = setup.navies?.[n.id];
+    const fleets = given === undefined ? [] : Array.isArray(given) ? given : [given as { port: string; ships: UnitClass[] }];
+    const navy = fleets[0];
     const militia = setup.militia?.[n.id];
     return {
       id: n.id,
@@ -60,6 +65,7 @@ export function nationSpecs(map: MapFile, setup: Pick<ScenarioSetup, 'navies' | 
       depots: own.filter((s) => s.kind === 'depot').map(place),
       rough: n.terrainBias ?? 0,
       ...(navy ? { navy: { port: navy.port, ships: [...navy.ships] } } : {}),
+      ...(fleets.length > 1 ? { squadrons: fleets.slice(1).map((f) => ({ port: f.port, ships: [...f.ships] })) } : {}),
     };
   });
 }
@@ -274,14 +280,14 @@ export function buildScenario(map: MapFile, seed: number, setup: ScenarioSetup):
       const f = raise(n, 'infantry', depots[i]!, counts);
       if (map.sites.find((s) => s.id === depots[i])!.profile === 'outpost') f.strength = 500;
     }
-    if (n.navy) {
+    for (const navy of n.navy ? [n.navy, ...(n.squadrons ?? [])] : []) {
       // At sea off the home port: the nearest open sea hexes, a full stack of ships to each (sorted,
       // so every seed agrees).
-      const port = Object.values(sites).find((s) => s.name === n.navy!.port);
-      if (!port || port.owner !== n.id) throw new Error(`${map.id}: ${n.id}'s navy port ${n.navy.port} is not one of its sites`);
+      const port = Object.values(sites).find((s) => s.name === navy.port);
+      if (!port || port.owner !== n.id) throw new Error(`${map.id}: ${n.id}'s navy port ${navy.port} is not one of its sites`);
       if (!tiles[port.key]!.port) throw new Error(`${port.name} is not a port`);
-      const sea = seaNear(tiles, port.key, Math.ceil(n.navy.ships.length / STACK_LIMIT));
-      n.navy.ships.forEach((c, i) => {
+      const sea = seaNear(tiles, port.key, Math.ceil(navy.ships.length / STACK_LIMIT));
+      navy.ships.forEach((c, i) => {
         const key = sea[Math.floor(i / STACK_LIMIT)]!;
         const c2 = (counts.get(c) ?? 0) + 1;
         counts.set(c, c2);
