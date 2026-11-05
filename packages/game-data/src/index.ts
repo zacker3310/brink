@@ -525,10 +525,24 @@ export const VICTORY = {
  * war (Total War) asks for a conquest: 60% of all victory points outright, or 55% standing held from
  * turn 50, so the war is not over while most of it is still to fight.
  */
-export function victoryBars(maxTurns: number): { dominationShare: number; supremacyShare: number; supremacyFromTurn: number } {
+export function victoryBars(maxTurns: number, theatre?: string): { dominationShare: number; supremacyShare: number; supremacyFromTurn: number } {
   if (maxTurns > 60) return { dominationShare: 60, supremacyShare: 55, supremacyFromTurn: 50 };
-  return { dominationShare: VICTORY.dominationShare, supremacyShare: VICTORY.supremacyShare, supremacyFromTurn: VICTORY.supremacyFromTurn };
+  const own = theatre === undefined ? undefined : THEATRE_VICTORY[theatre];
+  return { dominationShare: own?.dominationShare ?? VICTORY.dominationShare, supremacyShare: own?.supremacyShare ?? VICTORY.supremacyShare, supremacyFromTurn: VICTORY.supremacyFromTurn };
 }
+
+/**
+ * A theatre's own bars, where its count of powers and of minor states makes `VICTORY`'s the wrong
+ * size. They are set so that winning asks the same of a power as in the Pacific (four powers, a
+ * power's sites 15% of the map's victory points): domination about twice the victory points it
+ * starts with, supremacy about a third above its opening standing. A theatre not listed uses
+ * `VICTORY`. A Total War (over 60 turns) asks for a conquest in every theatre.
+ */
+export const THEATRE_VICTORY: Readonly<Record<string, { dominationShare: number; supremacyShare: number }>> = {
+  // Six powers among forty states: each opens with 7% of the victory points and a sixth of the
+  // armies and output, a standing of 13.
+  europe: { dominationShare: 15, supremacyShare: 18 },
+};
 
 /** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */
 export const CAMPAIGN_TURNS: Record<CampaignLength, number> = { quick: 20, standard: 30, epic: 45, total: 250 };
