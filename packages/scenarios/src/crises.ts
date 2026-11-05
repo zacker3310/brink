@@ -2,6 +2,7 @@ import type { HexKey, Nation, NationId, Relation, UnitClass, WorldState } from '
 import { STACK_LIMIT, UNITS } from '@brink/game-data';
 import { keyDistance, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { computeVision, emptyIntel, grossYields, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
+import { PACIFIC_ID } from './pacific';
 
 // Opening Crises (docs/pacific.md): a story and a deterministic edit of the turn-1 Pacific world.
 // A crisis is chosen at setup (dealt at random by default) and stored in `world.crisis`, so saves
@@ -481,6 +482,11 @@ export const CRISES: readonly Crisis[] = [
     },
   },
 ];
+
+/** The crises a theatre can open with: every one is written for the Pacific's map, so only it has any. */
+export function crisesFor(theatre: string): readonly Crisis[] {
+  return theatre === PACIFIC_ID ? CRISES : [];
+}
 
 export function crisisOf(id: string | undefined): Crisis | undefined {
   return CRISES.find((c) => c.id === id);

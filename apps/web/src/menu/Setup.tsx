@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, NATION_BLURB, UNITS, VICTORY, victoryBars } from '@brink/game-data';
-import { CRISES, crisisOf, dealCrisis, MINORS, NATIONS, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
+import { crisesFor, crisisOf, dealCrisis, minorsOf, nationsOf, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Kbd, Mark, useKeys } from '../chrome';
@@ -17,7 +17,7 @@ import { LeaderCard } from './Leader';
 
 const DIFFICULTIES: { id: Difficulty; label: string; threat: number; text: string }[] = [
   { id: 'easy', label: 'Easy', threat: 1, text: 'Your natural ally beside you, one enemy. +75% income, +55% attack, cheaper units.' },
-  { id: 'normal', label: 'Normal', threat: 2, text: 'All three rivals at war with you. +40% income, +30% attack.' },
+  { id: 'normal', label: 'Normal', threat: 2, text: 'Every rival at war with you. +40% income, +30% attack.' },
   { id: 'hard', label: 'Hard', threat: 3, text: 'Everyone at war, no edge, and the AI starts richer.' },
 ];
 
@@ -33,7 +33,7 @@ const CLASSIC = {
   id: 'classic',
   name: 'Classic War',
   hook: 'Everyone against everyone.',
-  story: 'No spark, no story: the four powers are at war from the first hour and the minor states are fair game. The way Brink was first played.',
+  story: 'No spark, no story: the powers are at war from the first hour and the minor states are fair game. The way Brink was first played.',
   setup: 'Every power is at war with every other (on Easy, with just one of them). Minor states hold their own cities.',
   threat: 2 as const,
   recommended: null as NationId | null,
@@ -46,14 +46,21 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     return t && t.unlock <= wars ? t.id : THEATRES[0]!.id;
   });
   const theatre = THEATRES.find((t) => t.id === theatreId)!;
-  const pickTheatre = (id: string) => {
-    setTheatreId(id);
-    writePrefs({ theatre: id });
-  };
+  // Each theatre has its own powers and minor states (and the Pacific its own crises).
+  const NATIONS = nationsOf(theatreId);
+  const MINORS = minorsOf(theatreId);
+  const CRISES = crisesFor(theatreId);
   const [nation, setNation] = useState<NationId>(() => {
     const p = readPrefs().nation;
     return NATIONS.some((n) => n.id === p) ? p! : NATIONS[0]!.id;
   });
+  const pickTheatre = (id: string) => {
+    setTheatreId(id);
+    writePrefs({ theatre: id });
+    // A nation that is not on the new map gives way to the theatre's first power.
+    const powers = nationsOf(id);
+    if (!powers.some((n) => n.id === nation)) setNation(powers[0]!.id);
+  };
   const [seed, setSeed] = useState(randomSeed);
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
@@ -79,14 +86,17 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     setCrisisPick(c);
     writePrefs({ crisis: c });
   };
-  const crisis = crisisPick === 'none' ? CLASSIC : crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
+  // A theatre without crises of its own opens with the classic war.
+  const dealt = crisisPick === 'none' || CRISES.length === 0 ? undefined : CRISES.find((c) => c.id === (crisisPick === 'random' ? dealCrisis(seed) : crisisPick));
+  const crisis = dealt ?? CLASSIC;
   /** The next crisis in the deck from this one: a fresh deal that never repeats the current one. */
   const dealAnother = () => {
+    if (CRISES.length < 2) return;
     const i = Math.max(0, CRISES.findIndex((c) => c.id === crisis.id));
     pickCrisis(CRISES[(i + 1 + (seed % (CRISES.length - 1))) % CRISES.length]!.id);
   };
   const world = useMemo(() => createScenario(theatreId, seed), [theatreId, seed]);
-  const spec = NATIONS.find((n) => n.id === nation)!;
+  const spec = NATIONS.find((n) => n.id === nation) ?? NATIONS[0]!;
   const gov = GOVERNMENTS[spec.government];
   const info = useMemo(() => dossier(world, nation), [world, nation]);
   const op = operationName(seed);
@@ -104,7 +114,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(nation, seed, turns, difficulty, theatreId, crisis.id === 'classic' ? undefined : crisis.id);
+      await onBegin(spec.id, seed, turns, difficulty, theatreId, crisis.id === 'classic' ? undefined : crisis.id);
     } finally {
       setStarting(false);
     }
@@ -228,7 +238,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
           <SectionHead id="roster" index="01">
             Choose your nation
           </SectionHead>
-          <div className="grid grid-cols-4 gap-2 lg:grid-cols-1" role="radiogroup" aria-label="Nation">
+          <div className={`grid ${NATIONS.length > 4 ? 'grid-cols-3' : 'grid-cols-4'} gap-2 lg:grid-cols-1`} role="radiogroup" aria-label="Nation">
             {NATIONS.map((n, i) => {
               const g = GOVERNMENTS[n.government];
               const active = n.id === nation;
@@ -359,7 +369,8 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               <div className="flex flex-wrap gap-1.5 text-[13px]">
                 {info.fronts.length === 0 && <span className="text-faint">None. Every rival is across the sea.</span>}
                 {info.fronts.map((f) => {
-                  const r = [...NATIONS, ...MINORS].find((n) => n.id === f)!;
+                  const r = [...NATIONS, ...MINORS].find((n) => n.id === f);
+                  if (!r) return null;
                   return (
                     <span key={f} className="wr-front" style={{ ['--c' as string]: r.color }}>
                       <Emblem color={r.color} government={r.government} className="h-4.5 w-4.5" />
@@ -382,7 +393,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               Mission parameters
             </SectionHead>
 
-            <SubHead first aside={crisisPick === 'random' ? 'dealt from the seed' : crisisPick === 'none' ? 'no crisis' : 'your pick'}>
+            <SubHead first aside={CRISES.length === 0 || crisisPick === 'none' ? 'no crisis' : crisisPick === 'random' ? 'dealt from the seed' : 'your pick'}>
               Opening crisis
             </SubHead>
             <div className="wr-crisis" data-testid="crisis-card" data-crisis={crisis.id}>
@@ -408,16 +419,20 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                   </button>
                 )}
                 {crisis.recommended === nation && <span className="wr-chip wr-chip-on">Recommended side</span>}
-                <button type="button" className="wr-chip" onClick={dealAnother} data-testid="crisis-deal">
-                  Deal another
-                </button>
+                {CRISES.length > 1 && (
+                  <button type="button" className="wr-chip" onClick={dealAnother} data-testid="crisis-deal">
+                    Deal another
+                  </button>
+                )}
               </div>
             </div>
             <div className="wr-crisis-deck" role="radiogroup" aria-label="Opening crisis">
-              <button type="button" role="radio" aria-checked={crisisPick === 'random'} onClick={() => pickCrisis('random')} data-testid="crisis-random">
-                Random
-              </button>
-              <button type="button" role="radio" aria-checked={crisisPick === 'none'} onClick={() => pickCrisis('none')} data-testid="crisis-none">
+              {CRISES.length > 0 && (
+                <button type="button" role="radio" aria-checked={crisisPick === 'random'} onClick={() => pickCrisis('random')} data-testid="crisis-random">
+                  Random
+                </button>
+              )}
+              <button type="button" role="radio" aria-checked={crisisPick === 'none' || CRISES.length === 0} onClick={() => pickCrisis('none')} data-testid="crisis-none">
                 Classic war
               </button>
               {CRISES.map((c) => (
@@ -453,7 +468,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               ))}
             </div>
 
-            {/* One theatre today: the picker returns when there is a choice to make. */}
+            {/* The picker shows when there is a choice of theatre to make. */}
             {THEATRES.length > 1 && <SubHead>Theatre</SubHead>}
             <div className={`grid gap-2 sm:grid-cols-3 ${THEATRES.length > 1 ? '' : 'hidden'}`} role="radiogroup" aria-label="Theatre">
               {THEATRES.map((t) => {

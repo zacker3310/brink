@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { NATIONS } from '@brink/scenarios';
+import { findNation } from '@brink/scenarios';
 import { useCoach } from '../coach';
 import { Emblem } from '../glyphs';
 import { readSlot } from '../saves';
@@ -33,7 +33,7 @@ function Deploy({ d }: { d: Deploying }) {
     const t = window.setInterval(() => setLine((l) => (l + 1) % LINES.length), 900);
     return () => window.clearInterval(t);
   }, []);
-  const spec = NATIONS.find((n) => n.id === d.nation);
+  const spec = d.nation ? findNation(d.nation) : undefined;
   return createPortal(
     <div className="deploy" role="status" aria-live="polite" data-testid="deploying" style={spec ? { ['--deploy' as string]: spec.color } : undefined}>
       <div className="deploy-ring">{spec ? <Emblem color={spec.color} government={spec.government} className="h-14 w-14" /> : null}</div>

@@ -2,6 +2,7 @@ import type { NationId, UnitClass, WorldState } from '@brink/contracts';
 import { type MapFile, parseMap } from '@brink/map';
 import { buildScenario, nationSpecs, type NationSpec, type ScenarioSetup } from './build';
 import pacificMap from './maps/pacific.map.json';
+import { INDOPAC_MINORS, INDOPAC_NATIONS, INDOPAC_THEATRE } from './indopac';
 
 export type { NationSpec, Place } from './build';
 
@@ -45,10 +46,10 @@ export const MINORS: readonly NationSpec[] = ALL.filter((n) => n.minor);
 
 /** A nation's short name for map labels and small tiles; the full name if it is not one of ours. */
 export function shortName(name: string): string {
-  return ALL.find((n) => n.name === name)?.short ?? name;
+  return [...ALL, ...INDOPAC_NATIONS, ...INDOPAC_MINORS].find((n) => n.name === name)?.short ?? name;
 }
 
-/** The one theatre. Kept as a list so saves and the setup screen read theatres as before. */
+/** A theatre a player can pick at setup. */
 export interface Theatre {
   id: string;
   name: string;
@@ -59,6 +60,7 @@ export interface Theatre {
 
 export const THEATRES: readonly Theatre[] = [
   { id: PACIFIC_ID, name: 'The Pacific', summary: 'Moscow to Washington: four powers, seven nations caught between them, and an ocean of islands.', unlock: 0 },
+  INDOPAC_THEATRE,
 ];
 
 export function theatreOf(id: string): Theatre | undefined {

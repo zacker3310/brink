@@ -33,7 +33,8 @@ const PINNED: readonly (readonly [seed: number, hash: string])[] = [
 ];
 
 describe('the Pacific from its map file', () => {
-  it('builds the same turn-1 world as the inline grid did, seed for seed', () => {
+  // Twenty worlds built and hashed: ~4 s alone, more beside the other theatres' tests.
+  it('builds the same turn-1 world as the inline grid did, seed for seed', { timeout: 60_000 }, () => {
     for (const [seed, hash] of PINNED) expect(hashState(createScenario(PACIFIC_ID, seed)), `seed ${seed}`).toBe(hash);
   });
 });
