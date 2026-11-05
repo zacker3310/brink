@@ -5,31 +5,32 @@ import { PACIFIC_ID } from './pacific';
 
 /**
  * The Pacific's turn-1 world, hashed, for seeds 1 to 20, as the inline character grid built it
- * (int-staff 3af72e8), re-pinned for ruleset 2.9.0 (balance: new data, the same map). Loading the theatre from `maps/pacific.map.json` must build the very same
+ * (int-staff 3af72e8), re-pinned for ruleset 2.10.0 (diplomacy; the same map and opening: with the version set back to
+ * 2.9.0 every hash is the 2.9.0 one). Loading the theatre from `maps/pacific.map.json` must build the very same
  * world, so no saved or replayed campaign can tell the difference. A change to the Pacific's ground
  * or its opening is a ruleset change: bump RULESET_VERSION and re-pin these.
  */
 const PINNED: readonly (readonly [seed: number, hash: string])[] = [
-  [1, '3e9a08ceac4935f1'],
-  [2, '6218feb46055ee99'],
-  [3, 'db4ad404656ca7e3'],
-  [4, 'fd31abc7bd1cdc94'],
-  [5, 'd9b379c5a68f0bfc'],
-  [6, '62d1c1b065dcd721'],
-  [7, 'b02105dad29b8959'],
-  [8, '8d75d5059546daea'],
-  [9, 'af51f8e67ad2a991'],
-  [10, '16d2f668b6a0c661'],
-  [11, 'f24e3cb4325c1d37'],
-  [12, '10a831655012bcd6'],
-  [13, '548eb82de7d170cc'],
-  [14, '0c72e9c3ab277b94'],
-  [15, '1bae5fbba444d15a'],
-  [16, '13b1f18ce6db8db5'],
-  [17, '1a8853f39c1347ba'],
-  [18, '0fdc1929ec78dee6'],
-  [19, 'ff7ed1544eb6a883'],
-  [20, '67073ff4fb710c5f'],
+  [1, 'cc9c74582929d7cd'],
+  [2, '2d57d8ba970ab345'],
+  [3, 'ccf1b74289f10f3b'],
+  [4, '6ee828d5b4b37504'],
+  [5, 'bb0ba37b41fe6f48'],
+  [6, '537b801a50d4396d'],
+  [7, '1e386994ebff22e9'],
+  [8, '1cf345dbb4e97e76'],
+  [9, 'ba058acc67c2fae9'],
+  [10, '9bbb80eae198399d'],
+  [11, '501e596240f529b3'],
+  [12, '6aa362e32a36ab12'],
+  [13, 'f55fc723d94f23e8'],
+  [14, 'd5fad7cdd5972e48'],
+  [15, '77138a05ad126186'],
+  [16, '1261315ec6dbe211'],
+  [17, '68624041bee5ff76'],
+  [18, '46f4a70f714ad102'],
+  [19, 'aa266f4a84a3a857'],
+  [20, '5912d65e40aab82b'],
 ];
 
 describe('the Pacific from its map file', () => {
