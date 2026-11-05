@@ -1,0 +1,1860 @@
+{
+  "format": "brink-map",
+  "version": 1,
+  "id": "europe",
+  "name": "Europe",
+  "cols": 56,
+  "rows": 32,
+  "layout": "odd-r",
+  "source": "Natural Earth 1:50m admin-0 countries (public domain, naturalearthdata.com), baked over 25W-60E, 29.5N-74N and finished by hand in packages/mapgen/src/europe.ts.",
+  "layers": {
+    "owner": {
+      "legend": {
+        ".": null,
+        "A": "austria",
+        "B": "benelux",
+        "C": "czechia",
+        "D": "denmark",
+        "E": "spain",
+        "F": "france",
+        "G": "germany",
+        "H": "switzerland",
+        "I": "italy",
+        "J": "jordan",
+        "K": "ukraine",
+        "L": "latvia",
+        "M": "moldova",
+        "N": "norway",
+        "O": "romania",
+        "P": "poland",
+        "Q": "belarus",
+        "R": "russia",
+        "S": "sweden",
+        "T": "turkey",
+        "U": "uk",
+        "W": "balkans",
+        "Y": "egypt",
+        "Z": "azerbaijan",
+        "a": "algeria",
+        "b": "bulgaria",
+        "c": "cyprus",
+        "e": "ireland",
+        "f": "finland",
+        "g": "greece",
+        "h": "hungary",
+        "i": "iceland",
+        "j": "georgia",
+        "k": "slovakia",
+        "l": "israel",
+        "m": "morocco",
+        "n": "iran",
+        "p": "portugal",
+        "q": "iraq",
+        "r": "armenia",
+        "s": "syria",
+        "t": "tunisia",
+        "v": "lithuania",
+        "x": "estonia",
+        "y": "libya",
+        "z": "kazakhstan"
+      },
+      "rows": [
+        "..........................NN........................RR..",
+        "...................................................RR...",
+        "................................NNNNN...................",
+        "............................NNNNNffRRRRR................",
+        "..........................NNNSSSffffRRRRRRRR..R..RRRRRRR",
+        "...iii...................NSSSSSSffffRRR.....RRRRRRRRRRRR",
+        "..iiiii.................NNSSSSS..fffRRRR.R.RRRRRRRRRRRRR",
+        "..iii.................NNSSSSS..ffffffRRRRRRRRRRRRRRRRRRR",
+        "....................NNNNNSSS...ffffffRRRRRRRRRRRRRRRRRRR",
+        "...................NNNNNSSSS..fffffRRRRRRRRRRRRRRRRRRRRR",
+        "....................NNNNSSSSS......RRRRRRRRRRRRRRRRRRRRR",
+        ".............U..........SSS.....xxRRRRRRRRRRRRRRRRRRRRRR",
+        ".............UU.......DD.SS....vLLLRRRRRRRRRRRRRRRRRRRRR",
+        "...........U.UU.......DD......RvvvQQQRRRRRRRRRRRRRRRRRRR",
+        "..........eee.UUU.....GGGGPPPPPPQQQQQQRRRRRRRRRRRRRRRRRR",
+        "..........ee.UUUU..BBGGGGGPPPPPPQQQQQRRRRRRRRRRRRRRRRRRR",
+        "..............UUU.BBBGGGGGGPPPPPPKKKKKKKRRRRRRRRRzzzzRRR",
+        ".................FFFGGGGCCCCPPPKKKKKKKKKKKRRRRRzzzzzzzzz",
+        "..............FFFFFFFFGGGAAAkkhKKKKKKKKKKKKRRRRRzzzzzzzz",
+        "...............FFFFFHHHIAAAhhhOOOOOMKKKKKRRRRRRRRz.zzzzz",
+        "................FFFFFIIII.WWWWOOOOOMK..K..RRRRRRR...zzzz",
+        "...............FFFFFFI.I..WWWWWOOOOO..K...RRRRR...zzzzzz",
+        "...........EEEEEEFF.....II...WWWbbbb........jjjR...zzzzz",
+        "..........ppEEEEEE....F..II..WWggTT.TTTTT...TjZZZ...zzzz",
+        "...........pEEEEE..........I..gg....TTTTTTTTTTrZZZ..zzzz",
+        "..........pEEEEE......I.......gg..TTTTTTTTTTTTnnZ...zzzz",
+        "...........pEEE..........II....g...TTTTTTTTTTqnnnn..nnnn",
+        "................aaaaaat.........g.......ssssqqqnnnnnnnnn",
+        "............mmmaaaaaaat...............c.ssssqqqnnnnnnnnn",
+        "..........mmmmmaaaaaattt...............lsJqqqqqnnnnnnnnn",
+        "..........mmmmaaaaaaaaatyyy...yyyYYYY..lJJJJqqqqnnnnnnnn",
+        "..........mmmaaaaaaaaayyyyyyyyyyyYYYYYYJJJJJJqqqnnnnnnnn"
+      ]
+    },
+    "terrain": {
+      "legend": {
+        "~": "water",
+        "*": "seeded"
+      },
+      "rows": [
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~**~~~~~~~~~~~~~~~~~~~~~~~~**~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~**~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*****~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~************~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~******************~~*~~*******",
+        "~~~***~~~~~~~~~~~~~~~~~~~**************~~~~~************",
+        "~~*****~~~~~~~~~~~~~~~~~*******~~*******~*~*************",
+        "~~***~~~~~~~~~~~~~~~~~*******~~*************************",
+        "~~~~~~~~~~~~~~~~~~~~********~~~*************************",
+        "~~~~~~~~~~~~~~~~~~~*********~~**************************",
+        "~~~~~~~~~~~~~~~~~~~~*********~~~~~~*********************",
+        "~~~~~~~~~~~~~*~~~~~~~~~~***~~~~~************************",
+        "~~~~~~~~~~~~~**~~~~~~~**~**~~~~*************************",
+        "~~~~~~~~~~~*~**~~~~~~~**~~~~~~**************************",
+        "~~~~~~~~~~***~***~~~~~**********************************",
+        "~~~~~~~~~~**~****~~*************************************",
+        "~~~~~~~~~~~~~~***~**************************************",
+        "~~~~~~~~~~~~~~~~~***************************************",
+        "~~~~~~~~~~~~~~******************************************",
+        "~~~~~~~~~~~~~~~***********************************~*****",
+        "~~~~~~~~~~~~~~~~*********~***********~~*~~*******~~~****",
+        "~~~~~~~~~~~~~~~*******~*~~**********~~*~~~*****~~~******",
+        "~~~~~~~~~~~********~~~~~**~~~*******~~~~~~~~****~~~*****",
+        "~~~~~~~~~~********~~~~*~~**~~******~*****~~~*****~~~****",
+        "~~~~~~~~~~~******~~~~~~~~~~*~~**~~~~**************~~****",
+        "~~~~~~~~~~******~~~~~~*~~~~~~~**~~***************~~~****",
+        "~~~~~~~~~~~****~~~~~~~~~~**~~~~*~~~***************~~****",
+        "~~~~~~~~~~~~~~~~*******~~~~~~~~~*~~~~~~~****************",
+        "~~~~~~~~~~~~***********~~~~~~~~~~~~~~~*~****************",
+        "~~~~~~~~~~**************~~~~~~~~~~~~~~~*****************",
+        "~~~~~~~~~~*****************~~~*******~~*****************",
+        "~~~~~~~~~~**********************************************"
+      ]
+    },
+    "seaZone": {
+      "legend": {
+        "-": null,
+        "a": "north-atlantic",
+        "b": "norwegian-sea",
+        "c": "barents",
+        "d": "north-sea",
+        "e": "baltic",
+        "f": "western-med",
+        "g": "central-med",
+        "h": "aegean",
+        "i": "marmara",
+        "j": "levant",
+        "k": "black-sea",
+        "l": "caspian"
+      },
+      "rows": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbb--cccccccccccccccccccccccc--cc",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbccccccccccccccccccccccc--ccc",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbccc-----ccccccccccccccccccc",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbb------------cccccccccccccccc",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbb------------------cc-cc-------",
+        "bbb---bbbbbbbbbbbbbbbbbbb--------------ccccc------------",
+        "bb-----bbaabbbbbbbbbbbbb-------ee-------c-c-------------",
+        "bb---aaaaaabbbbbbbbddd-------ee-------------------------",
+        "baaaaaaaaaaabbbbbbdd--------eee-------------------------",
+        "aaaaaaaaaaaabbbbddd---------ee--------------------------",
+        "aaaaaaaaaaaaaaaddddd---------eeeeee---------------------",
+        "aaaaaaaaaaaaa-dddddddddd---eeeee------------------------",
+        "aaaaaaaaaaaaa--ddddddd--e--eeee-------------------------",
+        "aaaaaaaaaaa-a--ddddddd--eeeeee--------------------------",
+        "aaaaaaaaaa---a---ddddd----------------------------------",
+        "aaaaaaaaaa--a----dd-------------------------------------",
+        "aaaaaaaaaaaaaa---d--------------------------------------",
+        "aaaaaaaaaaaaaaaaa---------------------------------------",
+        "aaaaaaaaaaaaaa------------------------------------------",
+        "aaaaaaaaaaaaaaa-----------------------------------l-----",
+        "aaaaaaaaaaaaaaaa---------g-----------kk-kk-------lll----",
+        "aaaaaaaaaaaaaaa-------f-gg----------kk-kkk-----lll------",
+        "aaaaaaaaaaa--------fffff--ggg-------kkkkkkkk----lll-----",
+        "aaaaaaaaaa--------ffff-fg--gg------k-----kkk-----lll----",
+        "aaaaaaaaaaa------fffffffggg-gg--hhii--------------ll----",
+        "aaaaaaaaaa------ffffff-ggggggg--hh---------------lll----",
+        "aaaaaaaaaaa----ffffffffgg--gggg-hhh---------------ll----",
+        "aaaaaaaaaaaaffff-------ggggggggh-hjjjjjj----------------",
+        "aaaaaaaaaaaa-----------gggggggghhhjjjj-j----------------",
+        "aaaaaaaaaa--------------ggggggghhjjjjjj-----------------",
+        "aaaaaaaaaa-----------------ggg-------jj-----------------",
+        "aaaaaaaaaa----------------------------------------------"
+      ]
+    },
+    "biome": {
+      "legend": {
+        "~": "sea",
+        "i": "ice",
+        "t": "tundra",
+        "b": "boreal",
+        "m": "temperate",
+        "s": "steppe",
+        "d": "desert",
+        "u": "subtropical",
+        "h": "highland"
+      },
+      "rows": [
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~ii~~~~~~~~~~~~~~~~~~~~~~~~ii~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ii~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ttttt~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~tttttttttttt~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~tttttttttttttttttt~~t~~ttttttt",
+        "~~~ttt~~~~~~~~~~~~~~~~~~~bbbbbbbbbbbbbb~~~~~bbbbbbbbbbbb",
+        "~~ttttt~~~~~~~~~~~~~~~~~bbbbbbb~~bbbbbbb~b~bbbbbbbbbbbbb",
+        "~~ttt~~~~~~~~~~~~~~~~~bbbbbbb~~bbbbbbbbbbbbbbbbbbbbbbbbb",
+        "~~~~~~~~~~~~~~~~~~~~bbbbbbbb~~~bbbbbbbbbbbbbbbbbbbbbbbbb",
+        "~~~~~~~~~~~~~~~~~~~bbbbbbbbb~~bbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "~~~~~~~~~~~~~~~~~~~~bbbbbbbbb~~~~~~bbbbbbbbbbbbbbbbbbbbb",
+        "~~~~~~~~~~~~~m~~~~~~~~~~mmm~~~~~mmmmmmmmmmmmmmmmmmmmmmmm",
+        "~~~~~~~~~~~~~mm~~~~~~~mm~mm~~~~mmmmmmmmmmmmmmmmmmmmmmmmm",
+        "~~~~~~~~~~~m~mm~~~~~~~mm~~~~~~mmmmmmmmmmmmmmmmmmmmmmmmmm",
+        "~~~~~~~~~~mmm~mmm~~~~~mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+        "~~~~~~~~~~mm~mmmm~~mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+        "~~~~~~~~~~~~~~mmm~mmmmmmmmmmmmmmmmmmmmssssssssssssssssss",
+        "~~~~~~~~~~~~~~~~~mmmmmmmmmmmmmmmmmmmmmssssssssssssssssss",
+        "~~~~~~~~~~~~~~mmmmmmmmmmmhhhmmmmmmmmmmssssssssssssssssss",
+        "~~~~~~~~~~~~~~~mmmmmhhhuhhhmmmmmmmmmmmssssssssssss~sssss",
+        "~~~~~~~~~~~~~~~~mmmmmuuuu~mmmmmmmmmmm~~s~~sssssss~~~ssss",
+        "~~~~~~~~~~~~~~~uuuuuuu~u~~uuuuuuuuuu~~s~~~sssss~~~ssssss",
+        "~~~~~~~~~~~uuuuuuuu~~~~~uu~~~uuuuuuu~~~~~~~~hhhs~~~sssss",
+        "~~~~~~~~~~uuuuuuuu~~~~u~~uu~~uuuuuu~uuhhh~~~hhsss~~~ssss",
+        "~~~~~~~~~~~uuuuuu~~~~~~~~~~u~~uu~~~~uuhhhhhhhhhsss~~ssss",
+        "~~~~~~~~~~uuuuuu~~~~~~u~~~~~~~uu~~uuuuhhhhhhhhhhs~~~ssss",
+        "~~~~~~~~~~~uuuu~~~~~~~~~~uu~~~~u~~~uuuhhhhhhhshhhh~~hhhh",
+        "~~~~~~~~~~~~~~~~uuuuuuu~~~~~~~~~u~~~~~~~uuuussshhhhhhhhh",
+        "~~~~~~~~~~~~uuuuuuuuuuu~~~~~~~~~~~~~~~u~uuuussshhhhhhhhh",
+        "~~~~~~~~~~uuuuudddddduuu~~~~~~~~~~~~~~~uuddddddhhhhhhhhh",
+        "~~~~~~~~~~uuuuddddddddduddd~~~ddddddd~~uddddddddhhhhhhhh",
+        "~~~~~~~~~~uuudddddddddddddddddddddddddddddddddddhhhhhhhh"
+      ]
+    }
+  },
+  "nations": [
+    {
+      "id": "uk",
+      "name": "United Kingdom",
+      "short": "UK",
+      "color": "#4f7fe0",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "uk-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "france",
+      "name": "France",
+      "short": "France",
+      "color": "#46b8c8",
+      "government": "federation",
+      "role": "power",
+      "capital": "france-capital",
+      "terrainBias": 5
+    },
+    {
+      "id": "germany",
+      "name": "Germany",
+      "short": "Germany",
+      "color": "#d4b03a",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "germany-capital"
+    },
+    {
+      "id": "poland",
+      "name": "Poland",
+      "short": "Poland",
+      "color": "#c75aa6",
+      "government": "union",
+      "role": "power",
+      "capital": "poland-capital",
+      "terrainBias": -10
+    },
+    {
+      "id": "russia",
+      "name": "Russia",
+      "short": "Russia",
+      "color": "#d0543e",
+      "government": "directorate",
+      "role": "power",
+      "capital": "russia-capital",
+      "terrainBias": 15
+    },
+    {
+      "id": "turkey",
+      "name": "Turkey",
+      "short": "Turkey",
+      "color": "#e58a35",
+      "government": "directorate",
+      "role": "power",
+      "capital": "turkey-capital",
+      "terrainBias": 25
+    },
+    {
+      "id": "iceland",
+      "name": "Iceland",
+      "short": "Iceland",
+      "color": "#9fb8c8",
+      "government": "federation",
+      "role": "minor",
+      "capital": "iceland-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "ireland",
+      "name": "Ireland",
+      "short": "Ireland",
+      "color": "#3e9a62",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "ireland-capital"
+    },
+    {
+      "id": "norway",
+      "name": "Norway",
+      "short": "Norway",
+      "color": "#b9424f",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "norway-capital",
+      "terrainBias": 40
+    },
+    {
+      "id": "sweden",
+      "name": "Sweden",
+      "short": "Sweden",
+      "color": "#5a8fb8",
+      "government": "federation",
+      "role": "minor",
+      "capital": "sweden-capital",
+      "terrainBias": 20
+    },
+    {
+      "id": "finland",
+      "name": "Finland",
+      "short": "Finland",
+      "color": "#e8e8ee",
+      "government": "federation",
+      "role": "minor",
+      "capital": "finland-capital",
+      "terrainBias": 20
+    },
+    {
+      "id": "denmark",
+      "name": "Denmark",
+      "short": "Denmark",
+      "color": "#c86a6a",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "denmark-capital",
+      "terrainBias": -20
+    },
+    {
+      "id": "benelux",
+      "name": "Benelux",
+      "short": "Benelux",
+      "color": "#e09a5a",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "benelux-capital",
+      "terrainBias": -25
+    },
+    {
+      "id": "portugal",
+      "name": "Portugal",
+      "short": "Portugal",
+      "color": "#4f9a52",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "portugal-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "spain",
+      "name": "Spain",
+      "short": "Spain",
+      "color": "#e0c45a",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "spain-capital",
+      "terrainBias": 20
+    },
+    {
+      "id": "italy",
+      "name": "Italy",
+      "short": "Italy",
+      "color": "#5ab87a",
+      "government": "federation",
+      "role": "minor",
+      "capital": "italy-capital",
+      "terrainBias": 25
+    },
+    {
+      "id": "switzerland",
+      "name": "Switzerland",
+      "short": "Swiss",
+      "color": "#e05050",
+      "government": "federation",
+      "role": "minor",
+      "capital": "switzerland-capital",
+      "terrainBias": 60
+    },
+    {
+      "id": "austria",
+      "name": "Austria",
+      "short": "Austria",
+      "color": "#e8a0a0",
+      "government": "federation",
+      "role": "minor",
+      "capital": "austria-capital",
+      "terrainBias": 45
+    },
+    {
+      "id": "czechia",
+      "name": "Czechia",
+      "short": "Czechia",
+      "color": "#6a7ac8",
+      "government": "federation",
+      "role": "minor",
+      "capital": "czechia-capital",
+      "terrainBias": 15
+    },
+    {
+      "id": "slovakia",
+      "name": "Slovakia",
+      "short": "Slovakia",
+      "color": "#7aa0d8",
+      "government": "union",
+      "role": "minor",
+      "capital": "slovakia-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "hungary",
+      "name": "Hungary",
+      "short": "Hungary",
+      "color": "#7ab05a",
+      "government": "union",
+      "role": "minor",
+      "capital": "hungary-capital",
+      "terrainBias": -20
+    },
+    {
+      "id": "balkans",
+      "name": "Western Balkans",
+      "short": "W. Balkans",
+      "color": "#a8744a",
+      "government": "union",
+      "role": "minor",
+      "capital": "balkans-capital",
+      "terrainBias": 40
+    },
+    {
+      "id": "romania",
+      "name": "Romania",
+      "short": "Romania",
+      "color": "#e0d06a",
+      "government": "union",
+      "role": "minor",
+      "capital": "romania-capital",
+      "terrainBias": 20
+    },
+    {
+      "id": "moldova",
+      "name": "Moldova",
+      "short": "Moldova",
+      "color": "#c8b06a",
+      "government": "union",
+      "role": "minor",
+      "capital": "moldova-capital"
+    },
+    {
+      "id": "bulgaria",
+      "name": "Bulgaria",
+      "short": "Bulgaria",
+      "color": "#6ab89a",
+      "government": "union",
+      "role": "minor",
+      "capital": "bulgaria-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "greece",
+      "name": "Greece",
+      "short": "Greece",
+      "color": "#6aa8e0",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "greece-capital",
+      "terrainBias": 35
+    },
+    {
+      "id": "cyprus",
+      "name": "Cyprus",
+      "short": "Cyprus",
+      "color": "#d8b080",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "cyprus-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "ukraine",
+      "name": "Ukraine",
+      "short": "Ukraine",
+      "color": "#5a9ae0",
+      "government": "union",
+      "role": "minor",
+      "capital": "ukraine-capital",
+      "terrainBias": -25
+    },
+    {
+      "id": "belarus",
+      "name": "Belarus",
+      "short": "Belarus",
+      "color": "#8a5ab8",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "belarus-capital"
+    },
+    {
+      "id": "estonia",
+      "name": "Estonia",
+      "short": "Estonia",
+      "color": "#4a8ac0",
+      "government": "federation",
+      "role": "minor",
+      "capital": "estonia-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "latvia",
+      "name": "Latvia",
+      "short": "Latvia",
+      "color": "#a04a5a",
+      "government": "federation",
+      "role": "minor",
+      "capital": "latvia-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "lithuania",
+      "name": "Lithuania",
+      "short": "Lithuania",
+      "color": "#b8a03a",
+      "government": "federation",
+      "role": "minor",
+      "capital": "lithuania-capital",
+      "terrainBias": 5
+    },
+    {
+      "id": "georgia",
+      "name": "Georgia",
+      "short": "Georgia",
+      "color": "#c84a4a",
+      "government": "union",
+      "role": "minor",
+      "capital": "georgia-capital",
+      "terrainBias": 55
+    },
+    {
+      "id": "armenia",
+      "name": "Armenia",
+      "short": "Armenia",
+      "color": "#d88a3a",
+      "government": "union",
+      "role": "minor",
+      "capital": "armenia-capital",
+      "terrainBias": 55
+    },
+    {
+      "id": "azerbaijan",
+      "name": "Azerbaijan",
+      "short": "Azerb.",
+      "color": "#3fa7b5",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "azerbaijan-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "kazakhstan",
+      "name": "Kazakhstan",
+      "short": "Kazakh.",
+      "color": "#8fae3a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "kazakhstan-capital",
+      "terrainBias": -15
+    },
+    {
+      "id": "iran",
+      "name": "Iran",
+      "short": "Iran",
+      "color": "#4aa05a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "iran-capital",
+      "terrainBias": 45
+    },
+    {
+      "id": "iraq",
+      "name": "Iraq",
+      "short": "Iraq",
+      "color": "#b0905a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "iraq-capital",
+      "terrainBias": -10
+    },
+    {
+      "id": "syria",
+      "name": "Syria",
+      "short": "Syria",
+      "color": "#a85a6a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "syria-capital",
+      "terrainBias": 15
+    },
+    {
+      "id": "israel",
+      "name": "Israel",
+      "short": "Israel",
+      "color": "#7ab8e8",
+      "government": "federation",
+      "role": "minor",
+      "capital": "israel-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "jordan",
+      "name": "Jordan",
+      "short": "Jordan",
+      "color": "#9a8a6a",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "jordan-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "egypt",
+      "name": "Egypt",
+      "short": "Egypt",
+      "color": "#d0a05a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "egypt-capital",
+      "terrainBias": -20
+    },
+    {
+      "id": "libya",
+      "name": "Libya",
+      "short": "Libya",
+      "color": "#7a9a4a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "libya-capital",
+      "terrainBias": -15
+    },
+    {
+      "id": "tunisia",
+      "name": "Tunisia",
+      "short": "Tunisia",
+      "color": "#c86a8a",
+      "government": "union",
+      "role": "minor",
+      "capital": "tunisia-capital"
+    },
+    {
+      "id": "algeria",
+      "name": "Algeria",
+      "short": "Algeria",
+      "color": "#5aa07a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "algeria-capital"
+    },
+    {
+      "id": "morocco",
+      "name": "Morocco",
+      "short": "Morocco",
+      "color": "#c0603a",
+      "government": "union",
+      "role": "minor",
+      "capital": "morocco-capital",
+      "terrainBias": 25
+    }
+  ],
+  "sites": [
+    {
+      "id": "uk-capital",
+      "kind": "capital",
+      "name": "London",
+      "at": [16, 16],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-city0",
+      "kind": "city",
+      "name": "Portsmouth",
+      "at": [14, 16],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-city1",
+      "kind": "city",
+      "name": "Manchester",
+      "at": [15, 14],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-city2",
+      "kind": "city",
+      "name": "Glasgow",
+      "at": [13, 12],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-city3",
+      "kind": "city",
+      "name": "Belfast",
+      "at": [11, 13],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-city4",
+      "kind": "city",
+      "name": "Birmingham",
+      "at": [14, 15],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-city5",
+      "kind": "city",
+      "name": "Edinburgh",
+      "at": [14, 12],
+      "owner": "uk"
+    },
+    {
+      "id": "uk-depot0",
+      "kind": "depot",
+      "name": "Rosyth",
+      "at": [14, 13],
+      "owner": "uk"
+    },
+    {
+      "id": "france-capital",
+      "kind": "capital",
+      "name": "Paris",
+      "at": [18, 18],
+      "owner": "france"
+    },
+    {
+      "id": "france-city0",
+      "kind": "city",
+      "name": "Strasbourg",
+      "at": [21, 18],
+      "owner": "france"
+    },
+    {
+      "id": "france-city1",
+      "kind": "city",
+      "name": "Lyon",
+      "at": [19, 20],
+      "owner": "france"
+    },
+    {
+      "id": "france-city2",
+      "kind": "city",
+      "name": "Toulon",
+      "at": [20, 21],
+      "owner": "france"
+    },
+    {
+      "id": "france-city3",
+      "kind": "city",
+      "name": "Brest",
+      "at": [14, 18],
+      "owner": "france"
+    },
+    {
+      "id": "france-city4",
+      "kind": "city",
+      "name": "Bordeaux",
+      "at": [16, 20],
+      "owner": "france"
+    },
+    {
+      "id": "france-depot0",
+      "kind": "depot",
+      "name": "Verdun",
+      "at": [20, 18],
+      "owner": "france"
+    },
+    {
+      "id": "france-depot1",
+      "kind": "depot",
+      "name": "Ajaccio",
+      "at": [22, 23],
+      "owner": "france",
+      "profile": "outpost"
+    },
+    {
+      "id": "germany-capital",
+      "kind": "capital",
+      "name": "Berlin",
+      "at": [25, 15],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city0",
+      "kind": "city",
+      "name": "Frankfurt",
+      "at": [22, 17],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city1",
+      "kind": "city",
+      "name": "Munich",
+      "at": [23, 18],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city2",
+      "kind": "city",
+      "name": "Hamburg",
+      "at": [22, 14],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city3",
+      "kind": "city",
+      "name": "Kiel",
+      "at": [24, 14],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city4",
+      "kind": "city",
+      "name": "Cologne",
+      "at": [21, 16],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city5",
+      "kind": "city",
+      "name": "Dresden",
+      "at": [26, 16],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-city6",
+      "kind": "city",
+      "name": "Stuttgart",
+      "at": [21, 17],
+      "owner": "germany"
+    },
+    {
+      "id": "germany-depot0",
+      "kind": "depot",
+      "name": "Leipzig",
+      "at": [24, 16],
+      "owner": "germany"
+    },
+    {
+      "id": "poland-capital",
+      "kind": "capital",
+      "name": "Warsaw",
+      "at": [30, 15],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-city0",
+      "kind": "city",
+      "name": "Gdansk",
+      "at": [29, 14],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-city1",
+      "kind": "city",
+      "name": "Krakow",
+      "at": [29, 17],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-city2",
+      "kind": "city",
+      "name": "Poznan",
+      "at": [27, 15],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-city3",
+      "kind": "city",
+      "name": "Lublin",
+      "at": [32, 16],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-city4",
+      "kind": "city",
+      "name": "Szczecin",
+      "at": [26, 14],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-city5",
+      "kind": "city",
+      "name": "Wroclaw",
+      "at": [28, 16],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-city6",
+      "kind": "city",
+      "name": "Bialystok",
+      "at": [31, 15],
+      "owner": "poland"
+    },
+    {
+      "id": "poland-depot0",
+      "kind": "depot",
+      "name": "Suwalki",
+      "at": [31, 14],
+      "owner": "poland"
+    },
+    {
+      "id": "russia-capital",
+      "kind": "capital",
+      "name": "Moscow",
+      "at": [41, 13],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city0",
+      "kind": "city",
+      "name": "St Petersburg",
+      "at": [35, 10],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city1",
+      "kind": "city",
+      "name": "Smolensk",
+      "at": [37, 13],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city2",
+      "kind": "city",
+      "name": "Kaliningrad",
+      "at": [30, 13],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city3",
+      "kind": "city",
+      "name": "Murmansk",
+      "at": [38, 3],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city4",
+      "kind": "city",
+      "name": "Novorossiysk",
+      "at": [42, 21],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city5",
+      "kind": "city",
+      "name": "Rostov",
+      "at": [42, 19],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city6",
+      "kind": "city",
+      "name": "Volgograd",
+      "at": [46, 18],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-city7",
+      "kind": "city",
+      "name": "Kazan",
+      "at": [48, 13],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-depot0",
+      "kind": "depot",
+      "name": "Pskov",
+      "at": [35, 12],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-depot1",
+      "kind": "depot",
+      "name": "Voronezh",
+      "at": [42, 16],
+      "owner": "russia"
+    },
+    {
+      "id": "russia-depot2",
+      "kind": "depot",
+      "name": "Arkhangelsk",
+      "at": [43, 6],
+      "owner": "russia"
+    },
+    {
+      "id": "turkey-capital",
+      "kind": "capital",
+      "name": "Ankara",
+      "at": [38, 24],
+      "owner": "turkey"
+    },
+    {
+      "id": "turkey-city0",
+      "kind": "city",
+      "name": "Istanbul",
+      "at": [34, 23],
+      "owner": "turkey"
+    },
+    {
+      "id": "turkey-city1",
+      "kind": "city",
+      "name": "Izmir",
+      "at": [34, 25],
+      "owner": "turkey"
+    },
+    {
+      "id": "turkey-city2",
+      "kind": "city",
+      "name": "Adana",
+      "at": [40, 26],
+      "owner": "turkey"
+    },
+    {
+      "id": "turkey-city3",
+      "kind": "city",
+      "name": "Trabzon",
+      "at": [42, 24],
+      "owner": "turkey"
+    },
+    {
+      "id": "turkey-depot0",
+      "kind": "depot",
+      "name": "Edirne",
+      "at": [33, 23],
+      "owner": "turkey"
+    },
+    {
+      "id": "turkey-depot1",
+      "kind": "depot",
+      "name": "Erzurum",
+      "at": [44, 24],
+      "owner": "turkey"
+    },
+    {
+      "id": "iceland-capital",
+      "kind": "capital",
+      "name": "Reykjavik",
+      "at": [2, 7],
+      "owner": "iceland",
+      "victoryPoints": 4
+    },
+    {
+      "id": "ireland-capital",
+      "kind": "capital",
+      "name": "Dublin",
+      "at": [12, 14],
+      "owner": "ireland"
+    },
+    {
+      "id": "ireland-city0",
+      "kind": "city",
+      "name": "Cork",
+      "at": [10, 15],
+      "owner": "ireland"
+    },
+    {
+      "id": "norway-capital",
+      "kind": "capital",
+      "name": "Oslo",
+      "at": [23, 10],
+      "owner": "norway"
+    },
+    {
+      "id": "norway-city0",
+      "kind": "city",
+      "name": "Bergen",
+      "at": [19, 9],
+      "owner": "norway"
+    },
+    {
+      "id": "norway-city1",
+      "kind": "city",
+      "name": "Tromso",
+      "at": [28, 3],
+      "owner": "norway"
+    },
+    {
+      "id": "norway-depot0",
+      "kind": "depot",
+      "name": "Longyearbyen",
+      "at": [26, 0],
+      "owner": "norway",
+      "profile": "outpost"
+    },
+    {
+      "id": "sweden-capital",
+      "kind": "capital",
+      "name": "Stockholm",
+      "at": [28, 10],
+      "owner": "sweden"
+    },
+    {
+      "id": "sweden-city0",
+      "kind": "city",
+      "name": "Gothenburg",
+      "at": [24, 11],
+      "owner": "sweden"
+    },
+    {
+      "id": "sweden-city1",
+      "kind": "city",
+      "name": "Umea",
+      "at": [30, 6],
+      "owner": "sweden"
+    },
+    {
+      "id": "finland-capital",
+      "kind": "capital",
+      "name": "Helsinki",
+      "at": [32, 9],
+      "owner": "finland"
+    },
+    {
+      "id": "finland-city0",
+      "kind": "city",
+      "name": "Oulu",
+      "at": [33, 6],
+      "owner": "finland"
+    },
+    {
+      "id": "denmark-capital",
+      "kind": "capital",
+      "name": "Copenhagen",
+      "at": [23, 13],
+      "owner": "denmark"
+    },
+    {
+      "id": "denmark-city0",
+      "kind": "city",
+      "name": "Aarhus",
+      "at": [22, 12],
+      "owner": "denmark"
+    },
+    {
+      "id": "benelux-capital",
+      "kind": "capital",
+      "name": "Brussels",
+      "at": [19, 16],
+      "owner": "benelux",
+      "victoryPoints": 8
+    },
+    {
+      "id": "benelux-city0",
+      "kind": "city",
+      "name": "Amsterdam",
+      "at": [19, 15],
+      "owner": "benelux"
+    },
+    {
+      "id": "portugal-capital",
+      "kind": "capital",
+      "name": "Lisbon",
+      "at": [10, 25],
+      "owner": "portugal"
+    },
+    {
+      "id": "portugal-city0",
+      "kind": "city",
+      "name": "Porto",
+      "at": [10, 23],
+      "owner": "portugal"
+    },
+    {
+      "id": "spain-capital",
+      "kind": "capital",
+      "name": "Madrid",
+      "at": [14, 24],
+      "owner": "spain",
+      "victoryPoints": 8
+    },
+    {
+      "id": "spain-city0",
+      "kind": "city",
+      "name": "Barcelona",
+      "at": [17, 23],
+      "owner": "spain"
+    },
+    {
+      "id": "spain-city1",
+      "kind": "city",
+      "name": "Seville",
+      "at": [12, 26],
+      "owner": "spain"
+    },
+    {
+      "id": "spain-city2",
+      "kind": "city",
+      "name": "Bilbao",
+      "at": [14, 22],
+      "owner": "spain"
+    },
+    {
+      "id": "italy-capital",
+      "kind": "capital",
+      "name": "Rome",
+      "at": [24, 22],
+      "owner": "italy",
+      "victoryPoints": 8
+    },
+    {
+      "id": "italy-city0",
+      "kind": "city",
+      "name": "Milan",
+      "at": [22, 20],
+      "owner": "italy"
+    },
+    {
+      "id": "italy-city1",
+      "kind": "city",
+      "name": "Naples",
+      "at": [25, 23],
+      "owner": "italy"
+    },
+    {
+      "id": "italy-city2",
+      "kind": "city",
+      "name": "Palermo",
+      "at": [25, 26],
+      "owner": "italy"
+    },
+    {
+      "id": "switzerland-capital",
+      "kind": "capital",
+      "name": "Bern",
+      "at": [21, 19],
+      "owner": "switzerland"
+    },
+    {
+      "id": "austria-capital",
+      "kind": "capital",
+      "name": "Vienna",
+      "at": [27, 18],
+      "owner": "austria"
+    },
+    {
+      "id": "austria-city0",
+      "kind": "city",
+      "name": "Graz",
+      "at": [25, 19],
+      "owner": "austria"
+    },
+    {
+      "id": "czechia-capital",
+      "kind": "capital",
+      "name": "Prague",
+      "at": [25, 17],
+      "owner": "czechia"
+    },
+    {
+      "id": "czechia-city0",
+      "kind": "city",
+      "name": "Brno",
+      "at": [27, 17],
+      "owner": "czechia"
+    },
+    {
+      "id": "slovakia-capital",
+      "kind": "capital",
+      "name": "Bratislava",
+      "at": [28, 18],
+      "owner": "slovakia",
+      "victoryPoints": 4
+    },
+    {
+      "id": "hungary-capital",
+      "kind": "capital",
+      "name": "Budapest",
+      "at": [28, 19],
+      "owner": "hungary"
+    },
+    {
+      "id": "hungary-city0",
+      "kind": "city",
+      "name": "Debrecen",
+      "at": [30, 18],
+      "owner": "hungary"
+    },
+    {
+      "id": "balkans-capital",
+      "kind": "capital",
+      "name": "Belgrade",
+      "at": [29, 21],
+      "owner": "balkans"
+    },
+    {
+      "id": "balkans-city0",
+      "kind": "city",
+      "name": "Zagreb",
+      "at": [27, 20],
+      "owner": "balkans"
+    },
+    {
+      "id": "balkans-city1",
+      "kind": "city",
+      "name": "Tirana",
+      "at": [29, 23],
+      "owner": "balkans"
+    },
+    {
+      "id": "romania-capital",
+      "kind": "capital",
+      "name": "Bucharest",
+      "at": [33, 21],
+      "owner": "romania"
+    },
+    {
+      "id": "romania-city0",
+      "kind": "city",
+      "name": "Cluj",
+      "at": [31, 19],
+      "owner": "romania"
+    },
+    {
+      "id": "romania-city1",
+      "kind": "city",
+      "name": "Constanta",
+      "at": [35, 21],
+      "owner": "romania"
+    },
+    {
+      "id": "moldova-capital",
+      "kind": "capital",
+      "name": "Chisinau",
+      "at": [35, 19],
+      "owner": "moldova",
+      "victoryPoints": 4
+    },
+    {
+      "id": "bulgaria-capital",
+      "kind": "capital",
+      "name": "Sofia",
+      "at": [32, 22],
+      "owner": "bulgaria"
+    },
+    {
+      "id": "bulgaria-city0",
+      "kind": "city",
+      "name": "Varna",
+      "at": [35, 22],
+      "owner": "bulgaria"
+    },
+    {
+      "id": "greece-capital",
+      "kind": "capital",
+      "name": "Athens",
+      "at": [31, 25],
+      "owner": "greece"
+    },
+    {
+      "id": "greece-city0",
+      "kind": "city",
+      "name": "Thessaloniki",
+      "at": [31, 23],
+      "owner": "greece"
+    },
+    {
+      "id": "greece-city1",
+      "kind": "city",
+      "name": "Heraklion",
+      "at": [32, 27],
+      "owner": "greece"
+    },
+    {
+      "id": "cyprus-capital",
+      "kind": "capital",
+      "name": "Nicosia",
+      "at": [38, 28],
+      "owner": "cyprus",
+      "victoryPoints": 4
+    },
+    {
+      "id": "ukraine-capital",
+      "kind": "capital",
+      "name": "Kyiv",
+      "at": [36, 16],
+      "owner": "ukraine",
+      "victoryPoints": 9
+    },
+    {
+      "id": "ukraine-city0",
+      "kind": "city",
+      "name": "Kharkiv",
+      "at": [40, 17],
+      "owner": "ukraine"
+    },
+    {
+      "id": "ukraine-city1",
+      "kind": "city",
+      "name": "Odesa",
+      "at": [36, 19],
+      "owner": "ukraine"
+    },
+    {
+      "id": "ukraine-city2",
+      "kind": "city",
+      "name": "Lviv",
+      "at": [32, 17],
+      "owner": "ukraine"
+    },
+    {
+      "id": "ukraine-city3",
+      "kind": "city",
+      "name": "Sevastopol",
+      "at": [38, 21],
+      "owner": "ukraine"
+    },
+    {
+      "id": "belarus-capital",
+      "kind": "capital",
+      "name": "Minsk",
+      "at": [34, 14],
+      "owner": "belarus"
+    },
+    {
+      "id": "belarus-city0",
+      "kind": "city",
+      "name": "Gomel",
+      "at": [36, 15],
+      "owner": "belarus"
+    },
+    {
+      "id": "estonia-capital",
+      "kind": "capital",
+      "name": "Tallinn",
+      "at": [33, 11],
+      "owner": "estonia",
+      "victoryPoints": 5
+    },
+    {
+      "id": "latvia-capital",
+      "kind": "capital",
+      "name": "Riga",
+      "at": [32, 12],
+      "owner": "latvia",
+      "victoryPoints": 5
+    },
+    {
+      "id": "lithuania-capital",
+      "kind": "capital",
+      "name": "Vilnius",
+      "at": [33, 13],
+      "owner": "lithuania",
+      "victoryPoints": 5
+    },
+    {
+      "id": "georgia-capital",
+      "kind": "capital",
+      "name": "Tbilisi",
+      "at": [45, 23],
+      "owner": "georgia"
+    },
+    {
+      "id": "armenia-capital",
+      "kind": "capital",
+      "name": "Yerevan",
+      "at": [46, 24],
+      "owner": "armenia",
+      "victoryPoints": 4
+    },
+    {
+      "id": "azerbaijan-capital",
+      "kind": "capital",
+      "name": "Baku",
+      "at": [49, 24],
+      "owner": "azerbaijan"
+    },
+    {
+      "id": "kazakhstan-capital",
+      "kind": "capital",
+      "name": "Aktobe",
+      "at": [54, 17],
+      "owner": "kazakhstan"
+    },
+    {
+      "id": "kazakhstan-city0",
+      "kind": "city",
+      "name": "Atyrau",
+      "at": [51, 19],
+      "owner": "kazakhstan"
+    },
+    {
+      "id": "iran-capital",
+      "kind": "capital",
+      "name": "Tehran",
+      "at": [50, 27],
+      "owner": "iran"
+    },
+    {
+      "id": "iran-city0",
+      "kind": "city",
+      "name": "Tabriz",
+      "at": [46, 25],
+      "owner": "iran"
+    },
+    {
+      "id": "iran-city1",
+      "kind": "city",
+      "name": "Mashhad",
+      "at": [55, 27],
+      "owner": "iran"
+    },
+    {
+      "id": "iraq-capital",
+      "kind": "capital",
+      "name": "Baghdad",
+      "at": [45, 29],
+      "owner": "iraq"
+    },
+    {
+      "id": "iraq-city0",
+      "kind": "city",
+      "name": "Mosul",
+      "at": [44, 27],
+      "owner": "iraq"
+    },
+    {
+      "id": "iraq-city1",
+      "kind": "city",
+      "name": "Basra",
+      "at": [47, 31],
+      "owner": "iraq"
+    },
+    {
+      "id": "syria-capital",
+      "kind": "capital",
+      "name": "Damascus",
+      "at": [40, 29],
+      "owner": "syria"
+    },
+    {
+      "id": "syria-city0",
+      "kind": "city",
+      "name": "Aleppo",
+      "at": [41, 27],
+      "owner": "syria"
+    },
+    {
+      "id": "israel-capital",
+      "kind": "capital",
+      "name": "Jerusalem",
+      "at": [39, 30],
+      "owner": "israel"
+    },
+    {
+      "id": "israel-city0",
+      "kind": "city",
+      "name": "Haifa",
+      "at": [39, 29],
+      "owner": "israel"
+    },
+    {
+      "id": "jordan-capital",
+      "kind": "capital",
+      "name": "Amman",
+      "at": [41, 30],
+      "owner": "jordan"
+    },
+    {
+      "id": "egypt-capital",
+      "kind": "capital",
+      "name": "Cairo",
+      "at": [36, 31],
+      "owner": "egypt"
+    },
+    {
+      "id": "egypt-city0",
+      "kind": "city",
+      "name": "Alexandria",
+      "at": [35, 30],
+      "owner": "egypt"
+    },
+    {
+      "id": "libya-capital",
+      "kind": "capital",
+      "name": "Tripoli",
+      "at": [24, 30],
+      "owner": "libya"
+    },
+    {
+      "id": "libya-city0",
+      "kind": "city",
+      "name": "Benghazi",
+      "at": [30, 30],
+      "owner": "libya"
+    },
+    {
+      "id": "tunisia-capital",
+      "kind": "capital",
+      "name": "Tunis",
+      "at": [22, 27],
+      "owner": "tunisia"
+    },
+    {
+      "id": "algeria-capital",
+      "kind": "capital",
+      "name": "Algiers",
+      "at": [18, 27],
+      "owner": "algeria"
+    },
+    {
+      "id": "algeria-city0",
+      "kind": "city",
+      "name": "Oran",
+      "at": [16, 27],
+      "owner": "algeria"
+    },
+    {
+      "id": "morocco-capital",
+      "kind": "capital",
+      "name": "Rabat",
+      "at": [12, 28],
+      "owner": "morocco"
+    },
+    {
+      "id": "morocco-city0",
+      "kind": "city",
+      "name": "Casablanca",
+      "at": [10, 30],
+      "owner": "morocco"
+    }
+  ],
+  "seaZones": [
+    {
+      "id": "north-atlantic",
+      "name": "North Atlantic"
+    },
+    {
+      "id": "norwegian-sea",
+      "name": "Norwegian Sea"
+    },
+    {
+      "id": "barents",
+      "name": "Barents and White Seas"
+    },
+    {
+      "id": "north-sea",
+      "name": "North Sea"
+    },
+    {
+      "id": "baltic",
+      "name": "Baltic Sea"
+    },
+    {
+      "id": "western-med",
+      "name": "Western Mediterranean"
+    },
+    {
+      "id": "central-med",
+      "name": "Central Mediterranean"
+    },
+    {
+      "id": "aegean",
+      "name": "Aegean Sea"
+    },
+    {
+      "id": "marmara",
+      "name": "Sea of Marmara"
+    },
+    {
+      "id": "levant",
+      "name": "Eastern Mediterranean"
+    },
+    {
+      "id": "black-sea",
+      "name": "Black Sea"
+    },
+    {
+      "id": "caspian",
+      "name": "Caspian Sea"
+    }
+  ],
+  "straits": [
+    {
+      "id": "giuk-gap",
+      "name": "GIUK gap",
+      "kind": "strait",
+      "hexes": [
+        [6, 8],
+        [7, 9],
+        [9, 9],
+        [10, 10],
+        [12, 10]
+      ],
+      "joins": [
+        "north-atlantic",
+        "norwegian-sea"
+      ]
+    },
+    {
+      "id": "english-channel",
+      "name": "English Channel",
+      "kind": "strait",
+      "hexes": [
+        [16, 17],
+        [17, 16]
+      ],
+      "joins": [
+        "north-atlantic",
+        "north-sea"
+      ]
+    },
+    {
+      "id": "oresund",
+      "name": "Danish Straits",
+      "kind": "strait",
+      "hexes": [
+        [24, 12]
+      ],
+      "joins": [
+        "north-sea",
+        "baltic"
+      ]
+    },
+    {
+      "id": "gibraltar",
+      "name": "Strait of Gibraltar",
+      "kind": "strait",
+      "hexes": [
+        [12, 27]
+      ],
+      "joins": [
+        "north-atlantic",
+        "western-med"
+      ]
+    },
+    {
+      "id": "bosphorus",
+      "name": "Bosphorus",
+      "kind": "strait",
+      "hexes": [
+        [35, 23]
+      ],
+      "joins": [
+        "black-sea",
+        "marmara"
+      ]
+    },
+    {
+      "id": "dardanelles",
+      "name": "Dardanelles",
+      "kind": "strait",
+      "hexes": [
+        [34, 24]
+      ],
+      "joins": [
+        "marmara",
+        "aegean"
+      ]
+    },
+    {
+      "id": "kerch",
+      "name": "Kerch Strait",
+      "kind": "strait",
+      "hexes": [
+        [40, 20]
+      ]
+    },
+    {
+      "id": "suwalki",
+      "name": "Suwalki corridor",
+      "kind": "land-bridge",
+      "hexes": [
+        [31, 14],
+        [31, 13]
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "kind": "oil",
+      "at": [14, 12],
+      "name": "North Sea oil (Aberdeen)"
+    },
+    {
+      "kind": "oil",
+      "at": [48, 24],
+      "name": "Baku fields"
+    },
+    {
+      "kind": "oil",
+      "at": [52, 14],
+      "name": "Volga-Urals fields"
+    },
+    {
+      "kind": "oil",
+      "at": [45, 28],
+      "name": "Kirkuk"
+    },
+    {
+      "kind": "oil",
+      "at": [20, 30],
+      "name": "Hassi Messaoud"
+    },
+    {
+      "kind": "oil",
+      "at": [28, 31],
+      "name": "Sirte Basin"
+    },
+    {
+      "kind": "food",
+      "at": [38, 18],
+      "name": "The black earth"
+    },
+    {
+      "kind": "food",
+      "at": [17, 19],
+      "name": "The Paris Basin"
+    },
+    {
+      "kind": "chips",
+      "at": [20, 15],
+      "name": "Eindhoven"
+    },
+    {
+      "kind": "chips",
+      "at": [26, 16],
+      "name": "Silicon Saxony"
+    },
+    {
+      "kind": "rare-earths",
+      "at": [40, 4],
+      "name": "Lovozero"
+    },
+    {
+      "kind": "rare-earths",
+      "at": [29, 4],
+      "name": "Kiruna"
+    }
+  ]
+}
