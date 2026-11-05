@@ -37,7 +37,7 @@ mountains. The canal is a strait record of kind `canal` on Panama City's hex, jo
 
 | Power | Government | Front (opening army) | Navy |
 |---|---|---|---|
-| United States | Commonwealth | Houston and Los Angeles, facing Mexico | Miami: fleet, two transports, carrier |
+| United States | Commonwealth | New York and Seattle, facing Canada | Miami: fleet, transport, carrier |
 | Canada | Commonwealth | Toronto and Vancouver, facing the United States | Halifax: fleet, transport |
 | Mexico | Union | Monterrey and Tijuana, facing the United States | Veracruz: fleet, transport |
 | Brazil | Union | Porto Alegre (Argentina) and Manaus (Colombia) | Rio de Janeiro: fleet, transport, carrier |
@@ -63,9 +63,9 @@ Civil War), when they fight with their own generals, decks and leaders.
 ## Minor states
 
 Guatemala, Nicaragua, Panama, Cuba, Haiti, the Dominican Republic, Venezuela, Guyana, Ecuador, Peru,
-Bolivia, Chile, Paraguay and Uruguay. Panama City is worth 10 victory points, what the canal is
-worth; Havana, Caracas, Lima and Santiago 8. Venezuela, Peru and Chile raise an extra infantry
-regiment a city, Cuba a mechanized one.
+Bolivia, Chile, Paraguay and Uruguay. Panama City, Havana and Santiago are worth 8 victory points,
+the other capitals 6. Venezuela raises an extra infantry and a mechanized regiment a city; Ecuador,
+Peru and Chile an infantry regiment, Cuba a mechanized one.
 
 ## Opening Crises
 

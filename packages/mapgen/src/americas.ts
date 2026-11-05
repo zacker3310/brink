@@ -119,24 +119,23 @@ const s = (owner: NationId, id: string, kind: Kind, name: string, at: [number, n
 
 /**
  * The real capitals and great cities. A power's first two cities hold its opening army on its front
- * (`build.ts`): the United States faces Mexico at Houston and Los Angeles, Canada faces it at Toronto
- * and Vancouver, Mexico faces north at Monterrey and Tijuana, Brazil faces Argentina at Porto Alegre
+ * (`build.ts`): the United States and Canada face each other at New York and Toronto, Seattle and
+ * Vancouver, Mexico faces north at Monterrey and Tijuana, Brazil faces Argentina at Porto Alegre
  * and Colombia at Manaus, Argentina faces Brazil at Corrientes and Chile at Mendoza, Colombia faces
  * Panama at Cartagena and Venezuela at Cucuta.
  */
 const SITES: MapSite[] = [
   s('usa', 'capital', 'capital', 'Washington', [20, 10]),
-  s('usa', 'city0', 'city', 'Houston', [16, 13]),
-  s('usa', 'city1', 'city', 'Los Angeles', [11, 11]),
-  s('usa', 'city2', 'city', 'New York', [20, 9]),
-  s('usa', 'city3', 'city', 'Chicago', [17, 9]),
-  s('usa', 'city4', 'city', 'Seattle', [10, 8]),
+  s('usa', 'city0', 'city', 'New York', [20, 9]),
+  s('usa', 'city1', 'city', 'Seattle', [10, 8]),
+  s('usa', 'city2', 'city', 'Houston', [16, 13]),
+  s('usa', 'city3', 'city', 'Los Angeles', [11, 11]),
+  s('usa', 'city4', 'city', 'Chicago', [17, 9]),
   s('usa', 'city5', 'city', 'Miami', [19, 13]),
   s('usa', 'city6', 'city', 'Honolulu', [2, 15], { victoryPoints: 4 }),
   s('usa', 'depot0', 'depot', 'Detroit', [18, 8]),
-  s('usa', 'depot1', 'depot', 'Denver', [14, 10]),
-  s('usa', 'depot2', 'depot', 'Anchorage', [3, 3]),
-  s('usa', 'depot3', 'depot', 'San Juan', [25, 16], { profile: 'outpost' }),
+  s('usa', 'depot1', 'depot', 'Anchorage', [3, 3]),
+  s('usa', 'depot2', 'depot', 'San Juan', [25, 16], { profile: 'outpost' }),
 
   s('canada', 'capital', 'capital', 'Ottawa', [20, 7]),
   s('canada', 'city0', 'city', 'Toronto', [19, 8]),
@@ -190,19 +189,19 @@ const SITES: MapSite[] = [
   // The minor states. Panama City holds the canal: it is worth what the canal is worth.
   s('guatemala', 'capital', 'capital', 'Guatemala City', [17, 18]),
   s('nicaragua', 'capital', 'capital', 'Managua', [18, 18]),
-  s('panama', 'capital', 'capital', 'Panama City', [19, 19], { victoryPoints: 10 }),
+  s('panama', 'capital', 'capital', 'Panama City', [19, 19], { victoryPoints: 8 }),
   s('cuba', 'capital', 'capital', 'Havana', [18, 15], { victoryPoints: 8 }),
   s('cuba', 'city0', 'city', 'Santiago de Cuba', [20, 15]),
   s('haiti', 'capital', 'capital', 'Port-au-Prince', [22, 16]),
   s('dominican', 'capital', 'capital', 'Santo Domingo', [23, 16]),
-  s('venezuela', 'capital', 'capital', 'Caracas', [24, 19], { victoryPoints: 8 }),
+  s('venezuela', 'capital', 'capital', 'Caracas', [24, 19]),
   s('venezuela', 'city0', 'city', 'Maracaibo', [23, 19]),
   s('venezuela', 'city1', 'city', 'Ciudad Guayana', [25, 20]),
   s('guyana', 'capital', 'capital', 'Georgetown', [26, 20]),
   s('guyana', 'city0', 'city', 'Paramaribo', [27, 20]),
   s('ecuador', 'capital', 'capital', 'Quito', [21, 22]),
   s('ecuador', 'city0', 'city', 'Guayaquil', [20, 22]),
-  s('peru', 'capital', 'capital', 'Lima', [20, 25], { victoryPoints: 8 }),
+  s('peru', 'capital', 'capital', 'Lima', [20, 25]),
   s('peru', 'city0', 'city', 'Iquitos', [21, 23]),
   s('peru', 'city1', 'city', 'Arequipa', [21, 27]),
   s('bolivia', 'capital', 'capital', 'La Paz', [22, 27]),

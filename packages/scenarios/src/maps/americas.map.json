@@ -458,36 +458,36 @@
     {
       "id": "usa-city0",
       "kind": "city",
+      "name": "New York",
+      "at": [20, 9],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city1",
+      "kind": "city",
+      "name": "Seattle",
+      "at": [10, 8],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city2",
+      "kind": "city",
       "name": "Houston",
       "at": [16, 13],
       "owner": "usa"
     },
     {
-      "id": "usa-city1",
+      "id": "usa-city3",
       "kind": "city",
       "name": "Los Angeles",
       "at": [11, 11],
       "owner": "usa"
     },
     {
-      "id": "usa-city2",
-      "kind": "city",
-      "name": "New York",
-      "at": [20, 9],
-      "owner": "usa"
-    },
-    {
-      "id": "usa-city3",
+      "id": "usa-city4",
       "kind": "city",
       "name": "Chicago",
       "at": [17, 9],
-      "owner": "usa"
-    },
-    {
-      "id": "usa-city4",
-      "kind": "city",
-      "name": "Seattle",
-      "at": [10, 8],
       "owner": "usa"
     },
     {
@@ -515,19 +515,12 @@
     {
       "id": "usa-depot1",
       "kind": "depot",
-      "name": "Denver",
-      "at": [14, 10],
-      "owner": "usa"
-    },
-    {
-      "id": "usa-depot2",
-      "kind": "depot",
       "name": "Anchorage",
       "at": [3, 3],
       "owner": "usa"
     },
     {
-      "id": "usa-depot3",
+      "id": "usa-depot2",
       "kind": "depot",
       "name": "San Juan",
       "at": [25, 16],
@@ -864,7 +857,7 @@
       "name": "Panama City",
       "at": [19, 19],
       "owner": "panama",
-      "victoryPoints": 10
+      "victoryPoints": 8
     },
     {
       "id": "cuba-capital",
@@ -900,8 +893,7 @@
       "kind": "capital",
       "name": "Caracas",
       "at": [24, 19],
-      "owner": "venezuela",
-      "victoryPoints": 8
+      "owner": "venezuela"
     },
     {
       "id": "venezuela-city0",
@@ -950,8 +942,7 @@
       "kind": "capital",
       "name": "Lima",
       "at": [20, 25],
-      "owner": "peru",
-      "victoryPoints": 8
+      "owner": "peru"
     },
     {
       "id": "peru-city0",

@@ -22,15 +22,18 @@ const SETUP: ScenarioSetup = {
   maxTurns: AMERICAS_MAX_TURNS,
   navies: {
     // The US Second Fleet at Miami: the Gulf, the Caribbean and the Atlantic, the canal a day away.
-    usa: { port: 'Miami', ships: ['fleet', 'transport', 'transport', 'carrier'] },
+    // One transport, not the Pacific's two: here the war is on land, on two fronts at once, and every
+    // ship is weight that parity takes out of the army.
+    usa: { port: 'Miami', ships: ['fleet', 'transport', 'carrier'] },
     canada: { port: 'Halifax', ships: ['fleet', 'transport'] },
     mexico: { port: 'Veracruz', ships: ['fleet', 'transport'] },
     colombia: { port: 'Cartagena', ships: ['fleet', 'transport'] },
     brazil: { port: 'Rio de Janeiro', ships: ['fleet', 'transport', 'carrier'] },
     argentina: { port: 'Buenos Aires', ships: ['fleet', 'transport'] },
   },
-  // Big countries defend deeper: militia per city beyond the infantry every city has.
-  militia: { venezuela: ['infantry'], peru: ['infantry'], chile: ['infantry'], cuba: ['mechanized'] } satisfies Record<NationId, UnitClass[]>,
+  // Big countries defend deeper: militia per city beyond the infantry every city has. Venezuela,
+  // Ecuador and Peru most of all: without it Colombia ate the northern Andes by turn ten.
+  militia: { venezuela: ['infantry', 'mechanized'], peru: ['infantry'], ecuador: ['infantry'], chile: ['infantry'], cuba: ['mechanized'] } satisfies Record<NationId, UnitClass[]>,
 };
 
 const ALL: readonly NationSpec[] = nationSpecs(AMERICAS_MAP, SETUP);
