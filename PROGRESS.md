@@ -25,6 +25,16 @@ Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.
 
 ## Completed
 
+- The Indo-Pacific South (Phase 6, `docs/indopac.md`): a second theatre, `indopac`, on a 52 x 36
+  map file from Karachi to Wellington. Five powers (India, Pakistan, China, Indonesia, Australia;
+  four new nation files with invented leaders and generals) and fifteen minor states; the Himalaya
+  as fixed mountains; Malacca, Sunda, Lombok, Torres and the Taiwan approaches as straits; the
+  South China Sea's reefs as outposts; Australia reachable only by sea. Setup lists theatres and
+  each theatre's nations; the Pacific's crises are dealt only in the Pacific. AI: a convoy off a
+  shore whose only land in reach is a held city sails for an open beach. Soak, 20 AI-only matches:
+  0 rejected orders, every power captures sites (Australia only by landing), no decisive ending
+  (0%: five powers start near 18% standing against the 29% supremacy bar set for four); on
+  score China 10, Australia 8, Pakistan 2. Phone e2e: `indopac.spec.ts`.
 - Balance after research, leaders and the staff AI (ruleset 2.9.0). Measured on 2.8.0: of 40 soak
   matches 15 decisive (China 12, Russia 3), median turn 30; after the first ten turns the wars
   were fought by nobody. Root causes and fixes, all in `packages/ai` unless named:

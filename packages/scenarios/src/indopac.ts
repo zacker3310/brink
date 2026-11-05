@@ -30,7 +30,17 @@ const SETUP: ScenarioSetup = {
     australia: { port: 'Darwin', ships: ['carrier', 'fleet', 'transport', 'transport', 'transport'] },
   },
   // Big countries defend deeper: militia per city beyond the infantry every city has.
-  militia: { vietnam: ['infantry'], thailand: ['infantry'], philippines: ['infantry'], malaysia: ['infantry'] } satisfies Record<NationId, UnitClass[]>,
+  // Indochina is China's back yard: its states dig in deep, or China eats them in ten turns and
+  // wins every war on the score (20 of 20 soak matches with one infantry regiment a city).
+  militia: {
+    vietnam: ['infantry', 'mechanized'],
+    thailand: ['infantry', 'mechanized'],
+    myanmar: ['infantry'],
+    laos: ['infantry'],
+    cambodia: ['infantry'],
+    philippines: ['infantry'],
+    malaysia: ['infantry'],
+  } satisfies Record<NationId, UnitClass[]>,
 };
 
 const ALL: readonly NationSpec[] = nationSpecs(INDOPAC_MAP, SETUP);
