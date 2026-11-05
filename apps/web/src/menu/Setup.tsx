@@ -15,10 +15,11 @@ import { LeaderCard } from './Leader';
 // command, the nation's colour for who you are). Classes are `.wr-*` in index.css, set outside the
 // Console scope's resets so display type survives.
 
-const DIFFICULTIES: { id: Difficulty; label: string; threat: number; text: string }[] = [
-  { id: 'easy', label: 'Easy', threat: 1, text: 'Your natural ally beside you, one enemy. +75% income, +55% attack, cheaper units.' },
-  { id: 'normal', label: 'Normal', threat: 2, text: 'All three rivals at war with you. +40% income, +30% attack.' },
-  { id: 'hard', label: 'Hard', threat: 3, text: 'Everyone at war, no edge, and the AI starts richer.' },
+// Each level in one plain line (what it means for you), then the numbers behind it.
+const DIFFICULTIES: { id: Difficulty; label: string; threat: number; means: string; text: string }[] = [
+  { id: 'easy', label: 'Easy', threat: 1, means: 'Learn the game: one enemy, an ally beside you, and a big edge.', text: '+75% income, +55% attack, cheaper units.' },
+  { id: 'normal', label: 'Normal', threat: 2, means: 'A real war: all three rivals against you, with a smaller edge.', text: '+40% income, +30% attack.' },
+  { id: 'hard', label: 'Hard', threat: 3, means: 'No help at all: everyone at war with you, and the AI starts richer.', text: 'No edge for you.' },
 ];
 
 const LENGTHS: [CampaignLength, string][] = [
@@ -428,6 +429,9 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
             </div>
 
             <SubHead>Difficulty</SubHead>
+            <p className="wr-choice-text -mt-1 mb-2" data-testid="difficulty-advice">
+              New to Brink? Start on Easy: one war to win, with the staff to help you plan it.
+            </p>
             <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Difficulty">
               {DIFFICULTIES.map((d) => (
                 <button
@@ -441,14 +445,23 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                   className="wr-choice"
                 >
                   <span className="flex items-center justify-between gap-2">
-                    <span className="wr-choice-title">{d.label}</span>
+                    <span className="wr-choice-title">
+                      {d.label}
+                      {d.id === 'easy' && (
+                        <span className="ml-2 rounded-full border border-current px-1.5 py-px align-middle font-mono text-[10px] tracking-wide uppercase" data-testid="difficulty-recommended">
+                          First game
+                        </span>
+                      )}
+                    </span>
                     <span className="wr-threat" aria-label={`Threat ${d.threat} of 3`}>
                       {[1, 2, 3].map((p) => (
                         <i key={p} data-on={p <= d.threat} />
                       ))}
                     </span>
                   </span>
-                  <span className="wr-choice-text">{d.text}</span>
+                  <span className="wr-choice-text" data-testid={`difficulty-means-${d.id}`}>
+                    <b className="font-semibold text-text">{d.means}</b> {d.text}
+                  </span>
                 </button>
               ))}
             </div>

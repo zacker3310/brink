@@ -1,8 +1,10 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 
 // A scripted playthrough as China on a phone, the way a new player meets the game: a new campaign,
-// the staff's operation against Taipei, a doctrine card, a general, eight turns ended with the staff
-// running the campaign, a battle opened when an attack comes up, and each debrief read.
+// the staff's operation against Taipei picked from the plan picker the first turn opens on, a
+// doctrine card, a general, eight turns ended with the staff running the campaign (Execute ends a
+// turn in one tap), a battle entered from ENTER BATTLE when an attack comes up, and each debrief
+// read. It counts the player's taps by stage and logs them (TAPS).
 // PLAYTEST_SHOTS=<dir> keeps a screenshot of every step.
 const { viewport, isMobile, hasTouch, userAgent } = devices['iPhone 14 Pro'];
 test.use({ viewport, deviceScaleFactor: 1, isMobile, hasTouch, userAgent });
@@ -54,6 +56,22 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
   test.setTimeout(600_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Every tap the player makes, counted in the page (a touch lands as one primary pointerdown).
+  await page.addInitScript(() => {
+    const w = window as unknown as { __taps: number };
+    w.__taps = 0;
+    window.addEventListener('pointerdown', (e) => {
+      if (e.isPrimary) w.__taps += 1;
+    }, true);
+  });
+  const taps = () => page.evaluate(() => (window as unknown as { __taps: number }).__taps);
+  const tally: Record<string, number> = {};
+  let mark = 0;
+  const count = async (label: string) => {
+    const n = await taps();
+    tally[label] = (tally[label] ?? 0) + n - mark;
+    mark = n;
+  };
   await page.addInitScript(() => {
     if (sessionStorage.getItem('playthrough')) return;
     sessionStorage.setItem('playthrough', '1');
@@ -72,21 +90,21 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
   await page.getByTestId('difficulty-normal').tap();
   await shot(page, 'setup');
   await page.getByTestId('start-game').tap();
+  await count('setup');
 
-  // The first turn's brief points at Operations, and goes straight there.
-  await expect(page.getByTestId('how-to-win')).toBeVisible({ timeout: 60_000 });
+  // The first turn opens on the plan picker: the staff's plans, ranked, each one tap. (It used to
+  // open on a brief that pointed at the Operations sheet, two taps from a launch; every operation
+  // is still a tap away under the plans.)
+  const picker = page.getByTestId('how-to-win');
+  await expect(picker).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('how-to-ops')).toContainText('Or let the staff run it');
-  await page.getByTestId('how-to-ops').evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await shot(page, 'how-to-win');
-  await page.getByTestId('how-to-operations').tap();
-  const sheet = page.getByTestId('operations');
-  await expect(sheet.getByTestId('operation').first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('turn')).toContainText('1/');
-  await shot(page, 'operations-sheet');
-  const taipei = sheet.getByTestId('operation').filter({ hasText: 'Take Taipei' }).first();
-  await expect(taipei).toBeVisible();
-  await taipei.getByTestId('operation-launch').tap();
-  await expect(sheet).toBeHidden();
+  await shot(page, 'plan-picker');
+  const taipei = picker.getByTestId('plan').filter({ hasText: 'Take Taipei' }).first();
+  await expect(taipei).toBeVisible({ timeout: 30_000 });
+  await taipei.getByTestId('plan-adopt').tap();
+  await expect(picker).toBeHidden();
+  await count('plan');
 
   // One command card over the dock: the operation, what it does this turn, and what else waits.
   const card = page.getByTestId('command-card');
@@ -173,7 +191,10 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
 
   let fought = false;
   const debriefs: string[] = [];
+  let turns = 0;
+  await count('extras');
   for (let turn = 1; turn <= 8; turn++) {
+    turns = turn;
     // A promotion may come up on its own.
     if (await page.getByTestId('promotion').isVisible().catch(() => false)) {
       await shot(page, `t${turn}-promotion`);
@@ -187,30 +208,48 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
       await page.getByTestId('event-option-1').tap();
       await page.getByTestId('decision-done').tap();
     }
-    if (!fought && (await findAttack(page))) {
+    await count('extras');
+    // ENTER BATTLE is up whenever an attack this turn meets enemies: one tap into the best fight.
+    // Without one, the player arms an attack by hand.
+    let tried = false;
+    if (!fought && (await page.getByTestId('enter-battle').isVisible().catch(() => false))) {
+      await shot(page, `t${turn}-enter-battle`);
+      await page.getByTestId('enter-battle').tap();
+      tried = true;
+    } else if (!fought && (await findAttack(page))) {
       await shot(page, `t${turn}-attack-armed`);
       await page.getByTestId('confirm-attack').tap();
+      tried = true;
+    }
+    if (tried) {
       const battle = await page.getByTestId('arena-brief').waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
       if (battle) {
         await shot(page, `t${turn}-battle-brief`);
         await page.getByTestId('arena-fight').tap();
         await expect(page.getByTestId('arena-canvas')).toBeVisible({ timeout: 20_000 });
         await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 120_000 });
+        await count('to-battle');
         await shot(page, `t${turn}-battle`);
         await page.evaluate(() => window.__arena!.win());
         await expect(page.getByTestId('arena-continue')).toBeVisible({ timeout: 30_000 });
         await shot(page, `t${turn}-battle-verdict`);
         await page.getByTestId('arena-continue').tap();
         await expect(page.getByTestId('arena')).toHaveCount(0);
+        await count('battle');
         fought = true;
       }
     }
+    if (!fought) await count('search');
     await shot(page, `t${turn}-orders`);
+    // With the staff's plan up, Execute ends the turn in one tap; otherwise the review comes first.
+    const oneTap = (await page.getByTestId('end-turn').getAttribute('data-one-tap')) === 'true';
     await page.getByTestId('end-turn').tap();
-    const commit = page.getByTestId('commit-turn');
-    await expect(commit).toBeVisible();
-    await shot(page, `t${turn}-review`);
-    await commit.tap();
+    if (!oneTap) {
+      const commit = page.getByTestId('commit-turn');
+      await expect(commit).toBeVisible();
+      await shot(page, `t${turn}-review`);
+      await commit.tap();
+    }
     if (await page.getByTestId('replay').isVisible({ timeout: 15_000 }).catch(() => false)) {
       await page.waitForTimeout(1500);
       await shot(page, `t${turn}-replay`);
@@ -218,6 +257,7 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
     }
     const debrief = page.getByTestId('debrief');
     await expect(debrief).toBeVisible({ timeout: 90_000 });
+    await count('end-turn');
     // The debrief stands alone over the dock: no decision card or chips stacked on it.
     await expect(page.getByTestId('command-card')).toHaveCount(0);
     debriefs.push((await debrief.textContent()) ?? '');
@@ -233,8 +273,12 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
     // close button then sat under the victory screen and the tap waited out the test.)
     if (await page.getByTestId('victory').isVisible().catch(() => false)) break;
     if (await page.getByTestId('debrief-close').isVisible().catch(() => false)) await page.getByTestId('debrief-close').tap();
+    await count('debrief');
     if (await page.getByTestId('victory').isVisible().catch(() => false)) break;
   }
+  await count('debrief');
+  // The taps a player makes, by stage: the playthrough's measure of how easy the game is to drive.
+  console.log(`TAPS ${JSON.stringify({ ...tally, turns, total: await taps() })}`);
   await shot(page, 'end');
   // The operation was followed in the debrief while it ran.
   expect(debriefs.some((d) => d.includes('STORM BRIDGE') || /Storm Bridge/i.test(d))).toBe(true);

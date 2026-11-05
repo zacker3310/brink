@@ -257,8 +257,8 @@ export function OperationRow() {
             {op.name}: {now ? now.title : 'Assault'} · ~{op.turns} turn{op.turns === 1 ? '' : 's'}
           </span>
           {now && (
-            <span className="block truncate text-[12px] text-muted" data-testid="operation-now">
-              {now.detail}
+            <span className="block truncate text-[12px] text-text/85" data-testid="operation-now">
+              <b className="font-semibold text-signal">Next:</b> {now.detail}.
             </span>
           )}
         </span>
