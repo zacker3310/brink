@@ -6,3 +6,5 @@ export * from './testbed';
 export * from './antarctica';
 export * from './mideast';
 export * from './americas';
+export * from './europe';
+export * from './indopac';

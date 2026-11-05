@@ -9,7 +9,9 @@ Phase 6 (`docs/MASTER-PLAN.md`): South Asia, Southeast Asia and Oceania as one t
 south onto the top row) to the Southern Ocean. Hand-traced lon/lat outlines (61E to 179.5E, 37.5N to
 47S, about 2.3 degrees a hex) were rasterised to hexes and then hand-finished: islands widened past
 real scale so each holds open ground beside its cities, and every narrows kept as one sea hex. No
-external data. The seed varies only the ground inside each country.
+external data. The seed varies only the ground inside each country. The grid, sites, sea zones and
+straits are source in `packages/mapgen/src/indopac.ts` (`pnpm --filter @brink/mapgen map:indopac`
+writes the file; a test checks it byte for byte).
 
 - **Fixed ground.** The Himalaya, the Karakoram, the Hindu Kush and the rim of the Tibetan plateau are
   mountains whatever the seed. The jungles of Borneo, New Guinea, Sumatra and the Indochinese hills
