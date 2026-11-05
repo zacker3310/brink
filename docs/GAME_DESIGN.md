@@ -13,7 +13,7 @@ One turn is six hours. You see only what your units and cities can see.
 
 ## The turn
 
-1. **Plan.** Give each formation an order (move, attack, dig in, hold, scout, withdraw). Recruit at
+1. **Plan.** Give each formation an order (move, attack, dig in, hold, scout, withdraw, airlift). Recruit at
    cities, start a building, set the budget, pick research, make diplomatic moves, answer a world event.
 2. **Review.** End Turn opens the order review: orders by type, units without orders, what you spend
    against what you hold, resources that will run out within two turns at last turn's rate, units
