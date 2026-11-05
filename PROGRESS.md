@@ -32,9 +32,9 @@ Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.
   Artefacts, the reverse-engineered branch (hidden until leaked), the Black Bag card, the Visitors
   (crystalline walkers, splitting swarms, shield emitters, terraforming, spreading incursions, their
   own planner) and the Accord (shared vision, peace, betrayal, a joint victory). Design:
-  `docs/architecture.md`. Soak, First Contact on Normal, 20 campaigns: Visitors win 25%, the rest
-  end at the limit; 0 rejected AI orders; Pacific with the toggle, 4 campaigns, 0 rejected. Not
-  done: an ice look for the map (the biome layer is not rendered), alien arena units and maps,
+  `docs/architecture.md`. Soak, First Contact on Normal, 20 campaigns: Visitors win 15% (3), the Accord 1,
+  16 at the limit; 0 rejected AI orders; Pacific with the toggle, 4 campaigns, 0 rejected. Not
+  done: the biome layer read by the renderer (First Contact gets a white wash), alien arena units and maps,
   whiteout weather, the satellite-pass event that turns the Black Files on mid-campaign.
 
 - Balance after research, leaders and the staff AI (ruleset 2.9.0). Measured on 2.8.0: of 40 soak
