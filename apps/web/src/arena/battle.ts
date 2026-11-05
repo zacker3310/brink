@@ -1,5 +1,7 @@
 import type { ArenaBattle, CardPlay, FormationId, FormationOrder, HexKey, NationOrders, NationView } from '@brink/contracts';
-import { UNITS } from '@brink/game-data';
+// Black Files: the arena has no Visitors of its own yet; a hand-fought battle against them fields
+// each as its stand-in (game-data `VISITOR_STAND_IN`: walker as armour, swarm as drones, emitter as artillery).
+import { standIn, UNITS } from '@brink/game-data';
 import { cardSupport, progressionSupport } from '@brink/simulation';
 import { keyDistance } from '@brink/map';
 import { leaderEffects, leaderOf } from '@brink/simulation';
@@ -122,7 +124,7 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
     const f = view.formations[id]!;
     const lead = leaders[id];
     const rank = lead ? Math.min(RANKS.length - 1, rankOf(f.experience) + 1 + lead.rank) : rankOf(f.experience);
-    return { id, cls: f.unitClass, strength: f.strength, name: f.name, color: view.self.color, rank };
+    return { id, cls: standIn(f.unitClass), strength: f.strength, name: f.name, color: view.self.color, rank };
   });
   const general = fighters
     .map((id) => leaderOf(view.commanders, id))
@@ -131,7 +133,7 @@ export function battleFor(view: NationView, target: HexKey, orders: Record<Forma
   const veteranEnemy = view.turn > view.maxTurns * 0.6 ? 1 : 0;
   const defenders: UnitSpec[] = enemies.map((c) => ({
     id: c.formation,
-    cls: c.unitClass,
+    cls: standIn(c.unitClass),
     strength: c.estimatedStrength,
     name: `${view.nations[c.owner]?.name ?? 'Enemy'} ${UNITS[c.unitClass].name}`,
     color: view.nations[c.owner]?.color ?? '#c0392b',

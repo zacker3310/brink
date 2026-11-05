@@ -1,6 +1,6 @@
 import type { NationId, VictoryState, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { VICTORY, victoryBars } from '@brink/game-data';
+import { BLACK_FILES, VICTORY, victoryBars } from '@brink/game-data';
 import { grossYields } from './economy';
 import { totalVictoryPoints, victoryPoints, victoryThreshold } from './fog';
 import { relationOf, sortedKeys } from './rules';
@@ -57,6 +57,28 @@ export function allianceBlocs(world: WorldState): NationId[][] {
   return out;
 }
 
+/**
+ * Black Files, checked before every other way a war ends. Once the Visitors have woken: they win
+ * holding `BLACK_FILES.visitorsShare` percent of all victory points, when no power is left, or at the
+ * turn limit still holding `limitShare` percent. Destroyed, they hand the Accord's signatories a joint
+ * victory (led by the one with most victory points); with nobody in the Accord the war goes on.
+ */
+function blackFilesVictory(world: WorldState, alive: NationId[], vp: Record<NationId, number>, total: number): VictoryState | null {
+  const bf = world.blackFiles;
+  if (!bf || bf.awake === null) return null;
+  const v = bf.visitors;
+  const turn = world.turn;
+  if (world.nations[v]?.eliminated) {
+    const signed = bf.accord.filter((n) => alive.includes(n));
+    if (signed.length === 0) return null;
+    const ranked = [...signed].sort((a, b) => vp[b]! - vp[a]! || (a < b ? -1 : 1));
+    return { winner: ranked[0]!, reason: 'accord', turn, coalition: [...signed].sort() };
+  }
+  const held = share(vp[v] ?? 0, total);
+  if (alive.length === 0 || held >= BLACK_FILES.visitorsShare || (turn >= world.maxTurns && held >= BLACK_FILES.limitShare)) return { winner: v, reason: 'visitors', turn };
+  return null;
+}
+
 /** Percent of all victory points a bloc of this size must hold for a coalition victory. */
 export function coalitionShare(members: number): number {
   return Math.min(100, VICTORY.coalitionBase + VICTORY.coalitionPerMember * members);
@@ -65,10 +87,12 @@ export function coalitionShare(members: number): number {
 export function evaluateVictory(world: WorldState): VictoryState | null {
   const alive = living(world);
   const turn = world.turn;
-  if (alive.length === 1) return { winner: alive[0]!, reason: 'last_standing', turn };
   const vp = victoryPoints(world);
   const total = totalVictoryPoints(world);
   const byVp = (a: NationId, b: NationId) => vp[b]! - vp[a]! || (a < b ? -1 : 1);
+  const black = blackFilesVictory(world, alive, vp, total);
+  if (black) return black;
+  if (alive.length === 1) return { winner: alive[0]!, reason: 'last_standing', turn };
 
   const leaders = alive.filter((n) => vp[n]! >= victoryThreshold(world));
   if (leaders.length === 1) return { winner: leaders[0]!, reason: 'victory_points', turn };

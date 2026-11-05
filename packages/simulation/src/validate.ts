@@ -20,8 +20,9 @@ import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
 import { checkAirlift, liftContext, lockAirlifts } from './airborne';
+import { blackResearchBlocker } from './blackfiles';
 import { lockCommanderOrders } from './commanders';
-import { bindingTreaty, canPropose, cleanTerms, dealGives, jointOpProblem, PROPOSAL_OF, termsProblem, type DiplomacyWorld } from './diplomacy';
+import { accordBinds, bindingTreaty, canPropose, cleanTerms, dealGives, jointOpProblem, PROPOSAL_OF, termsProblem, type DiplomacyWorld } from './diplomacy';
 import { computeVision, knownSiteOwner, type Vision } from './fog';
 import { checkPlays, marchBonus } from './doctrine';
 import { hasPassage } from './passage';
@@ -137,7 +138,7 @@ export function checkResearch(world: WorldState, nation: NationId, tech: string 
   const unlocked = world.nations[nation]!.research.unlocked;
   if (unlocked.includes(tech)) return 'technology already researched';
   if (!def.requires.every((r) => unlocked.includes(r))) return 'prerequisites not met';
-  return null;
+  return blackResearchBlocker(world, nation, tech);
 }
 
 /** Recruits accepted in site order while their combined cost fits the stockpile. */
@@ -221,6 +222,9 @@ export function checkDiplomacy(
       if (rel === 'war') return `at war with ${t.name}`;
       if (bindingTreaty(world, nation, x)) return `bound by a treaty with ${foe.name}`;
       if (bindingTreaty(world, target, x)) return `${t.name} is bound by a treaty with ${foe.name}`;
+      // The Accord binds as a pact does: war on a fellow signatory is only ever declared (a betrayal).
+      if (accordBinds(world, nation, x)) return `you stand with ${foe.name} in the Accord`;
+      if (accordBinds(world, target, x)) return `${t.name} stands with ${foe.name} in the Accord`;
       return null;
     }
     case 'propose_nonaggression':
@@ -253,6 +257,8 @@ export function checkDiplomacy(
           return `a joint operation needs you or ${t.name} at war with ${holder?.name ?? 'its holder'}`;
         case 'bound':
           return bindingTreaty(world, nation, site.owner!) ? `bound by a treaty with ${holder?.name ?? 'its holder'}` : `${t.name} is bound by a treaty with ${holder?.name ?? 'its holder'}`;
+        case 'accord':
+          return accordBinds(world, nation, site.owner!) ? `you stand with ${holder?.name ?? 'its holder'} in the Accord` : `${t.name} stands with ${holder?.name ?? 'its holder'} in the Accord`;
         default:
           return canPropose(world, nation, target, 'joint_op', terms) ? null : `a joint operation with ${t.name} is already under way`;
       }
@@ -262,6 +268,13 @@ export function checkDiplomacy(
       const x = terms?.against;
       if (x !== undefined && (!world.nations[x] || x === nation || x === target)) return 'passage toward whom?';
       return canPropose(world, nation, target, 'passage') ? null : `passage through ${t.name} is already granted`;
+    }
+    case 'propose_accord': {
+      const bf = world.blackFiles;
+      if (!bf || bf.awake === null || bf.awake === false) return 'there is no Accord to sign: nothing has come for us yet';
+      if (bf.betrayers.includes(nation)) return 'you broke the Accord: no one will sign it with you again';
+      if (bf.betrayers.includes(target)) return `${t.name} broke the Accord: no one will sign it with them again`;
+      return canPropose(world, nation, target, 'accord') ? null : `${t.name} and you are both in the Accord already`;
     }
     case 'embargo': {
       const e = treatyIn(world.treaties, 'embargo', nation, target, world.turn);

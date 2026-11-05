@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { DealTerms, NationOrders } from '@brink/contracts';
 import { AIRBORNE, LEADER_TUNING, PASSAGE } from '@brink/game-data';
+import { hexKey } from '@brink/map';
 import { createPacificScenario } from '@brink/scenarios';
-import { buildView, lockOrders, pairKey } from '@brink/simulation';
+import { buildView, dormantVisitors, lockOrders, newBlackFiles, pairKey } from '@brink/simulation';
 import { makeWorld, setRelation } from '../../simulation/src/fixture.test-util';
 import { fundAirlifts, holdTheGates } from './airborne';
 import { consider } from './diplomacy-ai';
@@ -60,6 +61,20 @@ describe('passage, the leaders', () => {
     expect(ask(100, { against: 'c', get: { credits: 50 } })).toEqual({ accept: false, reason: 'terms' });
   });
 
+  it('grants no passage toward a fellow signatory of the Accord (Black Files, ruleset 2.12.0), whatever the price', () => {
+    const w = makeWorld(8, 6, ['a', 'b', 'c']);
+    setRelation(w, 'a', 'b', 'peace');
+    setRelation(w, 'a', 'c', 'war');
+    setRelation(w, 'b', 'c', 'peace');
+    dormantVisitors(w);
+    w.blackFiles = newBlackFiles(w, { wakeAt: 5, wakeTurn: null, incursions: [{ key: hexKey(7, 5), name: 'Test' }] });
+    w.blackFiles.awake = 1;
+    const ask = () => consider(buildView(w, 'b'), emptyMemory(), { from: 'a', kind: 'passage', terms: { against: 'c', give: { credits: 400 } } });
+    expect(ask().accept).toBe(true);
+    w.blackFiles.accord = ['b', 'c'];
+    expect(ask()).toEqual({ accept: false, reason: 'likes_target' });
+  });
+
   it('asks the power at peace whose land lies across the way to its objective, and the engine takes the request', () => {
     const w = createPacificScenario(1);
     // Russia at peace with China; the objective Pyongyang lies beyond China's Manchuria.
@@ -104,6 +119,10 @@ describe('airborne, the staff', () => {
     expect(funded.formations[marine.id]).toEqual({ type: 'airlift', target: '1,1' });
     const broke = { ...view, self: { ...view.self, stockpile: { ...view.self.stockpile, credits: AIRBORNE.cost.credits - 1 } } };
     expect(fundAirlifts(broke, orders).formations[marine.id]).toEqual({ type: 'hold' });
+    // A sweetener the leader agreed to pay (an alliance, joint operation or passage, ruleset 2.11) is
+    // reserved before the fuel, as the validator reserves it: the lift is grounded, not refused.
+    const paying: NationOrders = { ...orders, recruit: [], diplomacy: [{ target: 'japan', action: 'propose_alliance', terms: { against: 'china', give: { credits: 15 } } }] };
+    expect(fundAirlifts(poor, paying).formations[marine.id]).toEqual({ type: 'hold' });
   });
 
   it('makes no peace with the power at the prize\'s gates while an airborne operation is under way', () => {

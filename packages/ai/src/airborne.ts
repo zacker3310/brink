@@ -7,6 +7,7 @@ import {
   airliftOrigin,
   canDrop,
   checkAirlift,
+  dealGives,
   enterCost,
   interceptChance,
   isNaval,
@@ -391,7 +392,30 @@ export function planAirborne(view: NationView, site: SiteView | null, forced: bo
     const share = p && p.defenders > 0 ? Math.floor((p.share[0] + p.share[1]) / 2) : 0;
     if (share < 500) for (const f of stormers) orders[f.id] = { type: 'defend' };
   }
+  if (forced) storm(view, site, plan, coming, orders);
   return true;
+}
+
+/**
+ * The assault, for an ordered operation: once `ENOUGH_DOWN` are down beside the prize, or nothing
+ * more is coming and the odds as seen are good, every fighting formation beside it storms it from
+ * where it stands. The rest of the planner storms a city only with 2.8 times the garrison it believes
+ * inside (ruleset 2.9.0), and it never sees into one among buildings: without this the troops that
+ * flew in would hold their zone, or wander off to another fight, and the prize would never be stormed.
+ */
+function storm(view: NationView, site: SiteView, plan: AirbornePlan, coming: boolean, orders: Record<FormationId, FormationOrder>): void {
+  const beside = plan.down.filter((f) => {
+    const def = UNITS[f.unitClass];
+    if (keyDistance(f.key, site.key) !== 1 || f.unitClass === 'recon' || def.range > 0 || f.ammunition < def.ammoPerAttack) return false;
+    return orders[f.id]?.type !== 'airlift' && enterCost(view.tiles[site.key], f.unitClass) !== null;
+  });
+  if (beside.length === 0) return;
+  if (beside.length < ENOUGH_DOWN) {
+    if (coming) return;
+    const p = previewAssault(view, beside.map((f) => f.id), site.key);
+    if (!p || p.defenders === 0 || Math.floor((p.share[0] + p.share[1]) / 2) < 500) return;
+  }
+  for (const f of beside) orders[f.id] = { type: 'attack', target: site.key, path: [] };
 }
 
 /** Where `f` ends the turn under `o`, or null for a passenger staying aboard (it takes no room). */
@@ -435,7 +459,9 @@ export function fundAirlifts(view: NationView, orders: NationOrders): NationOrde
     const r: Stockpile = airliftCost(n);
     for (const x of out.recruit) for (const res of RESOURCES) r[res] += recruitCost(view.self, x.unitClass)[res];
     for (const b of out.build ?? []) for (const res of RESOURCES) r[res] += FACILITIES[b.facility].cost[res];
-    for (const d of out.diplomacy) if (d.action === 'propose_exchange' || d.action === 'pay_tribute') for (const res of RESOURCES) r[res] += d.terms?.give?.[res] ?? 0;
+    // Every deal that hands something over, as the validator reserves it: an exchange or tribute, and
+    // since ruleset 2.11 an alliance's, joint operation's or passage's sweetener (`dealGives`).
+    for (const d of out.diplomacy) for (const res of RESOURCES) r[res] += dealGives(d.action, d.terms)[res] ?? 0;
     return r;
   };
   const fits = (n: number) => RESOURCES.every((r) => need(n)[r] <= view.self.stockpile[r]);

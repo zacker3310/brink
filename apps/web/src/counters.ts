@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
-import type { UnitClass } from '@brink/contracts';
+import type { FormationClass } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { pictogramCanvas, PICTO_W } from './design/pictograms';
 import { AFFILIATION, FONT_DISPLAY, SIGNAL, SURFACE } from './design/tokens';
@@ -17,7 +17,7 @@ const PICTO_RES = 4;
 export type Affiliation = 'friend' | 'hostile' | 'neutral' | 'unknown';
 
 export interface CounterLook {
-  cls: UnitClass;
+  cls: FormationClass;
   aff: Affiliation;
   /** Owning nation's colour, as #rrggbb. */
   fill: string;
@@ -43,7 +43,7 @@ export function steps(strength: number): number {
 
 const textures = new Map<string, Texture>();
 
-function picto(cls: UnitClass, color: string): Texture {
+function picto(cls: FormationClass, color: string): Texture {
   const key = `${cls}|${color}`;
   let t = textures.get(key);
   if (!t) {

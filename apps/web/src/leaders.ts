@@ -23,6 +23,7 @@ export const PROPOSAL_TEXT: Record<ProposalKind, string> = {
   tribute: 'tribute',
   joint_op: `a joint operation (${LEADER_TUNING.jointOpTurns} turns)`,
   passage: `right of passage (${PASSAGE.turns} turns: march through, supply across, base aircraft)`,
+  accord: 'the Accord (shared vision, no war between signatories, a joint victory over the Visitors)',
 };
 
 export const ACTION_TEXT: Record<DiplomaticAction, string> = {
@@ -38,6 +39,7 @@ export const ACTION_TEXT: Record<DiplomaticAction, string> = {
   pay_tribute: 'Pay tribute to',
   propose_joint_op: 'Offer a joint operation to',
   propose_passage: 'Ask for passage from',
+  propose_accord: 'Sign the Accord with',
 };
 
 export const TREATY_TEXT: Record<TreatyKind, string> = {
@@ -280,11 +282,19 @@ export function refusalText(view: NationView, nation: NationId, reason: string, 
   const x = kind === 'alliance' ? terms?.against : kind === 'joint_op' && terms?.site ? (view.sites[terms.site]?.owner ?? undefined) : undefined;
   const target = x ? (view.nations[x]?.name ?? x) : null;
   const mood = view.moods?.[nation]?.mood;
+  if (kind === 'accord') {
+    // Black Files: only a leader who detests you will not stand with you against the Visitors.
+    if (reason === 'cannot') return `${them} cannot sign the Accord now.`;
+    return `${them} will not stand with you even against the Visitors${mood !== undefined ? ` (mood ${mood > 0 ? '+' : ''}${mood})` : ''}.`;
+  }
   if (kind === 'passage') {
     // Right of passage: their land, your army. Toward whom it is for, if named.
     const toward = terms?.against ? (view.nations[terms.against]?.name ?? terms.against) : null;
+    const accord = view.blackFiles?.accord ?? [];
     switch (reason) {
       case 'likes_target':
+        // Black Files: a fellow signatory of the Accord is not marched on through its land either.
+        if (terms?.against && accord.includes(nation) && accord.includes(terms.against)) return `${them} won't open its land to an army bound for ${toward}: they stand together in the Accord.`;
         return `${them} won't open its land to an army bound for ${toward ?? 'a friend of theirs'}: they like ${toward ?? 'them'}.`;
       case 'focus':
         return `${them}'s army is set on you: it lets no army of yours through.`;

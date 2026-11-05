@@ -58,28 +58,34 @@ describe('airborne: the road to Ulaanbaatar', () => {
     expect(proposeOperations(s.view(), 3).some((o) => o.kind === 'airborne' && o.target === ub.id)).toBe(true);
   });
 
-  it('gets there: a standard campaign (Normal, 30 turns, seed 7), the staff drops four marines beside Ulaanbaatar by turn 5 with every order accepted', () => {
+  it('gets there: a standard campaign (Normal, 30 turns, seed 12), the staff drops four marines beside Ulaanbaatar by turn 7 with every order accepted', () => {
     // China takes Ulaanbaatar from Beijing, next door, on turn 1 of every campaign (12 seeds of 12):
-    // the drop meets China's garrison, not Mongolia's militia, and does not take it. On seed 7 the
-    // marines come down beside it on turns 4 and 5. (On some seeds Japan's strikes on the fleet off
-    // Tokyo on turn 1 sink or bleed the convoy before it can stage: seeds 2 to 5 and 8 drop nobody.)
-    const s = GameSession.create(PACIFIC_ID, 7, 'usa', [], { difficulty: 'normal' });
+    // the drop meets China's garrison, not Mongolia's militia, and does not take it. Measured again
+    // for ruleset 2.12.0: since balance 2.9.0 the rivals' fleets are where the convoy sails, and it
+    // stages later (on seed 7, where the airborne lane alone dropped four on turns 4 and 5, the
+    // amphibious groups are halted by contact on turn 2 and two marines come down on turn 6). In nine
+    // turns seeds 2 to 6, 8, 10 and 11 drop nobody; on seed 12 four marines come down beside it on
+    // turns 6 and 7.
+    const s = GameSession.create(PACIFIC_ID, 12, 'usa', [], { difficulty: 'normal' });
     const ub = ubOf(s);
-    const { lifts, rejected } = campaign(s, 6);
+    const { lifts, rejected } = campaign(s, 7);
     expect(rejected).toBe(0);
     const down = lifts.filter((e) => !e.aborted);
     expect(down.length).toBe(4);
     for (const e of down) expect(keyDistance(e.landed, ub.key)).toBe(1);
-    expect(down.map((e) => e.turn)).toEqual([4, 4, 5, 5]);
+    expect(down.map((e) => e.turn)).toEqual([6, 6, 7, 7]);
     expect(down.every((e) => e.mode === 'drop')).toBe(true);
   }, 120_000);
 
-  it('takes it: Mongolia left to the United States, its militia broken, Ulaanbaatar falls on turn 7 (Easy, 30 turns, seed 2)', () => {
+  it('takes it: Mongolia left to the United States, its militia broken, Ulaanbaatar falls on turn 5 (Easy, 30 turns, seed 2)', () => {
     // A standard start with one edit, documented: China and Russia at peace with Mongolia (so neither
     // walks in first, as China does on turn 1 of every unedited campaign) and the capital's militia
     // broken (120 strength, organization 20, its treasury empty so it raises no more: a full militia
     // dug into a city holds against any four light formations the combat rules know). The United States on Easy, where Japan is its ally,
-    // so the convoy is not sunk off Tokyo on turn 1.
+    // so the convoy is not sunk off Tokyo on turn 1. Ruleset 2.12.0: the four marines down on turns 3
+    // and 4 storm it on turn 5 (the operation's assault, `storm` in ai `airborne.ts`); before it, under
+    // balance 2.9.0, the rest of the planner never stormed a city it could not see into and the marines
+    // wandered off to fight beside it (12 seeds of 12; the airborne lane alone took it on turn 7).
     const made = GameSession.create(PACIFIC_ID, 2, 'usa', [], { difficulty: 'easy' });
     const save = made.toSave('steppe', '2026-11-05T00:00:00Z');
     save.world.relations[pairKey('china', 'mongolia')] = 'peace';
@@ -91,7 +97,7 @@ describe('airborne: the road to Ulaanbaatar', () => {
     const { lifts, rejected, fell } = campaign(s, 12);
     expect(rejected).toBe(0);
     expect(lifts.filter((e) => !e.aborted).length).toBeGreaterThanOrEqual(3);
-    expect(fell).toBe(7);
+    expect(fell).toBe(5);
     // A captured capital is an airfield: the next lift flies from Ulaanbaatar itself.
     expect(operationById(s.view(), `take:${ubOf(s).id}`)).toBeNull();
   }, 120_000);
@@ -109,7 +115,7 @@ describe('airborne: saves', () => {
     const loaded = parseSave(JSON.stringify(old));
     expect(loaded.migratedFrom).toBe('2.8.0');
     expect(loaded.rulesetVersion).toBe(RULESET_VERSION);
-    expect(RULESET_VERSION).toBe('2.11.0');
+    expect(RULESET_VERSION).toBe('2.12.0');
     expect(loaded.hash).toBe(hashState(loaded.world));
     expect(hashState(migrateSave({ ...loaded, saveVersion: SAVE_VERSION }).world)).toBe(loaded.hash);
     const resumed = GameSession.fromSave(loaded);

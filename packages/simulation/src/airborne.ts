@@ -13,8 +13,8 @@ import type {
   SiteKind,
   Stockpile,
   Terrain,
+  FormationClass,
   Treaty,
-  UnitClass,
   WorldState,
 } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
@@ -113,8 +113,9 @@ export function airliftOrigin(ctx: LiftContext, f: Formation): AirliftOrigin | n
 }
 
 /** Whether `cls` can fly at all, and whether it can drop (or only air-land). */
-export const canAirlift = (cls: UnitClass): boolean => AIRBORNE.land.includes(cls);
-export const canDrop = (cls: UnitClass): boolean => AIRBORNE.drop.includes(cls);
+// A Visitors' formation (Black Files) is never flown in: only the classes listed lift.
+export const canAirlift = (cls: FormationClass): boolean => (AIRBORNE.land as readonly FormationClass[]).includes(cls);
+export const canDrop = (cls: FormationClass): boolean => (AIRBORNE.drop as readonly FormationClass[]).includes(cls);
 
 /** How a lift onto `target` comes down, given whether a hostile holds it. */
 export function airliftMode(ctx: LiftContext, target: HexKey, held: boolean): AirliftMode {

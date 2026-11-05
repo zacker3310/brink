@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, NATION_BLURB, UNITS, VICTORY, victoryBars } from '@brink/game-data';
-import { CRISES, crisisOf, dealCrisis, MINORS, NATIONS, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
+import { CRISES, crisisOf, dealCrisis, FIRST_CONTACT_ID, FIRST_CONTACT_TURNS, MINORS, NATIONS, SCENARIOS, THEATRES, createScenario, type CrisisId } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Kbd, Mark, useKeys } from '../chrome';
@@ -40,7 +40,10 @@ const CLASSIC = {
   recommended: null as NationId | null,
 };
 
-export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string, crisis?: string) => Promise<void> }) {
+/** The powers on the ice in Black Files: First Contact; a player of another power leads the United States there. */
+const ON_THE_ICE: readonly NationId[] = ['usa', 'russia', 'china', 'uk', 'australia'];
+
+export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string, crisis?: string, blackFiles?: boolean) => Promise<void> }) {
   const wars = readCareer().warsWon.length;
   const [theatreId, setTheatreId] = useState(() => {
     const t = THEATRES.find((x) => x.id === readPrefs().theatre);
@@ -101,11 +104,28 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     setNation(id);
     writePrefs({ nation: id });
   };
+  // The Black Files: seeded into this campaign by the toggle (off by default), or played on their own.
+  const [blackFiles, setBlackFiles] = useState(() => readPrefs().blackFiles === true);
+  const toggleBlackFiles = () => {
+    setBlackFiles(!blackFiles);
+    writePrefs({ blackFiles: !blackFiles });
+  };
+  const firstContact = SCENARIOS.find((s) => s.id === FIRST_CONTACT_ID)!;
+  const iceNation = ON_THE_ICE.includes(nation) ? nation : 'usa';
   const begin = async () => {
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(nation, seed, turns, difficulty, theatreId, crisis.id === 'classic' ? undefined : crisis.id);
+      await onBegin(nation, seed, turns, difficulty, theatreId, crisis.id === 'classic' ? undefined : crisis.id, blackFiles);
+    } finally {
+      setStarting(false);
+    }
+  };
+  const beginFirstContact = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      await onBegin(iceNation, seed, FIRST_CONTACT_TURNS, difficulty, FIRST_CONTACT_ID);
     } finally {
       setStarting(false);
     }
@@ -464,6 +484,24 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                   </span>
                 </button>
               ))}
+            </div>
+
+            {/* The Black Files (MASTER-PLAN Phase 8): a toggle for this campaign, and a scenario of their own. */}
+            <SubHead aside={blackFiles ? 'classified: on' : 'off'}>The Black Files</SubHead>
+            <div className="grid gap-2 sm:grid-cols-2" data-testid="black-files-panel">
+              <button type="button" role="switch" aria-checked={blackFiles} data-testid="black-files" onClick={toggleBlackFiles} className="wr-choice">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="wr-choice-title">Black Files</span>
+                  <span className="wr-chip" data-on={blackFiles}>{blackFiles ? 'On' : 'Off'}</span>
+                </span>
+                <span className="wr-choice-text">Seed the anomaly into this campaign: Area 51, Tunguska, a Gobi site and a Bermuda deep site; digs in the Yukon, the Gobi and the steppe. Dig too deep and something wakes.</span>
+              </button>
+              <button type="button" data-testid="first-contact" onClick={() => void beginFirstContact()} disabled={starting} className="wr-choice">
+                <span className="wr-choice-title">{firstContact.name}</span>
+                <span className="wr-choice-text">
+                  {firstContact.summary} {FIRST_CONTACT_TURNS} turns, as {iceNation === nation ? spec.name : 'the United States'}.
+                </span>
+              </button>
             </div>
 
             {/* One theatre today: the picker returns when there is a choice to make. */}

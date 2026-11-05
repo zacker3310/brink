@@ -94,6 +94,18 @@ const TIERS: readonly SupplyPriority[] = ['high', 'normal', 'low'];
  */
 export function allocateLogistics(world: WorldState, nation: NationId, orders: NationOrders, events: GameEvent[]): Stockpile {
   const n = world.nations[nation]!;
+  // The Visitors (Black Files) carry what they need in the lattice itself: always supplied.
+  if (n.visitors) {
+    for (const id of sortedKeys(world.formations)) {
+      const f = world.formations[id]!;
+      if (f.owner !== nation) continue;
+      f.supply = 100;
+      f.fuel = 100;
+      f.ammunition = 100;
+      f.readiness = clamp(f.readiness + 10, 0, 100);
+    }
+    return zeroStockpile();
+  }
   const mods = nationModifiers(n);
   const dist = supplyDistances(world, nation);
   const cut = sabotagedHexes(world, nation);

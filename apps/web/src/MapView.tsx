@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Application, BlurFilter, CanvasSource, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
-import type { Formation, FormationOrder, HexKey, NationView, Terrain, UnitClass } from '@brink/contracts';
+import type { Formation, FormationClass, FormationOrder, HexKey, NationView, Terrain } from '@brink/contracts';
 import { UNITS } from '@brink/game-data';
 import { hexCorners, hexToPixel, keyOf, neighborKeys, parseKey, pixelToHex, type Point, type Reach } from '@brink/map';
 import { mainland } from './mainland';
@@ -9,6 +9,7 @@ import { addUnit, affiliationOf, keepScreenSize, setModelZoom, tickModels, type 
 import { AFFILIATION, FONT_DISPLAY, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay, useReplay } from './replay';
 import { terrainTexture } from './design/terrain';
+import { FIRST_CONTACT_ID } from '@brink/scenarios';
 import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
 import { sfx } from './sfx';
 import { isPhone } from './phone';
@@ -267,7 +268,9 @@ declare global {
       hexToClient(key: HexKey): { x: number; y: number };
       reachable(): HexKey[];
       enemies(): HexKey[];
-      formations(): { id: string; cls: UnitClass; key: HexKey }[];
+      formations(): { id: string; cls: FormationClass; key: HexKey }[];
+      /** The player's current view, for specs that check what the screen is built from. */
+      view(): NationView | null;
       /** The map's zoom. */
       scale(): number;
       /** A site's hex centre on screen. */
@@ -680,6 +683,9 @@ export function MapView() {
         const v = useGame.getState().view;
         return v ? Object.values(v.formations).map((f) => ({ id: f.id, cls: f.unitClass, key: f.key })) : [];
       },
+      view() {
+        return useGame.getState().view;
+      },
       scale() {
         return world.scale.x;
       },
@@ -960,7 +966,7 @@ export function MapView() {
       .sort()
       .map((id) => `${id}${sizeClass(v.sites[id]!)}${v.sites[id]!.facilities.join('')}`)
       .join(',');
-    const sig = `${style}${art ? 1 : 0}|${sites}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}`).join(',')}`;
+    const sig = `${style}${art ? 1 : 0}|${sites}|${keys.map((k) => `${k}${vis(k)}${v.tiles[k]!.terrain ?? ''}${v.tiles[k]!.river ? 'r' : ''}${v.tiles[k]!.siteId ?? ''}${v.tiles[k]!.crystal ? 'x' : ''}`).join(',')}`;
     if (groundSig.current === sig) return;
     groundSig.current = sig;
     const layer = a.layers.terrain!;
@@ -1015,6 +1021,9 @@ export function MapView() {
         crisp.poly(poly(key)).fill({ texture: art!.ground.urban, textureSpace: 'global', matrix: m });
       } else if (satMatrix) terrain.poly(poly(key)).fill({ texture: art!.ground[t.terrain], textureSpace: 'global', matrix: satMatrix });
       else terrain.poly(poly(key)).fill({ texture: terrainTexture(t.terrain), textureSpace: 'global', matrix: groundMatrix });
+      // Black Files: the Antarctic ice under a white wash, and ground the Visitors turned to crystal.
+      if (t.terrain !== 'water' && v.scenarioId === FIRST_CONTACT_ID) terrain.poly(poly(key)).fill({ color: 0xeef5ff, alpha: 0.5 });
+      if (t.crystal) terrain.poly(poly(key)).fill({ color: 0x7df9e4, alpha: 0.32 });
       // Without imagery, vary the light hex to hex as tiles taken at different hours.
       if (!art) {
         const shade = jitter(key, 3);
@@ -1327,7 +1336,7 @@ export function MapView() {
 
     // Planned orders: path, arrowhead and a ghost of the unit where it will end up.
     const paths = new Graphics();
-    const ghosts: { key: HexKey; cls: UnitClass; strength: number; facing: number }[] = [];
+    const ghosts: { key: HexKey; cls: FormationClass; strength: number; facing: number }[] = [];
     const orders = s.submitted ?? s.draft;
     if (orders && !replaying) {
       for (const id of Object.keys(orders.formations).sort()) {
@@ -1465,7 +1474,7 @@ export function MapView() {
 }
 
 /** Unit stats line for tooltips and the unit panel. */
-export function unitLine(cls: UnitClass): string {
+export function unitLine(cls: FormationClass): string {
   const d = UNITS[cls];
   return `${d.movement ? `${d.movement} MP` : 'rebases'} · atk ${d.softAttack}/${d.hardAttack} · def ${d.defense}${d.range ? ` · range ${d.range}` : ''}`;
 }

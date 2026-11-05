@@ -10,13 +10,14 @@ import type {
   NationId,
   NationOrders,
   Terrain,
-  UnitClass,
+  FormationClass,
   WorldState,
 } from '@brink/contracts';
 import { CARDS, deckFor, DOCTRINE, isLasting, UNITS, type CardDef, type CardEffect, type CardSupportAsset } from '@brink/game-data';
 import { keyDistance, neighborKeys, rangeKeys } from '@brink/map';
 import { roll } from './rng';
 import { handSizeOf, techMovement } from './progression';
+import { blackBag } from './blackfiles';
 import { clamp, nationModifiers, pct, relationOf, sortedKeys } from './rules';
 
 // Doctrine cards (contracts `doctrine.ts`, data in game-data `doctrine.ts`). Cards are checked with
@@ -30,7 +31,7 @@ export interface PlayBoard {
   tiles: Record<HexKey, { terrain: Terrain | null; owner: NationId | null } | undefined>;
   sites: Record<string, { kind: string; owner: NationId | null; key: HexKey }>;
   /** Only the nation's own formations are read. */
-  formations: Record<FormationId, { owner: NationId; unitClass: UnitClass; key: HexKey; aboard?: FormationId }>;
+  formations: Record<FormationId, { owner: NationId; unitClass: FormationClass; key: HexKey; aboard?: FormationId }>;
   nations: Record<NationId, { eliminated: boolean; minor?: boolean } | undefined>;
 }
 
@@ -223,7 +224,7 @@ export function effectsInForce(nation: Pick<Nation, 'doctrine'> | undefined, tur
 export function marchBonus(
   nation: (Pick<Nation, 'doctrine'> & { research?: Nation['research'] }) | undefined,
   turn: number,
-  f: { unitClass: UnitClass; aboard?: FormationId },
+  f: { unitClass: FormationClass; aboard?: FormationId },
   plays: readonly CardPlay[] = [],
 ): number {
   const tech = techMovement(nation?.research?.unlocked ?? [], f);
@@ -234,9 +235,9 @@ export function marchBonus(
 }
 
 /** Percent added to war-map strikes by `unitClass`. Cards of one kind do not stack: the best counts. */
-export function strikeBonus(nation: Pick<Nation, 'doctrine'> | undefined, turn: number, unitClass: UnitClass): number {
+export function strikeBonus(nation: Pick<Nation, 'doctrine'> | undefined, turn: number, unitClass: FormationClass): number {
   let best = 0;
-  for (const x of effectsInForce(nation, turn)) if (x.effect.kind === 'strike_bonus' && x.effect.classes.includes(unitClass)) best = Math.max(best, x.effect.percent);
+  for (const x of effectsInForce(nation, turn)) if (x.effect.kind === 'strike_bonus' && (x.effect.classes as readonly FormationClass[]).includes(unitClass)) best = Math.max(best, x.effect.percent);
   return best;
 }
 
@@ -305,6 +306,7 @@ export function resolveDoctrine(world: WorldState, orders: Record<NationId, Nati
   const stability = new Map<NationId, number>();
   const bump = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v);
   const formations = sortedKeys(world.formations).map((id) => world.formations[id]!);
+  const thefts: { thief: NationId; from: NationId }[] = [];
 
   for (const nation of sortedKeys(orders)) {
     const n = world.nations[nation]!;
@@ -347,6 +349,9 @@ export function resolveDoctrine(world: WorldState, orders: Record<NationId, Nati
           case 'destabilize':
             bump(stability, play.nation!, -e.amount);
             break;
+          case 'steal_artefact':
+            thefts.push({ thief: nation, from: play.nation! });
+            break;
           default:
             break;
         }
@@ -380,6 +385,8 @@ export function resolveDoctrine(world: WorldState, orders: Record<NationId, Nati
     const n = world.nations[id];
     if (n) n.stability = clamp(n.stability + stability.get(id)!, 0, 100);
   }
+  // Black Bag jobs (Black Files), from the artefacts held as the phase began.
+  if (thefts.length > 0) blackBag(world, thefts, events);
 
   // Command Points, then the draw.
   for (const id of sortedKeys(world.nations)) {

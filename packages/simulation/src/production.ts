@@ -115,7 +115,7 @@ export function resolveProduction(world: WorldState, nation: NationId, orders: N
     const here = Object.values(world.formations).filter((f) => f.key === site.key);
     if (here.filter((f) => !f.aboard && sameLayer(f.unitClass, item.unitClass)).length >= STACK_LIMIT || here.some((f) => relationOf(world.relations, nation, f.owner) !== 'alliance')) continue;
     const f = newFormation(world, nation, item.unitClass, site.key, formationName(world, nation, item.unitClass));
-    events.push({ kind: 'production', nation, formation: f.id, unitClass: f.unitClass, site: site.id, key: site.key });
+    events.push({ kind: 'production', nation, formation: f.id, unitClass: item.unitClass, site: site.id, key: site.key });
     done.push(item.id);
   }
   n.productionQueue = n.productionQueue.filter((i) => !done.includes(i.id));

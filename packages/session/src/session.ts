@@ -2,7 +2,7 @@ import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationVie
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { consider, emptyMemory, offerOf, planOrders, updateMemory, type Offer, type Verdict } from '@brink/ai';
 import { HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
-import { applyCrisis, createScenario, type CrisisId, crisisOf } from '@brink/scenarios';
+import { applyBlackFiles, applyCrisis, createScenario, type CrisisId, crisisOf, FIRST_CONTACT_ID } from '@brink/scenarios';
 import { keyDistance } from '@brink/map';
 import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys } from '@brink/simulation';
 
@@ -48,7 +48,7 @@ export class GameSession {
     seed: number,
     playerNation: NationId | null,
     others: readonly NationId[] = [],
-    opts: { maxTurns?: number; difficulty?: Difficulty; crisis?: string } = {},
+    opts: { maxTurns?: number; difficulty?: Difficulty; crisis?: string; blackFiles?: boolean } = {},
   ): GameSession {
     const world = createScenario(scenarioId, seed);
     // Any length from 5 turns to a 250-turn Total War; the scenario's own limit is only the default.
@@ -64,6 +64,9 @@ export class GameSession {
     }
     // Easy keeps its ally through any crisis that does not set the two at war.
     if (opts.difficulty === 'easy') easyAlly(world, humans);
+    // The Black Files toggle seeds the anomaly last, so the Visitors are at war with every nation the
+    // crisis made, and before anyone is given a memory.
+    if (opts.blackFiles) applyBlackFiles(world);
     const memory: Record<NationId, AiMemory> = {};
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
     return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});
@@ -276,6 +279,8 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
   // Every human seat plays with the level's command edge (none on Hard).
   if (difficulty !== 'hard') for (const h of humans) world.nations[h]!.edge = difficulty;
   if (difficulty === 'normal') return;
+  // First Contact opens under the Antarctic Treaty: the level's stockpiles, but no wars of Easy's making.
+  const treaty = world.scenarioId === FIRST_CONTACT_ID;
   const boost = (n: NationId, percent: number) => {
     const s = world.nations[n]!.stockpile;
     for (const r of sortedKeys(s)) s[r as keyof typeof s] = Math.floor((s[r as keyof typeof s] * percent) / 100);
@@ -283,6 +288,7 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
   const capital = (n: NationId) => Object.values(world.sites).find((s) => s.kind === 'capital' && s.owner === n)?.key;
   if (difficulty === 'easy') {
     for (const h of humans) boost(h, 150);
+    if (treaty) return;
     const me = humans[0];
     const home = me ? capital(me) : undefined;
     if (humans.length !== 1 || !me || !home) return;

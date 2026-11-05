@@ -62,7 +62,32 @@ export function migrateSave(save: SaveFile): SaveFile {
   initProgression(world);
   // Ruleset 2.6: leaders remember. A campaign begun before them starts with clean slates.
   world.memories ??= {};
+  // Ruleset 2.9 and 2.10 (airborne, passage) and 2.11 (diplomacy: publicRelations is the view's, the
+  // new deal kinds simply absent) add no world state: nothing to fill.
+  // Ruleset 2.12 (the Black Files lane's 2.10): a campaign without them stays without them; one with
+  // them gains any part of their state a younger build did not keep.
+  // Every step is keyed on a field being absent, so a migrated world comes out of it again unchanged.
+  normalizeBlackFiles(world);
   return { ...s, world, rulesetVersion: RULESET_VERSION, hash: hashState(world), ...(from !== RULESET_VERSION ? { migratedFrom: from } : {}) };
+}
+
+/**
+ * Ruleset 2.12 (the Black Files lane's 2.10): fill what an older Black Files world lacks. Idempotent: a world it
+ * has seen comes out the same. A world without the Black Files is left alone.
+ */
+export function normalizeBlackFiles(world: WorldState): void {
+  const bf = world.blackFiles;
+  if (!bf) return;
+  bf.artefacts ??= {};
+  bf.digs ??= {};
+  bf.leaked ??= [];
+  bf.accord ??= [];
+  bf.betrayers ??= [];
+  bf.held ??= {};
+  bf.splits ??= 0;
+  bf.incursions ??= [];
+  bf.wakeTurn ??= null;
+  bf.awake ??= null;
 }
 
 /**

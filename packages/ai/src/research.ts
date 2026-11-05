@@ -1,7 +1,7 @@
 import type { AiMemory, BuildOrder, FacilityId, NationView, SiteView, Stockpile, TechId } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { TECH_IDS, TECHS, UNITS, type TechBranch } from '@brink/game-data';
-import { balanceOf, buildBlocker, facilityCost, sortedKeys } from '@brink/simulation';
+import { balanceOf, blackResearchBlocker, buildBlocker, facilityCost, sortedKeys } from '@brink/simulation';
 
 // The AI's research and city development. It sees only its own NationView; every pick goes
 // through the engine's own checks (prerequisites, `buildBlocker`, the discounted cost), so it
@@ -26,7 +26,9 @@ function branchWeights(view: NationView): Record<TechBranch, number> {
     armour: 2 + Math.min(3, Math.floor(armour / 2)),
     air: 2 + Math.min(3, Math.floor(air / 2)),
     naval: naval >= 2 ? 2 + Math.min(2, Math.floor(naval / 2)) : 1,
+    // Reverse-engineered work (Black Files) is worth an artefact: always the first thing studied.
     cyber: 3,
+    black: 8,
   };
 }
 
@@ -43,6 +45,7 @@ export function chooseResearch(view: NationView): TechId | null | undefined {
   for (const t of TECH_IDS) {
     const def = TECHS[t]!;
     if (r.unlocked.includes(t) || !def.requires.every((p) => r.unlocked.includes(p))) continue;
+    if (blackResearchBlocker(view, view.self.id, t)) continue;
     // Cheap early technologies first, the branch's worth deciding between them.
     const score = Math.floor((weight[def.branch] * 100000) / def.cost);
     if (score > bestScore) {

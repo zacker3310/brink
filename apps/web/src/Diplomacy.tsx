@@ -172,11 +172,15 @@ interface DealOption {
   tone?: 'danger';
 }
 
-function optionsFor(rel: string): DealOption[] {
+function optionsFor(rel: string, accord: boolean): DealOption[] {
+  // Black Files: once the Visitors are awake, the Accord can be signed with anyone, even an enemy
+  // (it makes peace); where it cannot be signed the option stays in sight and says why.
+  const signing: DealOption[] = accord ? [{ action: 'propose_accord', kind: 'accord', label: 'Sign the Accord' }] : [];
   // At war, peace comes first; the deals that need it stay in sight, each saying so.
   if (rel === 'war')
     return [
       { action: 'propose_peace', kind: 'peace', label: 'Peace' },
+      ...signing,
       { action: 'propose_ceasefire', kind: 'ceasefire', label: 'Ceasefire' },
       { action: 'propose_alliance', kind: 'alliance', label: 'Alliance' },
       { action: 'propose_alliance', kind: 'alliance', label: 'Alliance against…', needs: 'against' },
@@ -186,6 +190,7 @@ function optionsFor(rel: string): DealOption[] {
       { action: 'embargo', label: 'Embargo', tone: 'danger' },
     ];
   return [
+    ...signing,
     { action: 'propose_trade', kind: 'trade', label: 'Trade agreement' },
     { action: 'propose_nonaggression', kind: 'nonaggression', label: 'Non-aggression' },
     { action: 'propose_exchange', kind: 'exchange', label: 'Exchange', needs: 'exchange' },
@@ -295,7 +300,8 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
     if (o.needs === 'tribute') return whyNot(o.action, { get: { credits: 20 } });
     return whyNot(o.action);
   };
-  const options = optionsFor(rel);
+  // Black Files: the Accord is offered once the Visitors are awake.
+  const options = optionsFor(rel, !!view.blackFiles?.awake);
 
   const terms = deal ? termsFor(deal) : undefined;
   // Passage may name whom it is for, or not (a leader wants more warmth to grant it unnamed).
@@ -477,7 +483,8 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
         <p className="mt-1 text-[12px] text-faint">One move toward each power a turn{planned ? ': this replaces the one above' : ''}.</p>
         {rel === 'war' && (
           <p className="mt-2 rounded-lg border border-signal/50 bg-ink-850 p-2.5 text-[13px] leading-snug" data-testid="peace-first">
-            You are at war with {them.name}. An alliance, a joint operation, passage or trade needs peace first: propose peace.
+            You are at war with {them.name}. An alliance, a joint operation, passage or trade needs peace first: propose peace
+            {view.blackFiles?.awake ? ', or sign the Accord, which makes it' : ''}.
           </p>
         )}
         <div className="mt-2 grid grid-cols-2 gap-2">

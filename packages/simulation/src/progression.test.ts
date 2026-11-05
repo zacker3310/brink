@@ -29,9 +29,15 @@ function world(): WorldState {
 
 describe('the research tree', () => {
   it('has five branches and 16 to 24 technologies, every prerequisite real, nothing circular', () => {
-    expect(TECH_BRANCHES).toHaveLength(5);
-    expect(TECH_IDS.length).toBeGreaterThanOrEqual(16);
-    expect(TECH_IDS.length).toBeLessThanOrEqual(24);
+    // Ruleset 2.12.0 (the Black Files) added a sixth branch, Reverse-Engineered, open only from an
+    // artefact at a black site: the tree every campaign plays is still the five below, and the
+    // sixth is checked on its own. Counting all branches would have asserted the wrong tree.
+    const base = TECH_IDS.filter((t) => !TECHS[t]!.artefact);
+    expect(TECH_BRANCHES.filter((b) => b !== 'black')).toHaveLength(5);
+    expect(base.length).toBeGreaterThanOrEqual(16);
+    expect(base.length).toBeLessThanOrEqual(24);
+    expect(TECH_IDS.filter((t) => TECHS[t]!.artefact).every((t) => TECHS[t]!.branch === 'black')).toBe(true);
+    expect(base.every((t) => TECHS[t]!.branch !== 'black')).toBe(true);
     for (const b of TECH_BRANCHES) {
       expect(BRANCHES[b].name.length).toBeGreaterThan(2);
       expect(TECH_IDS.filter((t) => TECHS[t]!.branch === b).length).toBeGreaterThanOrEqual(3);

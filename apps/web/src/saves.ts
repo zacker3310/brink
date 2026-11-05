@@ -67,6 +67,8 @@ export interface Prefs {
   theatre?: string;
   /** Opening Crisis picked on the setup screen: a crisis id, or 'random' to deal one from the seed. */
   crisis?: string;
+  /** The Black Files toggle on the setup screen (off by default). */
+  blackFiles?: boolean;
   /** The staff drafts a plan at the start of every turn (default on); off: every unit waits for you. */
   staffPlan?: boolean;
   /** Painted fantasy map (default), clean board-game map, or satellite imagery. */

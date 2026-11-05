@@ -185,7 +185,7 @@ generic leader per government, `LEADER_TUNING`); memory in `WorldState.memories`
   end `aiOrders` passes the human's offers to the same function (`incoming`), so the screen's answer
   is the answer at resolution.
 - Saves before 2.6 gain `memories: {}` on load (keyed on the field being absent).
-- 2.10: joining a war is weighed (`joinWar` in `consider`), not refused unless already hated. A joint
+- 2.10 (the diplomacy lane; shipped with airborne warfare as 2.11): joining a war is weighed (`joinWar` in `consider`), not refused unless already hated. A joint
   operation needs one partner at war with the holder (`jointOpProblem`); the other goes to war on
   signing. `lockOrders` judges a joint operation on the holder as the proposer knows it
   (`knownSiteOwner`): a prize that changed hands out of sight voids the deal at resolution instead of
@@ -194,6 +194,9 @@ generic leader per government, `LEADER_TUNING`); memory in `WorldState.memories`
   carry a sweetener (`give`/`get`, mirrored, reserved like a recruit, paid on signing). Every pair's
   relation is public in the view (`NationView.publicRelations`); the AI's and the client's diplomacy
   checks read it through `diplomacyWorldOf`.
+- 2.11: right of passage is a deal like those: it may carry a sweetener (`cleanTerms`, `mirrors`,
+  `dealGives`, paid on signing) that `consider` counts as goodwill (`PASSAGE.sweetenerPer1000`, capped
+  at `sweetenerMax`); a request toward a power the leader likes is refused as `likes_target`.
 
 ## Airborne and passage (ruleset 2.9)
 
@@ -217,6 +220,45 @@ generic leader per government, `LEADER_TUNING`); memory in `WorldState.memories`
   (stage, drop, hold, assault) judged by the same `airbornePlan`, so a launched airborne operation is
   carried out airborne.
 - Saves: 2.8.0 saves migrate unchanged (the new fields are optional and the new kinds simply absent).
+
+## The Black Files (ruleset 2.12; the lane's own 2.10)
+
+The secret layer (MASTER-PLAN Phase 8). State: `WorldState.blackFiles` (contracts `blackfiles.ts`);
+data: game-data `blackfiles.ts` (`BLACK_FILES`, the Visitors' units) and the `black` branch of
+`research.ts`; rules: simulation `blackfiles.ts`, phase 10c after development; scenarios
+`blackfiles.ts` (First Contact on `maps/antarctica.map.json`, `applyBlackFiles` for the Pacific).
+Absent from a world, nothing of it runs: the Pacific without the toggle is the 2.11.0 world but for
+its version stamp (`scenarios/src/pacific-map.test.ts`).
+
+- Digs: an excavation site (`Site.anomaly`) held by a power `digTurns` running yields an artefact
+  (public news). A black site taken seizes one of the loser's artefacts and leaks its programme; a
+  programme also leaks by `roll(seed, turn, 'leak', nation)`; the Black Bag card steals one (thefts
+  settle from one snapshot: two agencies after one artefact both fail and it leaks).
+- The reverse-engineered branch (railguns, point defence, cloaked drones, anti-gravity lift, quantum
+  radar): `checkResearch` asks for a black site and an artefact, the finished project spends one.
+  Rivals see a power's black technologies (`NationView.blackFiles.blackTechs`) only once it leaked.
+- The Visitors: a nation with `minor` and `visitors`, present from turn 1 but dormant (hidden from
+  every view, never eliminated) until `wakeAt` artefacts or `wakeTurn`. Their formations
+  (`FormationClass`: walker, swarm, emitter) are never recruited: incursions grow them, they regrow on
+  their ground, swarms split and re-form, held ground turns to crystal (hills), crystal far from the
+  incursions blooms into new ones. An emitter in a hex absorbs assaults and keeps the hex. Their
+  planner is `ai/src/visitors.ts`; as a minor they make no treaties.
+- The Accord: `propose_accord`, signed when mirrored. Signatories are at peace with each other and
+  share vision; a signatory declaring war on another betrays it (out for good, stability, every other
+  signatory at war with it). Victory (`victory.ts`, checked first): the Visitors destroyed hands the
+  signatories a joint win; the Visitors win holding `visitorsShare` of the victory points, or
+  `limitShare` at the turn limit.
+- The Accord among the other deals (2.12): it binds like a pact (`accordBinds` in `diplomacy.ts`):
+  no alliance against a fellow signatory and no joint operation on its city, since either takes one
+  signatory to war with another without a declaration (`canPropose`, `jointOpProblem` code `accord`,
+  `checkDiplomacy`: "you stand with X in the Accord"). `bindingTreaty` does not include it: a
+  declaration stays legal, and is the betrayal. A betrayal's wars end `WAR_ENDS` (passage among them)
+  and join `declared`, so those pairs heed no offer that turn. `considerPassage` refuses passage
+  toward a fellow signatory. `publicRelations` covers the pairs a view knows of: dormant Visitors are
+  in none. `diplomacyWorldOf` carries the view's `blackFiles`, so the AI and the client check the
+  Accord as the engine does.
+- The arena has no Visitors of its own: a hand-fought battle fields each as its stand-in
+  (`VISITOR_STAND_IN`, in `apps/web/src/arena/battle.ts`).
 
 ## Rejected alternatives
 

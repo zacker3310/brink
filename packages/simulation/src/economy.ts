@@ -1,6 +1,7 @@
 import type { FacilityId, Formation, FormationId, GameEvent, Ledger, Nation, NationId, NationView, NationOrders, Resource, SiteKind, Stockpile, Treaty, WorldState, Yields } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { FACILITIES, RESEARCH_BANK, RULES, TECHS, TREATIES, UNITS } from '@brink/game-data';
+import { studyArtefact } from './blackfiles';
 import { levelYields } from './progression';
 import { clamp, fortressFloor, nationModifiers, pct, sortedKeys, zeroStockpile } from './rules';
 
@@ -147,10 +148,15 @@ export function settleEconomy(
   n.research.progress += research;
   const current = n.research.current;
   if (current && TECHS[current] && n.research.progress >= TECHS[current].cost) {
-    n.research.progress -= TECHS[current].cost;
-    n.research.unlocked = [...n.research.unlocked, current].sort();
+    // A reverse-engineered project (Black Files) uses up an artefact at a black site as it finishes;
+    // one that lost its artefact or its laboratory is dropped, its points banked.
+    if (studyArtefact(world, nation, current)) {
+      n.research.progress -= TECHS[current].cost;
+      n.research.unlocked = [...n.research.unlocked, current].sort();
+      events.push({ kind: 'research', nation, tech: current });
+      if (TECHS[current].artefact) events.push({ kind: 'black_files', what: 'studied', nation, tech: current });
+    }
     n.research.current = null;
-    events.push({ kind: 'research', nation, tech: current });
   }
   if (!n.research.current) n.research.progress = Math.min(n.research.progress, RESEARCH_BANK);
 

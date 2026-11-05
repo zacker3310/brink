@@ -9,8 +9,9 @@ import { landmasses } from './land';
 // a power asks. Sees only its own view.
 
 /**
- * How a leader answers a request for passage. Never toward a friend: an ally, or a power the leader
- * feels warmly about, is not marched on through its land (`likes_target`). Never for the power its
+ * How a leader answers a request for passage. Never toward a friend: an ally, a power the leader
+ * feels warmly about or a fellow signatory of the Accord is not marched on through its land
+ * (`likes_target`). Never for the power its
  * own army marches on. Otherwise by mood (with any sweetener already added by `consider`), which a
  * hawk wants high and a dove forgives; a request that will not say whom it is for wants more warmth.
  */
@@ -18,6 +19,9 @@ export function considerPassage(view: NationView, mood: number, temper: Temperam
   if (spared) return { accept: true, reason: 'agreed' };
   if (isFocus) return { accept: false, reason: 'focus' };
   if (against && (view.relations[against] === 'alliance' || (view.attitudes?.[against]?.mood ?? 0) > LEADER_TUNING.stances.neutral)) return { accept: false, reason: 'likes_target' };
+  // Black Files: nor toward a fellow signatory of the Accord.
+  const accord = view.blackFiles?.accord ?? [];
+  if (against && accord.includes(view.self.id) && accord.includes(against)) return { accept: false, reason: 'likes_target' };
   const bar = PASSAGE.mood[temper] + (against ? 0 : PASSAGE.unnamed);
   return mood >= bar ? { accept: true, reason: 'agreed' } : { accept: false, reason: 'mood' };
 }

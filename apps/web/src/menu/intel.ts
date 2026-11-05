@@ -1,5 +1,5 @@
 import type { GovernmentId, NationId, Stockpile, UnitClass, WorldState } from '@brink/contracts';
-import { RULES, type Modifiers } from '@brink/game-data';
+import { RULES, standIn, type Modifiers } from '@brink/game-data';
 import { keyDistance, neighborKeys } from '@brink/map';
 import { grossYields, sortedKeys } from '@brink/simulation';
 
@@ -40,7 +40,7 @@ export function dossier(world: WorldState, id: NationId): Dossier {
   for (const k of sortedKeys(world.formations)) {
     const f = world.formations[k]!;
     if (f.owner !== id) continue;
-    forces[f.unitClass] += 1;
+    forces[standIn(f.unitClass)] += 1;
     formations += 1;
   }
 

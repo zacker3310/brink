@@ -63,6 +63,14 @@ function candidate(view: NationView, card: CardDef, orders: Record<FormationId, 
       const leader = rivals.sort((a, b) => view.nations[b]!.victoryPoints - view.nations[a]!.victoryPoints || (a < b ? -1 : 1))[0];
       return leader ? { play: { card: card.id, nation: leader }, value: 3 } : null;
     }
+    case 'steal_artefact': {
+      // Black Files: the rival power holding most artefacts (they are public), when anyone holds one.
+      const held = view.blackFiles?.artefacts ?? {};
+      const mark = sortedKeys(held)
+        .filter((n) => n !== self.id && view.nations[n] && !view.nations[n]!.minor && !view.nations[n]!.eliminated)
+        .sort((a, b) => held[b]! - held[a]! || (a < b ? -1 : 1))[0];
+      return mark ? { play: { card: card.id, nation: mark }, value: 4 + held[mark]! } : null;
+    }
     case 'card_strike':
       // Worth it on a big target, about one full formation seen there, or on a garrison holding a
       // city: every strike on it brings the day it can be stormed closer.

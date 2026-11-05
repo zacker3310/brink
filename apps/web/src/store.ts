@@ -110,7 +110,7 @@ interface State {
   /** The last resolved turn, kept so it can be replayed again. */
   lastTurn: { before: NationView; events: GameEvent[] } | null;
 
-  newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty, theatre?: string, crisis?: string): Promise<void>;
+  newGame(nation: NationId, seed: number, maxTurns?: number, difficulty?: Difficulty, theatre?: string, crisis?: string, blackFiles?: boolean): Promise<void>;
   /** Let the staff draft orders for every unit and city still waiting; the player can change any. */
   autoCommand(auto?: boolean): Promise<void>;
   /** Staff plan mode: the staff drafts a plan at the start of every turn. */
@@ -363,8 +363,8 @@ export const useGame = create<State>((set, get) => {
     aimingCard: null,
     aimingLift: null,
 
-    async newGame(nation, seed, maxTurns, difficulty, theatre, crisis) {
-      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre, crisis }))) {
+    async newGame(nation, seed, maxTurns, difficulty, theatre, crisis, blackFiles) {
+      if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre, crisis, ...(blackFiles ? { blackFiles: true } : {}) }))) {
         const capital = Object.values(get().view!.sites).find((s) => s.owner === nation && s.kind === 'capital');
         set({ selectedHex: capital?.key ?? null, hexFromFocus: true, selectedFormation: null, showReport: false, tab: 'overview', dismissed: [] });
         get().nextIdle();

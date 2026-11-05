@@ -67,7 +67,12 @@ export type CardEffect =
   /** Lasting. Everything within `radius` of the target is seen and detected, cover or not. */
   | { kind: 'reveal'; radius: number }
   /** Lasting. Landings from ships pay no amphibious assault penalty. */
-  | { kind: 'amphibious' };
+  | { kind: 'amphibious' }
+  /**
+   * Instant (Black Files). An artefact of the target power's is stolen, if it held one as the turn
+   * began; if it held none, or more agents went for it than it held, its black programme leaks.
+   */
+  | { kind: 'steal_artefact' };
 
 export interface CardDef {
   id: CardId;
@@ -200,6 +205,16 @@ export const GENERIC_CARDS: Record<CardId, CardDef> = {
       { kind: 'strike_bonus', classes: ['drone'], percent: 25 },
     ],
   }),
+  // Black Files only: dealt into a power's deck when the campaign has them (scenarios `blackfiles.ts`).
+  black_bag: card({
+    id: 'black_bag',
+    name: 'Black Bag Job',
+    flavour: 'No forced entry, no fingerprints, and a crate that was never on the manifest.',
+    cost: 3,
+    target: 'nation',
+    duration: 1,
+    effects: [{ kind: 'steal_artefact' }],
+  }),
   disinformation: card({
     id: 'disinformation',
     name: 'Disinformation',
@@ -317,6 +332,8 @@ export function describeEffect(e: CardEffect): string {
       return `See everything within ${e.radius} hexes of the target, even in cover.`;
     case 'amphibious':
       return 'Landings from ships pay no beach penalty.';
+    case 'steal_artefact':
+      return 'Steal an artefact from a rival power; if it has none, its black programme leaks.';
   }
 }
 

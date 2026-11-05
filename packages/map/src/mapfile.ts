@@ -61,6 +61,11 @@ export interface MapSite {
   victoryPoints?: number;
   /** An island outpost: a runway and a harbour, a depot that yields little and has a small garrison. */
   profile?: 'outpost';
+  /**
+   * Black Files: an excavation (an objective a power holds turns running to dig out an artefact) or a
+   * black site (a power's laboratory where artefacts are studied). Inert in a campaign without them.
+   */
+  anomaly?: 'excavation' | 'blacksite';
 }
 
 export interface MapSeaZone {
@@ -342,6 +347,11 @@ export function validateMap(value: unknown): MapError[] {
       if (s.owner !== null && !(typeof s.owner === 'string' && nationIds.has(s.owner))) err(`${p}.owner`, `${JSON.stringify(s.owner)} is not a nation on this map`);
       if (s.victoryPoints !== undefined && (!isInt(s.victoryPoints) || s.victoryPoints < 1)) err(`${p}.victoryPoints`, 'must be a positive integer');
       if (s.profile !== undefined && !(s.profile === 'outpost' && s.kind === 'depot')) err(`${p}.profile`, 'only a depot can be an "outpost"');
+      if (s.anomaly !== undefined) {
+        if (s.anomaly !== 'excavation' && s.anomaly !== 'blacksite') err(`${p}.anomaly`, 'must be "excavation" or "blacksite"');
+        else if (s.kind !== 'objective') err(`${p}.anomaly`, `an ${s.anomaly} is an objective, not a ${String(s.kind)}`);
+        else if (s.anomaly === 'blacksite' && s.owner === null) err(`${p}.anomaly`, 'a black site belongs to a nation');
+      }
       const at = inBounds(s.at, `${p}.at`);
       if (!at || !owner || !terrain) return;
       const [c, r] = at;

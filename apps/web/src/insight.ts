@@ -91,6 +91,8 @@ export const VICTORY_HOW: Record<VictoryReason, string> = {
   supremacy: 'by supremacy: ahead in land, army and output together',
   last_standing: 'as the last nation standing',
   turn_limit: 'on strategic score at the turn limit',
+  accord: 'with every signatory of the Accord: the Visitors are destroyed',
+  visitors: 'and the world is theirs: the incursion was never put down',
 };
 
 const TREATY_NAME: Record<TreatyKind, string> = TREATY_TEXT;

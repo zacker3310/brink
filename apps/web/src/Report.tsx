@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { GameEvent, HexKey, NationView, TurnReport, UnitClass } from '@brink/contracts';
+import type { FormationClass, GameEvent, HexKey, NationView, TurnReport } from '@brink/contracts';
 import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { Label, useKeys } from './chrome';
 import { commanderNote } from './generals';
@@ -54,7 +54,7 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
     Orders: [],
   };
   // One intel row per enemy formation: sighting and movement merged.
-  const sightings = new Map<string, { owner: string; unitClass: UnitClass; key: HexKey; moved: boolean }>();
+  const sightings = new Map<string, { owner: string; unitClass: FormationClass; key: HexKey; moved: boolean }>();
   for (const e of events) {
     switch (e.kind) {
       case 'engagement': {

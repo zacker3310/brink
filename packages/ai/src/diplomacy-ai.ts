@@ -2,7 +2,7 @@ import type { AiMemory, DealTerms, DiplomacyOrder, NationId, NationOrders, Natio
 import { RESOURCES } from '@brink/contracts';
 import { FACILITIES, LEADER_TUNING, leaderFor, PASSAGE, type LineTrigger } from '@brink/game-data';
 import { keyDistance } from '@brink/map';
-import { answerTo, bindingTreaty, checkDiplomacy, dealGives, diplomacyWorldOf, mirrors, pairKey, PROPOSAL_OF, recruitCost, sortedKeys, stockTotal, treatyIn } from '@brink/simulation';
+import { accordOpen, answerTo, bindingTreaty, checkDiplomacy, dealGives, diplomacyWorldOf, mirrors, pairKey, PROPOSAL_OF, recruitCost, sortedKeys, stockTotal, treatyIn } from '@brink/simulation';
 import { considerPassage } from './passage';
 
 // The leaders' side of the AI: how a rival's head of government answers an offer, what deals they
@@ -54,7 +54,13 @@ export function offerOf(from: NationId, d: DiplomacyOrder): Offer | null {
 }
 
 /** The view's public facts in the shape the engine's diplomacy checks read. */
+// Every pair's relation and, in the Black Files, who stands in the Accord (`diplomacyWorldOf`).
 const asWorld = diplomacyWorldOf;
+
+/** Whether `n` has signed the Accord (Black Files). */
+function inAccord(view: NationView, n: NationId): boolean {
+  return !!view.blackFiles?.accord.includes(n);
+}
 
 function powers(view: NationView): NationId[] {
   return sortedKeys(view.nations).filter((n) => n !== view.self.id && !view.nations[n]!.eliminated && !view.nations[n]!.minor);
@@ -214,6 +220,9 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
       const sweet = Math.min(PASSAGE.sweetenerMax, Math.trunc(worth(view, offer.terms?.give) / 1000) * PASSAGE.sweetenerPer1000);
       return considerPassage(view, mood + sweet, temper, from === focus, offer.terms?.against, false);
     }
+    // Black Files: against the Visitors almost anyone will sign; only a leader who detests you will not.
+    case 'accord':
+      return mood > AI.accordMood ? yes : { accept: false, reason: 'mood' };
   }
 }
 
@@ -290,6 +299,8 @@ export function leaderDiplomacy(view: NationView, memory: AiMemory, planned: Nat
     const mood = moodOf(view, d.target);
     if (d.action === 'declare_war') {
       if (bindingTreaty(view, self, d.target)) return false;
+      // The AI keeps the Accord: betrayal is a human's play.
+      if (inAccord(view, self) && inAccord(view, d.target)) return false;
       if (temper === 'dove' && mood >= AI.doveRestraint) return false;
       return true;
     }
@@ -315,6 +326,12 @@ export function leaderDiplomacy(view: NationView, memory: AiMemory, planned: Nat
   const add = (d: DiplomacyOrder) => {
     if (!own.some((x) => x.target === d.target || x.action === d.action)) own.push(d);
   };
+  // Black Files: once they have woken, the friendliest power not yet in the Accord with us is asked to sign.
+  const bf = view.blackFiles;
+  if (bf?.awake) {
+    const ask = free.find((n) => accordOpen(bf, self, n) && !pendingOwn(n, 'accord') && moodOf(view, n) > AI.accordMood);
+    if (ask) add({ target: ask, action: 'propose_accord' });
+  }
   const defiedRecently = (n: NationId) => (view.attitudes?.[n]?.reasons ?? []).some((r) => r.id === 'defied' && r.value <= Math.trunc((LEADER_TUNING.memory.defied.weight * 110) / 100));
   for (const n of free) {
     const rel = view.relations[n];
@@ -328,7 +345,7 @@ export function leaderDiplomacy(view: NationView, memory: AiMemory, planned: Nat
       continue;
     }
     // Defied: a hawk answers with war, when it is free to.
-    if (temper === 'hawk' && !spare.includes(n) && defiedRecently(n) && enemies.length < 2 && !bindingTreaty(view, self, n)) {
+    if (temper === 'hawk' && !spare.includes(n) && defiedRecently(n) && enemies.length < 2 && !bindingTreaty(view, self, n) && !(inAccord(view, self) && inAccord(view, n))) {
       add({ target: n, action: 'declare_war' });
       continue;
     }

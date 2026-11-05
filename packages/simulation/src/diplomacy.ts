@@ -1,6 +1,7 @@
 import type { DealTerms, DiplomaticAction, GameEvent, NationId, NationOrders, NationView, Proposal, ProposalKind, Relation, SiteId, Stockpile, Treaty, TreatyKind, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { LEADER_TUNING, PASSAGE, TREATIES } from '@brink/game-data';
+import { BLACK_FILES, LEADER_TUNING, PASSAGE, TREATIES } from '@brink/game-data';
+import { accordOpen } from './blackfiles';
 import { facilityCost } from './progression';
 import { pairKey, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
@@ -19,6 +20,7 @@ export const PROPOSAL_OF: Partial<Record<DiplomaticAction, ProposalKind>> = {
   pay_tribute: 'tribute',
   propose_joint_op: 'joint_op',
   propose_passage: 'passage',
+  propose_accord: 'accord',
 };
 
 /** The terms the other side offers to agree to `t`: what one gives the other gets. */
@@ -137,7 +139,7 @@ export function cleanTerms(action: DiplomaticAction, terms: DealTerms | undefine
 export function diplomacyWorldOf(view: NationView): DiplomacyWorld & { nations: NationView['nations'] } {
   const relations: Record<string, Relation> = { ...(view.publicRelations ?? {}) };
   for (const n of sortedKeys(view.relations)) relations[pairKey(view.self.id, n)] = view.relations[n]!;
-  return { relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites, tiles: view.tiles };
+  return { relations, treaties: view.treaties, turn: view.turn, nations: view.nations, sites: view.sites, tiles: view.tiles, ...(view.blackFiles ? { blackFiles: view.blackFiles } : {}) };
 }
 
 /** What diplomacy reads: a world, or a view's public facts recast as one. */
@@ -146,20 +148,35 @@ export type DiplomacyWorld = Pick<WorldState, 'relations' | 'treaties' | 'turn'>
   sites?: Record<SiteId, { owner: NationId | null; key: string }>;
   /** A view's tiles: a joint operation is only offered on a prize seen now (its holder may have changed). */
   tiles?: Record<string, { key: string; visibility?: 'visible' | 'observed' | 'unknown' }>;
+  /** Black Files: who is in the Accord and who broke it (a world's state or a view's). */
+  blackFiles?: { awake: boolean | number | null; accord: readonly NationId[]; betrayers: readonly NationId[] };
 };
+
+/**
+ * Black Files: whether `a` and `b` both stand in the Accord. It binds deals as a pact does: no
+ * alliance against a fellow signatory and no joint operation on its city, for either would take one
+ * signatory to war with another without a word said. War between signatories comes only by an open
+ * declaration, and that is the betrayal (`betrayAccord`). Works on a world or a view.
+ */
+export function accordBinds(world: Pick<DiplomacyWorld, 'blackFiles'>, a: NationId, b: NationId): boolean {
+  const accord = world.blackFiles?.accord;
+  return !!accord && a !== b && accord.includes(a) && accord.includes(b);
+}
 
 /**
  * Why a joint operation between `from` and `to` on `site` cannot be agreed, as a code, or null.
  * The prize is a third power's; the two are not at war with each other; at least one of them
  * already fights its holder (the other goes to war on signing, as an alliance against a power does);
- * neither is bound by a pact or ceasefire with the holder.
+ * neither is bound by a pact or ceasefire with the holder (`bound`), nor stands with it in the
+ * Accord (`accord`).
  */
-export function jointOpProblem(world: DiplomacyWorld, from: NationId, to: NationId, site: SiteId | undefined): 'no_prize' | 'not_third' | 'partners_at_war' | 'neither_at_war' | 'bound' | null {
+export function jointOpProblem(world: DiplomacyWorld, from: NationId, to: NationId, site: SiteId | undefined): 'no_prize' | 'not_third' | 'partners_at_war' | 'neither_at_war' | 'bound' | 'accord' | null {
   const owner = site ? world.sites?.[site]?.owner : undefined;
   if (!site || !world.sites?.[site]) return 'no_prize';
   if (!owner || owner === from || owner === to || world.nations?.[owner]?.eliminated) return 'not_third';
   if (relationOf(world.relations, from, to) === 'war') return 'partners_at_war';
   if (bindingTreaty(world, from, owner) || bindingTreaty(world, to, owner)) return 'bound';
+  if (accordBinds(world, from, owner) || accordBinds(world, to, owner)) return 'accord';
   if (relationOf(world.relations, from, owner) !== 'war' && relationOf(world.relations, to, owner) !== 'war') return 'neither_at_war';
   return null;
 }
@@ -192,7 +209,7 @@ export function canPropose(world: DiplomacyWorld, from: NationId, to: NationId, 
       if (x === undefined) return rel === 'peace';
       const foe = world.nations?.[x];
       if (x === from || x === to || (world.nations && (!foe || foe.eliminated || foe.minor))) return false;
-      return rel !== 'war' && !bindingTreaty(world, from, x) && !bindingTreaty(world, to, x);
+      return rel !== 'war' && !bindingTreaty(world, from, x) && !bindingTreaty(world, to, x) && !accordBinds(world, from, x) && !accordBinds(world, to, x);
     }
     case 'nonaggression':
       return rel === 'peace' && !running('nonaggression');
@@ -207,6 +224,8 @@ export function canPropose(world: DiplomacyWorld, from: NationId, to: NationId, 
       return rel === 'peace' && !running('passage');
     case 'joint_op':
       return !jointOpProblem(world, from, to, terms?.site) && !running('joint_op');
+    case 'accord':
+      return accordOpen(world.blackFiles, from, to);
   }
 }
 
@@ -226,12 +245,15 @@ function end(world: WorldState, kinds: readonly TreatyKind[], a: NationId, b: Na
   world.treaties = world.treaties.filter((t) => !(t.a === x && t.b === y && kinds.includes(t.kind)));
 }
 
-/** War between `declarer` and `target`, at once: it ends trade and any pact, truce or joint operation between them. */
+/** What a war between two powers ends: trade, any pact or truce, a joint operation, a right of passage. */
+const WAR_ENDS: readonly TreatyKind[] = ['trade', 'nonaggression', 'ceasefire', 'joint_op', 'passage'];
+
+/** War between `declarer` and `target`, at once: it ends trade and any pact, truce, joint operation or passage between them. */
 function goToWar(world: WorldState, declarer: NationId, target: NationId, events: GameEvent[]): void {
   const was = relationOf(world.relations, declarer, target);
   world.relations[pairKey(declarer, target)] = 'war';
   events.push({ kind: 'diplomacy', a: declarer, b: target, relation: 'war', proposedBy: declarer, ...(was === 'peace' || was === 'alliance' ? { broke: was } : {}) });
-  end(world, ['trade', 'nonaggression', 'ceasefire', 'joint_op', 'passage'], declarer, target, 'war', events);
+  end(world, WAR_ENDS, declarer, target, 'war', events);
 }
 
 /** Hand over what each side agreed to give, if both still can: all or nothing. */
@@ -304,6 +326,7 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
       if (declared.has(key)) continue;
       declared.add(key);
       goToWar(world, nation, d.target, events);
+      betrayAccord(world, nation, d.target, events, declared);
     }
   }
 
@@ -407,6 +430,9 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
         sign(world, 'passage', a, b, PASSAGE.turns, events);
         sweeten(world, p, events, committed);
         break;
+      case 'accord':
+        joinAccord(world, [a, b], events);
+        break;
       case 'nonaggression':
       case 'trade':
         sign(world, p.kind, a, b, p.kind === 'nonaggression' ? TREATIES.nonaggressionTurns : TREATIES.tradeTurns, events);
@@ -425,6 +451,55 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
   }
   world.proposals = [...dedup.keys()].sort().map((k) => dedup.get(k)!);
   world.treaties.sort((x, y) => (x.a + x.b + x.kind < y.a + y.b + y.kind ? -1 : x.a + x.b + x.kind > y.a + y.b + y.kind ? 1 : x.from - y.from));
+}
+
+/**
+ * Black Files: `members` join the Accord. Every signatory is at peace with every other (a war between
+ * them ends at once); they share their eyes (`fog.ts`) and win together if the Visitors fall (`victory.ts`).
+ */
+function joinAccord(world: WorldState, members: NationId[], events: GameEvent[]): void {
+  const bf = world.blackFiles;
+  if (!bf) return;
+  for (const n of [...members].sort()) {
+    if (bf.accord.includes(n)) continue;
+    for (const m of bf.accord) {
+      if (relationOf(world.relations, n, m) !== 'war') continue;
+      const [x, y] = n < m ? [n, m] : [m, n];
+      world.relations[pairKey(x, y)] = 'peace';
+      events.push({ kind: 'diplomacy', a: x, b: y, relation: 'peace', proposedBy: n });
+    }
+    bf.accord = [...bf.accord, n].sort();
+    events.push({ kind: 'black_files', what: 'accord', nation: n });
+  }
+  // The two who signed together may have been at war with each other.
+  const [a, b] = [...members].sort();
+  if (a && b && relationOf(world.relations, a, b) === 'war') {
+    world.relations[pairKey(a, b)] = 'peace';
+    events.push({ kind: 'diplomacy', a, b, relation: 'peace', proposedBy: a });
+  }
+}
+
+/**
+ * Black Files: a signatory that declares war on another breaks the Accord. It is out for good, loses
+ * `BLACK_FILES.betrayalStability` stability at once (on top of perfidy), and every other signatory
+ * goes to war with it: that war ends what any war ends between them (`WAR_ENDS`, a right of passage
+ * among them), and, like a declaration, the pair heeds no offer for the rest of the turn.
+ */
+function betrayAccord(world: WorldState, declarer: NationId, target: NationId, events: GameEvent[], declared: Set<string>): void {
+  const bf = world.blackFiles;
+  if (!bf || !bf.accord.includes(declarer) || !bf.accord.includes(target)) return;
+  bf.accord = bf.accord.filter((n) => n !== declarer);
+  bf.betrayers = [...bf.betrayers, declarer].sort();
+  const n = world.nations[declarer]!;
+  n.stability = Math.max(0, n.stability - BLACK_FILES.betrayalStability);
+  events.push({ kind: 'black_files', what: 'betrayal', nation: declarer, other: target });
+  for (const m of bf.accord) {
+    if (m === target || relationOf(world.relations, m, declarer) === 'war') continue;
+    world.relations[pairKey(m, declarer)] = 'war';
+    declared.add(pairKey(m, declarer));
+    events.push({ kind: 'diplomacy', a: m, b: declarer, relation: 'war', proposedBy: m });
+    end(world, WAR_ENDS, m, declarer, 'war', events);
+  }
 }
 
 /**

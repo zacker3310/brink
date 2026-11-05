@@ -1,6 +1,6 @@
 import type { DealTerms, DiplomaticAction, FacilityId, NationId, NationView, Stockpile, TechId, UnitClass } from '@brink/contracts';
 import { FACILITIES, TECH_IDS, TECHS } from '@brink/game-data';
-import { buildBlocker, checkDiplomacy, diplomacyWorldOf, facilitySlots, recruitCost, researchRate } from '@brink/simulation';
+import { blackResearchBlocker, buildBlocker, checkDiplomacy, diplomacyWorldOf, facilitySlots, recruitCost, researchRate } from '@brink/simulation';
 
 export function recruitCostFor(view: NationView, unitClass: UnitClass): Stockpile {
   return recruitCost(view.self, unitClass);
@@ -13,7 +13,10 @@ export function checkResearchView(view: NationView, tech: TechId): string | null
   const unlocked = view.self.research.unlocked;
   if (unlocked.includes(tech)) return 'Already researched';
   const missing = def.requires.filter((r) => !unlocked.includes(r));
-  return missing.length > 0 ? `Requires ${missing.map((m) => TECHS[m]?.name).join(', ')}` : null;
+  if (missing.length > 0) return `Requires ${missing.map((m) => TECHS[m]?.name).join(', ')}`;
+  // Reverse-engineered (Black Files): an artefact to study at a black site of your own.
+  const black = blackResearchBlocker(view, view.self.id, tech);
+  return black ? black.charAt(0).toUpperCase() + black.slice(1) : null;
 }
 
 /** The research worth doing next: the cheapest project that can start now. */
@@ -28,7 +31,8 @@ export function researchPerTurn(view: NationView, share = view.self.budget.resea
 
 /** Why the player may not take `action` toward `target` this turn, or null. The engine's own check, run on the view. */
 export function diplomacyBlocked(view: NationView, target: NationId, action: DiplomaticAction, terms?: DealTerms): string | null {
-  // Every pair's relation is public (a joint operation needs one of the two at war with the holder).
+  // Every pair's relation is public (a joint operation needs one of the two at war with the holder),
+  // and so is who stands in the Accord (Black Files): `diplomacyWorldOf` carries both.
   return checkDiplomacy(diplomacyWorldOf(view), view.self.id, target, action, terms);
 }
 

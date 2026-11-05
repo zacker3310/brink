@@ -66,13 +66,15 @@ export function ResearchScreen() {
     ['Normal', 25],
     ['High', 40],
   ];
-  const branches = branch === 'all' ? TECH_BRANCHES : [branch];
+  // The reverse-engineered branch exists only in a campaign with the Black Files.
+  const shown = view.blackFiles ? TECH_BRANCHES : TECH_BRANCHES.filter((b) => b !== 'black');
+  const branches = branch === 'all' ? shown : [branch];
   return (
     <section className="px-3 py-3" data-testid="research-screen">
       <header className="mb-2 flex items-baseline justify-between gap-2">
         <Label>Research</Label>
         <span className="font-mono text-[12px] text-muted" data-testid="research-output">
-          {output} pts/turn · {done.length}/{TECH_IDS.length} done
+          {output} pts/turn · {done.length}/{TECH_IDS.filter((t) => shown.includes(TECHS[t]!.branch)).length} done
         </span>
       </header>
       {current && TECHS[current] ? (
@@ -92,7 +94,7 @@ export function ResearchScreen() {
       )}
 
       <nav className="-mx-3 mb-2 flex gap-1.5 overflow-x-auto px-3 pb-1" aria-label="Research branches">
-        {(['all', ...TECH_BRANCHES] as const).map((b) => {
+        {(['all', ...shown] as const).map((b) => {
           const on = branch === b;
           const count = b === 'all' ? null : TECH_IDS.filter((t) => TECHS[t]!.branch === b);
           return (

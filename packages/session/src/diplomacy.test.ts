@@ -32,7 +32,7 @@ const rejected = (r: ReturnType<GameSession['advance']>) => r.events.filter((e) 
 /** What the player puts in to carry it: on turn 1 Japan, a dove, likes China (they share an enemy in Russia). */
 const SWEETENER = { credits: 200, food: 100 };
 
-describe('a 2.9.0 save under ruleset 2.10', () => {
+describe('a 2.9.0 save under the current ruleset (2.10 when written; 2.12 since the merges)', () => {
   it('loads with its pending offers and treaties as they were, migrates once, and resumes without a refusal', () => {
     const s = GameSession.create(PACIFIC_ID, 4, 'usa', [], { difficulty: 'easy' });
     s.advance(none(s, [{ target: 'russia', action: 'propose_trade' }]));
