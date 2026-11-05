@@ -88,20 +88,28 @@ export function applyBlackFiles(w: WorldState): void {
   for (const s of PACIFIC_SITES) {
     const key = cellKey(s.at);
     const t = w.tiles[key];
-    if (!t || t.siteId || (s.owner && !w.nations[s.owner])) throw new Error(`black files: no room for ${s.name}`);
+    // An Opening Crisis may have built on the hex, or handed it to someone else: the site goes to
+    // whoever holds the ground (a black site only to a power), or is not placed.
+    if (!t || t.siteId) continue;
+    let owner: NationId | null;
     if (s.island) {
       // Bermuda: an island raised from the sea hex, a harbour on it.
+      if (t.terrain !== 'water' || Object.values(w.formations).some((f) => f.key === key) || !w.nations[s.owner ?? '']) continue;
       t.terrain = 'plains';
       t.owner = s.owner;
       t.port = true;
-    } else if (t.owner !== s.owner || t.terrain === 'water') throw new Error(`black files: ${s.name} is not on ${s.owner}'s ground`);
+      owner = s.owner;
+    } else {
+      owner = t.owner;
+      if (t.terrain === 'water' || (s.anomaly === 'blacksite' && (!owner || w.nations[owner]?.minor))) continue;
+    }
     const site: Site = {
       id: s.id,
       name: s.name,
       kind: 'objective',
       key,
-      owner: s.owner,
-      originalOwner: s.owner,
+      owner,
+      originalOwner: owner,
       population: 20,
       victoryPoints: s.anomaly === 'excavation' ? 4 : 3,
       yields: { credits: 1, energy: 0, materials: 0, food: 0, industry: 0, research: s.anomaly === 'blacksite' ? 4 : 0 },

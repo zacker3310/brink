@@ -28,6 +28,14 @@ describe('the Black Files in a campaign', () => {
     expect(r.events.filter((e) => e.kind === 'order_rejected')).toEqual([]);
   });
 
+  it('seeds after the Opening Crisis: the Visitors are at war with every nation, the one the crisis made too', () => {
+    const w = GameSession.create(PACIFIC_ID, 5, 'usa', [], { blackFiles: true, crisis: 'second-civil-war', difficulty: 'normal' }).snapshot();
+    expect(w.nations.heartland).toBeDefined();
+    for (const n of Object.keys(w.nations)) if (n !== 'visitors') expect(w.relations[n < 'visitors' ? `${n}|visitors` : `visitors|${n}`], n).toBe('war');
+    // Black sites stand only on a power's ground, whoever the crisis gave it to.
+    for (const s of Object.values(w.sites)) if (s.anomaly === 'blacksite') expect(w.nations[s.owner!]!.minor).toBeFalsy();
+  });
+
   it('First Contact is a listed scenario on the Antarctica map, opening under the treaty', () => {
     expect(SCENARIOS.some((x) => x.id === FIRST_CONTACT_ID)).toBe(true);
     const s = GameSession.create(FIRST_CONTACT_ID, 7, 'uk', [], { difficulty: 'normal' });

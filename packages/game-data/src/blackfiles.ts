@@ -116,10 +116,12 @@ export const BLACK_FILES = {
   leakChance: 6,
   /**
    * The Visitors win holding this percent of all victory points, or at the turn limit still holding
-   * `limitShare` percent: the incursion was never put down.
+   * `limitShare` percent: the incursion was never put down. Measured on First Contact, Normal, AI
+   * against AI: at 12 the Visitors won 12 of 40 (seeds 1-40); 14 is about three incursions and a
+   * station held at the limit.
    */
   visitorsShare: 30,
-  limitShare: 12,
+  limitShare: 14,
   /** Every Visitors formation regains this much strength a turn on crystal or its own ground. */
   regrowth: 50,
 } as const;

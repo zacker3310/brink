@@ -51,8 +51,6 @@ export class GameSession {
     opts: { maxTurns?: number; difficulty?: Difficulty; crisis?: string; blackFiles?: boolean } = {},
   ): GameSession {
     const world = createScenario(scenarioId, seed);
-    // The Black Files toggle seeds the anomaly into the campaign before anyone is given a memory.
-    if (opts.blackFiles) applyBlackFiles(world);
     // Any length from 5 turns to a 250-turn Total War; the scenario's own limit is only the default.
     if (opts.maxTurns) world.maxTurns = Math.max(5, Math.min(MAX_CAMPAIGN_TURNS, Math.floor(opts.maxTurns)));
     const humans = playerNation === null ? [] : [playerNation, ...others.filter((n) => n !== playerNation)];
@@ -66,6 +64,9 @@ export class GameSession {
     }
     // Easy keeps its ally through any crisis that does not set the two at war.
     if (opts.difficulty === 'easy') easyAlly(world, humans);
+    // The Black Files toggle seeds the anomaly last, so the Visitors are at war with every nation the
+    // crisis made, and before anyone is given a memory.
+    if (opts.blackFiles) applyBlackFiles(world);
     const memory: Record<NationId, AiMemory> = {};
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
     return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});
