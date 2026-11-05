@@ -60,7 +60,7 @@ Updated 2026-11-05 (airborne warfare and right of passage, ruleset 2.9.0). Miles
     `ai/src/airborne.test.ts`, `session/src/airborne.test.ts` (the Ulaanbaatar proofs, the 2.8.0 save),
     `tests/e2e/airborne.spec.ts` (phone: launch, aim a lift, the drop in the replay and the debrief).
   - The Ulaanbaatar proof, measured: China takes Ulaanbaatar from Beijing, next door, on turn 1 of every
-    campaign (12 seeds of 12, every crisis tried). On Normal, seed 7, the staff drops four marines beside
+    campaign (12 seeds of 12; seven of the crises tried, all the same). On Normal, seed 7, the staff drops four marines beside
     it on turns 4 and 5 with every order accepted; they do not take it from China's garrison. With
     Mongolia left to the United States (China and Russia at peace with it) and its militia broken, on
     Easy, seed 2, Ulaanbaatar falls on turn 7, 0 rejected orders. A full militia in a city holds against
