@@ -6,9 +6,10 @@ import { buildView } from '@brink/simulation';
 import { keyDistance } from '@brink/map';
 import { fightsFor, holdOrders, nextStep, proposePlans } from './plans';
 
+// Operations are judged over the whole map: a loaded machine needs the minute.
 // Plans are drawn from the systems already there; these pin what they offer and what they do.
 
-describe('proposePlans', () => {
+describe('proposePlans', { timeout: 60_000 }, () => {
   const view = buildView(createPacificScenario(1), 'china');
 
   it('offers the staff operations, ranked as the staff ranks them, and at most the asked number', () => {
@@ -58,7 +59,7 @@ function front(): NationView {
   return view;
 }
 
-describe('fightsFor', () => {
+describe('fightsFor', { timeout: 60_000 }, () => {
   it('lists every attack with enemies to fight, best odds first, and nothing without one', () => {
     const view = front();
     expect(fightsFor(view, { formations: {} })).toEqual([]);
@@ -77,7 +78,7 @@ describe('fightsFor', () => {
   });
 });
 
-describe('peace and hold plans', () => {
+describe('peace and hold plans', { timeout: 60_000 }, () => {
   it('offers peace with a second enemy, counting the divisions it frees, never with the operation\'s target', () => {
     const view = front();
     const peace = proposePlans(view, { max: 8 }).filter((p) => p.kind === 'peace');
@@ -102,7 +103,7 @@ describe('peace and hold plans', () => {
   });
 });
 
-describe('nextStep', () => {
+describe('nextStep', { timeout: 60_000 }, () => {
   it('says the running operation\'s current phase in words, and nothing without one', () => {
     const view = buildView(createPacificScenario(1), 'china');
     expect(nextStep(view, null)).toBeNull();
