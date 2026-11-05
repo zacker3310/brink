@@ -1,6 +1,8 @@
 import { bestFire, facingFrom, fitMen, penChance, shotValue, suppLevel, usableWeapons, woundedMen } from './combat';
 import { act, canAct, reachable, pathTo, safestCell, strikeInfo, SUPPORT_REACH, supportChance, supportIntercept, unitAt, unitById, whyNot } from './engine';
 import type { SupportId } from './types';
+import { deployCells } from './deploy';
+import { actionKey, commandDecision } from './staff';
 
 import { passable } from './map';
 import { typeOf } from './roster';
@@ -723,6 +725,9 @@ function standingShot(v: View, u: Unit): Action | null {
 /** The next action for `side`, or null when its turn is done. Pure: reads the state, changes nothing. */
 export function decide(b: Battle, side: Side, skip: ReadonlySet<string> = new Set()): Action | null {
   if (b.ended || b.turn !== side) return null;
+  // Command first (section 16): begin after deployment, call reserves, move or release groups.
+  const command = commandDecision(b, side, skip);
+  if (command) return command;
   const v = viewOf(b, side);
   // Off-map rockets on a cluster worth them.
   for (const s of b.support) {
@@ -819,7 +824,7 @@ export function playSide(b: Battle, side: Side): void {
   for (let guard = 0; guard < 400 && !b.ended && b.turn === side; guard++) {
     const a = decide(b, side, skip);
     if (!a) break;
-    const id = a.type === 'support' ? `support:${a.asset}` : a.type === 'ability' ? `ability:${a.id}` : a.unit;
+    const id = actionKey(a);
     if (!act(b, a, side)) {
       // Never expected: the AI only picks what canAct allows. Count it and move on.
       refused.set(b, [...rejectedActions(b), `${a.type} ${id}: ${whyNot(b, a, side)}`]);
@@ -827,8 +832,9 @@ export function playSide(b: Battle, side: Side): void {
       continue;
     }
     // A unit that has done all it can is not asked again.
-    if (a.type === 'support') skip.add(id);
-    else if (a.type !== 'ability') {
+    if (a.type === 'ability') continue;
+    if (a.type === 'support' || a.type === 'place' || !('unit' in a)) skip.add(id);
+    else {
       const u = unitById(b, a.unit);
       if (!u || !u.alive || (u.acted && !u.smoked) || (u.acted && u.moved)) skip.add(id);
     }
@@ -849,6 +855,8 @@ export function deploy(b: Battle, side: Side): void {
   const approach: Point[] = [];
   for (let y = H - 14; y < H - 2; y += 3) for (let x = 2; x < W - 2; x += 4) approach.push({ x, y });
   const taken = new Set<string>();
+  // Never on top of the other side (a landing or drop zone deep in the field).
+  for (const u of b.units) if (u.side !== side && u.alive && !u.carrier) taken.add(`${isFlying(typeOf(u.type)) ? 'a' : 'g'}${u.x},${u.y}`);
   const z = b.map.zone;
   const centre = z ? { x: z.x, y: z.y } : { x: W / 2, y: 12 };
   const score = (u: Unit, p: Point): number => {
@@ -887,7 +895,8 @@ export function deploy(b: Battle, side: Side): void {
     const air = isFlying(t);
     let best: Point | null = null;
     let s = -Infinity;
-    for (const p of b.map.redSpawn) {
+    const cells = deployCells(b, side, t);
+    for (const p of cells) {
       const key = `${air ? 'a' : 'g'}${p.x},${p.y}`;
       if (taken.has(key)) continue;
       const v = score(u, p);
@@ -896,7 +905,7 @@ export function deploy(b: Battle, side: Side): void {
         best = p;
       }
     }
-    if (!best) best = b.map.redSpawn.find((p) => !taken.has(`${air ? 'a' : 'g'}${p.x},${p.y}`)) ?? { x: Math.floor(W / 2), y: 2 };
+    if (!best) best = cells.find((p) => !taken.has(`${air ? 'a' : 'g'}${p.x},${p.y}`)) ?? { x: Math.floor(W / 2), y: 2 };
     taken.add(`${air ? 'a' : 'g'}${best.x},${best.y}`);
     u.x = best.x;
     u.y = best.y;

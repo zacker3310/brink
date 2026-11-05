@@ -17,6 +17,9 @@ const SETUPS: ArenaSetup[] = [
   arenaSetup(53, { mix: 'roster', terrain: 'hills', weather: 'fog' }),
   arenaSetup(54, { mix: 'artillery', terrain: 'plains', site: 'objective' }),
   arenaSetup(55, { mix: 'air', terrain: 'mountains', time: 'dusk' }),
+  // Zones, reserves, Command Points and groups (section 16), in a deployment phase or not.
+  arenaSetup(56, { mix: 'mixed', terrain: 'plains', command: true }),
+  arenaSetup(57, { mix: 'armour', terrain: 'urban', site: 'city', command: true }),
 ];
 
 const sameJson = (s: Step) => JSON.stringify(s.b) === s.before;
@@ -115,7 +118,10 @@ describe('commands are all or nothing', () => {
         offered++;
         kinds.add(a.type);
         // A breach that only swept open ground and found nothing, and a hold, are as safe as a move.
-        expect(['move', 'face', 'overwatch', 'hunker', 'hold', 'breach', 'embark', 'dismount']).toContain(a.type);
+        // So are the command orders that roll nothing (section 16): placing a unit in deployment,
+        // beginning the battle, forming, changing and dissolving a group, and a group order that
+        // only moved its units (it is the moves that are checked below).
+        expect(['move', 'face', 'overwatch', 'hunker', 'hold', 'breach', 'embark', 'dismount', 'place', 'deployed', 'group', 'ungroup', 'formation', 'order']).toContain(a.type);
         expect(st.b.stream, `${a.type} drew from the stream`).toBe(before.stream);
         expect([...visibleTo(st.b, 'blue')].sort(), `${a.type} changed what blue sees`).toEqual([...visibleTo(before, 'blue')].sort());
         expect(st.b.intel.blue, `${a.type} changed blue's last known positions`).toEqual(before.intel.blue);

@@ -61,6 +61,7 @@ function asSeen(u: Unit): Unit {
  * - its own shots, hits and losses (not kills: a kill out of sight is not known) and nothing of
  *   the enemy's tallies;
  * - for red only, the enemy skill (blue's picture has 0);
+ * - its own groups, deployment zones and reserves (waves and Command Points); none of the other side's;
  * - no film (`events` is empty) and a constant stream (`OBSERVED_STREAM`).
  * Engine readers (sight, the shot card, reach, called fire, the planner) run on it as on the
  * battle. It is a picture, not a battle to play: acting on it settles nothing.
@@ -104,5 +105,9 @@ export function observe(b: Battle, side: Side): Observation {
     observer: side,
   };
   if (side === 'blue' && b.commands) obs.commands = clone(b.commands);
+  const foe = side === 'blue' ? 'red' : 'blue';
+  if (b.groups) obs.groups = clone(b.groups.filter((g) => g.side === side));
+  if (b.deployment) obs.deployment = { open: b.deployment.open, zones: { [side]: clone(b.deployment.zones[side]), [foe]: [] } as NonNullable<Battle['deployment']>['zones'] };
+  if (b.reserves) obs.reserves = { [side]: clone(b.reserves[side]), [foe]: { cp: 0, start: 0, waves: [], acted: -1 } } as NonNullable<Battle['reserves']>;
   return obs;
 }

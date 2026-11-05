@@ -41,6 +41,10 @@ import {
   FACTION_OF,
 } from './types';
 import { deploy, playSide } from './ai';
+import { commandAct, commandWhyNot, isCommandAction } from './command-rules';
+import { autoDeploy, deploymentFor } from './deploy';
+import { pruneGroups } from './groups';
+import { allUnits, noteAction, setupReserves } from './reserves';
 
 // A battle in turns (docs/arena-v2.md, section 3). Everything is a pure function of the setup and
 // the actions taken: the state is plain JSON with its random stream inside, so a battle replays
@@ -149,7 +153,12 @@ export function createBattle(setup: ArenaSetup): Battle {
     stats: { blue: { shots: 0, hits: 0, kills: 0, lost: 0 }, red: { shots: 0, hits: 0, kills: 0, lost: 0 } },
     stream: setup.seed >>> 0,
   };
-  deployBlue(b);
+  // Command (section 16): zones from the war map, and the reserves taken off the field.
+  const deployment = deploymentFor(map, setup);
+  if (deployment) b.deployment = deployment;
+  setupReserves(b, setup);
+  if (b.deployment) autoDeploy(b, 'blue');
+  else deployBlue(b);
   deploy(b, 'red');
   for (const u of b.units) if (u.carrier) {
     const c = b.units.find((x) => x.id === u.carrier)!;
@@ -635,6 +644,9 @@ export function whyNot(b: Battle, a: Action, side: Side = b.turn): string | null
   if (!wellFormed(a)) return 'Not an order';
   if (b.ended) return 'The battle is over';
   if (b.turn !== side) return 'Not your turn';
+  const command = commandWhyNot(b, a, side);
+  if (command !== undefined) return command;
+  if (isCommandAction(a)) return null;
   if (a.type === 'ability') {
     if (side !== 'blue' || b.abilities[a.id] !== 'ready' || ABILITIES[a.id].passive) return 'Not available';
     const def = ABILITIES[a.id];
@@ -752,6 +764,12 @@ export function canAct(b: Battle, a: Action, side: Side = b.turn): boolean {
 /** Take one action. Returns false (and changes nothing) if it is not allowed. */
 export function act(b: Battle, a: Action, side: Side = b.turn): boolean {
   if (!canAct(b, a, side)) return false;
+  if (isCommandAction(a)) {
+    commandAct(b, a, side, act);
+    checkEnd(b);
+    return true;
+  }
+  noteAction(b, side, a);
   if (a.type === 'ability') useAbility(b, a);
   else if (a.type === 'support') callSupport(b, side, a.asset, a.at);
   else {
@@ -1099,6 +1117,7 @@ function end(b: Battle, won: boolean, reason: NonNullable<Battle['endReason']>):
 }
 
 function checkEnd(b: Battle): void {
+  pruneGroups(b);
   if (b.ended) return;
   const alive = (s: Side) => b.units.some((u) => u.side === s && u.alive && unitValue(u) > 0);
   if (!alive('red')) end(b, true, 'destroyed');
@@ -1126,6 +1145,8 @@ function withdrawCheck(b: Battle): void {
  */
 export function endTurn(b: Battle): void {
   if (b.ended || b.turn !== 'blue') return;
+  // Ending the turn in the deployment phase begins the battle as the company stands.
+  if (b.deployment?.open) b.deployment.open = false;
   withdrawCheck(b);
   if (b.ended) return;
   b.turnIndex++;
@@ -1198,6 +1219,8 @@ export const UNDO_SAFE: Record<BattleEvent['type'], boolean> = {
   ability: false,
   capture: false,
   end: false,
+  deploy: true,
+  reinforce: false,
 };
 
 const ghostsOf = (b: Battle) =>
@@ -1238,9 +1261,11 @@ export function retreat(b: Battle): void {
 export function arenaResult(b: Battle): ArenaResult {
   const won = b.ended === 'won';
   const kept: Record<string, number> = {};
-  const formations = [...new Set(b.units.map((u) => u.formation))].sort();
+  // Reserves never called in keep all they had.
+  const everyone = allUnits(b);
+  const formations = [...new Set(everyone.map((u) => u.formation))].sort();
   for (const f of formations) {
-    const units = b.units.filter((u) => u.formation === f);
+    const units = everyone.filter((u) => u.formation === f);
     const sideWon = units[0]!.side === 'blue' ? won : !won;
     const start = units.reduce((s, u) => s + u.startValue, 0);
     const now = units.reduce((s, u) => s + unitValue(u, sideWon), 0);

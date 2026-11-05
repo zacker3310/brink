@@ -27,6 +27,8 @@ function points(): { b: Battle; at: string }[] {
     { mix: 'armour', terrain: 'plains', weather: 'fog' },
     { mix: 'urban', site: 'city' },
     { mix: 'roster', terrain: 'mountains', time: 'dawn', river: true },
+    // Zones, reserves and Command Points (section 16): a wave's arrival and groups are probed too.
+    { mix: 'mixed', terrain: 'hills', command: true },
   ] as const;
   shapes.forEach((pick, i) => {
     const b = createBattle(arenaSetup(80 + i, pick));
