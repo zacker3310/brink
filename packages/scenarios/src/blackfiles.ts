@@ -3,7 +3,7 @@ import { BLACK_FILES } from '@brink/game-data';
 import { cellKey, type MapFile, parseMap } from '@brink/map';
 import { computeVision, dormantVisitors, newBlackFiles, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 import { buildScenario, type ScenarioSetup } from './build';
-import antarcticaMap from './maps/antarctica.map.json';
+import antarcticaMap from './maps/antarctica.map.json' with { type: 'json' };
 
 // The Black Files (MASTER-PLAN Phase 8) as scenarios: the anomaly seeded into a Pacific campaign
 // (`applyBlackFiles`, the setup screen's toggle), and the standalone First Contact on the Antarctica

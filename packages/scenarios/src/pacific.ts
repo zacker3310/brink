@@ -1,7 +1,7 @@
 import type { NationId, UnitClass, WorldState } from '@brink/contracts';
 import { type MapFile, parseMap } from '@brink/map';
 import { buildScenario, nationSpecs, type NationSpec, type ScenarioSetup } from './build';
-import pacificMap from './maps/pacific.map.json';
+import pacificMap from './maps/pacific.map.json' with { type: 'json' };
 
 export type { NationSpec, Place } from './build';
 
