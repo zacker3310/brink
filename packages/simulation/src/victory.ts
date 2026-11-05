@@ -1,8 +1,8 @@
 import type { NationId, VictoryState, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { BLACK_FILES, VICTORY, victoryBars } from '@brink/game-data';
+import { BLACK_FILES, VICTORY } from '@brink/game-data';
 import { grossYields } from './economy';
-import { barPowers, totalVictoryPoints, victoryPoints, victoryThreshold } from './fog';
+import { barsOf, totalVictoryPoints, victoryPoints, victoryThreshold } from './fog';
 import { relationOf, sortedKeys } from './rules';
 
 // Phase 11b. Every way a campaign ends, checked in a fixed order so two paths reached on the same
@@ -97,7 +97,7 @@ export function evaluateVictory(world: WorldState): VictoryState | null {
   const leaders = alive.filter((n) => vp[n]! >= victoryThreshold(world));
   if (leaders.length === 1) return { winner: leaders[0]!, reason: 'victory_points', turn };
 
-  const bars = victoryBars(world.maxTurns, barPowers(world), world.scenarioId);
+  const bars = barsOf(world);
   if (turn >= bars.supremacyFromTurn) {
     const blocs = allianceBlocs(world)
       .map((members) => ({ members, held: members.reduce((a, n) => a + vp[n]!, 0) }))

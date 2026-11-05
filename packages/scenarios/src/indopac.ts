@@ -1,7 +1,6 @@
 import type { NationId, UnitClass, WorldState } from '@brink/contracts';
 import { type MapFile, parseMap } from '@brink/map';
 import { buildScenario, nationSpecs, type NationSpec, type ScenarioSetup } from './build';
-import type { Theatre } from './pacific';
 import indopacMap from './maps/indopac.map.json' with { type: 'json' };
 
 // The Indo-Pacific South (docs/indopac.md): South Asia, Southeast Asia and Oceania on one map, from
@@ -50,13 +49,6 @@ export const INDOPAC_NATIONS: readonly NationSpec[] = ALL.filter((n) => !n.minor
 
 /** The independent states between them. */
 export const INDOPAC_MINORS: readonly NationSpec[] = ALL.filter((n) => n.minor);
-
-export const INDOPAC_THEATRE: Theatre = {
-  id: INDOPAC_ID,
-  name: 'Indo-Pacific South',
-  summary: 'Karachi to Wellington: India, Pakistan, China, Indonesia and Australia, fifteen nations between them, and the straits that join two oceans.',
-  unlock: 0,
-};
 
 export function createIndoPacScenario(seed: number): WorldState {
   return buildScenario(INDOPAC_MAP, seed, SETUP);

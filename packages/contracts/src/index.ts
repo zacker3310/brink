@@ -393,8 +393,9 @@ export interface WorldState {
   turn: number;
   maxTurns: number;
   /**
-   * The level powers the victory bars are scaled for (`victoryBars`): the map's powers when it names
-   * more than four (the Middle East and Africa: six). Absent: four, the bars as measured.
+   * The powers the victory bars are scaled for (`victoryBars`): the map's count, set when it is built
+   * if it names more than the bars were measured with (four), so the bars never move in a match.
+   * Absent: four, the Pacific's bars exactly.
    */
   barPowers?: number;
   seed: number;
@@ -623,7 +624,7 @@ export interface NationView {
   rulesetVersion: string;
   turn: number;
   maxTurns: number;
-  /** As `WorldState.barPowers`: the powers the victory bars are scaled for, when not four. */
+  /** As `WorldState.barPowers`: the powers the victory bars are scaled for, when more than four. */
   barPowers?: number;
   self: Nation;
   nations: Record<NationId, PublicNation>;

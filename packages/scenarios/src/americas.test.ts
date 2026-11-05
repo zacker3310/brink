@@ -4,10 +4,9 @@ import { UNIT_CLASSES } from '@brink/contracts';
 import { RULES, UNITS } from '@brink/game-data';
 import { findPath, keyOf, neighborKeys, offsetToAxial } from '@brink/map';
 import { enterCost, seedCommanders, sortedKeys } from '@brink/simulation';
-import { AMERICAS_ALLIES, AMERICAS_ID, AMERICAS_MAP, AMERICAS_MINORS, AMERICAS_POWERS, createAmericasScenario } from './americas';
+import { AMERICAS_ID, AMERICAS_MAP, AMERICAS_MINORS, AMERICAS_POWERS, createAmericasScenario } from './americas';
 import { createScenario, SCENARIOS } from './index';
-import { THEATRES, theatreOf } from './pacific';
-import { findNation, shortName, theatreCrises, theatrePowers } from './theatres';
+import { classicOnly, findNation, naturalAlly, shortName, THEATRES, theatreCrises, theatreOf, theatrePowers } from './theatres';
 
 describe('The Americas', () => {
   const w = createAmericasScenario(1);
@@ -44,7 +43,8 @@ describe('The Americas', () => {
     expect(theatrePowers(AMERICAS_ID)).toBe(AMERICAS_POWERS);
     expect(theatreCrises(AMERICAS_ID)).toEqual([]);
     // Every power has a natural ally for Easy, and allies pair up.
-    for (const p of AMERICAS_POWERS) expect(AMERICAS_ALLIES[AMERICAS_ALLIES[p.id]!]).toBe(p.id);
+    for (const p of AMERICAS_POWERS) expect(naturalAlly(AMERICAS_ID, naturalAlly(AMERICAS_ID, p.id)!)).toBe(p.id);
+    expect(classicOnly(AMERICAS_ID)).toBe(true);
     // Brazil is found for the menus; the United States as the Pacific describes it.
     expect(findNation('brazil')?.name).toBe('Brazil');
     expect(findNation('usa')?.name).toBe('United States');

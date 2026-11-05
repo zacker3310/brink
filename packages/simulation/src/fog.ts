@@ -11,7 +11,7 @@ import type {
   TileView,
   WorldState,
 } from '@brink/contracts';
-import { TERRAIN, victoryBars } from '@brink/game-data';
+import { TERRAIN, VICTORY, victoryBars, type VictoryBars } from '@brink/game-data';
 import { keyDistance, rangeKeys } from '@brink/map';
 import { blackFilesView, dormant } from './blackfiles';
 import { leaderEffects, leaderOf } from './commanders';
@@ -121,9 +121,14 @@ export function emptyIntel(): NationIntel {
   return { observed: {}, knownOwner: {}, lastKnown: {} };
 }
 
-/** The level powers the victory bars are scaled for: the map's, set when it is built (four when absent). */
+/** The powers the victory bars are scaled for: the map's, set when it is built (as measured when absent). */
 export function barPowers(world: Pick<WorldState, 'barPowers'>): number {
-  return world.barPowers ?? 4;
+  return world.barPowers ?? VICTORY.measuredPowers;
+}
+
+/** The bars this campaign is won by: its length and its map's powers (`victoryBars`). */
+export function barsOf(world: Pick<WorldState, 'barPowers' | 'maxTurns'>): VictoryBars {
+  return victoryBars(world.maxTurns, barPowers(world));
 }
 
 /** Record what `nation` saw at the end of this turn. Mutates `world.intel[nation]`. */
@@ -172,7 +177,7 @@ export function totalVictoryPoints(world: WorldState): number {
 }
 
 export function victoryThreshold(world: WorldState): number {
-  return Math.ceil((totalVictoryPoints(world) * victoryBars(world.maxTurns, barPowers(world), world.scenarioId).dominationShare) / 100);
+  return Math.ceil((totalVictoryPoints(world) * barsOf(world).dominationShare) / 100);
 }
 
 /**

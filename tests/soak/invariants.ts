@@ -3,7 +3,8 @@ import { RESOURCES } from '@brink/contracts';
 import { CARDS, CITY_GROWTH, COMMANDER_RULES, DOCTRINE, FACILITY_SLOTS, LEVEL_SLOT_AT, levelForXp, STACK_LIMIT, TECHS, UNITS } from '@brink/game-data';
 import { handSizeOf } from '@brink/simulation';
 
-// The invariants every soak checks between turns, in every theatre.
+// The invariants every soak checks between turns, in every theatre: the one list, imported by every
+// soak file (soak.test.ts and each theatre's), with the Black Files' own beside it.
 
 /** Every invariant a world must satisfy between turns. Returns the broken ones. */
 export function invariants(w: WorldState): string[] {
@@ -32,6 +33,8 @@ export function invariants(w: WorldState): string[] {
     if (f.strength <= 0 || f.strength > 1000) bad.push(`${f.id} strength ${f.strength}`);
     // At sea: ships, and whoever rides in one, in that ship's own hex. Nothing else.
     if (w.tiles[f.key]?.terrain === 'water' && !UNITS[f.unitClass].naval && !f.aboard) bad.push(`${f.id} in water`);
+    // And ships only at sea or in a port: never beached.
+    if (UNITS[f.unitClass].naval && w.tiles[f.key] && w.tiles[f.key]!.terrain !== 'water' && !w.tiles[f.key]!.port) bad.push(`${f.id} ship ashore`);
     if (f.aboard && (!w.formations[f.aboard] || w.formations[f.aboard]!.key !== f.key)) bad.push(`${f.id} aboard a ship that is not there`);
     if (f.aboard && UNITS[w.formations[f.aboard]?.unitClass ?? 'infantry'].carries !== (UNITS[f.unitClass].ground ? 'ground' : 'air')) bad.push(`${f.id} aboard the wrong kind of ship`);
     perHex.set(f.key, [...(perHex.get(f.key) ?? []), f.owner]);
@@ -77,5 +80,25 @@ export function invariants(w: WorldState): string[] {
     if (led.has(c.formation)) bad.push(`two generals lead ${c.formation}`);
     led.add(c.formation);
   }
+  return bad;
+}
+
+/**
+ * The Black Files' own invariants, for a world with them: whole artefacts held only by powers, nobody
+ * both in the Accord and out of it for good, no signatories at war, a sleeping Visitors with nothing,
+ * digs that only ever empty, and only the Visitors fielding their kinds of unit.
+ */
+export function blackFilesInvariants(w: WorldState): string[] {
+  const bf = w.blackFiles;
+  if (!bf) return [];
+  const bad: string[] = [];
+  for (const [n, a] of Object.entries(bf.artefacts)) if (!Number.isInteger(a) || a <= 0 || !w.nations[n] || w.nations[n]!.minor) bad.push(`${n} holds ${a} artefacts`);
+  for (const n of bf.accord) if (bf.betrayers.includes(n)) bad.push(`${n} both signed and betrayed`);
+  for (const a of bf.accord) for (const b of bf.accord) if (a < b && w.relations[`${a}|${b}`] === 'war') bad.push(`signatories ${a} and ${b} at war`);
+  for (const d of Object.values(bf.digs)) if (d.left < 0 || d.turns < 0) bad.push('a dig below nothing');
+  if (bf.awake === null) {
+    if (Object.values(w.formations).some((f) => f.owner === bf.visitors) || Object.values(w.sites).some((s) => s.owner === bf.visitors)) bad.push('the Visitors hold something asleep');
+  }
+  for (const f of Object.values(w.formations)) if ((f.owner === bf.visitors) !== ['walker', 'swarm', 'emitter'].includes(f.unitClass)) bad.push(`${f.id} ${f.unitClass} of ${f.owner}`);
   return bad;
 }

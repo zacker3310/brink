@@ -10,6 +10,9 @@ export interface SlotInfo {
   turn: number;
   nation: string;
   savedAt: string;
+  /** The campaign's theatre and length (slots written before the theatres have neither). */
+  theatre?: string;
+  maxTurns?: number;
 }
 
 export const SLOT_NAMES = ['Slot 1', 'Slot 2', 'Slot 3'] as const;

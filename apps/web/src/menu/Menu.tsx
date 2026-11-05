@@ -20,6 +20,8 @@ const TUTORIAL_SEED = 1;
 
 interface Deploying {
   nation?: string;
+  /** The campaign the nation is in, so its colours are that theatre's. */
+  theatre?: string;
   title: string;
   kicker: string;
 }
@@ -33,7 +35,7 @@ function Deploy({ d }: { d: Deploying }) {
     const t = window.setInterval(() => setLine((l) => (l + 1) % LINES.length), 900);
     return () => window.clearInterval(t);
   }, []);
-  const spec = findNation(d.nation);
+  const spec = findNation(d.nation, d.theatre);
   return createPortal(
     <div className="deploy" role="status" aria-live="polite" data-testid="deploying" style={spec ? { ['--deploy' as string]: spec.color } : undefined}>
       <div className="deploy-ring">{spec ? <Emblem color={spec.color} government={spec.government} className="h-14 w-14" /> : null}</div>
@@ -86,7 +88,7 @@ export function Menu() {
           onQuickBattle={() => fight(quickBattle())}
           onContinue={(s) => {
             const text = readSlot(s.slot);
-            if (text) void deploy({ nation: s.nation, title: `Turn ${s.turn}`, kicker: 'Resuming campaign' }, () => loadGame(text));
+            if (text) void deploy({ nation: s.nation, ...(s.theatre ? { theatre: s.theatre } : {}), title: `Turn ${s.turn}`, kicker: 'Resuming campaign' }, () => loadGame(text));
             else notify('That slot could not be read', 'error');
           }}
         />
@@ -94,7 +96,7 @@ export function Menu() {
       {screen === 'setup' && (
         <Setup
           onBack={back}
-          onBegin={(nation, seed, ...rest) => deploy({ nation, title: operationName(seed), kicker: 'Operation' }, () => newGame(nation, seed, ...rest))}
+          onBegin={(nation, seed, maxTurns, difficulty, theatre, ...rest) => deploy({ nation, theatre, title: operationName(seed), kicker: 'Operation' }, () => newGame(nation, seed, maxTurns, difficulty, theatre, ...rest))}
         />
       )}
       {screen === 'archive' && <Archive slots={slots} onBack={back} onLoad={load} onError={(t) => notify(t, 'error')} />}

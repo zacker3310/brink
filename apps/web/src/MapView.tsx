@@ -9,7 +9,7 @@ import { addUnit, affiliationOf, keepScreenSize, setModelZoom, tickModels, type 
 import { AFFILIATION, FONT_DISPLAY, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
 import { buildTimeline, playReplay, useReplay } from './replay';
 import { terrainTexture } from './design/terrain';
-import { FIRST_CONTACT_ID } from '@brink/scenarios';
+import { theatreOf } from '@brink/scenarios';
 import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
 import { sfx } from './sfx';
 import { isPhone } from './phone';
@@ -997,6 +997,8 @@ export function MapView() {
     const minY = Math.min(...pts.map((p) => p.y)) - SIZE;
     const span = Math.max(Math.max(...pts.map((p) => p.x)) + SIZE - minX, Math.max(...pts.map((p) => p.y)) + SIZE - minY);
     const satMatrix = art ? new Matrix().scale(span / art.ground.plains.width, span / art.ground.plains.width).translate(minX, minY) : null;
+    // A theatre whose land is ice (First Contact's Antarctica) draws it pale.
+    const ice = theatreOf(v.scenarioId)?.ice === true;
     for (const key of keys) {
       const t = v.tiles[key]!;
       if (t.visibility === 'unknown' || !t.terrain) {
@@ -1022,7 +1024,7 @@ export function MapView() {
       } else if (satMatrix) terrain.poly(poly(key)).fill({ texture: art!.ground[t.terrain], textureSpace: 'global', matrix: satMatrix });
       else terrain.poly(poly(key)).fill({ texture: terrainTexture(t.terrain), textureSpace: 'global', matrix: groundMatrix });
       // Black Files: the Antarctic ice under a white wash, and ground the Visitors turned to crystal.
-      if (t.terrain !== 'water' && v.scenarioId === FIRST_CONTACT_ID) terrain.poly(poly(key)).fill({ color: 0xeef5ff, alpha: 0.5 });
+      if (t.terrain !== 'water' && ice) terrain.poly(poly(key)).fill({ color: 0xeef5ff, alpha: 0.5 });
       if (t.crystal) terrain.poly(poly(key)).fill({ color: 0x7df9e4, alpha: 0.32 });
       // Without imagery, vary the light hex to hex as tiles taken at different hours.
       if (!art) {

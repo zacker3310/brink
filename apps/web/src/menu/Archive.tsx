@@ -1,4 +1,4 @@
-import { findNation, SCENARIOS } from '@brink/scenarios';
+import { DEFAULT_THEATRE, findNation, theatreOf } from '@brink/scenarios';
 import { latestSlot, readSlot, SLOT_NAMES, type SlotInfo } from '../saves';
 import { Frame, Label, relativeTime, ScreenHeader, useKeys } from '../chrome';
 
@@ -13,7 +13,6 @@ export function Archive({
   onLoad: (text: string) => void;
   onError: (text: string) => void;
 }) {
-  const maxTurns = SCENARIOS[0]!.maxTurns;
   const latest = latestSlot(slots);
   useKeys((e) => e.key === 'Escape' && onBack(), [onBack]);
 
@@ -24,7 +23,9 @@ export function Archive({
         <ul className="grid gap-3 sm:grid-cols-3">
           {SLOT_NAMES.map((slot, i) => {
             const info = slots.find((s) => s.slot === slot);
-            const nation = info ? findNation(info.nation) : undefined;
+            const nation = info ? findNation(info.nation, info.theatre) : undefined;
+            // A slot written before slots named their campaign is the default theatre's, at its own length.
+            const maxTurns = info?.maxTurns ?? (theatreOf(info?.theatre) ?? DEFAULT_THEATRE).maxTurns;
             const progress = info ? Math.min(100, ((info.turn - 1) / maxTurns) * 100) : 0;
             return (
               <li key={slot} className={`enter-${i + 1}`}>

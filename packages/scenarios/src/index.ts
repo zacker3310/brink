@@ -1,23 +1,18 @@
 import type { WorldState } from '@brink/contracts';
 import { seedCommanders } from '@brink/simulation';
-import { AMERICAS_ID, AMERICAS_MAX_TURNS, AMERICAS_POWERS, createAmericasScenario } from './americas';
-import { createEuropeScenario, EUROPE_ID, EUROPE_MAX_TURNS, EUROPE_NATIONS } from './europe';
-import { createMideastScenario, MIDEAST_ID, MIDEAST_MAX_TURNS, MIDEAST_NATIONS } from './mideast';
-import { createPacificScenario, MAX_TURNS, NATIONS, PACIFIC_ID } from './pacific';
-import { createIndoPacScenario, INDOPAC_ID, INDOPAC_MAX_TURNS, INDOPAC_NATIONS } from './indopac';
 import { createTestbedScenario, TESTBED_ID } from './testbed';
-import { createFirstContact, FIRST_CONTACT_ID, FIRST_CONTACT_TURNS } from './blackfiles';
+import { ALL_THEATRES, createTheatre } from './theatres';
 
 export * from './crises';
-export * from './pacific';
-export * from './indopac';
 export * from './build';
-export * from './testbed';
-export * from './blackfiles';
+export * from './pacific';
 export * from './europe';
-export * from './theatres';
 export * from './mideast';
+export * from './indopac';
 export * from './americas';
+export * from './blackfiles';
+export * from './testbed';
+export * from './theatres';
 
 export interface ScenarioInfo {
   id: string;
@@ -27,59 +22,12 @@ export interface ScenarioInfo {
   maxTurns: number;
 }
 
-export const SCENARIOS: readonly ScenarioInfo[] = [
-  {
-    id: PACIFIC_ID,
-    name: 'The Pacific',
-    summary: 'The United States, Russia, China and Japan fight across an ocean of islands, with Canada, Mexico, the Koreas and Taiwan caught between them.',
-    nations: NATIONS.length,
-    maxTurns: MAX_TURNS,
-  },
-  {
-    id: FIRST_CONTACT_ID,
-    name: 'Black Files: First Contact',
-    summary: 'Five powers on the Antarctic ice under the treaty, four digs on the plateau, and something under it that wakes. Sign the Accord, or betray it.',
-    nations: 5,
-    maxTurns: FIRST_CONTACT_TURNS,
-  },
-  {
-    id: EUROPE_ID,
-    name: 'Europe',
-    summary: 'The United Kingdom, France, Germany, Poland, Russia and Turkey fight from the Atlantic to the Urals, with the Nordics, the Baltics, Ukraine, the Balkans and the Mediterranean shore caught between them.',
-    nations: EUROPE_NATIONS.length,
-    maxTurns: EUROPE_MAX_TURNS,
-  },
-  {
-    id: MIDEAST_ID,
-    name: 'Middle East and Africa',
-    summary: 'Turkey, Iran, Saudi Arabia, Egypt, Nigeria and South Africa contest the oil, the minerals and the straits from the Mediterranean to the Cape.',
-    nations: MIDEAST_NATIONS.length,
-    maxTurns: MIDEAST_MAX_TURNS,
-  },
-  {
-    id: INDOPAC_ID,
-    name: 'Indo-Pacific South',
-    summary: 'India, Pakistan, China, Indonesia and Australia fight from the Himalaya to the Tasman Sea, over the straits, reefs and islands between two oceans.',
-    nations: INDOPAC_NATIONS.length,
-    maxTurns: INDOPAC_MAX_TURNS,
-  },
-  {
-    id: AMERICAS_ID,
-    name: 'The Americas',
-    summary: 'The United States, Canada, Mexico, Colombia, Brazil and Argentina fight from the Arctic to Cape Horn, with Cuba, Venezuela, Peru, Chile and the Panama Canal between them.',
-    nations: AMERICAS_POWERS.length,
-    maxTurns: AMERICAS_MAX_TURNS,
-  },
-];
+/** Every campaign a player can start, as the title screen and the API list them (`ALL_THEATRES`). */
+export const SCENARIOS: readonly ScenarioInfo[] = ALL_THEATRES.map((t) => ({ id: t.id, name: t.name, summary: t.about, nations: t.powers.length, maxTurns: t.maxTurns }));
 
 export function createScenario(id: string, seed: number): WorldState {
-  // Black Files: First Contact, on the Antarctica map (scenarios `blackfiles.ts`).
-  if (id === FIRST_CONTACT_ID) return seedCommanders(createFirstContact(seed));
-  if (id === PACIFIC_ID) return seedCommanders(createPacificScenario(seed));
-  if (id === EUROPE_ID) return seedCommanders(createEuropeScenario(seed));
-  if (id === MIDEAST_ID) return seedCommanders(createMideastScenario(seed));
-  if (id === INDOPAC_ID) return seedCommanders(createIndoPacScenario(seed));
-  if (id === AMERICAS_ID) return seedCommanders(createAmericasScenario(seed));
+  const world = createTheatre(id, seed);
+  if (world) return world;
   // The world-engine testbed: playable by the engine and the AI, never listed for a player.
   if (id === TESTBED_ID) return seedCommanders(createTestbedScenario(seed));
   throw new Error(`unknown scenario: ${id}`);

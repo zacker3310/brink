@@ -2,7 +2,7 @@ import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationVie
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { consider, emptyMemory, offerOf, planOrders, updateMemory, type Offer, type Verdict } from '@brink/ai';
 import { HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
-import { applyBlackFiles, applyCrisis, createScenario, type CrisisId, crisisOf, FIRST_CONTACT_ID, theatreCrises } from '@brink/scenarios';
+import { applyBlackFiles, applyCrisis, createScenario, type CrisisId, crisisOf, naturalAlly, theatreCrises, theatreOf } from '@brink/scenarios';
 import { keyDistance } from '@brink/map';
 import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys, supremacyStanding } from '@brink/simulation';
 
@@ -66,8 +66,11 @@ export class GameSession {
     // Easy keeps its ally through any crisis that does not set the two at war.
     if (opts.difficulty === 'easy') easyAlly(world, humans);
     // The Black Files toggle seeds the anomaly last, so the Visitors are at war with every nation the
-    // crisis made, and before anyone is given a memory.
-    if (opts.blackFiles) applyBlackFiles(world);
+    // crisis made, and before anyone is given a memory. Its sites are on one theatre's map.
+    if (opts.blackFiles) {
+      if (!theatreOf(scenarioId)?.blackFiles) throw new Error(`the Black Files are not placed on ${scenarioId}'s map`);
+      applyBlackFiles(world);
+    }
     const memory: Record<NationId, AiMemory> = {};
     for (const n of sortedKeys(world.nations)) if (!humans.includes(n)) memory[n] = emptyMemory();
     return new GameSession(world, humans, memory, Object.fromEntries(humans.map((n) => [n, []])), {});
@@ -261,34 +264,10 @@ export class GameSession {
   }
 }
 
-/**
- * Each power's natural allies, who fight beside a human player on Easy: the first that is a power in
- * the campaign's theatre (Russia's is China in the Pacific, Turkey in Europe).
- */
-const ALLY: Record<NationId, readonly NationId[]> = {
-  japan: ['usa'],
-  usa: ['japan', 'canada'],
-  russia: ['china', 'turkey'],
-  china: ['russia'],
-  uk: ['france'],
-  france: ['uk'],
-  germany: ['poland'],
-  poland: ['germany'],
-  turkey: ['russia'],
-  // The Indo-Pacific South: India and Australia; Pakistan and China. Indonesia stands alone.
-  india: ['australia'],
-  australia: ['india'],
-  pakistan: ['china'],
-  // The Americas: the United States and Canada, Mexico and Colombia, Brazil and Argentina.
-  canada: ['usa'],
-  mexico: ['colombia'],
-  colombia: ['mexico'],
-  brazil: ['argentina'],
-  argentina: ['brazil'],
-};
-
+/** The natural ally who fights beside a human player on Easy: the theatre's pair for `me`, if on the map. */
 function allyOf(world: WorldState, me: NationId): NationId | undefined {
-  return (ALLY[me] ?? []).find((n) => world.nations[n] && !world.nations[n]!.minor);
+  const ally = naturalAlly(world.scenarioId, me);
+  return ally && world.nations[ally] && !world.nations[ally]!.minor ? ally : undefined;
 }
 
 /** Easy, single player: the ally the difficulty gave stays an ally unless the crisis set them at war. */
@@ -309,8 +288,8 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
   // Every human seat plays with the level's command edge (none on Hard).
   if (difficulty !== 'hard') for (const h of humans) world.nations[h]!.edge = difficulty;
   if (difficulty === 'normal') return;
-  // First Contact opens under the Antarctic Treaty: the level's stockpiles, but no wars of Easy's making.
-  const treaty = world.scenarioId === FIRST_CONTACT_ID;
+  // A theatre under a treaty (First Contact's Antarctic Treaty): the level's stockpiles, but no wars of Easy's making.
+  const treaty = theatreOf(world.scenarioId)?.treaty === true;
   const boost = (n: NationId, percent: number) => {
     const s = world.nations[n]!.stockpile;
     for (const r of sortedKeys(s)) s[r as keyof typeof s] = Math.floor((s[r as keyof typeof s] * percent) / 100);
@@ -328,8 +307,8 @@ function applyDifficulty(world: WorldState, humans: readonly NationId[], difficu
       const k = capital(n);
       return k ? keyDistance(home, k) : Infinity;
     };
-    // Your natural ally fights beside you (Japan and the United States, Russia and China); the
-    // enemy is the nearest power of the other side; the last stays out of it.
+    // Your natural ally fights beside you (the theatre's pair: Japan and the United States, Russia and
+    // China in the Pacific); the enemy is the nearest power of the other side; the rest stay out of it.
     const ally = allyOf(world, me);
     const enemies = rivals.filter((n) => n !== ally);
     const nearest = [...enemies].sort((a, b) => far(a) - far(b) || (a < b ? -1 : 1))[0];

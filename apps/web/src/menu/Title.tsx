@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RULESET_VERSION } from '@brink/game-data';
-import { CRISES, findNation, SCENARIOS } from '@brink/scenarios';
+import { ALL_THEATRES, findNation, THEATRES } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { tutorialDone } from '../coach';
 import { latestSlot, type SlotInfo } from '../saves';
@@ -40,9 +40,8 @@ export function Title({
   onTutorial: () => void;
   onQuickBattle: () => void;
 }) {
-  const scenario = SCENARIOS[0]!;
   const last = latestSlot(slots);
-  const lastNation = last ? findNation(last.nation) : undefined;
+  const lastNation = last ? findNation(last.nation, last.theatre) : undefined;
   const career = readCareer();
   const [muted, setMute] = useState(isMuted());
   const [intro] = useState(() => {
@@ -57,7 +56,7 @@ export function Title({
   const items: Item[] = [
     ...(fresh ? [guided] : []),
     ...(last ? [{ id: 'continue', label: 'Continue', sub: `${lastNation?.name ?? last.nation} · turn ${last.turn} · ${relativeTime(last.savedAt)}`, swatch: lastNation?.color, go: () => onContinue(last) }] : []),
-    { id: 'new', label: 'New campaign', sub: 'Choose a nation. Three AI powers want what you hold.', go: () => go('setup') },
+    { id: 'new', label: 'New campaign', sub: `Choose a theatre and a nation. Every rival power wants what you hold.`, go: () => go('setup') },
     { id: 'quick', label: 'Quick battle', sub: 'Straight into the fight: one company, one objective', go: onQuickBattle },
     { id: 'skirmish', label: 'Skirmish', sub: career.battles ? `${career.stars}★ earned in battle` : 'Pick a battle. Earn stars.', go: () => go('skirmish') },
     ...(fresh ? [] : [guided]),
@@ -80,7 +79,7 @@ export function Title({
     [items.length, cursor, last?.slot],
   );
 
-  const wire = CRISES.map((c) => `${c.name}: ${c.hook}`);
+  const wire = ALL_THEATRES.flatMap((t) => t.crises).map((c) => `${c.name}: ${c.hook}`);
   const row = (it: Item, i: number) => (
     <button
       type="button"
@@ -137,7 +136,7 @@ export function Title({
         <div className="flex min-h-0 flex-1 flex-col px-6 pt-5 pb-3 sm:px-14 sm:pt-10 lg:justify-center lg:pt-0">
           <header className="home-rise">
             <p className="home-kicker">
-              {scenario.name} <span className="home-kicker-sep">·</span> Four powers <span className="home-kicker-sep">·</span> One turn
+              {THEATRES.length} theatres <span className="home-kicker-sep">·</span> Every power at once <span className="home-kicker-sep">·</span> One turn
             </p>
             <h1 className="home-logo" data-testid="wordmark">
               Brink

@@ -1,5 +1,5 @@
 import type { Formation, GovernmentId, HexKey, Nation, NationId, Site, Terrain, Tile, UnitClass, WorldState, Yields } from '@brink/contracts';
-import { RULES, RULESET_VERSION, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { RULES, RULESET_VERSION, STACK_LIMIT, UNITS, VICTORY } from '@brink/game-data';
 import { cellKey, hexKey, keyDistance, layerAt, type MapFile, type MapSite, neighborKeys, offsetToAxial } from '@brink/map';
 import { computeVision, emptyIntel, grossYields, initDoctrine, mulberry32, newFormation, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
 
@@ -245,8 +245,8 @@ export function buildScenario(map: MapFile, seed: number, setup: ScenarioSetup):
     scenarioId: setup.scenarioId,
     turn: 1,
     maxTurns: setup.maxTurns,
-    // More than four powers: the victory bars come down in proportion (`victoryBars`).
-    ...(powers.length > 4 ? { barPowers: powers.length } : {}),
+    // More powers than the bars were measured with: the bars scale with their count (`victoryBars`).
+    ...(powers.length > VICTORY.measuredPowers ? { barPowers: powers.length } : {}),
     seed: seed >>> 0,
     nextId: 1,
     tiles,

@@ -1,7 +1,7 @@
 import type { SaveFile, WorldState } from '@brink/contracts';
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
-import { RULESET_VERSION } from '@brink/game-data';
-import { SCENARIOS, THEATRES } from '@brink/scenarios';
+import { RULESET_VERSION, VICTORY } from '@brink/game-data';
+import { theatreOf } from '@brink/scenarios';
 import { clone, hashState, initDoctrine, initProgression, seedCommanders } from '@brink/simulation';
 
 /** Theatres the game no longer has (ruleset 2.0.0 replaced them with the Pacific). */
@@ -66,9 +66,24 @@ export function migrateSave(save: SaveFile): SaveFile {
   // new deal kinds simply absent) add no world state: nothing to fill.
   // Ruleset 2.12 (the Black Files lane's 2.10): a campaign without them stays without them; one with
   // them gains any part of their state a younger build did not keep.
+  // Ruleset 2.13 (the theatres): the victory bars scale with the powers on the map, fixed at build as
+  // `barPowers`; a campaign begun before carries the count its map has.
   // Every step is keyed on a field being absent, so a migrated world comes out of it again unchanged.
   normalizeBlackFiles(world);
+  fillBarPowers(world);
   return { ...s, world, rulesetVersion: RULESET_VERSION, hash: hashState(world), ...(from !== RULESET_VERSION ? { migratedFrom: from } : {}) };
+}
+
+/**
+ * Ruleset 2.13: a world built before the bars scaled with the powers on its map gains its map's count,
+ * as a world of 2.13 is built with it (`buildScenario`): only where it has more powers than the bars
+ * were measured with (First Contact's five). A Pacific world, of four, is left exactly as it was.
+ * Idempotent: a world that has the field keeps it.
+ */
+export function fillBarPowers(world: WorldState): void {
+  if (world.barPowers !== undefined) return;
+  const powers = theatreOf(world.scenarioId)?.powers.length ?? 0;
+  if (powers > VICTORY.measuredPowers) world.barPowers = powers;
 }
 
 /**
@@ -110,7 +125,7 @@ export function parseSave(text: string): SaveFile {
   if (typeof s.rulesetVersion !== 'string' || compareVersions(s.rulesetVersion, RULESET_VERSION) > 0) {
     throw new SaveError(`save uses ruleset ${s.rulesetVersion}, newer than this build (${RULESET_VERSION}); update the game`);
   }
-  const known = SCENARIOS.some((sc) => sc.id === s.scenarioId) || THEATRES.some((t) => t.id === s.scenarioId);
+  const known = theatreOf(s.scenarioId) !== undefined;
   if (!known && RETIRED.includes(s.scenarioId as string)) throw new SaveError('this campaign was fought in the Meridian, which the Pacific has replaced; start a new campaign');
   if (!known) throw new SaveError(`unknown scenario ${s.scenarioId}`);
   if (!s.world || typeof s.world !== 'object' || s.world.rulesetVersion !== s.rulesetVersion || s.world.scenarioId !== s.scenarioId) throw new SaveError('save world does not match its header');

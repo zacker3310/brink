@@ -5,8 +5,7 @@ import { cellKey, findPath, keyDistance, neighborKeys } from '@brink/map';
 import { enterCost, hashState, seedCommanders, sortedKeys } from '@brink/simulation';
 import { createIndoPacScenario, INDOPAC_ID, INDOPAC_MAP, INDOPAC_MINORS, INDOPAC_NATIONS } from './indopac';
 import { createScenario, SCENARIOS } from './index';
-import { THEATRES } from './pacific';
-import { findNation, theatreCrises, theatreMinors, theatrePowers } from './theatres';
+import { findNation, THEATRES, theatreCrises, theatreMinors, theatrePowers } from './theatres';
 
 // Worlds built and hashed take seconds each on a loaded machine: those tests get a time budget.
 describe('The Indo-Pacific South', () => {

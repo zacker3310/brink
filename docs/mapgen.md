@@ -136,8 +136,13 @@ committed file matches the generator byte for byte.
   checked, but the simulation does not read them yet. That is the trade-and-chokepoints lane.
 - **Scale.** At 160 x 80 the per-hex loops in the builder and in fog and supply need the incremental
   work the master plan lists. The testbed's numbers above are the baseline.
-- **Pacific-only data still in code:** the crises (by site name and Pacific cells; `theatres.ts`
-  gives other theatres none). Easy's natural allies are a preference list per power, and the setup
-  screen reads each theatre's own nations (`docs/europe.md`).
+- **Pacific-only data still in code:** the crises (by site name and Pacific cells) and the Black
+  Files' sites. `packages/scenarios/src/theatres.ts` is the one table of theatres: each one's powers,
+  minor states, crises (none outside the Pacific: the classic war only), Easy's natural allies in
+  pairs, whether the Black Files toggle can seed it, and how its world is built.
 - **Europe** (`europe.map.json`, 56 x 32, 46 nations) is the second theatre: a Natural Earth bake
   finished by hand, its grid in `packages/mapgen/src/europe.ts`.
+- **Every theatre's map has its generator in `packages/mapgen`** and a test that the committed file is
+  its output byte for byte: `europe.ts`, `mideast.ts`, `indopac.ts`, `americas.ts`, `antarctica.ts`,
+  `testbed.ts` (`pnpm --filter @brink/mapgen map:<id>` rewrites one). The Indo-Pacific South was traced
+  by a script outside the repository; `indopac.ts` is that script ported, and writes the same file.

@@ -782,7 +782,7 @@ export const useGame = create<State>((set, get) => {
         return;
       }
       const view = get().view!;
-      const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString() }, r.text);
+      const ok = writeSlot({ slot, label: `${view.self.name}, turn ${r.turn}`, turn: r.turn, nation: view.self.id, savedAt: new Date().toISOString(), theatre: view.scenarioId, maxTurns: view.maxTurns }, r.text);
       if (!ok) get().notify('Could not save: browser storage is unavailable or full', 'error');
       else if (!quiet) get().notify(`Saved to ${slot}`);
       set({ slots: listSlots() });

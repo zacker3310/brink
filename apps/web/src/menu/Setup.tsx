@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from 'react-dom';
 import type { CampaignLength, Difficulty, NationId } from '@brink/contracts';
 import { CAMPAIGN_TURNS, GOVERNMENTS, NATION_BLURB, UNITS, VICTORY, victoryBars } from '@brink/game-data';
-import { crisisOf, dealCrisis, FIRST_CONTACT_ID, FIRST_CONTACT_TURNS, SCENARIOS, THEATRES, createScenario, theatreCrises, theatreMinors, theatrePowers, type CrisisId } from '@brink/scenarios';
+import { classicOnly, crisisOf, dealCrisis, FIRST_CONTACT, THEATRES, createScenario, theatreCrises, theatreMinors, theatrePowers, type CrisisId } from '@brink/scenarios';
 import { readCareer } from '../arena/career';
 import { readPrefs, writePrefs } from '../saves';
 import { Kbd, Mark, useKeys } from '../chrome';
@@ -40,8 +40,8 @@ const CLASSIC = {
   recommended: null as NationId | null,
 };
 
-/** The powers on the ice in Black Files: First Contact; a player of another power leads the United States there. */
-const ON_THE_ICE: readonly NationId[] = ['usa', 'russia', 'china', 'uk', 'australia'];
+/** The powers on the ice in Black Files: First Contact; a player of another power leads its first (the United States) there. */
+const ON_THE_ICE: readonly NationId[] = FIRST_CONTACT.powers.map((n) => n.id);
 
 export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (nation: NationId, seed: number, maxTurns: number, difficulty: Difficulty, theatre: string, crisis?: string, blackFiles?: boolean) => Promise<void> }) {
   const wars = readCareer().warsWon.length;
@@ -50,7 +50,6 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     return t && t.unlock <= wars ? t.id : THEATRES[0]!.id;
   });
   const theatre = THEATRES.find((t) => t.id === theatreId)!;
-  // Each theatre has its own powers and minor states.
   const pickTheatre = (id: string) => {
     setTheatreId(id);
     writePrefs({ theatre: id });
@@ -66,7 +65,8 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
   const [starting, setStarting] = useState(false);
   const [length, setLength] = useState<CampaignLength>(() => readPrefs().length ?? 'quick');
   const turns = CAMPAIGN_TURNS[length];
-  const bars = victoryBars(turns, nations.length, theatreId);
+  // The bars the campaign will be won by: by its length and the theatre's count of powers.
+  const bars = victoryBars(turns, nations.length);
   const [difficulty, setDifficulty] = useState<Difficulty>(() => readPrefs().difficulty ?? 'easy');
   const pickDifficulty = (d: Difficulty) => {
     setDifficulty(d);
@@ -88,7 +88,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     writePrefs({ crisis: c });
   };
   // A theatre with no crises of its own opens the classic way.
-  const crisis = crisisPick === 'none' || CRISES.length === 0 ? CLASSIC : crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
+  const crisis = crisisPick === 'none' || classicOnly(theatreId) ? CLASSIC : crisisOf(crisisPick === 'random' ? dealCrisis(seed) : crisisPick)!;
   /** The next crisis in the deck from this one: a fresh deal that never repeats the current one. */
   const dealAnother = () => {
     if (CRISES.length < 2) return;
@@ -110,14 +110,16 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     setNation(id);
     writePrefs({ nation: id });
   };
-  // The Black Files: seeded into this campaign by the toggle (off by default), or played on their own.
-  const [blackFiles, setBlackFiles] = useState(() => readPrefs().blackFiles === true);
+  // The Black Files: seeded into this campaign by the toggle (off by default) in a theatre whose map
+  // has their sites, or played on their own.
+  const [blackFilesPick, setBlackFiles] = useState(() => readPrefs().blackFiles === true);
+  const blackFiles = blackFilesPick && theatre.blackFiles;
   const toggleBlackFiles = () => {
     setBlackFiles(!blackFiles);
     writePrefs({ blackFiles: !blackFiles });
   };
-  const firstContact = SCENARIOS.find((s) => s.id === FIRST_CONTACT_ID)!;
-  const iceNation = ON_THE_ICE.includes(nation) ? nation : 'usa';
+  const firstContact = FIRST_CONTACT;
+  const iceNation = ON_THE_ICE.includes(nation) ? nation : ON_THE_ICE[0]!;
   const begin = async () => {
     if (starting) return;
     setStarting(true);
@@ -131,7 +133,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     if (starting) return;
     setStarting(true);
     try {
-      await onBegin(iceNation, seed, FIRST_CONTACT_TURNS, difficulty, FIRST_CONTACT_ID);
+      await onBegin(iceNation, seed, FIRST_CONTACT.maxTurns, difficulty, FIRST_CONTACT.id);
     } finally {
       setStarting(false);
     }
@@ -409,7 +411,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               Mission parameters
             </SectionHead>
 
-            <SubHead first aside={crisis.id === 'classic' ? 'no crisis' : crisisPick === 'random' ? 'dealt from the seed' : 'your pick'}>
+            <SubHead first aside={classicOnly(theatreId) ? 'none in this theatre' : crisis.id === 'classic' ? 'no crisis' : crisisPick === 'random' ? 'dealt from the seed' : 'your pick'}>
               Opening crisis
             </SubHead>
             <div className="wr-crisis" data-testid="crisis-card" data-crisis={crisis.id}>
@@ -442,19 +444,22 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
                 )}
               </div>
             </div>
-            <div className={`wr-crisis-deck ${CRISES.length ? '' : 'hidden'}`} role="radiogroup" aria-label="Opening crisis">
-              <button type="button" role="radio" aria-checked={crisisPick === 'random'} onClick={() => pickCrisis('random')} data-testid="crisis-random">
-                Random
-              </button>
-              <button type="button" role="radio" aria-checked={crisisPick === 'none'} onClick={() => pickCrisis('none')} data-testid="crisis-none">
-                Classic war
-              </button>
-              {CRISES.map((c) => (
-                <button key={c.id} type="button" role="radio" aria-checked={crisisPick === c.id} onClick={() => pickCrisis(c.id)} data-testid={`crisis-${c.id}`}>
-                  {c.name}
+            {/* A theatre with no Opening Crisis of its own (`classicOnly`) opens the classic way: no deck to pick from. */}
+            {!classicOnly(theatreId) && (
+              <div className="wr-crisis-deck" role="radiogroup" aria-label="Opening crisis">
+                <button type="button" role="radio" aria-checked={crisisPick === 'random'} onClick={() => pickCrisis('random')} data-testid="crisis-random">
+                  Random
                 </button>
-              ))}
-            </div>
+                <button type="button" role="radio" aria-checked={crisisPick === 'none'} onClick={() => pickCrisis('none')} data-testid="crisis-none">
+                  Classic war
+                </button>
+                {CRISES.map((c) => (
+                  <button key={c.id} type="button" role="radio" aria-checked={crisisPick === c.id} onClick={() => pickCrisis(c.id)} data-testid={`crisis-${c.id}`}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <SubHead>Difficulty</SubHead>
             <p className="wr-choice-text -mt-1 mb-2" data-testid="difficulty-advice">
@@ -494,25 +499,28 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
               ))}
             </div>
 
-            {/* The Black Files (MASTER-PLAN Phase 8): a toggle for this campaign, and a scenario of their own. */}
-            <SubHead aside={blackFiles ? 'classified: on' : 'off'}>The Black Files</SubHead>
+            {/* The Black Files (MASTER-PLAN Phase 8): a toggle for this campaign where the theatre's map has
+                their sites, and a scenario of their own. */}
+            <SubHead aside={!theatre.blackFiles ? 'not in this theatre' : blackFiles ? 'classified: on' : 'off'}>The Black Files</SubHead>
             <div className="grid gap-2 sm:grid-cols-2" data-testid="black-files-panel">
-              <button type="button" role="switch" aria-checked={blackFiles} data-testid="black-files" onClick={toggleBlackFiles} className="wr-choice">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="wr-choice-title">Black Files</span>
-                  <span className="wr-chip" data-on={blackFiles}>{blackFiles ? 'On' : 'Off'}</span>
-                </span>
-                <span className="wr-choice-text">Seed the anomaly into this campaign: Area 51, Tunguska, a Gobi site and a Bermuda deep site; digs in the Yukon, the Gobi and the steppe. Dig too deep and something wakes.</span>
-              </button>
+              {theatre.blackFiles && (
+                <button type="button" role="switch" aria-checked={blackFiles} data-testid="black-files" onClick={toggleBlackFiles} className="wr-choice">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="wr-choice-title">Black Files</span>
+                    <span className="wr-chip" data-on={blackFiles}>{blackFiles ? 'On' : 'Off'}</span>
+                  </span>
+                  <span className="wr-choice-text">Seed the anomaly into this campaign: Area 51, Tunguska, a Gobi site and a Bermuda deep site; digs in the Yukon, the Gobi and the steppe. Dig too deep and something wakes.</span>
+                </button>
+              )}
               <button type="button" data-testid="first-contact" onClick={() => void beginFirstContact()} disabled={starting} className="wr-choice">
                 <span className="wr-choice-title">{firstContact.name}</span>
                 <span className="wr-choice-text">
-                  {firstContact.summary} {FIRST_CONTACT_TURNS} turns, as {iceNation === nation ? spec.name : 'the United States'}.
+                  {firstContact.about} {firstContact.maxTurns} turns, as {iceNation === nation ? spec.name : `the ${firstContact.powers[0]!.name}`}.
                 </span>
               </button>
             </div>
 
-            {/* One theatre today: the picker returns when there is a choice to make. */}
+            {/* The theatre picker: every listed theatre (`THEATRES`); First Contact has its button above. */}
             {THEATRES.length > 1 && <SubHead>Theatre</SubHead>}
             <div className={`grid gap-2 sm:grid-cols-3 ${THEATRES.length > 1 ? '' : 'hidden'}`} role="radiogroup" aria-label="Theatre">
               {THEATRES.map((t) => {

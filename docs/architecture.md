@@ -10,12 +10,13 @@ packages/contracts   plain JSON types: WorldState, orders, events, NationView, S
 packages/map         axial hex math, pixel layout, A*, reachable sets (render-independent)
 packages/game-data   versioned balance data: terrain, unit classes, techs, governments, RULES
 packages/simulation  pure deterministic engine: resolveTurn, validation, fog, previews
-packages/scenarios   The Pacific (800 hexes, Moscow to Washington: four powers, seven minor states; docs/pacific.md)
+packages/scenarios   the theatres, one table in theatres.ts: the Pacific (docs/pacific.md), Europe, the Middle East
+                     and Africa, the Indo-Pacific South, the Americas, and Black Files: First Contact
 packages/ai          utility AI: NationView in, NationOrders out
 packages/session     GameSession (match loop) and versioned save files
 apps/web             React + PixiJS + Zustand + Tailwind client; engine runs in a Web Worker
 apps/api             Fastify: health, scenario list, headless AI-only simulation runs
-tests/soak           100 seeded AI-vs-AI matches with invariant checks every turn
+tests/soak           seeded AI-vs-AI matches per theatre, every turn checked by one invariants.ts
 tests/e2e            Playwright journey: start, order, end turn, report, save, resume
 ```
 

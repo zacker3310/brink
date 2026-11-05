@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { PACIFIC_ID } from '@brink/scenarios';
+import { DEFAULT_THEATRE } from '@brink/scenarios';
 import { GameSession, parseSave, serializeSave } from '@brink/session';
 import { previewAssault, previewStrike } from '@brink/simulation';
 import type { Envelope, Request, Response, SeatState } from './protocol';
@@ -18,7 +18,7 @@ function state(nation?: string): Response {
 function handle(req: Request): Response {
   switch (req.type) {
     case 'new':
-      session = GameSession.create(req.theatre ?? PACIFIC_ID, req.seed, req.nation, req.others ?? [], { maxTurns: req.maxTurns, difficulty: req.difficulty, crisis: req.crisis, ...(req.blackFiles ? { blackFiles: true } : {}) });
+      session = GameSession.create(req.theatre ?? DEFAULT_THEATRE.id, req.seed, req.nation, req.others ?? [], { maxTurns: req.maxTurns, difficulty: req.difficulty, crisis: req.crisis, ...(req.blackFiles ? { blackFiles: true } : {}) });
       return state();
     case 'load': {
       const save = parseSave(req.text);

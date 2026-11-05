@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { HexKey, NationView } from '@brink/contracts';
 import { hexCorners, hexToPixel, neighborKeys, parseKey, type Point } from '@brink/map';
-import { createScenario, PACIFIC_ID, shortName } from '@brink/scenarios';
+import { createScenario, DEFAULT_THEATRE, shortName } from '@brink/scenarios';
 import { mainland } from '../mainland';
 import { buildView } from '@brink/simulation';
 import { paintTheatre } from '../paint/ground';
@@ -80,7 +80,7 @@ export function TitleScene({ className = '' }: { className?: string }) {
       app.canvas.setAttribute('aria-hidden', 'true');
       const world = new Container();
       app.stage.addChild(world);
-      const v = buildView(createScenario(PACIFIC_ID, 1), 'usa');
+      const v = buildView(createScenario(DEFAULT_THEATRE.id, 1), DEFAULT_THEATRE.powers[0]!.id);
       const keys = Object.keys(v.tiles).sort();
       const painted = paintTheatre(v, keys, SIZE);
       const tex = Texture.from(painted.canvas);

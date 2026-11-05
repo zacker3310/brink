@@ -44,19 +44,6 @@ export const AMERICAS_POWERS: readonly NationSpec[] = ALL.filter((n) => !n.minor
 /** The independent states between them. */
 export const AMERICAS_MINORS: readonly NationSpec[] = ALL.filter((n) => n.minor);
 
-/**
- * Easy's natural allies (`packages/session`): the United States and Canada, Mexico and Colombia,
- * Brazil and Argentina.
- */
-export const AMERICAS_ALLIES: Readonly<Record<NationId, NationId>> = {
-  usa: 'canada',
-  canada: 'usa',
-  mexico: 'colombia',
-  colombia: 'mexico',
-  brazil: 'argentina',
-  argentina: 'brazil',
-};
-
 export function createAmericasScenario(seed: number): WorldState {
   return buildScenario(AMERICAS_MAP, seed, SETUP);
 }

@@ -6,8 +6,7 @@ import { findPath, keyOf, layerAt, neighborKeys, offsetToAxial } from '@brink/ma
 import { enterCost, seedCommanders, sortedKeys } from '@brink/simulation';
 import { createScenario, SCENARIOS } from './index';
 import { createMideastScenario, MIDEAST_ID, MIDEAST_MAP, MIDEAST_MINORS, MIDEAST_NATIONS } from './mideast';
-import { THEATRES } from './pacific';
-import { shortName, theatreCrises, theatreMinors, theatrePowers } from './theatres';
+import { shortName, THEATRES, theatreCrises, theatreMinors, theatrePowers } from './theatres';
 
 // The Middle East and Africa (docs/mideast.md): the geography sanity of the map and the turn-1
 // world it builds. Places are where they are on a globe, the straits are chokepoints, the seas

@@ -2,7 +2,7 @@ import type { HexKey, NationId, Site, WorldState } from '@brink/contracts';
 import { BLACK_FILES } from '@brink/game-data';
 import { cellKey, type MapFile, parseMap } from '@brink/map';
 import { computeVision, dormantVisitors, newBlackFiles, pairKey, sortedKeys, updateIntel } from '@brink/simulation';
-import { buildScenario, type ScenarioSetup } from './build';
+import { buildScenario, nationSpecs, type NationSpec, type ScenarioSetup } from './build';
 import antarcticaMap from './maps/antarctica.map.json' with { type: 'json' };
 
 // The Black Files (MASTER-PLAN Phase 8) as scenarios: the anomaly seeded into a Pacific campaign
@@ -26,6 +26,14 @@ const FIRST_CONTACT: ScenarioSetup = {
     australia: { port: 'Casey Station', ships: ['fleet', 'transport'] },
   },
 };
+
+const ON_THE_ICE: readonly NationSpec[] = nationSpecs(ANTARCTICA_MAP, FIRST_CONTACT);
+
+/** The five powers on the ice by treaty claim. */
+export const FIRST_CONTACT_NATIONS: readonly NationSpec[] = ON_THE_ICE.filter((n) => !n.minor);
+
+/** The neutrals on the ice: Norway and Chile. */
+export const FIRST_CONTACT_MINORS: readonly NationSpec[] = ON_THE_ICE.filter((n) => n.minor);
 
 /** Where the Visitors come up in Antarctica: under the pole, in Ellsworth Land, beside Lake Vostok. */
 const ANTARCTICA_INCURSIONS: readonly { at: [number, number]; name: string }[] = [

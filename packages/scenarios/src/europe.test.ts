@@ -5,8 +5,7 @@ import { cellKey, findPath, keyDistance, neighborKeys } from '@brink/map';
 import { enterCost, seedCommanders, sortedKeys } from '@brink/simulation';
 import { createEuropeScenario, EUROPE_ID, EUROPE_MAP, EUROPE_MINORS, EUROPE_NATIONS } from './europe';
 import { createScenario, SCENARIOS } from './index';
-import { THEATRES } from './pacific';
-import { findNation, theatreCrises, theatreMinors, theatrePowers } from './theatres';
+import { findNation, THEATRES, theatreCrises, theatreMinors, theatrePowers } from './theatres';
 
 describe('Europe', { timeout: 60_000 }, () => {
   const w = createEuropeScenario(1);
@@ -185,15 +184,15 @@ describe('Europe', { timeout: 60_000 }, () => {
     expect(land('russia')).toBeGreaterThan(land('uk') * 10);
   });
 
-  it('asks a European power for as much as a Pacific one: its own victory bars', () => {
-    const total = Object.values(w.sites).reduce((a, s) => a + s.victoryPoints, 0);
-    const start = sitesOf('uk').reduce((a, s) => a + s.victoryPoints, 0);
-    const bars = victoryBars(w.maxTurns, w.barPowers, EUROPE_ID);
+  it('is won by the bars of a six-power map: the one rule every theatre is won by', () => {
+    // The lane that built Europe set it bars of its own (15% domination, 18% supremacy, about twice a
+    // power's opening share of the points); ruleset 2.13.0 has one rule for every theatre, scaled by
+    // the count of powers fixed at build (`barPowers`), and Europe's six are its input.
+    expect(w.barPowers).toBe(6);
+    const bars = victoryBars(w.maxTurns, w.barPowers);
+    expect(bars).toEqual(victoryBars(30, EUROPE_NATIONS.length));
     expect(bars.dominationShare).toBeLessThan(VICTORY.dominationShare);
-    // Domination is about twice a power's opening share, as in the Pacific (32% against 15%).
-    const multiple = (bars.dominationShare * total) / 100 / start;
-    expect(multiple).toBeGreaterThan(1.8);
-    expect(multiple).toBeLessThan(2.6);
+    expect(bars.supremacyShare).toBeLessThan(VICTORY.supremacyShare);
     // Every power is at war with every other, and the minor states at peace with one another.
     for (const a of EUROPE_NATIONS) for (const b of EUROPE_MINORS) expect(w.relations[[a.id, b.id].sort().join('|')]).toBe('war');
     expect(w.relations[['spain', 'portugal'].sort().join('|')]).toBe('peace');

@@ -18,7 +18,7 @@ export * from './leaders';
 export * from './airborne';
 export * from './blackfiles';
 
-export const RULESET_VERSION = '2.12.0';
+export const RULESET_VERSION = '2.13.0';
 
 export const HOURS_PER_TURN = 6;
 
@@ -526,46 +526,38 @@ export const VICTORY = {
   supremacyShare: 29,
   supremacyStability: 35,
   supremacyFromTurn: 8,
+  /** The powers the bars above were measured with: the Pacific's four. A map of more scales them (`victoryBars`). */
+  measuredPowers: 4,
+  /** Supremacy's margin over a fair share of the standing (100 / powers): 29 - 25 at four powers. */
+  supremacyMargin: 4,
 } as const;
 
-/**
- * The bars a campaign is won by, by its length. Up to an epic 60 turns they are `VICTORY`'s; a longer
- * war (Total War) asks for a conquest: 60% of all victory points outright, or 55% standing held from
- * turn 50, so the war is not over while most of it is still to fight.
- *
- * `VICTORY`'s bars were measured on four level powers. With more (`powers`: the map's, fixed at
- * build as `WorldState.barPowers`, so the bar never moves in a match), each starts with a smaller
- * share, so the bars come down: domination in proportion, supremacy to a fair share of the standing
- * plus the four-power margin. Six powers win at 21% of the points or 21% standing. (The Middle East
- * and Africa's six played 20 AI-only matches to the limit at the four-power bars: no leader passed
- * 18% standing or 14% of the points.)
- */
-export function victoryBars(maxTurns: number, powers = 4, theatre?: string): { dominationShare: number; supremacyShare: number; supremacyFromTurn: number } {
-  if (maxTurns > 60) return { dominationShare: 60, supremacyShare: 55, supremacyFromTurn: 50 };
-  const own = theatre === undefined ? undefined : THEATRE_VICTORY[theatre];
-  if (own) return { ...own, supremacyFromTurn: VICTORY.supremacyFromTurn };
-  if (powers <= 4) return { dominationShare: VICTORY.dominationShare, supremacyShare: VICTORY.supremacyShare, supremacyFromTurn: VICTORY.supremacyFromTurn };
-  // Domination in proportion to the points each starts with; supremacy keeps its four-power margin
-  // (4 points) over a fair share of the standing.
-  return {
-    dominationShare: Math.round((VICTORY.dominationShare * 4) / powers),
-    supremacyShare: Math.round(100 / powers) + VICTORY.supremacyShare - 25,
-    supremacyFromTurn: VICTORY.supremacyFromTurn,
-  };
+/** What a campaign is won by: domination, supremacy, and the turn supremacy counts from. */
+export interface VictoryBars {
+  dominationShare: number;
+  supremacyShare: number;
+  supremacyFromTurn: number;
 }
 
 /**
- * A theatre's own bars, where its count of powers and of minor states makes `VICTORY`'s the wrong
- * size. They are set so that winning asks the same of a power as in the Pacific (four powers, a
- * power's sites 15% of the map's victory points): domination about twice the victory points it
- * starts with, supremacy about a third above its opening standing. A theatre not listed uses
- * `VICTORY`. A Total War (over 60 turns) asks for a conquest in every theatre.
+ * The bars a campaign is won by, by its length and by how many powers its map has: one rule for every
+ * theatre. Up to an epic 60 turns, with the four powers `VICTORY`'s bars were measured with, they are
+ * `VICTORY`'s exactly (the Pacific). A map of more powers (`powers`: its count, fixed at build as
+ * `WorldState.barPowers`, so a bar never moves in a match) opens each power on a smaller share of the
+ * points, the armies and the output, so the bars come down with the count: domination in proportion
+ * to it, supremacy to a fair share of the standing (100 / powers) plus the four-power margin. A longer
+ * war (Total War) asks for a conquest in every theatre: 60% of all victory points outright, or 55%
+ * standing held from turn 50, so the war is not over while most of it is still to fight.
  */
-export const THEATRE_VICTORY: Readonly<Record<string, { dominationShare: number; supremacyShare: number }>> = {
-  // Six powers among forty states: each opens with 7% of the victory points and a sixth of the
-  // armies and output, a standing of 13.
-  europe: { dominationShare: 15, supremacyShare: 18 },
-};
+export function victoryBars(maxTurns: number, powers: number = VICTORY.measuredPowers): VictoryBars {
+  if (maxTurns > 60) return { dominationShare: 60, supremacyShare: 55, supremacyFromTurn: 50 };
+  const n = Math.max(VICTORY.measuredPowers, powers);
+  return {
+    dominationShare: Math.round((VICTORY.dominationShare * VICTORY.measuredPowers) / n),
+    supremacyShare: Math.round(100 / n) + VICTORY.supremacyMargin,
+    supremacyFromTurn: VICTORY.supremacyFromTurn,
+  };
+}
 
 /** Turn limits for each campaign length. Every campaign ends at its limit at the latest. */
 export const CAMPAIGN_TURNS: Record<CampaignLength, number> = { quick: 20, standard: 30, epic: 45, total: 250 };
