@@ -13,7 +13,7 @@ interface Leader {
 }
 
 const LEADERS: Record<GovernmentId, Leader> = {
-  commonwealth: { name: 'Adm. Grace Halloran', post: 'Theatre commander, Pacific', line: 'Money is ammunition. We spend it before they do.', hat: 'bare' },
+  commonwealth: { name: 'Adm. Grace Halloran', post: 'Theatre commander', line: 'Money is ammunition. We spend it before they do.', hat: 'bare' },
   directorate: { name: 'Gen. Arkady Volkov', post: 'Chief of the General Staff', line: 'Strike first. Explain afterwards.', hat: 'peaked' },
   union: { name: 'Marshal Wei Lan', post: 'Eastern Theatre Command', line: 'Let every hex they take cost them a city.', hat: 'peaked' },
   federation: { name: 'Gen. Kenji Arata', post: 'Chief of Staff, Joint Staff', line: 'We see them first, and we hit them from further away.', hat: 'beret' },

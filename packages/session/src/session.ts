@@ -2,7 +2,7 @@ import type { AiMemory, Difficulty, GameEvent, NationId, NationOrders, NationVie
 import { SAVE_FORMAT, SAVE_VERSION } from '@brink/contracts';
 import { consider, emptyMemory, offerOf, planOrders, updateMemory, type Offer, type Verdict } from '@brink/ai';
 import { HARD_AI_STOCKPILE, RULESET_VERSION } from '@brink/game-data';
-import { applyCrisis, createScenario, type CrisisId, crisisOf } from '@brink/scenarios';
+import { applyCrisis, createScenario, type CrisisId, crisisOf, theatreOf } from '@brink/scenarios';
 import { keyDistance } from '@brink/map';
 import { buildView, clone, hashState, lockOrders, pairKey, resolveTurn, sortedKeys } from '@brink/simulation';
 
@@ -60,6 +60,7 @@ export class GameSession {
     // After the difficulty, which sets who is at war on Easy: the crisis's wars are the story.
     if (opts.crisis) {
       if (!crisisOf(opts.crisis)) throw new Error(`unknown crisis: ${opts.crisis}`);
+      if (theatreOf(scenarioId)?.crises === false) throw new Error(`no opening crises in ${scenarioId}: they are written for the Pacific`);
       applyCrisis(world, opts.crisis as CrisisId);
     }
     // Easy keeps its ally through any crisis that does not set the two at war.

@@ -2,6 +2,7 @@ import type { NationId, UnitClass, WorldState } from '@brink/contracts';
 import { type MapFile, parseMap } from '@brink/map';
 import { buildScenario, nationSpecs, type NationSpec, type ScenarioSetup } from './build';
 import pacificMap from './maps/pacific.map.json';
+import { MIDEAST_ID, MIDEAST_MINORS, MIDEAST_NATIONS } from './mideast';
 
 export type { NationSpec, Place } from './build';
 
@@ -45,24 +46,53 @@ export const MINORS: readonly NationSpec[] = ALL.filter((n) => n.minor);
 
 /** A nation's short name for map labels and small tiles; the full name if it is not one of ours. */
 export function shortName(name: string): string {
-  return ALL.find((n) => n.name === name)?.short ?? name;
+  return ALL.find((n) => n.name === name)?.short ?? THEATRES.flatMap((t) => [...(t.nations ?? []), ...(t.minors ?? [])]).find((n) => n.name === name)?.short ?? name;
 }
 
-/** The one theatre. Kept as a list so saves and the setup screen read theatres as before. */
+/** The theatres a player picks from. Kept as a list so saves and the setup screen read theatres as before. */
 export interface Theatre {
   id: string;
   name: string;
   summary: string;
   /** Wars you must have won to play it. */
   unlock: number;
+  /** The powers a player can lead and the minor states; the Pacific's (`NATIONS`, `MINORS`) when absent. */
+  nations?: readonly NationSpec[];
+  minors?: readonly NationSpec[];
+  /** False where the Opening Crises (written for the Pacific) do not apply: only the classic war. */
+  crises?: boolean;
 }
 
 export const THEATRES: readonly Theatre[] = [
   { id: PACIFIC_ID, name: 'The Pacific', summary: 'Moscow to Washington: four powers, seven nations caught between them, and an ocean of islands.', unlock: 0 },
+  {
+    id: MIDEAST_ID,
+    name: 'Middle East and Africa',
+    summary: 'Istanbul to the Cape: six regional powers, nineteen states between them, and the oil and the straits of Suez, Hormuz and Bab-el-Mandeb.',
+    unlock: 0,
+    nations: MIDEAST_NATIONS,
+    minors: MIDEAST_MINORS,
+    crises: false,
+  },
 ];
 
 export function theatreOf(id: string): Theatre | undefined {
   return THEATRES.find((t) => t.id === id);
+}
+
+/** The powers a player can lead in a theatre (the Pacific's for an unknown id). */
+export function theatreNations(id: string): readonly NationSpec[] {
+  return theatreOf(id)?.nations ?? NATIONS;
+}
+
+/** The minor states of a theatre (the Pacific's for an unknown id). */
+export function theatreMinors(id: string): readonly NationSpec[] {
+  return theatreOf(id)?.minors ?? MINORS;
+}
+
+/** A playable power of any theatre, by id: its colour and government for a save slot or a banner. */
+export function powerSpec(id: string): NationSpec | undefined {
+  return NATIONS.find((n) => n.id === id) ?? THEATRES.flatMap((t) => t.nations ?? []).find((n) => n.id === id);
 }
 
 export function createPacificScenario(seed: number): WorldState {

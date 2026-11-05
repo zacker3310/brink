@@ -1,4 +1,4 @@
-import { NATIONS, SCENARIOS } from '@brink/scenarios';
+import { powerSpec, SCENARIOS } from '@brink/scenarios';
 import { latestSlot, readSlot, SLOT_NAMES, type SlotInfo } from '../saves';
 import { Frame, Label, relativeTime, ScreenHeader, useKeys } from '../chrome';
 
@@ -24,7 +24,7 @@ export function Archive({
         <ul className="grid gap-3 sm:grid-cols-3">
           {SLOT_NAMES.map((slot, i) => {
             const info = slots.find((s) => s.slot === slot);
-            const nation = info ? NATIONS.find((n) => n.id === info.nation) : undefined;
+            const nation = info ? powerSpec(info.nation) : undefined;
             const progress = info ? Math.min(100, ((info.turn - 1) / maxTurns) * 100) : 0;
             return (
               <li key={slot} className={`enter-${i + 1}`}>
