@@ -2,6 +2,7 @@ import type { Formation, FormationId, GameEvent, HexKey, NationId, NationOrders,
 import { STACK_LIMIT, UNITS } from '@brink/game-data';
 import { neighborKeys } from '@brink/map';
 import { marchBonus } from './doctrine';
+import { hasPassage } from './passage';
 import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, relationOf, sortedKeys, stackAt } from './rules';
 
 type Halt = 'enemy' | 'contact' | 'contested' | 'stacking';
@@ -50,7 +51,11 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
   const meetings: [FormationId, FormationId][] = [];
   const moved = new Set<FormationId>();
   const movers: Mover[] = [];
-  const rel = (a: NationId, b: NationId) => relationOf(world.relations, a, b);
+  // At peace and granted passage: as good as allied for moving through and sharing a hex.
+  const rel = (a: NationId, b: NationId) => {
+    const r = relationOf(world.relations, a, b);
+    return r === 'peace' && hasPassage(world, a, b) ? 'alliance' : r;
+  };
   // Where every formation stood when the phase began: a rebase to a carrier finds it by this.
   const startKey = new Map(sortedKeys(world.formations).map((id) => [id, world.formations[id]!.key]));
 
@@ -259,7 +264,7 @@ export function resolveMovement(world: WorldState, orders: Record<NationId, Nati
       const overrun = Object.values(world.formations).some((o) => o.key === dest && rel(f.owner, o.owner) !== 'alliance');
       if (overrun) events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [], halted: 'enemy' });
       else if (!room) events.push({ kind: 'movement', formation: id, owner: f.owner, unitClass: f.unitClass, path: [], halted: 'stacking' });
-      else if (siteId && world.sites[siteId]!.owner === f.owner) {
+      else if (siteId && (world.sites[siteId]!.owner === f.owner || hasPassage(world, f.owner, world.sites[siteId]!.owner))) {
         delete f.aboard;
         f.key = dest;
         moved.add(id);

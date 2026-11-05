@@ -1,6 +1,7 @@
 import type { AiMemory, DealTerms, DiplomacyOrder, NationId, NationOrders, NationView, ProposalKind, Relation, Resource, SiteId, Stockpile } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
 import { FACILITIES, LEADER_TUNING, leaderFor, type LineTrigger } from '@brink/game-data';
+import { considerPassage } from './passage';
 import { answerTo, bindingTreaty, checkDiplomacy, mirrors, pairKey, PROPOSAL_OF, recruitCost, sortedKeys, stockTotal, treatyIn } from '@brink/simulation';
 
 // The leaders' side of the AI: how a rival's head of government answers an offer, what deals they
@@ -145,6 +146,8 @@ export function consider(view: NationView, memory: AiMemory, offer: Offer, opts:
     }
     case 'joint_op':
       return mood >= AI.jointOpMood ? yes : { accept: false, reason: 'mood' };
+    case 'passage':
+      return considerPassage(view, mood, temper, from === focus, offer.terms?.against, opts.spare?.includes(from) ?? false);
   }
 }
 

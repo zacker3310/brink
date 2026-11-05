@@ -221,6 +221,7 @@ export function resolveEngagements(
   seed: number,
   events: GameEvent[],
   engaged: Set<FormationId>,
+  airborne?: ReadonlySet<FormationId>,
 ): EngagementResult {
   const book = new EffectBook();
   const leaders = leaderEffects(world.commanders);
@@ -285,6 +286,7 @@ export function resolveEngagements(
       leader,
       amphibious: amphibiousInForce(world.nations[a.nation], world.turn),
       fortified: siteDefense(tile.siteId ? world.sites[tile.siteId] : undefined),
+      ...(airborne?.size ? { airborne } : {}),
     };
     const power = { attack: attackerPower(a.attackers, defenders, ctx), defense: defenderPower(defenders, ctx) };
     const res = assaultLosses(power, swing(id, 'attacker'), swing(id, 'defender'));

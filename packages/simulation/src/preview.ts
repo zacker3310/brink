@@ -76,7 +76,7 @@ function enemyMods(view: NationView, owner: string) {
 }
 
 /** An estimate, never a promise: hidden organization, entrenchment and dice are all ranges. */
-export function previewAssault(view: NationView, attackerIds: readonly FormationId[], target: HexKey): AssaultPreview | null {
+export function previewAssault(view: NationView, attackerIds: readonly FormationId[], target: HexKey, opts: { airborne?: ReadonlySet<FormationId> } = {}): AssaultPreview | null {
   const attackers = attackerIds.map((id) => view.formations[id]).filter((f): f is Formation => !!f);
   if (attackers.length === 0) return null;
   const staleness = Math.max(0, ...Object.values(view.contacts).filter((c) => c.key === target).map((c) => view.turn - c.lastSeen));
@@ -95,6 +95,7 @@ export function previewAssault(view: NationView, attackerIds: readonly Formation
     defending: () => false,
     leader: (fid) => leaders[fid],
     fortified: siteDefense(tile?.siteId ? view.sites[tile.siteId] : undefined),
+    ...(opts.airborne?.size ? { airborne: opts.airborne } : {}),
   };
   if (believed.low.length === 0) {
     return { confidence: 'blind', defenders: 0, share: [1000, 1000], attackerLoss: [0, 0], defenderLoss: [0, 0], outcomes: ['attacker_victory'] };

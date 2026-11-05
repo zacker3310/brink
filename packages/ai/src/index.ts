@@ -26,10 +26,14 @@ import { planCards } from './doctrine';
 import { landmasses } from './land';
 import { chooseResearch, planCityBuilds } from './research';
 import { jointOpTarget, leaderDiplomacy, type Offer } from './diplomacy-ai';
+import { fundAirlifts, holdTheGates, planAirborne } from './airborne';
+import { seekPassage } from './passage';
 
 export { planCards } from './doctrine';
 export * from './diplomacy-ai';
 export { proposeOperations, operationById, ODDS_WORDS, type Operation, type OperationPhase } from './operations';
+export { airbornePlan, type AirbornePlan } from './airborne';
+export { considerPassage, passageWanted } from './passage';
 
 // A deterministic utility AI. It sees only its own NationView and its own memory, and every
 // order it writes goes through the same validator as a human's. Two layers:
@@ -734,6 +738,9 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
     endAt(plan, f.key, end);
   }
 
+  // Airborne: a prize no march and no landing reaches soon gets its troops by air (airborne.ts).
+  planAirborne(view, forced ?? plan.target, !!forced, orders);
+
   // One diplomatic order per target: the engine refuses a second. War on a pact partner is
   // refused too, so the pact is honoured here rather than bounced by the validator.
   const war = planDiplomacy(view, plan, memory, opts.spare ?? []).filter((d) => d.action !== 'declare_war' || !treatyIn(view.treaties, 'nonaggression', self, d.target, view.turn));
@@ -763,7 +770,8 @@ export function planOrders(view: NationView, memory: AiMemory, seed: number, opt
   if (commanders) out.commanders = commanders;
   const play = planCards(view, orders);
   if (play.length) out.play = play;
-  return leaderDiplomacy(view, memory, out, opts);
+  // Passage where the war needs it, then the lifts' fuel, reserved after everything else.
+  return fundAirlifts(view, seekPassage(view, memory, holdTheGates(view, leaderDiplomacy(view, memory, out, opts), opts.target), opts.target));
 }
 
 /** What a perk is worth to a general leading `f`: punch first, then staying power. */

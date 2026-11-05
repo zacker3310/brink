@@ -13,6 +13,7 @@ import type {
   WorldState,
 } from '@brink/contracts';
 import { RULESET_VERSION } from '@brink/game-data';
+import { payAirlifts, resolveAirborne } from './airborne';
 import { applyCommanderOrders, applyLeaderSupply, resolveCommanders } from './commanders';
 import { settleEconomy } from './economy';
 import { resolveDiplomacy, resolveJointOps } from './diplomacy';
@@ -39,6 +40,7 @@ export const PHASES = [
   'logistics',
   'reconnaissance',
   'strikes',
+  'airborne',
   'movement',
   'engagements',
   'territory',
@@ -152,6 +154,10 @@ function reportFor(world: WorldState, nation: NationId, vision: Vision, events: 
       case 'retreat':
         if (friendly(e.owner) || sees(e.from) || sees(e.to)) out.push(e);
         break;
+      // A lift is seen by its own side, by whoever shot at it, and wherever it is seen coming down.
+      case 'airlift':
+        if (friendly(e.owner) || e.by.some(friendly) || (!e.aborted && sees(e.landed))) out.push(e);
+        break;
       case 'destroyed':
         if (friendly(e.owner) || sees(e.at)) out.push(e);
         break;
@@ -237,6 +243,11 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   // 3. Production and recruitment. Each nation touches only its own stockpile and queue.
   const production: Record<NationId, Stockpile> = {};
   for (const n of nations) production[n] = resolveProduction(world, n, orders[n]!, events);
+  // 3b. Lifts are paid for (fuel), on the production line of the books.
+  for (const n of nations) {
+    const lift = payAirlifts(world, n, orders[n]!);
+    for (const r of sortedKeys(lift)) production[n]![r] += lift[r];
+  }
 
   // 4. Logistics, against one snapshot of enemy positions.
   const logistics: Record<NationId, Stockpile> = {};
@@ -252,12 +263,16 @@ export function resolveTurn(input: WorldState, submissions: readonly NationOrder
   // 6. Ranged and air.
   const support = resolveStrikes(world, orders, vision, seed, events, engaged);
 
+  // 7a. Airlifts and drops, from one snapshot, before anything walks.
+  const airborne = resolveAirborne(world, orders, seed, events);
+
   // 7. Movement.
   const movement = resolveMovement(world, orders);
   events.push(...movement.events);
+  for (const id of airborne.lifted) movement.moved.add(id);
 
   // 8. Engagements.
-  const engagement = resolveEngagements(world, orders, movement.meetings, vision, support, seed, events, engaged);
+  const engagement = resolveEngagements(world, orders, movement.meetings, vision, support, seed, events, engaged, airborne.assault);
 
   // 9. Retreats, advances, territory.
   resolveRetreats(world, engagement, events);

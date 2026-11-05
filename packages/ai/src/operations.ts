@@ -1,7 +1,8 @@
 import type { Formation, FormationId, HexKey, NationView, SiteId, SiteView, UnitClass } from '@brink/contracts';
-import { CARDS, STACK_LIMIT, UNITS } from '@brink/game-data';
+import { AIRBORNE, CARDS, STACK_LIMIT, UNITS } from '@brink/game-data';
 import { findPath, keyDistance, neighborKeys } from '@brink/map';
 import { enterCost, movementAllowance, previewAssault, sortedKeys } from '@brink/simulation';
+import { airbornePlan, type AirbornePlan } from './airborne';
 import { landmasses } from './land';
 
 // Operations: the staff's answer to "what should I do, and how?". From the player's own picture
@@ -10,12 +11,12 @@ import { landmasses } from './land';
 // Launching one makes it the staff's objective (`planOrders` with `target`): the same planner the
 // rival powers use marches, ships, lands and storms toward it, so every order it drafts is legal.
 
-export type OperationKind = 'overland' | 'amphibious';
+export type OperationKind = 'overland' | 'amphibious' | 'airborne';
 export type PhaseState = 'done' | 'now' | 'next';
 export type OperationOdds = 'good' | 'even' | 'bad' | 'unknown';
 
 export interface OperationPhase {
-  id: 'lift' | 'assemble' | 'embark' | 'sail' | 'shape' | 'land' | 'march' | 'assault';
+  id: 'lift' | 'assemble' | 'embark' | 'sail' | 'shape' | 'land' | 'march' | 'assault' | 'stage' | 'drop' | 'hold';
   title: string;
   detail: string;
   state: PhaseState;
@@ -112,6 +113,11 @@ function prizes(view: NationView): SiteView[] {
 
 /** Every operation the staff can see against one prize, judged from where the forces stand now. */
 function judge(view: NationView, site: SiteView, land: Map<HexKey, number>, prefer?: OperationKind): Operation | null {
+  // A prize no march and no landing reaches soon: the troops fly (the planner decides the same way).
+  if (prefer === undefined || prefer === 'airborne') {
+    const air = airbornePlan(view, site);
+    if (air) return judgeAirborne(view, site, air);
+  }
   const own = sortedKeys(view.formations).map((id) => view.formations[id]!);
   const goalLand = land.get(site.key);
   if (goalLand === undefined) return null;
@@ -261,6 +267,106 @@ function judge(view: NationView, site: SiteView, land: Map<HexKey, number>, pref
   };
 }
 
+/** The airborne operation: stage, drop, hold, assault (`airborne.ts` carries it out). */
+function judgeAirborne(view: NationView, site: SiteView, air: AirbornePlan): Operation {
+  const name = site.name;
+  const deck = air.route === 'carrier';
+  const origin = deck ? AIRBORNE.origins.carrier : air.field?.facilities.includes('airbase') ? AIRBORNE.origins.airbase : AIRBORNE.origins.capital;
+  const perTurn = origin.capacity;
+  const staged = deck ? !!air.carrier && air.carrier.key === air.stage && air.transports.some((t) => t.key === air.stage) : air.troops.some((f) => f.key === air.field?.key);
+  const waiting = air.troops.filter((f) => !air.down.includes(f));
+  const down = air.down.length;
+  const phases: OperationPhase[] = [];
+  let turns = 0;
+  if (deck) {
+    const ships = [air.carrier!, ...air.transports];
+    const sail = Math.max(0, ...ships.map((s) => (s.key === air.stage ? 0 : (seaTurns(view, s, air.stage!) ?? 3))));
+    turns += sail;
+    phases.push({
+      id: 'stage',
+      title: 'Stage',
+      detail: air.transports.length
+        ? `Sail ${air.carrier!.name} with ${air.transports.map((t) => t.name).join(' and ')} to the sea within ${origin.range} hexes of ${name}`
+        : `Bring troops aboard an amphibious group to ${air.carrier!.name} within ${origin.range} hexes of ${name}`,
+      state: staged || (down > 0 && waiting.length === 0) ? 'done' : 'now',
+    });
+  } else {
+    const gathering = Math.max(0, ...air.troops.map((f) => (f.key === air.field!.key ? 0 : (marchTurns(view, f, air.field!.key) ?? 1))));
+    turns += gathering;
+    phases.push({ id: 'stage', title: 'Gather', detail: `Gather light troops at ${air.field!.name}, ${origin.range} hexes of reach`, state: staged || (down > 0 && waiting.length === 0) ? 'done' : 'now' });
+  }
+  const flights = Math.max(1, Math.ceil(waiting.length / Math.max(1, perTurn)));
+  turns += waiting.length ? flights : 0;
+  phases.push({
+    id: 'drop',
+    title: 'Drop',
+    detail: `Fly ${plural(Math.max(waiting.length, 1), 'unit')} onto the ground beside ${name}, ${perTurn} a turn${air.risk > 0 ? `; about ${air.risk}% of the lift may be shot down` : ''}`,
+    state: waiting.length === 0 && down > 0 ? 'done' : staged ? 'now' : 'next',
+  });
+  phases.push({
+    id: 'hold',
+    title: 'Hold',
+    detail: `Hold the drop zone until enough are down: out of supply until it takes ${name}`,
+    state: down >= 3 || (down > 0 && waiting.length === 0) ? 'done' : down > 0 ? 'now' : 'next',
+  });
+  phases.push({ id: 'assault', title: 'Assault', detail: `Storm ${name} from the drop zone`, state: down >= 2 && (down >= 3 || waiting.length === 0) ? 'now' : 'next' });
+  turns += 1;
+  // The odds: the troops as they will come down beside it, scattered.
+  const zone = air.zones[0]!;
+  const landed: NationView = {
+    ...view,
+    formations: Object.fromEntries(
+      sortedKeys(view.formations).map((id) => {
+        const f = view.formations[id]!;
+        if (!air.troops.includes(f)) return [id, f];
+        const { aboard: _gone, ...rest } = f;
+        void _gone;
+        return [id, { ...rest, key: zone, organization: Math.max(0, f.organization - AIRBORNE.dropOrganization), readiness: Math.max(0, f.readiness - AIRBORNE.dropReadiness) }];
+      }),
+    ),
+  };
+  const army = [...air.down, ...air.troops.filter((f) => !air.down.includes(f))].slice(0, STACK_LIMIT * 2);
+  const contacts = Object.values(view.contacts).filter((c) => view.relations[c.owner] === 'war' && !UNITS[c.unitClass].naval);
+  const seen = contacts.filter((c) => keyDistance(c.key, site.key) <= 1).reduce((a, c) => a + c.estimatedStrength, 0);
+  // A great power's city out of sight is held, seen or not: light troops dropped on it meet its garrison.
+  const prior = view.tiles[site.key]?.visibility !== 'visible' && site.owner && !view.nations[site.owner]?.minor ? (site.kind === 'capital' ? 2000 : site.kind === 'city' ? 1000 : 0) : 0;
+  const garrison = Math.max(seen, prior);
+  const judged = oddsOf(landed, army, site.key).odds;
+  const odds: OperationOdds = garrison >= 1000 && judged !== 'good' ? 'bad' : judged;
+  const why = [`${site.victoryPoints} VP beyond any march or landing: the troops fly in`];
+  if (deck) why.push(`From the deck: the carrier's helicopters and tiltrotors fly ${perTurn} a turn from an amphibious group lying with it`);
+  else why.push(`From ${air.field!.name}: ${perTurn} a turn`);
+  if (garrison === 0) why.push(`No garrison seen at ${name}: the first troops down will see it`);
+  else why.push(`Garrison about ${Math.round(garrison / 100)} strength in and around it; you bring ${Math.round(army.reduce((a, f) => a + f.strength, 0) / 100)}`);
+  if (site.kind === 'capital') why.push('A capital: taking it shakes the whole country, and its airport flies the next lift');
+  const warnings: string[] = ['Troops come down scattered and out of supply until they take it or link up'];
+  if (air.risk >= 20) warnings.push(`Enemy aircraft, ships or missile batteries cover the way in: about ${air.risk}% of the lift may be shot down`);
+  if (air.troops.length === 0 && down === 0) warnings.push('No light troops ready to fly');
+  if (odds === 'bad') warnings.push('Too strong to storm with what can be dropped: bring more troops in before the assault');
+  const lead = phases.find((p) => p.state === 'now') ?? phases.find((p) => p.state === 'next');
+  // Light troops against a garrison: what guards it weighs four times what it does for an army.
+  const score = site.victoryPoints * 10 - turns * 8 + ODDS_SCORE[odds] - garrison / 25 + (site.kind === 'capital' ? 10 : 0);
+  return {
+    id: `take:${site.id}`,
+    kind: 'airborne',
+    codename: codename(site.id, view.self.id),
+    name: `Take ${name}`,
+    target: site.id,
+    at: site.key,
+    victoryPoints: site.victoryPoints,
+    summary: `Airborne assault, about ${plural(Math.max(1, turns), 'turn')}, ${ODDS_WORDS[odds]}. Next: ${lead?.title.toLowerCase() ?? 'assault'}.`,
+    why,
+    warnings,
+    army: army.map((f) => f.id),
+    support: deck ? [air.carrier!.id, ...air.transports.map((t) => t.id)] : [],
+    turns: Math.max(1, turns),
+    odds,
+    garrison,
+    phases,
+    score,
+  };
+}
+
 /**
  * The staff's best few operations, best first: always the best overland and best amphibious one
  * when both exist, then the rest by score.
@@ -273,7 +379,7 @@ export function proposeOperations(view: NationView, max = 3): Operation[] {
     .filter((o): o is Operation => o !== null)
     .sort((a, b) => b.score - a.score || (a.target < b.target ? -1 : 1));
   const picked: Operation[] = [];
-  for (const kind of ['overland', 'amphibious'] as const) {
+  for (const kind of ['overland', 'amphibious', 'airborne'] as const) {
     const best = all.find((o) => o.kind === kind);
     if (best) picked.push(best);
   }

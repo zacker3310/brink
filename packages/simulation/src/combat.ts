@@ -1,6 +1,6 @@
 import type { Formation, FormationId, NationId, Terrain } from '@brink/contracts';
 import type { LeaderEffect } from './commanders';
-import { AMPHIBIOUS_ASSAULT_PENALTY, RIVER_ASSAULT_PENALTY, RULES, TERRAIN, UNITS } from '@brink/game-data';
+import { AIRBORNE, AMPHIBIOUS_ASSAULT_PENALTY, RIVER_ASSAULT_PENALTY, RULES, TERRAIN, UNITS } from '@brink/game-data';
 import { clamp, pct, type FullModifiers } from './rules';
 
 // Combat power is integer fixed-point: stat x strength (0..1000) with each modifier applied as
@@ -50,6 +50,8 @@ export interface AssaultContext {
   amphibious?: boolean;
   /** A facility at the hex's site (missile battery) stiffens its owner's defenders by `percent`. */
   fortified?: { owner: NationId; percent: number };
+  /** Formations that came down beside the hex by air this turn and storm it straight from the drop. */
+  airborne?: ReadonlySet<FormationId>;
 }
 
 export interface Power {
@@ -71,6 +73,8 @@ export function attackerPower(attackers: readonly Formation[], defenders: readon
     // Storming a beach from a ship: a general who knows beaches takes some or all of the sting out,
     // Amphibious Doctrine all of it.
     if (a.aboard && !ctx.amphibious) v = pct(v, 100 - pct(AMPHIBIOUS_ASSAULT_PENALTY, 100 - (lead?.amphibious ?? 0)));
+    // Storming a held hex straight from the drop: scattered, light, no time to form up.
+    if (ctx.airborne?.has(a.id)) v = pct(v, 100 - AIRBORNE.assaultPenalty);
     total += v;
   }
   if (ctx.river) total = pct(total, 100 - RIVER_ASSAULT_PENALTY);

@@ -14,8 +14,9 @@ export * from './blurbs';
 export * from './research';
 export * from './cities';
 export * from './leaders';
+export * from './airborne';
 
-export const RULESET_VERSION = '2.8.0';
+export const RULESET_VERSION = '2.9.0';
 
 export const HOURS_PER_TURN = 6;
 
