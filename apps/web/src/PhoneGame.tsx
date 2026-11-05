@@ -17,6 +17,7 @@ import { Diplomacy, LeaderQuotes } from './Diplomacy';
 import { advise } from './advisor';
 import { plannedBattles } from './arena/battle';
 import { OperationRow, OperationsSheet } from './Operations';
+import { CommandPlans, EnterBattle, endTurn, HoldRow, PlanPicker, planLine, usePlanList, usePlans, useOneTap } from './Plans';
 import { operationById } from '@brink/ai';
 import { boardOrders, describeOrder, fleetLoadOrders, hostilesAt, landOrders, loadOrders } from './planning';
 import { useReplay } from './replay';
@@ -31,7 +32,7 @@ import { EventCard } from './UnitPanel';
 import { CommandRow, GeneralsRoster, PromotionModal } from './Generals';
 import { AimBanner, HandChip, PhoneHand } from './Hand';
 import { lossText, oddsFor, ODDS_TEXT, ROLE } from './odds';
-import { crisisOf, shortName } from '@brink/scenarios';
+import { shortName } from '@brink/scenarios';
 import { minorsOf, powersOf, signed } from './ui';
 import { RANKS, rankOf } from '@brink/arena';
 
@@ -633,6 +634,10 @@ function CommandCard({ onEvent }: { onEvent: () => void }) {
   const selectFormation = useGame((s) => s.selectFormation);
   const focusOn = useGame((s) => s.focusOn);
   const choice = useGame((s) => s.draft?.eventChoice);
+  const openPlans = usePlans((s) => s.setOpen);
+  const plans = usePlanList(4).length;
+  const oneTap = useOneTap();
+  const openReview = useGame((s) => s.openReview);
   if (view.victory) return null;
   const a = advise(view, draft.formations, planned.length, operation);
   // With an operation up, its row already says the plan is drafted: speak only about a unit to act on.
@@ -654,7 +659,9 @@ function CommandCard({ onEvent }: { onEvent: () => void }) {
   const chip = 'flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-line bg-ink-850 px-3 text-[13px] text-muted active:bg-ink-800';
   return (
     <div className="pointer-events-auto rounded-t-2xl border-t border-line bg-ink-900/97 px-3 pt-2.5 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]" data-testid="command-card">
-      <OperationRow />
+      <EnterBattle className="mb-2" />
+      {operation || plans === 0 ? <OperationRow /> : <CommandPlans />}
+      <HoldRow />
       {advice && (
         <div className="mt-2 flex items-center gap-3 border-t border-line/60 pt-2" data-testid="advisor">
           <p className="min-w-0 flex-1 text-[13px] leading-snug text-text">{a.text}</p>
@@ -665,8 +672,14 @@ function CommandCard({ onEvent }: { onEvent: () => void }) {
           )}
         </div>
       )}
-      {(event || report || lastTurn || toLoad > 0 || idleCities.length > 0) && (
+      {(event || report || lastTurn || toLoad > 0 || idleCities.length > 0 || oneTap || (operation && plans > 0)) && (
         <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3" data-testid="command-chips">
+          {operation && plans > 0 && (
+            <button type="button" className={`${chip} border-signal/50 text-signal`} onClick={() => openPlans(true)} data-testid="plans-open">
+              <Icon name="objective" className="h-3.5 w-3.5" />
+              Other plans ({plans})
+            </button>
+          )}
           {event && (
             <button type="button" className={`${chip} border-signal/60 text-signal`} onClick={onEvent} data-testid="event-open">
               <Icon name="alert" className="h-3.5 w-3.5" />
@@ -692,6 +705,12 @@ function CommandCard({ onEvent }: { onEvent: () => void }) {
             <button type="button" className={`${chip} border-signal/50 text-signal`} onClick={() => openCity(idleCities[0]!.id)} data-testid="idle-cities">
               <Icon name="build" className="h-3.5 w-3.5" />
               {idleCities.length} {idleCities.length === 1 ? 'city' : 'cities'} idle: build
+            </button>
+          )}
+          {oneTap && (
+            <button type="button" className={chip} onClick={openReview} data-testid="open-review">
+              <Icon name="check" className="h-3.5 w-3.5" />
+              Review orders
             </button>
           )}
           {report && (
@@ -730,17 +749,24 @@ function Debrief({ onDone }: { onDone: () => void }) {
     .sort((a, b) => rank(a.n) - rank(b.n) || a.i - b.i)
     .map((x) => x.n);
   const vp = report.victoryPoints[view.self.id] ?? 0;
+  const plan = planLine(view, report, operation);
   return (
     <div className="sheet-in pointer-events-auto border-t border-signal/60 bg-ink-950/95 px-3 pt-2.5 pb-1" data-testid="debrief">
       <div className="flex items-center justify-between">
         <span className="font-display text-[11px] font-black tracking-[0.1em] text-signal uppercase">Turn {report.turn} debrief</span>
         <span className="font-mono text-[11px] text-muted">{vp} VP</span>
       </div>
-      {operation && (
-        <p className="mt-1 truncate text-[12px] text-muted" data-testid="debrief-operation">
-          <span className="font-mono text-signal uppercase">{operation.codename}</span>{' '}
-          {op && now ? `· next: ${now.title.toLowerCase()} (${op.phases.filter((p) => p.state === 'done').length}/${op.phases.length}), ~${op.turns} turn${op.turns === 1 ? '' : 's'} to ${op.name.replace('Take ', '')}` : `· ${operation.name}`}
+      {plan ? (
+        <p className={`mt-1 text-[14px] leading-snug font-semibold ${plan.tone === 'good' ? 'text-good' : plan.tone === 'bad' ? 'text-hostile' : 'text-text'}`} data-testid="debrief-plan">
+          {plan.text}
         </p>
+      ) : (
+        operation && (
+          <p className="mt-1 truncate text-[12px] text-muted" data-testid="debrief-operation">
+            <span className="font-mono text-signal uppercase">{operation.codename}</span>{' '}
+            {op && now ? `· next: ${now.title.toLowerCase()} (${op.phases.filter((p) => p.state === 'done').length}/${op.phases.length}), ~${op.turns} turn${op.turns === 1 ? '' : 's'} to ${op.name.replace('Take ', '')}` : `· ${operation.name}`}
+          </p>
+        )
       )}
       <ul className="mt-1.5 flex flex-col gap-1">
         {notes.length === 0 && <li className="text-[12px] text-muted">A quiet turn. Nothing your forces saw changed hands.</li>}
@@ -783,13 +809,13 @@ function Debrief({ onDone }: { onDone: () => void }) {
 function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean }) {
   const view = useGame((s) => s.view)!;
   const draft = useGame((s) => s.draft)!;
-  const openReview = useGame((s) => s.openReview);
   const nextIdle = useGame((s) => s.nextIdle);
   const autoCommand = useGame((s) => s.autoCommand);
   const clearPlan = useGame((s) => s.clearPlan);
   const planned = useGame((s) => s.planned).length;
   const resolving = useGame((s) => s.resolving);
   const idle = idleFormations(view, draft.formations).length;
+  const oneTap = useOneTap();
   // Battles in the staff's plan the player may fight by hand from the order review.
   const toFight = planned > 0 ? plannedBattles(view, draft).filter((b) => !b.fought).length : 0;
   const over = view.victory !== null;
@@ -825,14 +851,15 @@ function Dock({ onCommand, cooling }: { onCommand: () => void; cooling: boolean 
         </button>
         <button
           type="button"
-          onClick={openReview}
+          onClick={() => endTurn(oneTap)}
           disabled={resolving || over || cooling}
           data-testid="end-turn"
+          data-one-tap={oneTap || undefined}
           className="end-turn relative flex-1 overflow-hidden rounded-xl bg-signal px-3 text-ink-950 active:brightness-90 disabled:opacity-60"
         >
           <div className="font-display text-xl leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : planned > 0 ? 'Execute' : 'End turn'}</div>
           <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">
-            {resolving ? 'orders locked' : idle ? `${idle} without orders` : planned > 0 ? `staff plan · ${planned} order${planned === 1 ? '' : 's'}${toFight ? ` · ${toFight} to fight` : ''}` : 'everyone has orders'}
+            {resolving ? 'orders locked' : idle ? `${idle} without orders` : oneTap ? `plan + end turn${toFight ? ` · ${toFight} to fight` : ''}` : planned > 0 ? `staff plan · ${planned} order${planned === 1 ? '' : 's'}${toFight ? ` · ${toFight} to fight` : ''}` : 'everyone has orders'}
           </div>
         </button>
       </div>
@@ -906,64 +933,6 @@ function WorldCard({ onClose, onDiplomacy }: { onClose: () => void; onDiplomacy:
   );
 }
 
-/** The whole game in three steps, at the start of a campaign and from the menu. */
-function HowToWin({ onClose }: { onClose: () => void }) {
-  const view = useGame((s) => s.view)!;
-  const operation = useGame((s) => s.operation);
-  const goal = nextObjective(view, operation);
-  const crisis = crisisOf(view.crisis);
-  const steps: [string, string][] = [
-    ['Take places', `Cities and capitals are worth victory points, the minor states' most of all. Reach ${view.victoryThreshold} and you win; allies can win together, and a power far ahead in land, army and output wins by supremacy. Otherwise the best standing after turn ${view.maxTurns} wins.${goal ? ` Start with ${goal.site.name}: the amber ring.` : ''}`],
-    ['Move and attack', 'Tap your tile, then a blue hex to move there. Enemies you can hit are tagged WIN, EVEN or RISKY: attack the WINs.'],
-    ['End the turn', 'Everyone moves at once. Watch what happens, read the debrief, go again. Stuck? Tap Plan and your generals give every unit orders.'],
-  ];
-  return (
-    <div className="fixed inset-0 z-40 flex items-end bg-ink-950/70" data-testid="how-to-win">
-      <div className="sheet-in safe-bottom max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border-t border-line bg-ink-900 px-5 pt-5">
-        {crisis && (
-          <div className="mb-4 rounded-xl border border-hostile/40 bg-hostile/10 p-3" data-testid="how-to-crisis">
-            <div className="text-[11px] font-semibold tracking-[0.12em] text-hostile uppercase">Opening crisis</div>
-            <div className="font-display text-xl font-extrabold uppercase">{crisis.name}</div>
-            <p className="mt-1 text-[14px] leading-snug text-text/90">{crisis.story}</p>
-            <p className="mt-1.5 text-[13px] leading-snug text-muted">{crisis.setup}</p>
-          </div>
-        )}
-        <div className="font-display text-2xl font-extrabold uppercase">How to win</div>
-        {view.difficulty === 'easy' && !crisis && <p className="mt-1 text-[13px] text-good">Easy: you face one enemy. The others stay at peace with you.</p>}
-        <ol className="mt-3 space-y-3">
-          {steps.map(([title, text], i) => (
-            <li key={title} className="flex gap-3">
-              <span className="font-display flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal text-lg font-extrabold text-ink-950">{i + 1}</span>
-              <div>
-                <div className="font-display text-base font-bold uppercase">{title}</div>
-                <p className="text-[14px] leading-snug text-muted">{text}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className="mt-4 rounded-xl border border-signal/50 bg-signal/10 p-3" data-testid="how-to-ops">
-          <div className="font-display text-base font-bold tracking-wide text-signal uppercase">Or let the staff run it</div>
-          <p className="mt-0.5 text-[14px] leading-snug text-muted">Pick an operation, like taking a city across the sea. Every turn the staff drafts the marching, sailing, landing and assault; you change what you like and end the turn.</p>
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              useGame.getState().setOpsOpen(true);
-            }}
-            className="font-display mt-2 h-11 w-full rounded-lg border border-signal/70 text-[15px] font-extrabold tracking-wide text-signal uppercase active:bg-signal/15"
-            data-testid="how-to-operations"
-          >
-            Pick an operation
-          </button>
-        </div>
-        <button type="button" onClick={onClose} className="font-display mt-3 mb-1 h-12 w-full rounded-xl bg-signal text-lg font-extrabold text-ink-950 uppercase" data-testid="how-to-close">
-          Got it
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function PhoneGame() {
   const showReport = useGame((s) => s.showReport);
   const playback = useGame((s) => s.playback);
@@ -982,7 +951,9 @@ export function PhoneGame() {
   // The guided turn's coach is the one voice while it runs: no advisor card beside it.
   const coaching = useCoach((s) => s.active);
   const firstTurn = useGame((s) => s.view?.turn === 1 && !s.view.victory);
+  // The first turn opens on the plan picker (how to win sits under the plans).
   const [howTo, setHowTo] = useState(firstTurn && !useCoach.getState().active);
+  const picker = usePlans((s) => s.open);
   const control = useCamera((s) => s.control);
   const reportTurn = useGame((s) => s.report?.turn ?? 0);
   const [briefed, setBriefed] = useState(reportTurn);
@@ -1072,7 +1043,8 @@ export function PhoneGame() {
       <OperationsSheet />
       {menu && <MenuSheet onClose={() => setMenu(false)} onHowTo={() => setHowTo(true)} />}
       <PromotionModal hold={debrief} />
-      {howTo && <HowToWin onClose={() => setHowTo(false)} />}
+      {howTo && <PlanPicker intro onClose={() => setHowTo(false)} />}
+      {picker && !howTo && !playback && <PlanPicker onClose={() => usePlans.getState().setOpen(false)} />}
       <VictoryOverlay />
       {showReport && <Report />}
       <Coach />

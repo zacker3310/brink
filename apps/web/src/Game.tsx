@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { OperationsSheet, OperationStrip } from './Operations';
+import { DeskPlans, EnterBattle } from './Plans';
 import type { Resource } from '@brink/contracts';
 import { GOVERNMENTS, UNITS } from '@brink/game-data';
 import { useCamera } from './camera';
@@ -442,6 +443,8 @@ export function Game() {
           {/* The right rail: the turn's notifications above, the turn controls below, never on top of each other. */}
           <div className="pointer-events-none absolute top-12 right-3 bottom-3 z-10 flex flex-col items-end gap-2">
             <Notifications />
+            <DeskPlans />
+            <EnterBattle className="pointer-events-auto w-72" />
             <TurnControls />
           </div>
           <SidePanel />

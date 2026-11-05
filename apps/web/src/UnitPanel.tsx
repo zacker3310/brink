@@ -12,6 +12,7 @@ import { healthColor } from './design/tokens';
 import { useGame } from './store';
 import { battleFor, plannedBattles } from './arena/battle';
 import { CommandRow } from './Generals';
+import { endTurn, useOneTap } from './Plans';
 import { RANKS, rankOf } from '@brink/arena';
 
 // Civ-style unit panel (bottom-left) and turn controls (bottom-right), floating over the map.
@@ -333,6 +334,7 @@ export function TurnControls() {
   const fleetLoad = fleetLoadOrders(view, draft.formations, plannedIds);
   const toLoad = Object.keys(fleetLoad).length;
   const toFight = planned > 0 ? plannedBattles(view, draft).filter((b) => !b.fought).length : 0;
+  const oneTap = useOneTap();
   const total = Object.keys(view.formations).length;
   const idle = idleFormations(view, draft.formations).length;
   const over = view.victory !== null;
@@ -395,18 +397,26 @@ export function TurnControls() {
               </button>
             )}
           </span>
-          <button type="button" onClick={clearPlan} className="shrink-0 text-faint hover:text-text" data-testid="clear-plan">Clear</button>
+          <span className="flex shrink-0 flex-col items-end gap-0.5">
+            <button type="button" onClick={clearPlan} className="text-faint hover:text-text" data-testid="clear-plan">Clear</button>
+            {oneTap && (
+              <button type="button" onClick={openReview} className="text-faint hover:text-text" data-testid="open-review" title="See every order before the turn ends">
+                Review
+              </button>
+            )}
+          </span>
         </div>
       )}
       <button
         type="button"
-        onClick={openReview}
+        onClick={() => endTurn(oneTap)}
         disabled={resolving || over}
         data-testid="end-turn"
+        data-one-tap={oneTap || undefined}
         className="end-turn relative overflow-hidden bg-signal px-4 py-3 text-ink-950 transition-all hover:brightness-110 disabled:opacity-60"
       >
         <div className="font-display text-lg leading-none font-black uppercase">{resolving ? 'Resolving…' : over ? 'Game over' : planned > 0 ? 'Execute plan' : 'Next turn'}</div>
-        <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : `turn ${view.turn} · ctrl+enter`}</div>
+        <div className="font-display mt-1 text-[10px] font-bold tracking-[0.06em] uppercase opacity-70">{resolving ? 'orders locked' : oneTap ? `plan + end turn · turn ${view.turn}` : `turn ${view.turn} · ctrl+enter`}</div>
       </button>
       <Minimap />
     </div>

@@ -54,6 +54,22 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
   test.setTimeout(600_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Every tap the player makes, counted in the page (a touch lands as one primary pointerdown).
+  await page.addInitScript(() => {
+    const w = window as unknown as { __taps: number };
+    w.__taps = 0;
+    window.addEventListener('pointerdown', (e) => {
+      if (e.isPrimary) w.__taps += 1;
+    }, true);
+  });
+  const taps = () => page.evaluate(() => (window as unknown as { __taps: number }).__taps);
+  const tally: Record<string, number> = {};
+  let mark = 0;
+  const count = async (label: string) => {
+    const n = await taps();
+    tally[label] = (tally[label] ?? 0) + n - mark;
+    mark = n;
+  };
   await page.addInitScript(() => {
     if (sessionStorage.getItem('playthrough')) return;
     sessionStorage.setItem('playthrough', '1');
@@ -72,6 +88,7 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
   await page.getByTestId('difficulty-normal').tap();
   await shot(page, 'setup');
   await page.getByTestId('start-game').tap();
+  await count('setup');
 
   // The first turn's brief points at Operations, and goes straight there.
   await expect(page.getByTestId('how-to-win')).toBeVisible({ timeout: 60_000 });
@@ -87,6 +104,7 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
   await expect(taipei).toBeVisible();
   await taipei.getByTestId('operation-launch').tap();
   await expect(sheet).toBeHidden();
+  await count('plan');
 
   // One command card over the dock: the operation, what it does this turn, and what else waits.
   const card = page.getByTestId('command-card');
@@ -173,7 +191,10 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
 
   let fought = false;
   const debriefs: string[] = [];
+  let turns = 0;
+  await count('extras');
   for (let turn = 1; turn <= 8; turn++) {
+    turns = turn;
     // A promotion may come up on its own.
     if (await page.getByTestId('promotion').isVisible().catch(() => false)) {
       await shot(page, `t${turn}-promotion`);
@@ -187,6 +208,7 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
       await page.getByTestId('event-option-1').tap();
       await page.getByTestId('decision-done').tap();
     }
+    await count('extras');
     if (!fought && (await findAttack(page))) {
       await shot(page, `t${turn}-attack-armed`);
       await page.getByTestId('confirm-attack').tap();
@@ -196,15 +218,18 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
         await page.getByTestId('arena-fight').tap();
         await expect(page.getByTestId('arena-canvas')).toBeVisible({ timeout: 20_000 });
         await page.waitForFunction(() => window.__arena?.ready(), null, { timeout: 120_000 });
+        await count('to-battle');
         await shot(page, `t${turn}-battle`);
         await page.evaluate(() => window.__arena!.win());
         await expect(page.getByTestId('arena-continue')).toBeVisible({ timeout: 30_000 });
         await shot(page, `t${turn}-battle-verdict`);
         await page.getByTestId('arena-continue').tap();
         await expect(page.getByTestId('arena')).toHaveCount(0);
+        await count('battle');
         fought = true;
       }
     }
+    if (!fought) await count('search');
     await shot(page, `t${turn}-orders`);
     await page.getByTestId('end-turn').tap();
     const commit = page.getByTestId('commit-turn');
@@ -218,6 +243,7 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
     }
     const debrief = page.getByTestId('debrief');
     await expect(debrief).toBeVisible({ timeout: 90_000 });
+    await count('end-turn');
     // The debrief stands alone over the dock: no decision card or chips stacked on it.
     await expect(page.getByTestId('command-card')).toHaveCount(0);
     debriefs.push((await debrief.textContent()) ?? '');
@@ -233,8 +259,12 @@ test('a new player plays China for eight turns on a phone', async ({ page }) => 
     // close button then sat under the victory screen and the tap waited out the test.)
     if (await page.getByTestId('victory').isVisible().catch(() => false)) break;
     if (await page.getByTestId('debrief-close').isVisible().catch(() => false)) await page.getByTestId('debrief-close').tap();
+    await count('debrief');
     if (await page.getByTestId('victory').isVisible().catch(() => false)) break;
   }
+  await count('debrief');
+  // The taps a player makes, by stage: the playthrough's measure of how easy the game is to drive.
+  console.log(`TAPS ${JSON.stringify({ ...tally, turns, total: await taps() })}`);
   await shot(page, 'end');
   // The operation was followed in the debrief while it ran.
   expect(debriefs.some((d) => d.includes('STORM BRIDGE') || /Storm Bridge/i.test(d))).toBe(true);
