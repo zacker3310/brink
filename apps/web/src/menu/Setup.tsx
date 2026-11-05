@@ -50,6 +50,7 @@ export function Setup({ onBack, onBegin }: { onBack: () => void; onBegin: (natio
     return t && t.unlock <= wars ? t.id : THEATRES[0]!.id;
   });
   const theatre = THEATRES.find((t) => t.id === theatreId)!;
+  // Each theatre has its own powers and minor states.
   const pickTheatre = (id: string) => {
     setTheatreId(id);
     writePrefs({ theatre: id });

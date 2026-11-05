@@ -25,6 +25,18 @@ Updated 2026-11-05 (the Black Files, diplomacy that works, airborne warfare and 
 
 ## Completed
 
+- The Americas (Phase 6, `docs/americas.md`): a second theatre on the setup screen. A 32 x 41 map
+  drawn as a character grid (`packages/mapgen/src/americas.ts`, `pnpm --filter @brink/mapgen
+  map:americas`), Alaska and the Arctic to Tierra del Fuego; the Rockies, the Andes and the Amazon
+  fixed on the ground; the Panama Canal, the Florida Strait, the Yucatan Channel, Magellan and the
+  Drake Passage. The canal is Panama City, the one port touching both the Caribbean and the Pacific:
+  with it shut the voyage runs round the Horn, more than six times as long. Six powers (the United
+  States, Canada, Mexico, Brazil, Argentina, Colombia) and fourteen minor states; five new country
+  files with invented leaders; Canada and Mexico stay minor states in the Pacific. The setup screen
+  lists each theatre's own powers; the Opening Crises stay Pacific-only (`classicOnly`). Soak, 20
+  AI-only matches: 0 rejected orders, every one to the turn limit (decisive rate 0%; supremacy at
+  29% of the standing is a four-power bar), score wins Colombia 15, Mexico 3, Canada 2; Panama City
+  taken in all 20, 40 ships through the canal. A turn costs about twice the Pacific's.
 - The Indo-Pacific South (Phase 6, `docs/indopac.md`): a second theatre, `indopac`, on a 52 x 36
   map file from Karachi to Wellington. Five powers (India, Pakistan, China, Indonesia, Australia;
   four new nation files with invented leaders and generals) and fifteen minor states; the Himalaya

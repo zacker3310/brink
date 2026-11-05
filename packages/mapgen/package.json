@@ -12,7 +12,8 @@
     "map:testbed": "tsx src/cli/testbed.ts ../scenarios/src/maps/testbed.map.json",
     "map:antarctica": "tsx src/cli/antarctica.ts ../scenarios/src/maps/antarctica.map.json",
     "map:europe": "tsx src/cli/europe.ts ../scenarios/src/maps/europe.map.json",
-    "map:mideast": "tsx src/cli/mideast.ts ../scenarios/src/maps/mideast.map.json"
+    "map:mideast": "tsx src/cli/mideast.ts ../scenarios/src/maps/mideast.map.json",
+    "map:americas": "tsx src/cli/americas.ts ../scenarios/src/maps/americas.map.json"
   },
   "dependencies": { "@brink/contracts": "workspace:*", "@brink/map": "workspace:*" },
   "devDependencies": { "tsx": "4.23.15" }

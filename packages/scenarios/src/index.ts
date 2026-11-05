@@ -1,5 +1,6 @@
 import type { WorldState } from '@brink/contracts';
 import { seedCommanders } from '@brink/simulation';
+import { AMERICAS_ID, AMERICAS_MAX_TURNS, AMERICAS_POWERS, createAmericasScenario } from './americas';
 import { createEuropeScenario, EUROPE_ID, EUROPE_MAX_TURNS, EUROPE_NATIONS } from './europe';
 import { createMideastScenario, MIDEAST_ID, MIDEAST_MAX_TURNS, MIDEAST_NATIONS } from './mideast';
 import { createPacificScenario, MAX_TURNS, NATIONS, PACIFIC_ID } from './pacific';
@@ -16,6 +17,7 @@ export * from './blackfiles';
 export * from './europe';
 export * from './theatres';
 export * from './mideast';
+export * from './americas';
 
 export interface ScenarioInfo {
   id: string;
@@ -61,6 +63,13 @@ export const SCENARIOS: readonly ScenarioInfo[] = [
     nations: INDOPAC_NATIONS.length,
     maxTurns: INDOPAC_MAX_TURNS,
   },
+  {
+    id: AMERICAS_ID,
+    name: 'The Americas',
+    summary: 'The United States, Canada, Mexico, Colombia, Brazil and Argentina fight from the Arctic to Cape Horn, with Cuba, Venezuela, Peru, Chile and the Panama Canal between them.',
+    nations: AMERICAS_POWERS.length,
+    maxTurns: AMERICAS_MAX_TURNS,
+  },
 ];
 
 export function createScenario(id: string, seed: number): WorldState {
@@ -70,6 +79,7 @@ export function createScenario(id: string, seed: number): WorldState {
   if (id === EUROPE_ID) return seedCommanders(createEuropeScenario(seed));
   if (id === MIDEAST_ID) return seedCommanders(createMideastScenario(seed));
   if (id === INDOPAC_ID) return seedCommanders(createIndoPacScenario(seed));
+  if (id === AMERICAS_ID) return seedCommanders(createAmericasScenario(seed));
   // The world-engine testbed: playable by the engine and the AI, never listed for a player.
   if (id === TESTBED_ID) return seedCommanders(createTestbedScenario(seed));
   throw new Error(`unknown scenario: ${id}`);

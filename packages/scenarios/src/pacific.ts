@@ -1,5 +1,6 @@
 import type { NationId, UnitClass, WorldState } from '@brink/contracts';
 import { type MapFile, parseMap } from '@brink/map';
+import { AMERICAS_ID } from './americas';
 import { buildScenario, nationSpecs, type NationSpec, type ScenarioSetup } from './build';
 import { EUROPE_ID } from './europe';
 import pacificMap from './maps/pacific.map.json' with { type: 'json' };
@@ -60,6 +61,7 @@ export const THEATRES: readonly Theatre[] = [
   { id: EUROPE_ID, name: 'Europe', summary: 'The Atlantic to the Urals: six powers, forty nations between them, and the straits from the Channel to the Bosphorus.', unlock: 0 },
   { id: MIDEAST_ID, name: 'Middle East and Africa', summary: 'Istanbul to the Cape: six regional powers, twenty-four states between them, and the oil and the straits of Suez, Hormuz and Bab-el-Mandeb.', unlock: 0 },
   INDOPAC_THEATRE,
+  { id: AMERICAS_ID, name: 'The Americas', summary: 'Alaska to Cape Horn: six powers, fourteen nations between them, and the Panama Canal in the middle.', unlock: 0 },
 ];
 
 export function theatreOf(id: string): Theatre | undefined {

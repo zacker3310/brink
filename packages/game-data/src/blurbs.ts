@@ -19,6 +19,11 @@ import { BLURB as india } from './nations/india';
 import { BLURB as pakistan } from './nations/pakistan';
 import { BLURB as indonesia } from './nations/indonesia';
 import { BLURB as australia } from './nations/australia';
+import { BLURB as canada } from './nations/canada';
+import { BLURB as mexico } from './nations/mexico';
+import { BLURB as colombia } from './nations/colombia';
+import { BLURB as brazil } from './nations/brazil';
+import { BLURB as argentina } from './nations/argentina';
 
 /** A nation's playstyle blurb, by nation id; a nation without one has no entry. */
-export const NATION_BLURB: Readonly<Record<string, string>> = { china, japan, usa, ...NATION_BLURBS, uk, france, germany, poland, turkey, egypt, iran, nigeria, 'saudi-arabia': saudiArabia, 'south-africa': southAfrica, india, pakistan, indonesia, australia };
+export const NATION_BLURB: Readonly<Record<string, string>> = { china, japan, usa, ...NATION_BLURBS, uk, france, germany, poland, turkey, egypt, iran, nigeria, 'saudi-arabia': saudiArabia, 'south-africa': southAfrica, india, pakistan, indonesia, australia, canada, mexico, colombia, brazil, argentina };

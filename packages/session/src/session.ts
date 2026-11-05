@@ -267,7 +267,7 @@ export class GameSession {
  */
 const ALLY: Record<NationId, readonly NationId[]> = {
   japan: ['usa'],
-  usa: ['japan'],
+  usa: ['japan', 'canada'],
   russia: ['china', 'turkey'],
   china: ['russia'],
   uk: ['france'],
@@ -279,6 +279,12 @@ const ALLY: Record<NationId, readonly NationId[]> = {
   india: ['australia'],
   australia: ['india'],
   pakistan: ['china'],
+  // The Americas: the United States and Canada, Mexico and Colombia, Brazil and Argentina.
+  canada: ['usa'],
+  mexico: ['colombia'],
+  colombia: ['mexico'],
+  brazil: ['argentina'],
+  argentina: ['brazil'],
 };
 
 function allyOf(world: WorldState, me: NationId): NationId | undefined {

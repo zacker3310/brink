@@ -1,0 +1,1199 @@
+{
+  "format": "brink-map",
+  "version": 1,
+  "id": "americas",
+  "name": "The Americas",
+  "cols": 32,
+  "rows": 41,
+  "layout": "odd-r",
+  "source": "Hand-drawn character grid (packages/mapgen/src/americas.ts), converted by gridToMap. Coastlines after public-domain Natural Earth outlines, by eye.",
+  "layers": {
+    "owner": {
+      "legend": {
+        ".": null,
+        "#": null,
+        "A": "argentina",
+        "B": "brazil",
+        "C": "colombia",
+        "D": "dominican",
+        "E": "ecuador",
+        "G": "guatemala",
+        "H": "haiti",
+        "K": "canada",
+        "L": "bolivia",
+        "M": "mexico",
+        "N": "nicaragua",
+        "P": "panama",
+        "Q": "cuba",
+        "R": "peru",
+        "U": "usa",
+        "V": "venezuela",
+        "W": "uruguay",
+        "X": "chile",
+        "Y": "guyana",
+        "Z": "paraguay"
+      },
+      "rows": [
+        "...UUU...KKKKKK.....KK...#######",
+        "UUUUUUKKKKKKKKKKKKK.KKKK.#######",
+        "UUUUUUKKKKKKKKKKK.....KK..####..",
+        "UUUUUUKKKKKKKKKK..........#.....",
+        ".UU...UUKKKKKKKKK...KKKK........",
+        ".U.....UKKKKKKKKK...KKKK........",
+        ".........KKKKKKKKKK.KKKK.K......",
+        ".........KKKKKKKKKKKKKK.K.......",
+        "..........UUUUUUUUUKKKUK........",
+        "..........UUUUUUUUUUUU..........",
+        "..........UUUUUUUUUUU...........",
+        "...........UUUUUUUUUU...........",
+        "...........MMMUUUUUU............",
+        "...........M.MMUU..U............",
+        "............M.MM................",
+        "..U..........MMM..QQQ...........",
+        "..............MMMM....HD.U......",
+        "..............MMMGN.............",
+        ".................GNP............",
+        "...................PPCCVVV......",
+        ".....................CCCVVYY....",
+        ".....................CCCVBBB....",
+        "....................EECCCBBBB...",
+        "....................ERCBBBBBBB..",
+        "....................RRRBBBBBBBB.",
+        "....................RRRLBBBBBB..",
+        ".....................RRLLBBBBB..",
+        ".....................RLLLBBBBB..",
+        "......................XLLZBBBB..",
+        "......................XAZZBBB...",
+        "......................XAAABB....",
+        "......................XAAWB.....",
+        "......................XAAAW.....",
+        "......................XAA.......",
+        "......................XAA.......",
+        "......................XA........",
+        "......................XA........",
+        "......................XA.#......",
+        "................................",
+        "......................XA........",
+        "................................"
+      ]
+    },
+    "terrain": {
+      "legend": {
+        "~": "water",
+        "*": "seeded",
+        "p": "plains",
+        "f": "forest",
+        "h": "hills",
+        "m": "mountains"
+      },
+      "rows": [
+        "~~~ppp~~~pppppp~~~~~pp~~~ppppppp",
+        "ppp****************~pppp~ppppppp",
+        "***m*************~~~~~**~~pppp~~",
+        "****m*m*********~~~~~~~~~~p~~~~~",
+        "~**~~~**mfffffff*~~~ff**~~~~~~~~",
+        "~*~~~~~**ffffffff~~~ffff~~~~~~~~",
+        "~~~~~~~~~*mm*pp****~*hh*~*~~~~~~",
+        "~~~~~~~~~*mm*pp********~*~~~~~~~",
+        "~~~~~~~~~~**m*ppp*******~~~~~~~~",
+        "~~~~~~~~~~**mmppp*****~~~~~~~~~~",
+        "~~~~~~~~~~**mm*pp*h**~~~~~~~~~~~",
+        "~~~~~~~~~~~**m*pp**h*~~~~~~~~~~~",
+        "~~~~~~~~~~~****p****~~~~~~~~~~~~",
+        "~~~~~~~~~~~*~****~~*~~~~~~~~~~~~",
+        "~~~~~~~~~~~~*~**~~~~~~~~~~~~~~~~",
+        "~~*~~~~~~~~~~*m*~~***~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~****~~~~**~*~~~~~~",
+        "~~~~~~~~~~~~~~*****~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~***~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~*f*****~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~*******~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~***ffff~~~~",
+        "~~~~~~~~~~~~~~~~~~~~**ffffff*~~~",
+        "~~~~~~~~~~~~~~~~~~~~m**f*ffff*~~",
+        "~~~~~~~~~~~~~~~~~~~~*mmfffff***~",
+        "~~~~~~~~~~~~~~~~~~~~*mmffff***~~",
+        "~~~~~~~~~~~~~~~~~~~~~mmm******~~",
+        "~~~~~~~~~~~~~~~~~~~~~**m**h*h*~~",
+        "~~~~~~~~~~~~~~~~~~~~~~mmm***h*~~",
+        "~~~~~~~~~~~~~~~~~~~~~~*******~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~mm****~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~mp***~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~**p**~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~*pp~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~m**~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~mp~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~m*~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~*p~p~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~**~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+      ]
+    },
+    "seaZone": {
+      "legend": {
+        "-": null,
+        "a": "arctic",
+        "b": "north-pacific",
+        "c": "east-pacific",
+        "d": "south-pacific",
+        "e": "hudson-bay",
+        "f": "north-atlantic",
+        "g": "gulf-of-mexico",
+        "h": "caribbean",
+        "i": "south-atlantic"
+      },
+      "rows": [
+        "aaa---aaa------aaaaa--aaa-------",
+        "-------------------a----a-------",
+        "-----------------eeeee--aa----aa",
+        "----------------eeeeeeffff-fffff",
+        "b--bbb-----------eee----ffffffff",
+        "b-bbbbb----------eee----ffffffff",
+        "bbbbbbbbb----------e----f-ffffff",
+        "bbbbbbbbb--------------f-fffffff",
+        "bbbbbbbbbb--------------ffffffff",
+        "bbbbbbbbbb------------ffffffffff",
+        "bbbbbbbbbb-----------fffffffffff",
+        "bbbbbbbbbbb----------fffffffffff",
+        "bbbbbbbbbbb---------ffffffffffff",
+        "ccccccccccc-c----gg-ffffffffffff",
+        "cccccccccccc-c--gggfffffffffffff",
+        "cc-cccccccccc---gg---fffffffffff",
+        "cccccccccccccc----hhhh--h-hfffff",
+        "cccccccccccccc-----hhhhhhhhfffff",
+        "ccccccccccccccccc---hhhhhhhfffff",
+        "ccccccccccccccccccc-------iiiiii",
+        "ccccccccccccccccccccc-------iiii",
+        "ccccccccccccccccccccc-------iiii",
+        "cccccccccccccccccccc---------iii",
+        "cccccccccccccccccccc----------ii",
+        "dddddddddddddddddddd-----------i",
+        "dddddddddddddddddddd----------ii",
+        "ddddddddddddddddddddd---------ii",
+        "ddddddddddddddddddddd---------ii",
+        "dddddddddddddddddddddd--------ii",
+        "dddddddddddddddddddddd-------iii",
+        "dddddddddddddddddddddd------iiii",
+        "dddddddddddddddddddddd-----iiiii",
+        "dddddddddddddddddddddd-----iiiii",
+        "dddddddddddddddddddddd---iiiiiii",
+        "dddddddddddddddddddddd---iiiiiii",
+        "dddddddddddddddddddddd--iiiiiiii",
+        "dddddddddddddddddddddd--iiiiiiii",
+        "dddddddddddddddddddddd--i-iiiiii",
+        "dddddddddddddddddddddddiiiiiiiii",
+        "dddddddddddddddddddddd--iiiiiiii",
+        "dddddddddddddddddddddddiiiiiiiii"
+      ]
+    },
+    "biome": {
+      "legend": {
+        "~": "sea",
+        "i": "ice",
+        "t": "tundra",
+        "b": "boreal",
+        "m": "temperate",
+        "s": "steppe",
+        "d": "desert",
+        "u": "subtropical",
+        "r": "tropical",
+        "h": "highland"
+      },
+      "rows": [
+        "~~~ttt~~~tttttt~~~~~tt~~~iiiiiii",
+        "ttttttttttttttttttt~tttt~iiiiiii",
+        "ttttttttttttttttt~~~~~tt~~iiii~~",
+        "tttttttttttttttt~~~~~~~~~~i~~~~~",
+        "~bb~~~bbbbbbbbbbb~~~bbbb~~~~~~~~",
+        "~b~~~~~bbbbbbbbbb~~~bbbb~~~~~~~~",
+        "~~~~~~~~~bbbssssbbb~bbbb~b~~~~~~",
+        "~~~~~~~~~mbbssssbbbmmmm~m~~~~~~~",
+        "~~~~~~~~~~mmmmsssmmmmmmm~~~~~~~~",
+        "~~~~~~~~~~mmmmsssmmmmm~~~~~~~~~~",
+        "~~~~~~~~~~muddsssmmmm~~~~~~~~~~~",
+        "~~~~~~~~~~~uddsssuuuu~~~~~~~~~~~",
+        "~~~~~~~~~~~ddduuuuuu~~~~~~~~~~~~",
+        "~~~~~~~~~~~d~dduu~~u~~~~~~~~~~~~",
+        "~~~~~~~~~~~~d~dd~~~~~~~~~~~~~~~~",
+        "~~r~~~~~~~~~~uuu~~rrr~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~uhrr~~~~rr~r~~~~~~",
+        "~~~~~~~~~~~~~~rrrrr~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~rrr~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~rrrrrrr~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~rhrrrrr~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~rrrrrrr~~~~",
+        "~~~~~~~~~~~~~~~~~~~~rhrrrrrrr~~~",
+        "~~~~~~~~~~~~~~~~~~~~hrrrrrrrrr~~",
+        "~~~~~~~~~~~~~~~~~~~~dhhrrrrrrrr~",
+        "~~~~~~~~~~~~~~~~~~~~dhhhrrrrrr~~",
+        "~~~~~~~~~~~~~~~~~~~~~hhhrrrrrr~~",
+        "~~~~~~~~~~~~~~~~~~~~~dhhruuuuu~~",
+        "~~~~~~~~~~~~~~~~~~~~~~hhhuuuuu~~",
+        "~~~~~~~~~~~~~~~~~~~~~~duuuuuu~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~hhuuuu~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~hmmmu~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~mmmmm~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~mmm~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~hss~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~hs~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~hs~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~ts~t~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~tt~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+      ]
+    }
+  },
+  "nations": [
+    {
+      "id": "usa",
+      "name": "United States",
+      "short": "USA",
+      "color": "#4f8fe0",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "usa-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "canada",
+      "name": "Canada",
+      "short": "Canada",
+      "color": "#b9424f",
+      "government": "commonwealth",
+      "role": "power",
+      "capital": "canada-capital",
+      "terrainBias": 25
+    },
+    {
+      "id": "mexico",
+      "name": "Mexico",
+      "short": "Mexico",
+      "color": "#3e9a62",
+      "government": "union",
+      "role": "power",
+      "capital": "mexico-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "brazil",
+      "name": "Brazil",
+      "short": "Brazil",
+      "color": "#e0b43c",
+      "government": "union",
+      "role": "power",
+      "capital": "brazil-capital",
+      "terrainBias": 0
+    },
+    {
+      "id": "argentina",
+      "name": "Argentina",
+      "short": "Argentina",
+      "color": "#7fc4e8",
+      "government": "federation",
+      "role": "power",
+      "capital": "argentina-capital",
+      "terrainBias": -10
+    },
+    {
+      "id": "colombia",
+      "name": "Colombia",
+      "short": "Colombia",
+      "color": "#e8873a",
+      "government": "directorate",
+      "role": "power",
+      "capital": "colombia-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "guatemala",
+      "name": "Guatemala",
+      "short": "Guat.",
+      "color": "#5f8f8a",
+      "government": "federation",
+      "role": "minor",
+      "capital": "guatemala-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "nicaragua",
+      "name": "Nicaragua",
+      "short": "Nic.",
+      "color": "#9a6e9e",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "nicaragua-capital",
+      "terrainBias": 20
+    },
+    {
+      "id": "panama",
+      "name": "Panama",
+      "short": "Panama",
+      "color": "#c94f7c",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "panama-capital",
+      "terrainBias": 15
+    },
+    {
+      "id": "cuba",
+      "name": "Cuba",
+      "short": "Cuba",
+      "color": "#a83a3a",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "cuba-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "haiti",
+      "name": "Haiti",
+      "short": "Haiti",
+      "color": "#5a6fd0",
+      "government": "federation",
+      "role": "minor",
+      "capital": "haiti-capital",
+      "terrainBias": 30
+    },
+    {
+      "id": "dominican",
+      "name": "Dominican Republic",
+      "short": "Dom. Rep.",
+      "color": "#c46d4e",
+      "government": "federation",
+      "role": "minor",
+      "capital": "dominican-capital",
+      "terrainBias": 25
+    },
+    {
+      "id": "venezuela",
+      "name": "Venezuela",
+      "short": "Venez.",
+      "color": "#8a5ab8",
+      "government": "directorate",
+      "role": "minor",
+      "capital": "venezuela-capital",
+      "terrainBias": 10
+    },
+    {
+      "id": "guyana",
+      "name": "Guyana",
+      "short": "Guyana",
+      "color": "#6fa04a",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "guyana-capital",
+      "terrainBias": 20
+    },
+    {
+      "id": "ecuador",
+      "name": "Ecuador",
+      "short": "Ecuador",
+      "color": "#d3a24a",
+      "government": "federation",
+      "role": "minor",
+      "capital": "ecuador-capital",
+      "terrainBias": 40
+    },
+    {
+      "id": "peru",
+      "name": "Peru",
+      "short": "Peru",
+      "color": "#c97ab0",
+      "government": "federation",
+      "role": "minor",
+      "capital": "peru-capital",
+      "terrainBias": 40
+    },
+    {
+      "id": "bolivia",
+      "name": "Bolivia",
+      "short": "Bolivia",
+      "color": "#8fae3a",
+      "government": "union",
+      "role": "minor",
+      "capital": "bolivia-capital",
+      "terrainBias": 40
+    },
+    {
+      "id": "chile",
+      "name": "Chile",
+      "short": "Chile",
+      "color": "#3fa7b5",
+      "government": "federation",
+      "role": "minor",
+      "capital": "chile-capital",
+      "terrainBias": 45
+    },
+    {
+      "id": "paraguay",
+      "name": "Paraguay",
+      "short": "Para.",
+      "color": "#a8744a",
+      "government": "union",
+      "role": "minor",
+      "capital": "paraguay-capital",
+      "terrainBias": -10
+    },
+    {
+      "id": "uruguay",
+      "name": "Uruguay",
+      "short": "Uruguay",
+      "color": "#9fb4c8",
+      "government": "commonwealth",
+      "role": "minor",
+      "capital": "uruguay-capital",
+      "terrainBias": -15
+    }
+  ],
+  "sites": [
+    {
+      "id": "usa-capital",
+      "kind": "capital",
+      "name": "Washington",
+      "at": [20, 10],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city0",
+      "kind": "city",
+      "name": "New York",
+      "at": [20, 9],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city1",
+      "kind": "city",
+      "name": "Seattle",
+      "at": [10, 8],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city2",
+      "kind": "city",
+      "name": "Houston",
+      "at": [16, 13],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city3",
+      "kind": "city",
+      "name": "Los Angeles",
+      "at": [11, 11],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city4",
+      "kind": "city",
+      "name": "Chicago",
+      "at": [17, 9],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city5",
+      "kind": "city",
+      "name": "Miami",
+      "at": [19, 13],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-city6",
+      "kind": "city",
+      "name": "Honolulu",
+      "at": [2, 15],
+      "owner": "usa",
+      "victoryPoints": 4
+    },
+    {
+      "id": "usa-depot0",
+      "kind": "depot",
+      "name": "Detroit",
+      "at": [18, 8],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-depot1",
+      "kind": "depot",
+      "name": "Anchorage",
+      "at": [3, 3],
+      "owner": "usa"
+    },
+    {
+      "id": "usa-depot2",
+      "kind": "depot",
+      "name": "San Juan",
+      "at": [25, 16],
+      "owner": "usa",
+      "profile": "outpost"
+    },
+    {
+      "id": "canada-capital",
+      "kind": "capital",
+      "name": "Ottawa",
+      "at": [20, 7],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-city0",
+      "kind": "city",
+      "name": "Toronto",
+      "at": [19, 8],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-city1",
+      "kind": "city",
+      "name": "Vancouver",
+      "at": [9, 7],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-city2",
+      "kind": "city",
+      "name": "Montreal",
+      "at": [21, 8],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-city3",
+      "kind": "city",
+      "name": "Calgary",
+      "at": [12, 6],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-city4",
+      "kind": "city",
+      "name": "Winnipeg",
+      "at": [15, 7],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-depot0",
+      "kind": "depot",
+      "name": "Halifax",
+      "at": [23, 8],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-depot1",
+      "kind": "depot",
+      "name": "Whitehorse",
+      "at": [7, 3],
+      "owner": "canada"
+    },
+    {
+      "id": "canada-depot2",
+      "kind": "depot",
+      "name": "Iqaluit",
+      "at": [22, 2],
+      "owner": "canada",
+      "profile": "outpost"
+    },
+    {
+      "id": "mexico-capital",
+      "kind": "capital",
+      "name": "Mexico City",
+      "at": [15, 16],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-city0",
+      "kind": "city",
+      "name": "Monterrey",
+      "at": [15, 14],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-city1",
+      "kind": "city",
+      "name": "Tijuana",
+      "at": [11, 12],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-city2",
+      "kind": "city",
+      "name": "Guadalajara",
+      "at": [14, 16],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-city3",
+      "kind": "city",
+      "name": "Veracruz",
+      "at": [16, 16],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-city4",
+      "kind": "city",
+      "name": "Hermosillo",
+      "at": [12, 12],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-depot0",
+      "kind": "depot",
+      "name": "Chihuahua",
+      "at": [13, 13],
+      "owner": "mexico"
+    },
+    {
+      "id": "mexico-depot1",
+      "kind": "depot",
+      "name": "Merida",
+      "at": [17, 16],
+      "owner": "mexico"
+    },
+    {
+      "id": "brazil-capital",
+      "kind": "capital",
+      "name": "Brasilia",
+      "at": [27, 27],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-city0",
+      "kind": "city",
+      "name": "Porto Alegre",
+      "at": [26, 31],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-city1",
+      "kind": "city",
+      "name": "Manaus",
+      "at": [24, 23],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-city2",
+      "kind": "city",
+      "name": "Sao Paulo",
+      "at": [27, 29],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-city3",
+      "kind": "city",
+      "name": "Rio de Janeiro",
+      "at": [28, 29],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-city4",
+      "kind": "city",
+      "name": "Salvador",
+      "at": [29, 26],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-city5",
+      "kind": "city",
+      "name": "Recife",
+      "at": [30, 24],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-city6",
+      "kind": "city",
+      "name": "Belem",
+      "at": [28, 22],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-depot0",
+      "kind": "depot",
+      "name": "Campo Grande",
+      "at": [26, 28],
+      "owner": "brazil"
+    },
+    {
+      "id": "brazil-depot1",
+      "kind": "depot",
+      "name": "Cuiaba",
+      "at": [25, 26],
+      "owner": "brazil"
+    },
+    {
+      "id": "argentina-capital",
+      "kind": "capital",
+      "name": "Buenos Aires",
+      "at": [25, 32],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-city0",
+      "kind": "city",
+      "name": "Corrientes",
+      "at": [25, 30],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-city1",
+      "kind": "city",
+      "name": "Mendoza",
+      "at": [23, 32],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-city2",
+      "kind": "city",
+      "name": "Cordoba",
+      "at": [24, 31],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-city3",
+      "kind": "city",
+      "name": "Salta",
+      "at": [23, 29],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-city4",
+      "kind": "city",
+      "name": "Bahia Blanca",
+      "at": [24, 34],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-depot0",
+      "kind": "depot",
+      "name": "Neuquen",
+      "at": [23, 34],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-depot1",
+      "kind": "depot",
+      "name": "Comodoro Rivadavia",
+      "at": [23, 36],
+      "owner": "argentina"
+    },
+    {
+      "id": "argentina-depot2",
+      "kind": "depot",
+      "name": "Ushuaia",
+      "at": [23, 39],
+      "owner": "argentina",
+      "profile": "outpost"
+    },
+    {
+      "id": "colombia-capital",
+      "kind": "capital",
+      "name": "Bogota",
+      "at": [22, 20],
+      "owner": "colombia"
+    },
+    {
+      "id": "colombia-city0",
+      "kind": "city",
+      "name": "Cartagena",
+      "at": [21, 19],
+      "owner": "colombia"
+    },
+    {
+      "id": "colombia-city1",
+      "kind": "city",
+      "name": "Cucuta",
+      "at": [23, 20],
+      "owner": "colombia"
+    },
+    {
+      "id": "colombia-city2",
+      "kind": "city",
+      "name": "Medellin",
+      "at": [22, 21],
+      "owner": "colombia"
+    },
+    {
+      "id": "colombia-city3",
+      "kind": "city",
+      "name": "Cali",
+      "at": [21, 21],
+      "owner": "colombia"
+    },
+    {
+      "id": "colombia-city4",
+      "kind": "city",
+      "name": "Barranquilla",
+      "at": [22, 19],
+      "owner": "colombia"
+    },
+    {
+      "id": "colombia-city5",
+      "kind": "city",
+      "name": "Villavicencio",
+      "at": [23, 21],
+      "owner": "colombia"
+    },
+    {
+      "id": "colombia-depot0",
+      "kind": "depot",
+      "name": "Leticia",
+      "at": [22, 23],
+      "owner": "colombia"
+    },
+    {
+      "id": "guatemala-capital",
+      "kind": "capital",
+      "name": "Guatemala City",
+      "at": [17, 18],
+      "owner": "guatemala"
+    },
+    {
+      "id": "nicaragua-capital",
+      "kind": "capital",
+      "name": "Managua",
+      "at": [18, 18],
+      "owner": "nicaragua"
+    },
+    {
+      "id": "panama-capital",
+      "kind": "capital",
+      "name": "Panama City",
+      "at": [19, 19],
+      "owner": "panama",
+      "victoryPoints": 8
+    },
+    {
+      "id": "cuba-capital",
+      "kind": "capital",
+      "name": "Havana",
+      "at": [18, 15],
+      "owner": "cuba",
+      "victoryPoints": 8
+    },
+    {
+      "id": "cuba-city0",
+      "kind": "city",
+      "name": "Santiago de Cuba",
+      "at": [20, 15],
+      "owner": "cuba"
+    },
+    {
+      "id": "haiti-capital",
+      "kind": "capital",
+      "name": "Port-au-Prince",
+      "at": [22, 16],
+      "owner": "haiti"
+    },
+    {
+      "id": "dominican-capital",
+      "kind": "capital",
+      "name": "Santo Domingo",
+      "at": [23, 16],
+      "owner": "dominican"
+    },
+    {
+      "id": "venezuela-capital",
+      "kind": "capital",
+      "name": "Caracas",
+      "at": [24, 19],
+      "owner": "venezuela"
+    },
+    {
+      "id": "venezuela-city0",
+      "kind": "city",
+      "name": "Maracaibo",
+      "at": [23, 19],
+      "owner": "venezuela"
+    },
+    {
+      "id": "venezuela-city1",
+      "kind": "city",
+      "name": "Ciudad Guayana",
+      "at": [25, 20],
+      "owner": "venezuela"
+    },
+    {
+      "id": "guyana-capital",
+      "kind": "capital",
+      "name": "Georgetown",
+      "at": [26, 20],
+      "owner": "guyana"
+    },
+    {
+      "id": "guyana-city0",
+      "kind": "city",
+      "name": "Paramaribo",
+      "at": [27, 20],
+      "owner": "guyana"
+    },
+    {
+      "id": "ecuador-capital",
+      "kind": "capital",
+      "name": "Quito",
+      "at": [21, 22],
+      "owner": "ecuador"
+    },
+    {
+      "id": "ecuador-city0",
+      "kind": "city",
+      "name": "Guayaquil",
+      "at": [20, 22],
+      "owner": "ecuador"
+    },
+    {
+      "id": "peru-capital",
+      "kind": "capital",
+      "name": "Lima",
+      "at": [20, 25],
+      "owner": "peru"
+    },
+    {
+      "id": "peru-city0",
+      "kind": "city",
+      "name": "Iquitos",
+      "at": [21, 23],
+      "owner": "peru"
+    },
+    {
+      "id": "peru-city1",
+      "kind": "city",
+      "name": "Arequipa",
+      "at": [21, 27],
+      "owner": "peru"
+    },
+    {
+      "id": "bolivia-capital",
+      "kind": "capital",
+      "name": "La Paz",
+      "at": [22, 27],
+      "owner": "bolivia"
+    },
+    {
+      "id": "bolivia-city0",
+      "kind": "city",
+      "name": "Santa Cruz",
+      "at": [24, 27],
+      "owner": "bolivia"
+    },
+    {
+      "id": "chile-capital",
+      "kind": "capital",
+      "name": "Santiago",
+      "at": [22, 32],
+      "owner": "chile",
+      "victoryPoints": 8
+    },
+    {
+      "id": "chile-city0",
+      "kind": "city",
+      "name": "Antofagasta",
+      "at": [22, 29],
+      "owner": "chile"
+    },
+    {
+      "id": "chile-city1",
+      "kind": "city",
+      "name": "Concepcion",
+      "at": [22, 33],
+      "owner": "chile"
+    },
+    {
+      "id": "chile-city2",
+      "kind": "city",
+      "name": "Punta Arenas",
+      "at": [22, 37],
+      "owner": "chile"
+    },
+    {
+      "id": "paraguay-capital",
+      "kind": "capital",
+      "name": "Asuncion",
+      "at": [25, 29],
+      "owner": "paraguay"
+    },
+    {
+      "id": "uruguay-capital",
+      "kind": "capital",
+      "name": "Montevideo",
+      "at": [26, 32],
+      "owner": "uruguay"
+    }
+  ],
+  "seaZones": [
+    {
+      "id": "arctic",
+      "name": "Arctic Ocean"
+    },
+    {
+      "id": "north-pacific",
+      "name": "North Pacific"
+    },
+    {
+      "id": "east-pacific",
+      "name": "Eastern Pacific"
+    },
+    {
+      "id": "south-pacific",
+      "name": "South Pacific"
+    },
+    {
+      "id": "hudson-bay",
+      "name": "Hudson Bay"
+    },
+    {
+      "id": "north-atlantic",
+      "name": "North Atlantic"
+    },
+    {
+      "id": "gulf-of-mexico",
+      "name": "Gulf of Mexico"
+    },
+    {
+      "id": "caribbean",
+      "name": "Caribbean Sea"
+    },
+    {
+      "id": "south-atlantic",
+      "name": "South Atlantic"
+    }
+  ],
+  "straits": [
+    {
+      "id": "panama-canal",
+      "name": "Panama Canal",
+      "kind": "canal",
+      "hexes": [
+        [19, 19]
+      ],
+      "joins": [
+        "caribbean",
+        "east-pacific"
+      ]
+    },
+    {
+      "id": "florida-strait",
+      "name": "Florida Strait",
+      "kind": "strait",
+      "hexes": [
+        [19, 14],
+        [20, 14]
+      ],
+      "joins": [
+        "gulf-of-mexico",
+        "north-atlantic"
+      ]
+    },
+    {
+      "id": "yucatan-channel",
+      "name": "Yucatan Channel",
+      "kind": "strait",
+      "hexes": [
+        [17, 15],
+        [18, 16]
+      ],
+      "joins": [
+        "gulf-of-mexico",
+        "caribbean"
+      ]
+    },
+    {
+      "id": "magellan",
+      "name": "Strait of Magellan",
+      "kind": "strait",
+      "hexes": [
+        [22, 38],
+        [23, 38]
+      ],
+      "joins": [
+        "south-pacific",
+        "south-atlantic"
+      ]
+    },
+    {
+      "id": "drake-passage",
+      "name": "Drake Passage",
+      "kind": "strait",
+      "hexes": [
+        [20, 40],
+        [21, 40],
+        [22, 40],
+        [23, 40],
+        [24, 40],
+        [25, 40]
+      ],
+      "joins": [
+        "south-pacific",
+        "south-atlantic"
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "kind": "oil",
+      "at": [4, 1],
+      "name": "Prudhoe Bay"
+    },
+    {
+      "kind": "oil",
+      "at": [12, 5],
+      "name": "Athabasca oil sands"
+    },
+    {
+      "kind": "oil",
+      "at": [15, 12],
+      "name": "Permian Basin"
+    },
+    {
+      "kind": "oil",
+      "at": [24, 20],
+      "name": "Orinoco Belt"
+    },
+    {
+      "kind": "oil",
+      "at": [23, 33],
+      "name": "Vaca Muerta"
+    },
+    {
+      "kind": "oil",
+      "at": [26, 29],
+      "name": "Santos Basin"
+    },
+    {
+      "kind": "chips",
+      "at": [11, 10],
+      "name": "Silicon Valley"
+    },
+    {
+      "kind": "chips",
+      "at": [13, 11],
+      "name": "Phoenix fabs"
+    },
+    {
+      "kind": "rare-earths",
+      "at": [12, 11],
+      "name": "Mountain Pass"
+    },
+    {
+      "kind": "rare-earths",
+      "at": [23, 28],
+      "name": "Salar de Uyuni lithium"
+    },
+    {
+      "kind": "food",
+      "at": [16, 9],
+      "name": "The Corn Belt"
+    },
+    {
+      "kind": "food",
+      "at": [14, 7],
+      "name": "The Prairies"
+    },
+    {
+      "kind": "food",
+      "at": [24, 33],
+      "name": "The Pampas"
+    },
+    {
+      "kind": "food",
+      "at": [26, 25],
+      "name": "Mato Grosso soy"
+    }
+  ]
+}

@@ -25,6 +25,11 @@ import { DOCTRINE as india } from './nations/india';
 import { DOCTRINE as pakistan } from './nations/pakistan';
 import { DOCTRINE as indonesia } from './nations/indonesia';
 import { DOCTRINE as australia } from './nations/australia';
+import { DOCTRINE as canada } from './nations/canada';
+import { DOCTRINE as mexico } from './nations/mexico';
+import { DOCTRINE as colombia } from './nations/colombia';
+import { DOCTRINE as brazil } from './nations/brazil';
+import { DOCTRINE as argentina } from './nations/argentina';
 
 export const DOCTRINE = {
   /** Cards held at the end of a turn, after the draw. */
@@ -268,6 +273,11 @@ export const NATION_DOCTRINES: Record<NationId, NationDoctrine> = {
   pakistan,
   indonesia,
   australia,
+  canada,
+  mexico,
+  colombia,
+  brazil,
+  argentina,
 };
 
 /** Every card the game knows: the generic ones and every nation's signature cards. */
