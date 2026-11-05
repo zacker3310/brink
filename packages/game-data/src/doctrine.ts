@@ -11,6 +11,12 @@ import { DOCTRINE as china } from './nations/china';
 import { NATION_DOCTRINE as russia } from './nations/russia';
 import { NATION_DOCTRINE as japan } from './nations/japan';
 import { DOCTRINE as usa } from './nations/usa';
+import { NATION_DOCTRINE as egypt } from './nations/egypt';
+import { NATION_DOCTRINE as iran } from './nations/iran';
+import { NATION_DOCTRINE as nigeria } from './nations/nigeria';
+import { NATION_DOCTRINE as saudiArabia } from './nations/saudi-arabia';
+import { NATION_DOCTRINE as southAfrica } from './nations/south-africa';
+import { NATION_DOCTRINE as turkey } from './nations/turkey';
 
 export const DOCTRINE = {
   /** Cards held at the end of a turn, after the draw. */
@@ -225,6 +231,12 @@ export const NATION_DOCTRINES: Record<NationId, NationDoctrine> = {
   russia,
   japan,
   usa,
+  egypt,
+  iran,
+  nigeria,
+  'saudi-arabia': saudiArabia,
+  'south-africa': southAfrica,
+  turkey,
 };
 
 /** Every card the game knows: the generic ones and every nation's signature cards. */

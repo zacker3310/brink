@@ -6,6 +6,12 @@ import { ROSTER as china } from './nations/china';
 import { ROSTER as russia } from './nations/russia';
 import { ROSTER as japan } from './nations/japan';
 import { ROSTER as usa } from './nations/usa';
+import { ROSTER as egypt } from './nations/egypt';
+import { ROSTER as iran } from './nations/iran';
+import { ROSTER as nigeria } from './nations/nigeria';
+import { ROSTER as saudiArabia } from './nations/saudi-arabia';
+import { ROSTER as southAfrica } from './nations/south-africa';
+import { ROSTER as turkey } from './nations/turkey';
 
 /**
  * What a general (a trait, a perk, or simply being there) does for the formation they lead.
@@ -153,6 +159,12 @@ export const NATION_ROSTERS: Record<NationId, readonly GeneralDef[]> = {
   russia,
   japan,
   usa,
+  egypt,
+  iran,
+  nigeria,
+  'saudi-arabia': saudiArabia,
+  'south-africa': southAfrica,
+  turkey,
 };
 
 /** The generals `nation` fields: its own roster, else its government's. */
