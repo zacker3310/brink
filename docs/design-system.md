@@ -115,6 +115,7 @@ hover combat card) and gets the same map.
 | Component | File | Notes |
 |---|---|---|
 | Phone game screen | `PhoneGame.tsx`, `phone.ts` | Status strip (turn, victory bar, funds, hand, goal), dock (Nation, Plan, Next, End Turn), and over the dock exactly one card at a time: the command card (operation row, one line of advice, a row of 44 px chips for a decision, idle cities, last turn), the unit card, the hex card (only for a hex you tapped), the aim banner or the debrief; sheets |
+| Plans, Enter Battle, one-tap turn | `Plans.tsx`, `plans.ts` | The plan picker the first turn opens on (the staff's best few plans, ranked: an operation, a city to hold, peace on a second front; each one tap, how to win under them); the best two on the command card with no operation running, else the operation's next step and Other plans; ENTER BATTLE (amber, hazard edge, place and odds, a count) whenever an attack this turn meets enemies, straight to the best fight; with the staff's plan up, Execute ends the turn in one tap and Review orders is a chip; the debrief's first line is what the turn did for the plan |
 | Map pointers | `opspot.ts`, `MapView.tsx` | The running operation's current place (port or beach) in a dashed amber ring with a tag; every hex an armed card can take in friend blue |
 | Counters, pictograms | `counters.ts`, `design/pictograms.ts`, `glyphs.tsx` | The only way to draw a unit |
 | Odds, goal | `odds.ts`, `objective.ts` | Shared by map and cards |
