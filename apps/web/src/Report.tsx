@@ -101,6 +101,20 @@ function digest(view: NationView, events: GameEvent[]): { totals: Totals; sectio
         });
         break;
       }
+      case 'airlift': {
+        const ours = e.owner === me;
+        const where = at(e.landed);
+        const how = e.mode === 'airland' ? 'air-landed' : e.mode === 'assault' ? 'came down beside it to storm it' : 'dropped';
+        if (ours) totals.lost += e.strengthLoss;
+        out.Movement!.push({
+          at: e.aborted ? e.from : e.landed,
+          tone: e.aborted || e.hit ? 'bad' : ours ? 'good' : undefined,
+          text: e.aborted
+            ? `${name(view, e.formation, e.owner)}'s lift to ${at(e.to)} turned back: ${e.aborted}.`
+            : `${name(view, e.formation, e.owner)} ${how} ${e.mode === 'assault' ? `${at(e.to)} (down at ${where})` : `at ${where}`}${e.hit ? `: hit on the way in by ${e.by.map((n) => nation(view, n)).join(' and ')}, −${e.strengthLoss}${e.destroyed ? ', lost' : ''}` : e.chance > 0 ? `, through a ${e.chance}% risk` : ''}.`,
+        });
+        break;
+      }
       case 'destroyed':
         if (e.owner === me) totals.ourDestroyed += 1;
         else totals.theirDestroyed += 1;

@@ -48,6 +48,14 @@ export function operationSpot(view: NationView, op: Operation): Spot | null {
       const key = beachOf(view, op.at);
       return key && key !== op.at ? { key, label: 'LAND HERE' } : null;
     }
+    // Airborne: the sea hex the carrier group waits in (or the airfield), then the drop zone.
+    case 'stage': {
+      const key = op.air?.stage ?? (op.air?.field ? view.sites[op.air.field]?.key : undefined);
+      return key ? { key, label: op.air?.stage ? 'STAGE' : 'AIRFIELD' } : null;
+    }
+    case 'drop':
+    case 'hold':
+      return op.air ? { key: op.air.zone, label: now.id === 'drop' ? 'DROP ZONE' : 'HOLD' } : null;
     default:
       return null;
   }

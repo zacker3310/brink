@@ -24,6 +24,7 @@ import { AimBanner, DesktopHand } from './Hand';
 import { Meter, powersOf, signed, Swatch } from './ui';
 import { Icon } from './icons';
 import { sfx } from './sfx';
+import { canFly } from './airlift';
 
 const RES: [Resource, string][] = [
   ['credits', 'Treasury'],
@@ -398,6 +399,7 @@ function useShortcuts(toggleHelp: () => void) {
     } else if (k === 'n') g.nextIdle();
     else if (e.key === 'Escape') {
       if (g.aimingCard) return g.cancelAim();
+      if (g.aimingLift) return g.cancelLift();
       if (g.selectedCity) return;
       if (g.panelOpen) g.togglePanel(false);
       g.selectFormation(null);
@@ -414,6 +416,7 @@ function useShortcuts(toggleHelp: () => void) {
       else if (k === 'a') g.setMode('attack');
       else if (k === 'r') g.setMode('recon');
       else if (k === 'w') g.setMode('withdraw');
+      else if (k === 'l' && g.view && canFly(g.view, f)) g.startLift(f.id);
     }
   }, []);
 }

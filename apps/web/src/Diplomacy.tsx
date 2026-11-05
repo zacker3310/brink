@@ -136,7 +136,7 @@ interface DealOption {
   action: DiplomaticAction;
   kind?: ProposalKind;
   label: string;
-  needs?: 'exchange' | 'tribute' | 'against' | 'site';
+  needs?: 'exchange' | 'tribute' | 'against' | 'site' | 'toward';
   tone?: 'danger';
 }
 
@@ -153,6 +153,8 @@ function optionsFor(rel: string): DealOption[] {
     { action: 'propose_alliance', kind: 'alliance', label: 'Alliance' },
     { action: 'propose_alliance', kind: 'alliance', label: 'Alliance against…', needs: 'against' },
     { action: 'propose_joint_op', kind: 'joint_op', label: 'Joint operation', needs: 'site' },
+    // Military access: march through, supply across, base aircraft. Allies have it already.
+    ...(rel === 'peace' ? [{ action: 'propose_passage', kind: 'passage', label: 'Right of passage', needs: 'toward' } as DealOption] : []),
     { action: 'demand_tribute', kind: 'tribute', label: 'Demand tribute', needs: 'tribute' },
     { action: 'embargo', label: 'Embargo', tone: 'danger' },
     { action: 'declare_war', label: 'Declare war', tone: 'danger' },
@@ -213,6 +215,7 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
   const [get, setGet] = useState<{ r: Resource; n: number }>({ r: 'materials', n: 60 });
   const [against, setAgainst] = useState<NationId | null>(null);
   const [site, setSite] = useState<string | null>(null);
+  const [toward, setToward] = useState<NationId | null>(null);
   const [reply, setReply] = useState<{ verdict: Verdict; order: { action: DiplomaticAction; terms?: DealTerms } } | null>(null);
   const [asking, setAsking] = useState(false);
 
@@ -225,6 +228,7 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
     if (o.needs === 'tribute') return { get: { [get.r]: get.n } };
     if (o.needs === 'against') return against ? { against } : undefined;
     if (o.needs === 'site') return site ? { site } : undefined;
+    if (o.needs === 'toward') return toward ? { against: toward } : undefined;
     return undefined;
   };
   const enemiesOfMine = Object.keys(view.relations).filter((n) => view.relations[n] === 'war');
@@ -236,7 +240,12 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
   const options = optionsFor(rel).filter((o) => (o.needs === 'site' ? prizes.length > 0 : o.needs === 'against' ? thirdPowers.length > 0 : true));
 
   const terms = deal ? termsFor(deal) : undefined;
-  const ready = deal && (!deal.needs || terms);
+  // Passage may name whom it is for, or not (a leader wants more warmth to grant it unnamed).
+  const ready = deal && (!deal.needs || deal.needs === 'toward' || terms);
+  const foes = Object.keys(view.relations)
+    .filter((n) => view.relations[n] === 'war' && n !== nation && view.nations[n] && !view.nations[n]!.eliminated)
+    .sort((a, b) => (view.nations[a]!.name < view.nations[b]!.name ? -1 : 1))
+    .slice(0, 7);
   const blocked = deal && ready ? diplomacyBlocked(view, nation, deal.action, terms) : null;
   const short = deal?.needs === 'exchange' && view.self.stockpile[give.r] < give.n ? `You hold only ${view.self.stockpile[give.r]} ${RES_NAME[give.r].toLowerCase()}` : null;
 
@@ -382,7 +391,7 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-friend/60 bg-friend/10 p-2.5" data-testid="planned-deal">
           <span className="min-w-0 flex-1 text-[13px]">
             At turn end: {ACTION_TEXT[planned.action].toLowerCase()} {them.name}
-            {planned.terms && planned.action !== 'propose_alliance' ? ` (${dealText(view, (planned.action === 'demand_tribute' || planned.action === 'pay_tribute' ? 'tribute' : planned.action === 'propose_joint_op' ? 'joint_op' : 'exchange') as ProposalKind, planned.terms)})` : ''}
+            {planned.terms && planned.action !== 'propose_alliance' ? ` (${dealText(view, (planned.action === 'demand_tribute' || planned.action === 'pay_tribute' ? 'tribute' : planned.action === 'propose_joint_op' ? 'joint_op' : planned.action === 'propose_passage' ? 'passage' : 'exchange') as ProposalKind, planned.terms)})` : ''}
             {planned.action === 'declare_war' && rel !== 'war' ? ` · −${RULES.perfidy[rel === 'alliance' ? 'alliance' : 'peace']} stability` : ''}
           </span>
           <button type="button" className={`${big} shrink-0 border border-line bg-ink-850`} data-testid="planned-cancel" onClick={() => setDiplomacy(nation, null)}>
@@ -440,6 +449,18 @@ function LeaderScreen({ view, nation, onBack }: { view: NationView; nation: Nati
                 {thirdPowers.map((n) => (
                   <button key={n.id} type="button" aria-pressed={against === n.id} onClick={() => setAgainst(n.id)} className={`h-11 rounded-lg border text-[13px] font-semibold ${against === n.id ? 'border-friend bg-friend/15 text-friend' : 'border-line bg-ink-800'}`}>
                     Against {n.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {deal.needs === 'toward' && (
+              <div className="grid grid-cols-2 gap-1.5" data-testid="passage-toward">
+                <button type="button" aria-pressed={toward === null} onClick={() => setToward(null)} className={`h-11 rounded-lg border text-[13px] font-semibold ${toward === null ? 'border-friend bg-friend/15 text-friend' : 'border-line bg-ink-800'}`}>
+                  Not saying
+                </button>
+                {foes.map((n) => (
+                  <button key={n} type="button" aria-pressed={toward === n} onClick={() => setToward(n)} className={`h-11 truncate rounded-lg border px-2 text-[13px] font-semibold ${toward === n ? 'border-friend bg-friend/15 text-friend' : 'border-line bg-ink-800'}`}>
+                    Toward {view.nations[n]!.name}
                   </button>
                 ))}
               </div>

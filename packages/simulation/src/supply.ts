@@ -2,6 +2,7 @@ import type { GameEvent, HexKey, NationId, NationOrders, Stockpile, SupplyPriori
 import { FACILITIES, RULES, SEA_SUPPLY_COST, SITE_SUPPLY, TERRAIN, UNITS } from '@brink/game-data';
 import { neighborKeys } from '@brink/map';
 import { sabotagedHexes } from './doctrine';
+import { hasPassage } from './passage';
 import { clamp, nationModifiers, pct, relationOf, sortedKeys, zeroStockpile } from './rules';
 
 /** Hexes holding a formation of a nation at war with `nation`, from one shared snapshot. */
@@ -32,7 +33,7 @@ export function supplyDistances(world: WorldState, nation: NationId): Map<HexKey
     const t = world.tiles[key];
     if (!t || hostile.has(key)) return false;
     if (t.terrain === 'water') return world.tiles[from]!.terrain === 'water' || world.tiles[from]!.port === true;
-    return held.has(key) || (t.owner !== null && relationOf(world.relations, nation, t.owner) === 'alliance');
+    return held.has(key) || (t.owner !== null && (relationOf(world.relations, nation, t.owner) === 'alliance' || hasPassage(world, nation, t.owner)));
   };
   const interdicted = (key: HexKey): boolean => neighborKeys(key).some((k) => hostile.has(k));
 

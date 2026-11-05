@@ -1,6 +1,6 @@
 import type { DealTerms, DiplomaticAction, GameEvent, NationId, NationOrders, Proposal, ProposalKind, SiteId, Stockpile, Treaty, TreatyKind, WorldState } from '@brink/contracts';
 import { RESOURCES } from '@brink/contracts';
-import { LEADER_TUNING, TREATIES } from '@brink/game-data';
+import { LEADER_TUNING, PASSAGE, TREATIES } from '@brink/game-data';
 import { facilityCost } from './progression';
 import { pairKey, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
@@ -18,6 +18,7 @@ export const PROPOSAL_OF: Partial<Record<DiplomaticAction, ProposalKind>> = {
   demand_tribute: 'tribute',
   pay_tribute: 'tribute',
   propose_joint_op: 'joint_op',
+  propose_passage: 'passage',
 };
 
 /** The terms the other side offers to agree to `t`: what one gives the other gets. */
@@ -52,7 +53,7 @@ function sameStock(a: Partial<Stockpile> | undefined, b: Partial<Stockpile> | un
 export function mirrors(p: Pick<Proposal, 'from' | 'to' | 'kind' | 'terms'>, q: Pick<Proposal, 'from' | 'to' | 'kind' | 'terms'>): boolean {
   if (q.from !== p.to || q.to !== p.from || q.kind !== p.kind) return false;
   if (p.kind === 'exchange' || p.kind === 'tribute') return sameStock(p.terms?.give, q.terms?.get) && sameStock(p.terms?.get, q.terms?.give);
-  if (p.kind === 'alliance') return (p.terms?.against ?? null) === (q.terms?.against ?? null);
+  if (p.kind === 'alliance' || p.kind === 'passage') return (p.terms?.against ?? null) === (q.terms?.against ?? null);
   if (p.kind === 'joint_op') return p.terms?.site === q.terms?.site;
   return true;
 }
@@ -87,6 +88,7 @@ export function termsProblem(action: DiplomaticAction, terms: DealTerms | undefi
     case 'propose_joint_op':
       return typeof terms?.site === 'string' ? null : 'a joint operation names its prize';
     case 'propose_alliance':
+    case 'propose_passage':
       return terms?.against === undefined || typeof terms.against === 'string' ? null : 'malformed terms';
     default:
       return null;
@@ -114,6 +116,7 @@ export function cleanTerms(action: DiplomaticAction, terms: DealTerms | undefine
     case 'propose_joint_op':
       return terms.site ? { site: terms.site } : undefined;
     case 'propose_alliance':
+    case 'propose_passage':
       return terms.against ? { against: terms.against } : undefined;
     default:
       return undefined;
@@ -165,6 +168,9 @@ export function canPropose(world: DiplomacyWorld, from: NationId, to: NationId, 
       return rel !== 'war' && !treatyIn(world.treaties, 'embargo', from, to, world.turn);
     case 'tribute':
       return rel === 'peace';
+    // Allies already share their ground: passage is between powers merely at peace.
+    case 'passage':
+      return rel === 'peace' && !running('passage');
     case 'joint_op': {
       const owner = terms?.site ? world.sites?.[terms.site]?.owner : undefined;
       if (!owner || owner === from || owner === to || world.nations?.[owner]?.eliminated) return false;
@@ -194,7 +200,7 @@ function goToWar(world: WorldState, declarer: NationId, target: NationId, events
   const was = relationOf(world.relations, declarer, target);
   world.relations[pairKey(declarer, target)] = 'war';
   events.push({ kind: 'diplomacy', a: declarer, b: target, relation: 'war', proposedBy: declarer, ...(was === 'peace' || was === 'alliance' ? { broke: was } : {}) });
-  end(world, ['trade', 'nonaggression', 'ceasefire', 'joint_op'], declarer, target, 'war', events);
+  end(world, ['trade', 'nonaggression', 'ceasefire', 'joint_op', 'passage'], declarer, target, 'war', events);
 }
 
 /** Hand over what each side agreed to give, if both still can: all or nothing. */
@@ -346,6 +352,9 @@ export function resolveDiplomacy(world: WorldState, orders: Record<NationId, Nat
         break;
       case 'joint_op':
         sign(world, 'joint_op', a, b, LEADER_TUNING.jointOpTurns, events, undefined, p.terms!.site!);
+        break;
+      case 'passage':
+        sign(world, 'passage', a, b, PASSAGE.turns, events);
         break;
       case 'nonaggression':
       case 'trade':

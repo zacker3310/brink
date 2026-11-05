@@ -93,6 +93,9 @@ export const FACILITY_IDS: readonly FacilityId[] = ['factory', 'power_plant', 'f
 
 export type Relation = 'war' | 'peace' | 'alliance';
 
+/** How a lift comes down: air-landed at an airfield, a drop, or a drop that storms a held hex. */
+export type AirliftMode = 'airland' | 'drop' | 'assault';
+
 export type DiplomaticAction =
   | 'declare_war'
   | 'propose_peace'
@@ -109,10 +112,12 @@ export type DiplomaticAction =
   /** Answer a demand: hand over `terms.give`. */
   | 'pay_tribute'
   /** Both march on `terms.site` (`LEADER_TUNING.jointOpTurns`). */
-  | 'propose_joint_op';
+  | 'propose_joint_op'
+  /** Right of passage both ways (`PASSAGE.turns`); `terms.against` may name whom it is for. */
+  | 'propose_passage';
 
 /** Tribute is one kind both ways: a demand (`get`) is met by a payment (`give`) that mirrors it. */
-export type ProposalKind = 'peace' | 'alliance' | 'nonaggression' | 'trade' | 'ceasefire' | 'exchange' | 'tribute' | 'joint_op';
+export type ProposalKind = 'peace' | 'alliance' | 'nonaggression' | 'trade' | 'ceasefire' | 'exchange' | 'tribute' | 'joint_op' | 'passage';
 
 export interface Proposal {
   from: NationId;
@@ -128,7 +133,7 @@ export interface Proposal {
  * Non-aggression: neither may declare war on the other while it lasts. Trade: both gain income;
  * war ends it. Embargo: declared by `by`; ends any trade and bars a new one while it lasts.
  */
-export type TreatyKind = 'nonaggression' | 'trade' | 'embargo' | 'ceasefire' | 'joint_op';
+export type TreatyKind = 'nonaggression' | 'trade' | 'embargo' | 'ceasefire' | 'joint_op' | 'passage';
 
 export interface Treaty {
   kind: TreatyKind;
@@ -229,7 +234,7 @@ export interface PendingEvent {
   turn: number;
 }
 
-export type OrderType = 'hold' | 'move' | 'attack' | 'defend' | 'recon' | 'withdraw' | 'embark';
+export type OrderType = 'hold' | 'move' | 'attack' | 'defend' | 'recon' | 'withdraw' | 'embark' | 'airlift';
 
 export type SupplyPriority = 'high' | 'normal' | 'low';
 
@@ -242,7 +247,13 @@ export type FormationOrder =
   /** Ground: approach along `path`, then assault the adjacent `target`. Ranged: strike `target`. */
   | { type: 'attack'; target: HexKey; path: HexKey[] }
   /** Go aboard an own transport (ground) or carrier (air) in the same hex, before anything moves. */
-  | { type: 'embark'; carrier: FormationId };
+  | { type: 'embark'; carrier: FormationId }
+  /**
+   * Fly to `target` from an airfield (an own Airbase or capital) or from a carrier's deck (aboard an
+   * amphibious group lying with an own carrier): an own or allied site is air-landed in good order;
+   * any other land hex is a drop, and a drop onto a held hex storms it at once.
+   */
+  | { type: 'airlift'; target: HexKey };
 
 export interface Formation {
   id: FormationId;
@@ -488,6 +499,27 @@ export type GameEvent =
   | { kind: 'elimination'; nation: NationId; /** Who took the whole country: the holder of most of its cities. */ annexedBy?: NationId }
   | { kind: 'victory'; winner: NationId; reason: VictoryReason; coalition?: NationId[] }
   | { kind: 'order_rejected'; nation: NationId; formation: FormationId | null; reason: string }
+  /**
+   * A formation flown in. `mode`: air-landed at an airfield, dropped, or dropped beside `to` to storm
+   * it (`landed` is where it came down). `hit`: the lift was intercepted and lost `strengthLoss`, by
+   * the nations named in `by`. `aborted`: it turned back (`reason`) and stayed where it was.
+   */
+  | {
+      kind: 'airlift';
+      formation: FormationId;
+      owner: NationId;
+      unitClass: UnitClass;
+      from: HexKey;
+      to: HexKey;
+      landed: HexKey;
+      mode: AirliftMode;
+      chance: number;
+      hit: boolean;
+      strengthLoss: number;
+      by: NationId[];
+      destroyed?: true;
+      aborted?: string;
+    }
   | CommanderEvent
   | CardPlayedEvent;
 

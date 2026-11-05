@@ -3,6 +3,7 @@ import { CARDS, EVENTS, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { arenaNote, atPlace, describeEffect, hexLabel, treatyText } from './insight';
 import { commanderNote } from './generals';
 import { dealText, stockText, TREATY_TEXT } from './leaders';
+import { liftLines } from './airlift';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useGame } from './store';
 
@@ -35,6 +36,8 @@ export const ICON: Record<string, string> = {
   warn: 'M12 3l10 18H2z M12 10v5 M12 18h.01',
   star: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z',
   card: 'M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M9 7h6 M9 11h6',
+  // A canopy: troops flown in.
+  chute: 'M4 11a8 8 0 0 1 16 0z M4 11l8 9 8-9 M12 11v9',
 };
 
 export const TONE: Record<Tone, string> = {
@@ -49,6 +52,24 @@ export function notesFor(view: NationView, report: TurnReport): Note[] {
   const me = view.self.id;
   const nation = (id: string | null) => (id ? (view.nations[id]?.name ?? id) : 'nobody');
   const out: Note[] = [];
+  // The turn's lifts, ours in one line and the enemy's in another: who came down where, and the cost.
+  const lifts = report.events.filter((e) => e.kind === 'airlift');
+  if (lifts.length > 0) {
+    const ownDown = lifts.filter((e) => e.kind === 'airlift' && e.owner === me && !e.aborted);
+    const lines = liftLines(view, report.events);
+    const hit = ownDown.some((e) => e.kind === 'airlift' && e.hit);
+    if (lines.length > 0) {
+      const first = lifts[0]!;
+      out.push({
+        id: `${report.turn}-lift`,
+        icon: 'chute',
+        tone: ownDown.length === 0 ? 'info' : hit ? 'bad' : 'good',
+        title: lines[0]!.split(';')[0]!,
+        text: [lines[0]!.split(';').slice(1).join(';').trim(), ...lines.slice(1)].filter(Boolean).join('. '),
+        ...(first.kind === 'airlift' ? { at: first.landed } : {}),
+      });
+    }
+  }
   report.events.forEach((e, i) => {
     const id = `${report.turn}-${i}`;
     switch (e.kind) {

@@ -12,6 +12,12 @@ interface Window {
     cardTargets(): string[];
     /** The running operation's current place on the map (port, beach), if it is not the prize. */
     opSpot(): { key: string; label: string } | null;
+    /** Hexes the formation waiting for its landing hex can fly to, with the risk shown. */
+    liftTargets(): { key: string; chance: number; mode: string }[];
+    /** Bring a hex to the middle of the screen; select an own formation. */
+    focus(key: string): void;
+    select(id: string): void;
+    holdReplay(ms: number | null): void;
   };
   // Installed by apps/web/src/arena/ArenaScreen.tsx while a battle is on.
   __arena?: {

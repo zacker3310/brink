@@ -8,6 +8,7 @@ import { Icon } from './icons';
 import { describeEffect, hexLabel, idleFormations } from './insight';
 import { Minimap } from './MapOverlays';
 import { boardOrders, describeOrder, fleetLoadOrders, type Mode } from './planning';
+import { canFly } from './airlift';
 import { healthColor } from './design/tokens';
 import { useGame } from './store';
 import { battleFor, plannedBattles } from './arena/battle';
@@ -44,6 +45,8 @@ const ICONS: Record<string, string> = {
   hold: 'M8 5v14 M16 5v14',
   defend: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
   clear: 'M6 6l12 12 M18 6L6 18',
+  // A transport aircraft seen from above: the lift.
+  airlift: 'M12 2v20 M3 11l9-3 9 3 M8 20l4-2 4 2',
 };
 
 function Action({
@@ -126,6 +129,9 @@ export function UnitPanel() {
   const setPriority = useGame((s) => s.setPriority);
   const resolving = useGame((s) => s.resolving);
   const rejected = useGame((s) => s.rejected);
+  const aimingLift = useGame((s) => s.aimingLift);
+  const startLift = useGame((s) => s.startLift);
+  const cancelLift = useGame((s) => s.cancelLift);
   const [details, setDetails] = useState(false);
   // Sit beside an open drawer or city panel instead of under it.
   const shifted = useGame((s) => s.panelOpen || s.selectedCity !== null);
@@ -230,6 +236,17 @@ export function UnitPanel() {
           {Object.keys(boardOrders(view, [f])).length > 0 && (
             <Action icon="move" label="Board the ship alongside" hotkey="B" testId="order-board" active={order?.type === 'embark'} disabled={resolving} onClick={() => issueOrder(f.id, boardOrders(view, [f])[f.id]!)} />
           )}
+          {canFly(view, f) && (
+            <Action
+              icon="airlift"
+              label="Airlift or air assault"
+              hotkey="L"
+              testId="order-airlift"
+              active={order?.type === 'airlift' || aimingLift === f.id}
+              disabled={resolving}
+              onClick={() => (aimingLift === f.id ? cancelLift() : startLift(f.id))}
+            />
+          )}
           <Action icon="hold" label="Hold position" hotkey="H" testId="order-hold" active={order?.type === 'hold'} disabled={resolving} onClick={() => issueOrder(f.id, { type: 'hold' })} />
           <Action icon="clear" label="Cancel order" hotkey="X" testId="order-clear" disabled={resolving || !order} onClick={() => setOrder(f.id, null)} />
           <button type="button" onClick={() => setDetails(!details)} className="ml-auto text-[10px] text-faint hover:text-text" aria-expanded={details}>
@@ -237,7 +254,9 @@ export function UnitPanel() {
           </button>
         </div>
         <div className="border-t border-line/60 px-3 py-1.5 text-[10px] text-faint">
-          Right-click the map to order · {def.ground ? 'blue = reachable, red = attackable' : 'click one of your cities to rebase, or a target to strike'}
+          {aimingLift === f.id
+            ? 'Click where to come down · blue: clear, amber: some risk, red: heavy · bold edge: air-land at an airfield · right-click to cancel'
+            : <>Right-click the map to order · {def.ground ? 'blue = reachable, red = attackable' : 'click one of your cities to rebase, or a target to strike'}</>}
         </div>
 
         {details && (

@@ -15,6 +15,7 @@ const ODDS_TONE: Record<Operation['odds'], string> = {
   unknown: 'border-line text-muted',
 };
 const ODDS_LABEL: Record<Operation['odds'], string> = { good: 'Likely win', even: 'Even fight', bad: 'Risky', unknown: 'Unscouted' };
+const KIND_TEXT: Record<Operation['kind'], string> = { overland: 'Overland assault', amphibious: 'Amphibious landing', airborne: 'Airborne assault' };
 
 function PhaseDot({ state }: { state: OperationPhase['state'] }) {
   if (state === 'done')
@@ -53,7 +54,7 @@ function OperationCard({ op, active, onLaunch, onShow }: { op: Operation; active
           <div className="font-mono text-[10px] tracking-wide text-signal uppercase">{op.codename}</div>
           <h3 className="font-display text-xl leading-tight font-extrabold tracking-wide uppercase">{op.name}</h3>
           <div className="mt-0.5 text-[12px] text-muted">
-            {op.kind === 'amphibious' ? 'Amphibious landing' : 'Overland assault'} · {op.victoryPoints} VP · ~{op.turns} turn{op.turns === 1 ? '' : 's'}
+            {KIND_TEXT[op.kind]} · {op.victoryPoints} VP · ~{op.turns} turn{op.turns === 1 ? '' : 's'}
           </div>
         </div>
         <span className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[11px] uppercase ${ODDS_TONE[op.odds]}`}>{ODDS_LABEL[op.odds]}</span>
@@ -123,7 +124,7 @@ export function OperationsSheet() {
           </button>
         </div>
         <p className="mb-3 text-[13px] text-muted">
-          Pick a prize and the staff runs the whole campaign for it: marching, loading the ships, the crossing, the landing and the assault. Every turn it drafts that turn&apos;s orders; you can change any of them. Ships, air wings and drones near the target fight in the battle as fire support.
+          Pick a prize and the staff runs the whole campaign for it: marching, loading the ships, the crossing and the landing, or staging the carrier and the drop from the air, then the assault. Every turn it drafts that turn&apos;s orders; you can change any of them. Ships, air wings and drones near the target fight in the battle as fire support.
         </p>
         {active && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-signal/50 bg-signal/10 px-3 py-2 text-[13px]">

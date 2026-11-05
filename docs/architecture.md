@@ -36,6 +36,7 @@ It clones its input, never reads the clock, and throws if the ruleset version di
 | 4 | logistics | Dijkstra from cities and depots through own or allied ground; enemy hexes block and adjacency costs extra. Capacity is shared by priority tier, proportionally within a tier. Fuel and ammunition refills **consume** energy and materials now. |
 | 5 | reconnaissance | Vision per nation, with recon orders active. Decides whether strikes and assaults are spotted. |
 | 6 | strikes | Artillery and air strikes computed from one snapshot, then committed together. |
+| 7a | airborne | Airlifts (`simulation/src/airborne.ts`): every lift judged against one snapshot (origin still there, who holds the landing hex, the threats near the flight), interception rolled per formation (`roll(seed, turn, 'airlift', id)`), two powers not allied landing in one hex both turned back, stacking within a side by id, then all committed. A drop beside a held hex becomes an attack order on it, fought in phase 8 at `AIRBORNE.assaultPenalty`. Paid in phase 3b. |
 | 7 | movement | Discrete-event clock (below). |
 | 8 | engagements | Assaults grouped by (attacking nation, target hex) and head-on meetings, all computed from the post-movement snapshot, then committed. |
 | 9 | territory | Beaten defenders retreat (joint choice), winners advance, then occupation and front consolidation transfer hexes. |
@@ -184,6 +185,29 @@ generic leader per government, `LEADER_TUNING`); memory in `WorldState.memories`
   end `aiOrders` passes the human's offers to the same function (`incoming`), so the screen's answer
   is the answer at resolution.
 - Saves before 2.6 gain `memories: {}` on load (keyed on the field being absent).
+
+## Airborne and passage (ruleset 2.9)
+
+- Data: game-data `airborne.ts` (`AIRBORNE`: origins, ranges, capacities, cost, fuel, drop penalties,
+  interception; `PASSAGE`: turns and the leaders' moods). Rules: simulation `airborne.ts` and `passage.ts`.
+- Order: `{ type: 'airlift', target }`. Validation (`checkAirlift`, run on a world or a view through a
+  `LiftContext`) checks class, origin, range, terrain and own stacking; `lockAirlifts` then holds each
+  origin to its capacity and reserves the credits after recruits, buildings and deals. Who owns the ground
+  now is not validated (a view may only know who held it): a lift into a neutral's land turns back when it
+  arrives, as a march stops at a border. No new state: the lift moves the formation (`aboard` cleared) and
+  lowers its organization and readiness.
+- Events: `airlift` (from, to, where it came down, mode, chance, hit, loss, by whom, aborted). Reports: its
+  owner, whoever shot at it, and anyone who sees where it came down.
+- Passage: a treaty kind (`propose_passage`, mirrored like an alliance's `against`). `hasPassage` is read in
+  movement (a partner counts as allied for entering and sharing hexes), supply (routes cross its land),
+  air rebasing and air-landing. `goToWar` ends it.
+- AI (`packages/ai`): `airborne.ts` (`airbornePlan`: a prize far by land, no beach near it, a carrier with
+  loaded amphibious groups or an airfield in reach; `planAirborne` stages, flies, holds; `fundAirlifts`
+  makes room for the fuel; `holdTheGates` makes no peace with the power at an airborne prize's gates),
+  `passage.ts` (`considerPassage`, `passageWanted`, `seekPassage`). Operations gain the `airborne` kind
+  (stage, drop, hold, assault) judged by the same `airbornePlan`, so a launched airborne operation is
+  carried out airborne.
+- Saves: 2.8.0 saves migrate unchanged (the new fields are optional and the new kinds simply absent).
 
 ## Rejected alternatives
 

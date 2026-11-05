@@ -36,6 +36,8 @@ import type { Mode } from './planning';
 import type { Response } from './protocol';
 import { AUTOSAVE, listSlots, readPrefs, writePrefs, writeSlot, type ActiveOperation, type MapStyle, type SlotInfo } from './saves';
 import { operationById, proposeOperations, type Operation } from '@brink/ai';
+import { liftFor, liftOrigin, liftTargets } from './airlift';
+import { keyDistance } from '@brink/map';
 
 /** The diplomacy the staff may sign for the player on its own: what calms a front and costs nothing. */
 const STAFF_DIPLOMACY: ReadonlySet<DiplomaticAction> = new Set<DiplomaticAction>(['propose_peace', 'propose_ceasefire', 'propose_nonaggression', 'propose_trade']);
@@ -187,6 +189,11 @@ interface State {
   cancelAim(): void;
   /** Take a card back into the hand. */
   unplayCard(index: number): void;
+  /** A formation waiting for its landing hex: the next tap flies it there (`airlift.ts`). */
+  aimingLift: FormationId | null;
+  startLift(id: FormationId): void;
+  aimLift(key: HexKey): void;
+  cancelLift(): void;
   submit(): Promise<void>;
   /** The order review is open: End Turn shows it, Commit submits. */
   review: boolean;
@@ -245,7 +252,7 @@ export const useGame = create<State>((set, get) => {
       return false;
     }
     if (r.type === 'state') {
-      set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), planned: [], submitted: null, rejected: [], screen: 'game', aimingCard: null });
+      set({ view: r.view, report: r.report, history: r.history, draft: freshDraft(r.view), planned: [], submitted: null, rejected: [], screen: 'game', aimingCard: null, aimingLift: null });
       // The operation for this seat, and whether it is over: the prize taken, or out of reach.
       const op = readOperation(r.view);
       if (op && !operationById(r.view, op.id, op.kind)) {
@@ -353,6 +360,7 @@ export const useGame = create<State>((set, get) => {
     lastTurn: null,
     armed: null,
     aimingCard: null,
+    aimingLift: null,
 
     async newGame(nation, seed, maxTurns, difficulty, theatre, crisis) {
       if (apply(await engine.call({ type: 'new', seed, nation, maxTurns, difficulty, theatre, crisis }))) {
@@ -390,7 +398,7 @@ export const useGame = create<State>((set, get) => {
       const f = id ? get().view?.formations[id] : null;
       if (id && id !== get().selectedFormation) sfx.select();
       // Closing a unit leaves its hex outlined but asks nothing about it: no hex card after Close.
-      set({ selectedFormation: id, group: id ? [id] : [], selectedHex: f?.key ?? get().selectedHex, mode: 'move', armed: null, ...(id ? { selectedCity: null } : { hexFromFocus: true }) });
+      set({ selectedFormation: id, group: id ? [id] : [], selectedHex: f?.key ?? get().selectedHex, mode: 'move', armed: null, aimingLift: null, ...(id ? { selectedCity: null } : { hexFromFocus: true }) });
     },
     selectStack(key, idleOnly = false) {
       const { view, draft } = get();
@@ -408,7 +416,7 @@ export const useGame = create<State>((set, get) => {
       // along when the carrier sails.
       const wings = Object.values(view.formations).filter((p) => p.aboard && here.some((c) => c.id === p.aboard && UNITS[c.unitClass].carries === 'air') && (!idleOnly || !draft?.formations[p.id]));
       if (lead.id !== get().selectedFormation) sfx.select();
-      set({ selectedFormation: lead.id, group: [...here, ...wings].map((f) => f.id), selectedHex: key, mode: 'move', armed: null, selectedCity: null });
+      set({ selectedFormation: lead.id, group: [...here, ...wings].map((f) => f.id), selectedHex: key, mode: 'move', armed: null, aimingLift: null, selectedCity: null });
     },
     toggleGroup(id) {
       const { group, selectedFormation } = get();
@@ -652,6 +660,35 @@ export const useGame = create<State>((set, get) => {
       if (tryPlay({ card, target: key })) set({ aimingCard: null });
     },
     cancelAim: () => set({ aimingCard: null }),
+    startLift(id) {
+      const { view, resolving } = get();
+      const f = view?.formations[id];
+      if (!view || !f || resolving) return;
+      const from = liftOrigin(view, f);
+      if (!from) return;
+      sfx.arm();
+      set({ aimingLift: id, armed: null, aimingCard: null, selectedFormation: id, group: [id] });
+      // Look where it can go: the running operation's prize when it is in reach, else the nearest landing.
+      const targets = liftTargets(view, f);
+      const op = get().operation ? operationById(view, get().operation!.id, get().operation!.kind) : null;
+      const near = op && targets.some((t) => keyDistance(t.key, op.at) <= 1) ? op.at : [...targets].sort((a, b) => keyDistance(a.key, f.key) - keyDistance(b.key, f.key) || (a.key < b.key ? -1 : 1))[0]?.key;
+      if (near) get().focusOn(near);
+    },
+    aimLift(key) {
+      const { view, aimingLift } = get();
+      const f = aimingLift ? view?.formations[aimingLift] : undefined;
+      if (!view || !f) return set({ aimingLift: null });
+      const r = liftFor(view, f, key);
+      if ('error' in r) {
+        get().notify(r.error, 'warn');
+        return;
+      }
+      set({ aimingLift: null });
+      get().selectHex(key);
+      get().issueOrder(f.id, { type: 'airlift', target: key });
+      get().notify(r.label);
+    },
+    cancelLift: () => set({ aimingLift: null }),
     unplayCard(index) {
       const p = get().draft?.play?.[index];
       if (!p) return;

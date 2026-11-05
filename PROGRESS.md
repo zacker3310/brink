@@ -1,6 +1,7 @@
 # PROGRESS
 
 Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.9.0). Milestone 1 (first playable).
+Updated 2026-11-05 (airborne warfare and right of passage, ruleset 2.9.0). Milestone 1 (first playable).
 
 ## Definition of done
 
@@ -53,6 +54,47 @@ Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.
   - Data: the Union's units 8% cheaper (15%); Easy and Normal command edges re-measured.
   Result, 40 matches: 25 decisive (62%), median turn 29; decisive wins USA 14, China 10, Russia 1;
   on score USA 9, Japan 4, China 2. Difficulty (32 a level): see Outstanding.
+- Airborne warfare and right of passage (ruleset 2.9.0; the player: "I want to invade Mongolia as the
+  United States but I can't get there"): Ulaanbaatar is five hexes from the sea and fourteen from the
+  nearest US site, so before this the only way in was across Russia or China.
+  - Airlift (`simulation/src/airborne.ts`, data `game-data/src/airborne.ts`): infantry and recon fly
+    from an own Airbase (12 hexes, two a turn), an own capital-class site (10, one: a captured
+    Ulaanbaatar is a base) or a carrier's deck (7, two per carrier, troops aboard an amphibious group
+    lying with it); mechanized infantry only air-lands at an airfield. Onto an own or allied site it
+    air-lands in good order; elsewhere it drops (-25 organization, -20 readiness, stays put, out of
+    supply off its lines); onto a held hex it comes down beside it and storms it at once at -40%.
+    20 credits reserved after deals, 4 energy of fuel burned as there is. Interception: a roll per
+    formation against the aircraft, drones, ships and missile batteries near the flight (at most 45%,
+    a hit costs 250 strength). Phase 7a, one snapshot; contested landings turn both back.
+  - Right of passage (`simulation/src/passage.ts`): a treaty between powers at peace, both ways, 8
+    turns: move through and share hexes, supply across, rebase aircraft and air-land at the other's
+    sites; it takes no ground and ends at war. Leaders (`ai/src/passage.ts`) refuse it toward an ally or
+    a power they like, never grant it to the power they march on, want more warmth as hawks and when
+    it names no target; a power asks for it when a neutral's land lies across its way. The Diplomacy
+    screen's deal builder offers it, with "toward" whom.
+  - Operations: an `airborne` kind (stage, drop, hold, assault), offered to the United States for
+    Ulaanbaatar on turn 1; the staff (`ai/src/airborne.ts`) sails the carrier group and the loaded
+    amphibious groups to the least exposed sea hex in the deck's reach, flies two a turn into the
+    quietest drop zone, holds it while more come, then storms; it makes no peace with the power at the
+    prize's gates while it runs, and pays for the fuel by dropping recruits, never by a refused order.
+  - Client: Airlift on the unit card (phone and desktop, L), every landing hex tinted by its
+    interception risk (blue clear, amber, red; a bold edge air-lands), the phone card shrinking to the
+    lift's panel and the camera on the prize; the planned lift drawn as an arc with a canopy; the
+    replay flies transport aircraft (helicopters from a deck) and brings canopies down, a hit flaring
+    and trailing smoke; the debrief and the report tell of drops and losses; the map's operation spot
+    says STAGE and DROP ZONE.
+  - Tests: `simulation/src/airborne.test.ts` (range, origins, classes, capacity, cost, own site against
+    drop, assault drop and its penalty, supply, interception sums and determinism, contested landings,
+    aircraft into a new site, passage signed, marched through, supplied across, ended by war, public),
+    `ai/src/airborne.test.ts`, `session/src/airborne.test.ts` (the Ulaanbaatar proofs, the 2.8.0 save),
+    `tests/e2e/airborne.spec.ts` (phone: launch, aim a lift, the drop in the replay and the debrief).
+  - The Ulaanbaatar proof, measured: China takes Ulaanbaatar from Beijing, next door, on turn 1 of every
+    campaign (12 seeds of 12; seven of the crises tried, all the same). On Normal, seed 7, the staff drops four marines beside
+    it on turns 4 and 5 with every order accepted; they do not take it from China's garrison. With
+    Mongolia left to the United States (China and Russia at peace with it) and its militia broken, on
+    Easy, seed 2, Ulaanbaatar falls on turn 7, 0 rejected orders. A full militia in a city holds against
+    any four light formations the combat rules know, dropped or not.
+
 - Civ-style progression (ruleset 2.6.0): a research tree of 24 technologies in five branches
   (Logistics & Economy, Armour, Air & Missiles, Naval, Cyber & Intel; `game-data/src/research.ts`)
   whose effects reach movement (armour, ships), combat (armour attack, ship attack and defense),
@@ -437,6 +479,13 @@ Updated 2026-11-05 (balance after research, leaders and the staff AI, ruleset 2.
   the real game (title, operation, turn, battle, air strike, end card). `menu.spec.ts` covers it.
 
 ## Outstanding
+
+- Airborne (2.9.0): the rival powers jump only for an objective far by land with no beach near it; in 4
+  AI-only campaigns none did (passage was asked for and signed in Cold Peace). On Normal, Japan's strikes
+  off Tokyo on turn 1 bleed or sink the US convoy on most seeds (2 to 5 and 8 drop nobody in 6 turns), so
+  the staff's airborne operation reaches Ulaanbaatar on some seeds only. Next: a staff that waits out of
+  range until the convoy is safe, a second wave from the US ports, airbases in the AI's builds near its
+  fronts. A passage that expires leaves troops on the other's land, where they stop at every border hex.
 
 - iPhone: tested in Chromium with iPhone 14 Pro emulation (touch, viewport, DPR), not yet in real
   Safari/WebKit; verify on a device (audio unlock, safe areas, standalone launch).

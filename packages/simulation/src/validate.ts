@@ -19,9 +19,11 @@ import type {
 import { RESOURCES, UNIT_CLASSES } from '@brink/contracts';
 import { AIR_REBASE_RANGE, FACILITIES, TECHS, UNITS } from '@brink/game-data';
 import { areAdjacent, keyDistance } from '@brink/map';
+import { checkAirlift, liftContext, lockAirlifts } from './airborne';
 import { lockCommanderOrders } from './commanders';
 import { bindingTreaty, canPropose, cleanTerms, PROPOSAL_OF, termsProblem, type DiplomacyWorld } from './diplomacy';
 import { checkPlays, marchBonus } from './doctrine';
+import { hasPassage } from './passage';
 import { buildBlocker, facilityCost } from './progression';
 import { alongside, enterCost, isAir, isNaval, movementAllowance, passengersOf, pathCost, recruitCost, relationOf, sortedKeys, treatyIn } from './rules';
 
@@ -63,7 +65,7 @@ export function checkFormationOrder(world: WorldState, nation: NationId, id: str
         const dest = order.path[0]!;
         const site = world.tiles[dest]?.siteId ? world.sites[world.tiles[dest]!.siteId!] : undefined;
         const deck = carrierAt(world, nation, dest, 'air');
-        if ((!site || site.owner !== nation) && !deck) return 'air formations rebase only to own sites and carriers';
+        if ((!site || (site.owner !== nation && !hasPassage(world, nation, site.owner))) && !deck) return 'air formations rebase only to own sites, a passage partner\'s and carriers';
         if (keyDistance(f.key, dest) > AIR_REBASE_RANGE) return 'rebase destination out of range';
         return null;
       }
@@ -106,6 +108,8 @@ export function checkFormationOrder(world: WorldState, nation: NationId, id: str
       if (passengersOf(world, c.id).length >= (UNITS[c.unitClass].capacity ?? 0)) return `${UNITS[c.unitClass].name} is full`;
       return null;
     }
+    case 'airlift':
+      return checkAirlift(liftContext(world, nation), f, o.target);
     default:
       return 'unknown order type';
   }
@@ -240,6 +244,12 @@ export function checkDiplomacy(
       if (rel === 'war') return `at war with ${t.name}`;
       if (relationOf(world.relations, nation, site.owner) !== 'war') return 'a joint operation needs you at war with its holder';
       return canPropose(world, nation, target, 'joint_op', terms) ? null : `a joint operation with ${t.name} is already under way`;
+    }
+    case 'propose_passage': {
+      if (rel !== 'peace') return rel === 'war' ? `at war with ${t.name}` : `${t.name} is an ally: its ground is already open to you`;
+      const x = terms?.against;
+      if (x !== undefined && (!world.nations[x] || x === nation || x === target)) return 'passage toward whom?';
+      return canPropose(world, nation, target, 'passage') ? null : `passage through ${t.name} is already granted`;
     }
     case 'embargo': {
       const e = treatyIn(world.treaties, 'embargo', nation, target, world.turn);
@@ -411,6 +421,9 @@ export function lockOrders(world: WorldState, submissions: readonly NationOrders
         }
       }
     }
+
+    // Lifts last: each origin's capacity, and fuel from what recruits, buildings and deals left.
+    lockAirlifts(world, nation, locked, reject, reserved);
 
     if (sub.battles !== undefined) {
       const battles = Array.isArray(sub.battles) ? sub.battles : [];

@@ -1,6 +1,6 @@
 # Brink: game design
 
-The rules as implemented, ruleset `2.0.0`. Numbers come from `packages/game-data`; when this
+The rules as implemented, ruleset `2.9.0`. Numbers come from `packages/game-data`; when this
 document and the code disagree, the code is right and this file is stale.
 
 ## Premise
@@ -13,7 +13,7 @@ One turn is six hours. You see only what your units and cities can see.
 
 ## The turn
 
-1. **Plan.** Give each formation an order (move, attack, dig in, hold, scout, withdraw). Recruit at
+1. **Plan.** Give each formation an order (move, attack, dig in, hold, scout, withdraw, airlift). Recruit at
    cities, start a building, set the budget, pick research, make diplomatic moves, answer a world event.
 2. **Review.** End Turn opens the order review: orders by type, units without orders, what you spend
    against what you hold, resources that will run out within two turns at last turn's rate, units
@@ -32,6 +32,7 @@ One turn is six hours. You see only what your units and cities can see.
 | 4 | Logistics | Supply flows from capitals, cities and depots. |
 | 5 | Reconnaissance | Vision is computed. |
 | 6 | Strikes | Artillery, helicopter and drone strikes, all from one snapshot, committed together. |
+| 7a | Airborne | Airlifts and drops, from one snapshot, before anything walks (below). |
 | 7 | Movement | All ground movement on one clock (below). |
 | 8 | Engagements | Assaults and head-on meetings from the post-movement snapshot, committed together. Hand-fought battles apply here. |
 | 9 | Territory | Beaten defenders retreat, winners advance, hexes and sites change hands. |
@@ -120,6 +121,36 @@ terrain and entrenchment, and strip 25 entrenchment. Ground units fire back at a
 **Hand-fought battles**: an attack on a hex with seen enemies can be fought in the arena; the result
 replaces the dice if the hex still holds what was fought. See `docs/arena.md`.
 
+## Airborne (ruleset 2.9.0)
+
+Light formations fly (`AIRBORNE` in `game-data/src/airborne.ts`; rules in `simulation/src/airborne.ts`).
+An airlift order names a land hex; the formation flies from where it stands:
+
+| Origin | Range | Lifts a turn | Who |
+|---|---|---|---|
+| An own site with an Airbase | 12 hexes | 2 | infantry, recon; mechanized only onto an airfield |
+| An own capital-class site (a nation's capital, or one taken: a captured Ulaanbaatar is a base) | 10 | 1 | the same |
+| A carrier's deck: troops aboard an amphibious group lying in the same hex as an own carrier group (its helicopters and tiltrotors) | 7 | 2 per carrier | infantry, recon |
+
+- **Air-land**: onto an own or allied site (or a passage partner's), in good order.
+- **Drop**: onto any other land hex in range (enemy, minor, unowned). The drop comes down scattered
+  (-25 organization, -20 readiness), stays where it lands that turn, takes the ground it lands on, and
+  may attack next turn. Supply never flies: off its own lines it is out of supply (and loses 10 strength
+  a turn) until it takes a site or links up.
+- **Air assault**: a drop onto a hex a hostile holds comes down beside it (the quietest open hex next to
+  it) and storms it at once, at -40% attack (`assaultPenalty`), alongside anyone else attacking it.
+- **Cost**: 20 credits a formation, reserved at validation after recruits, buildings and deals (a lift
+  that does not fit is refused and holds), plus 4 energy of fuel burned from what there is.
+- **Interception**: each lift is a roll, `roll(seed, turn, 'airlift', id)`, against a chance summed over
+  every hostile threat that reaches the flight's corridor or the landing hex: aircraft 12% (within their
+  strike range), drones 6%, fleets 8% and carriers 4% (within 2), missile batteries 15% (within 3); at most
+  45%. A hit costs 250 strength and 15 organization; the survivors still land. The event names who shot.
+- **Turned back** (nothing paid back): two powers not allied coming down in one hex (both), a full
+  landing zone, neutral troops or a neutral power's land (without passage), the carrier sunk before
+  take-off, or nowhere to come down beside a held hex.
+- Aircraft rebase onto a site the moment it is yours: drop on a city, take it, and the helicopters and
+  drones land there next turn.
+
 ## Supply
 
 Supply flows automatically from capitals (60), cities (30) and depots (25) along owned or friendly
@@ -171,6 +202,7 @@ resolution. Declarations of war and embargoes take effect at once.
 | Demand tribute | Peace | An ultimatum: paid when they offer the payment back. Unpaid after two turns, it lapses: they defied you. |
 | Alliance against X | Not at war with each other; no pact or ceasefire with X | Allies, and whichever of you is not yet at war with X goes to war (perfidy applies). |
 | Joint operation | Not at war with each other; you at war with the prize's holder | For 5 turns both march on one city; ends when either takes it. |
+| Right of passage | Peace (allies have it already); may name whom it is for | For 8 turns, both ways: march through and share the other's hexes, supply across its land, rebase aircraft to its sites and air-land troops there. Takes no ground. Ends at war. Leaders refuse it toward their allies and powers they like, and never to the power they march on; a hawk wants a warm mood, a dove less, an unnamed request more. |
 
 ### Leaders
 

@@ -7,7 +7,7 @@ import { mainland } from './mainland';
 import { HEX_SIZE, useCamera } from './camera';
 import { addUnit, affiliationOf, keepScreenSize, setModelZoom, tickModels, type CounterLook } from './counters';
 import { AFFILIATION, FONT_DISPLAY, FONT_UI, SIGNAL, SURFACE, TEXT } from './design/tokens';
-import { buildTimeline, playReplay } from './replay';
+import { buildTimeline, playReplay, useReplay } from './replay';
 import { terrainTexture } from './design/terrain';
 import { getArt, loadArt, siteArt, URBAN_SPOTS, type Art } from './art';
 import { sfx } from './sfx';
@@ -16,6 +16,7 @@ import { threatZones } from '@brink/simulation';
 import { contextualOrder, hostilesAt, orderForClick, reachFor } from './planning';
 import { nextObjective } from './objective';
 import { cardTargets, operationSpot, type Spot } from './opspot';
+import { liftTargets, riskBand } from './airlift';
 import { operationById } from '@brink/ai';
 import type { ActiveOperation } from './saves';
 import { groupOrders, oddsFor, ODDS_TAG, type Odds } from './odds';
@@ -89,6 +90,23 @@ function jitter(key: HexKey, i: number): number {
   let h = 2166136261;
   for (const ch of `${key}:${i}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return ((h >>> 0) % 1000) / 1000 - 0.5;
+}
+
+/** A planned airlift: a dashed arc from where it flies to where it comes down, a canopy at the end. */
+function drawLift(g: Graphics, from: HexKey, to: HexKey, color: number, alpha: number) {
+  const a = center(from);
+  const b = center(to);
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - Math.hypot(b.x - a.x, b.y - a.y) * 0.25 };
+  const at = (t: number) => ({ x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * mid.x + t * t * b.x, y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * mid.y + t * t * b.y });
+  for (let t = 0; t < 1; t += 0.08) {
+    const p = at(t);
+    const q = at(Math.min(1, t + 0.045));
+    g.moveTo(p.x, p.y).lineTo(q.x, q.y);
+  }
+  g.stroke({ width: 3, color, alpha, cap: 'round' });
+  // The canopy over the landing hex.
+  g.moveTo(b.x - 9, b.y - 12).arc(b.x, b.y - 12, 9, Math.PI, 0).lineTo(b.x - 9, b.y - 12).fill({ color, alpha: alpha * 0.85 });
+  g.moveTo(b.x - 8, b.y - 12).lineTo(b.x, b.y - 2).moveTo(b.x + 8, b.y - 12).lineTo(b.x, b.y - 2).moveTo(b.x, b.y - 12).lineTo(b.x, b.y - 2).stroke({ width: 1.5, color, alpha });
 }
 
 function drawPath(g: Graphics, from: HexKey, order: FormationOrder, color: number, alpha: number, dashed = false) {
@@ -260,6 +278,13 @@ declare global {
       cardTargets(): HexKey[];
       /** The running operation's current place on the map, if it is not the prize. */
       opSpot(): Spot | null;
+      /** Hexes the formation waiting for its landing hex can fly to, with the risk shown. */
+      liftTargets(): { key: HexKey; chance: number; mode: string }[];
+      /** Bring a hex to the middle of the screen, and select an own formation (as a tap on its chip would). */
+      focus(key: HexKey): void;
+      select(id: string): void;
+      /** Hold the turn's replay at `ms` into its film (paused), to look at one moment of it; null plays on. */
+      holdReplay(ms: number | null): void;
     };
   }
 }
@@ -677,6 +702,21 @@ export function MapView() {
         const s = useGame.getState();
         return s.view ? opSpot(s.view, s.operation) : null;
       },
+      focus(key) {
+        useGame.getState().focusOn(key);
+      },
+      select(id) {
+        useGame.getState().selectFormation(id);
+      },
+      holdReplay(ms) {
+        if (ms === null) useReplay.setState({ paused: false });
+        else useReplay.setState({ paused: true, seek: ms });
+      },
+      liftTargets() {
+        const s = useGame.getState();
+        const f = s.aimingLift ? s.view?.formations[s.aimingLift] : undefined;
+        return s.view && f ? liftTargets(s.view, f) : [];
+      },
       enemies() {
         const v = useGame.getState().view;
         return v ? [...new Set(Object.values(v.contacts).filter((c) => c.confirmed && v.relations[c.owner] === 'war').map((c) => c.key))].sort() : [];
@@ -697,6 +737,12 @@ export function MapView() {
     if (s.aimingCard) {
       if (input === 'right') s.cancelAim();
       else s.aimCard(key);
+      return;
+    }
+    // A formation waiting for its landing hex: this tap flies it there.
+    if (s.aimingLift) {
+      if (input === 'right') s.cancelLift();
+      else s.aimLift(key);
       return;
     }
     const right = input === 'right';
@@ -1193,7 +1239,16 @@ export function MapView() {
     // Movement range (blue, Civ-style) with a bright outer border, attackable enemies in red.
     const hl = new Graphics();
     const badges: Container[] = [];
-    const r = replaying ? null : currentReach();
+    const lifting = !replaying && s.aimingLift ? v.formations[s.aimingLift] : undefined;
+    const r = replaying || lifting ? null : currentReach();
+    // A formation waiting to fly: every hex it can come down on, tinted by the interception risk.
+    if (lifting) {
+      const tint = { clear: MOVE, some: SIGNAL, heavy: ATTACK } as const;
+      for (const t of liftTargets(v, lifting)) {
+        const color = tint[riskBand(t.chance)];
+        hl.poly(poly(t.key, 1)).fill({ color, alpha: t.mode === 'assault' ? 0.3 : 0.18 }).stroke({ width: t.mode === 'airland' ? 3 : 1.5, color, alpha: 0.9 });
+      }
+    }
     if (r) {
       // At sea, friend blue vanishes into the water: a ship's reach is drawn bright, almost white.
       const atSea = !!UNITS[r.f.unitClass].naval;
@@ -1280,6 +1335,11 @@ export function MapView() {
         const o = orders.formations[id]!;
         if (!f) continue;
         const selected = id === s.selectedFormation;
+        if (o.type === 'airlift') {
+          drawLift(paths, f.key, o.target, s.submitted ? 0xf4f1e8 : MOVE, selected ? 1 : 0.75);
+          ghosts.push({ key: o.target, cls: f.unitClass, strength: f.strength, facing: 0 });
+          continue;
+        }
         drawPath(paths, f.key, o, s.submitted ? 0xf4f1e8 : o.type === 'attack' ? ATTACK : MOVE, selected ? 1 : 0.7);
         if ('path' in o && o.path.length > 0) {
           const end = o.path.at(-1)!;
@@ -1357,7 +1417,7 @@ export function MapView() {
 
   useEffect(() => {
     const unsub = useGame.subscribe((s, prev) => {
-      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat || s.armed !== prev.armed || s.aimingCard !== prev.aimingCard || s.operation !== prev.operation || s.mapStyle !== prev.mapStyle || s.group !== prev.group) redraw();
+      if (s.showReport !== prev.showReport || s.playback !== prev.playback || s.showThreat !== prev.showThreat || s.armed !== prev.armed || s.aimingCard !== prev.aimingCard || s.aimingLift !== prev.aimingLift || s.operation !== prev.operation || s.mapStyle !== prev.mapStyle || s.group !== prev.group) redraw();
     });
     return unsub;
   }, []);

@@ -95,6 +95,8 @@ export function describeOrder(order: FormationOrder | undefined, view?: NationVi
       return order.path.length > 0 ? `Advance ${order.path.length}, assault ${place(order.target)}` : `Attack ${place(order.target)}`;
     case 'embark':
       return `Board ${view?.formations[order.carrier]?.name ?? 'ship'}`;
+    case 'airlift':
+      return `Fly to ${place(order.target)}`;
   }
 }
 
