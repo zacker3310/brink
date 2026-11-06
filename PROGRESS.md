@@ -2,6 +2,8 @@
 
 Updated 2026-11-05 (six theatres in one build: the Pacific, Europe, the Middle East and Africa, the Indo-Pacific South, the Americas and Black Files: First Contact, ruleset 2.13.0). Milestone 1 (first playable).
 
+**Work stopped 2026-11-06 with unshipped branches saved: read `docs/HANDOFF.md` first to pick it back up.**
+
 ## Definition of done
 
 | # | Requirement | Status | Evidence |
